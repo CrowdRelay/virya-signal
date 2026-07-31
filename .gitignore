@@ -4,3 +4,11 @@
 /src-tauri/gen
 .DS_Store
 *.hold
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+AuthKey_*.p8
+keystore.properties
+.env
+.env.*

@@ -1,0 +1,79 @@
+name: Android Smoke Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/**"
+      - "src-tauri/**"
+      - "scripts/**"
+      - ".github/workflows/mobile-smoke.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/**"
+      - "src-tauri/**"
+      - "scripts/**"
+      - ".github/workflows/mobile-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  CARGO_TERM_COLOR: always
+  NDK_VERSION: "27.2.12479018"
+
+jobs:
+  android-debug:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK and NDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}"
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+          echo "NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+          targets: wasm32-unknown-unknown,aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Tauri tools
+        run: |
+          cargo install trunk --version 0.21.14 --locked
+          cargo install tauri-cli --version '^2' --locked
+      - name: Generate Android project
+        run: cargo tauri android init --ci --skip-targets-install
+      - name: Generate mobile icons
+        run: cargo tauri icon src-tauri/icons/icon.png --ios-color "#080808"
+      - name: Target Android API 36
+        run: python3 scripts/prepare-android.py
+      - name: Build debug APK
+        run: cargo tauri android build --ci --debug --apk
+      - name: Collect APK
+        run: |
+          mkdir -p artifacts
+          APK="$(find src-tauri/gen/android/app/build/outputs/apk -type f -name '*.apk' | head -n 1)"
+          test -n "$APK"
+          cp "$APK" artifacts/virya-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: virya-android-debug
+          path: artifacts/virya-debug.apk
+          retention-days: 14

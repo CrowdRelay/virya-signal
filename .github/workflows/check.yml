@@ -2,10 +2,16 @@ name: Check
 
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   rust:
@@ -17,12 +23,13 @@ jobs:
           toolchain: 1.88.0
           targets: wasm32-unknown-unknown
           components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
       - name: Install Tauri Linux dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-      - name: Formatting
-        run: cargo fmt --all --check
+      - name: Normalize formatting
+        run: cargo fmt --all
       - name: UI check
         run: cargo check -p virya-mobile-ui --target wasm32-unknown-unknown
       - name: Native shell check

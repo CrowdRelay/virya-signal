@@ -1,0 +1,245 @@
+name: Mobile Store Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version, for example 0.2.0
+        required: true
+        default: 0.2.0
+      play_track:
+        description: Google Play track
+        required: true
+        type: choice
+        default: internal
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+      submit_ios_review:
+        description: Submit the uploaded iOS build for App Review
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mobile-store-release
+  cancel-in-progress: false
+
+env:
+  CI: "true"
+  CARGO_TERM_COLOR: always
+  NDK_VERSION: "27.2.12479018"
+  RELEASE_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.version }}
+  PLAY_TRACK: ${{ inputs.play_track || 'internal' }}
+
+jobs:
+  android:
+    name: Android AAB and Google Play
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    environment:
+      name: ${{ (inputs.play_track == 'production') && 'production' || 'store-testing' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Android secrets
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          PLAY_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          test -n "$KEYSTORE" || { echo "Missing ANDROID_KEYSTORE_BASE64"; exit 1; }
+          test -n "$ALIAS" || { echo "Missing ANDROID_KEY_ALIAS"; exit 1; }
+          test -n "$PASSWORD" || { echo "Missing ANDROID_KEY_PASSWORD"; exit 1; }
+          test -n "$PLAY_JSON" || { echo "Missing GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"; exit 1; }
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK and NDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}"
+          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+          echo "NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+          targets: wasm32-unknown-unknown,aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Tauri tools
+        run: |
+          cargo install trunk --version 0.21.14 --locked
+          cargo install tauri-cli --version '^2' --locked
+      - name: Set release version
+        run: python3 scripts/set-release-version.py "$RELEASE_VERSION" --android-version-code "$GITHUB_RUN_NUMBER"
+      - name: Generate Android project
+        run: cargo tauri android init --ci --skip-targets-install
+      - name: Generate mobile icons
+        run: cargo tauri icon src-tauri/icons/icon.png --ios-color "#080808"
+      - name: Configure Android signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/virya-upload.jks"
+          cat > src-tauri/gen/android/keystore.properties <<EOF
+          keyAlias=$ANDROID_KEY_ALIAS
+          password=$ANDROID_KEY_PASSWORD
+          storeFile=$RUNNER_TEMP/virya-upload.jks
+          EOF
+          python3 scripts/prepare-android.py --signing
+      - name: Build signed AAB
+        run: cargo tauri android build --ci --aab
+      - name: Collect AAB
+        run: |
+          mkdir -p artifacts
+          AAB="$(find src-tauri/gen/android/app/build/outputs/bundle -type f -name '*.aab' | head -n 1)"
+          test -n "$AAB"
+          cp "$AAB" "artifacts/virya-${RELEASE_VERSION#v}.aab"
+          echo "AAB_PATH=$GITHUB_WORKSPACE/artifacts/virya-${RELEASE_VERSION#v}.aab" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: virya-android-${{ env.RELEASE_VERSION }}
+          path: artifacts/*.aab
+          retention-days: 30
+      - name: Upload to Google Play
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: music.virya.control
+          releaseFiles: ${{ env.AAB_PATH }}
+          track: ${{ env.PLAY_TRACK }}
+          status: completed
+
+  ios:
+    name: iOS IPA and App Store Connect
+    runs-on: macos-15
+    timeout-minutes: 120
+    environment:
+      name: ${{ inputs.submit_ios_review && 'production' || 'store-testing' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Apple secrets
+        env:
+          CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          PROVISION: ${{ secrets.IOS_MOBILE_PROVISION }}
+          KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY_BASE64 }}
+        run: |
+          test -n "$CERTIFICATE" || { echo "Missing IOS_CERTIFICATE"; exit 1; }
+          test -n "$CERTIFICATE_PASSWORD" || { echo "Missing IOS_CERTIFICATE_PASSWORD"; exit 1; }
+          test -n "$PROVISION" || { echo "Missing IOS_MOBILE_PROVISION"; exit 1; }
+          test -n "$KEY_ID" || { echo "Missing APPLE_API_KEY_ID"; exit 1; }
+          test -n "$ISSUER" || { echo "Missing APPLE_API_ISSUER"; exit 1; }
+          test -n "$PRIVATE_KEY" || { echo "Missing APPLE_API_PRIVATE_KEY_BASE64"; exit 1; }
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+          targets: wasm32-unknown-unknown,aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Tauri tools
+        run: |
+          cargo install trunk --version 0.21.14 --locked
+          cargo install tauri-cli --version '^2' --locked
+      - name: Set release version
+        run: python3 scripts/set-release-version.py "$RELEASE_VERSION" --build-number "$GITHUB_RUN_NUMBER"
+      - name: Prepare App Store Connect API key
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_PRIVATE_KEY_BASE64: ${{ secrets.APPLE_API_PRIVATE_KEY_BASE64 }}
+        run: |
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8"
+          echo "$APPLE_API_PRIVATE_KEY_BASE64" | base64 --decode > "$KEY_PATH"
+          chmod 600 "$KEY_PATH"
+          echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+      - name: Generate iOS project
+        run: cargo tauri ios init --ci --skip-targets-install
+      - name: Generate mobile icons
+        run: cargo tauri icon src-tauri/icons/icon.png --ios-color "#080808"
+      - name: Build signed IPA
+        env:
+          IOS_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_MOBILE_PROVISION: ${{ secrets.IOS_MOBILE_PROVISION }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_KEY_PATH: ${{ env.APPLE_API_KEY_PATH }}
+        run: cargo tauri ios build --ci --export-method app-store-connect
+      - name: Collect IPA
+        run: |
+          mkdir -p artifacts
+          IPA="$(find src-tauri/gen/apple/build -type f -name '*.ipa' | head -n 1)"
+          test -n "$IPA"
+          cp "$IPA" "artifacts/virya-${RELEASE_VERSION#v}.ipa"
+          echo "IPA_PATH=$GITHUB_WORKSPACE/artifacts/virya-${RELEASE_VERSION#v}.ipa" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: virya-ios-${{ env.RELEASE_VERSION }}
+          path: artifacts/*.ipa
+          retention-days: 30
+      - name: Upload to TestFlight
+        if: ${{ !inputs.submit_ios_review }}
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: xcrun altool --upload-app --type ios --file "$IPA_PATH" --apiKey "$APPLE_API_KEY_ID" --apiIssuer "$APPLE_API_ISSUER"
+      - name: Upload and submit for App Review
+        if: ${{ inputs.submit_ios_review }}
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          gem install fastlane --no-document
+          export APP_STORE_KEY_JSON="$RUNNER_TEMP/app-store-key.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "key_id": os.environ["APPLE_API_KEY_ID"],
+              "issuer_id": os.environ["APPLE_API_ISSUER"],
+              "key": Path(os.environ["APPLE_API_KEY_PATH"]).read_text(),
+              "duration": 1200,
+              "in_house": False,
+          }
+          Path(os.environ["APP_STORE_KEY_JSON"]).write_text(json.dumps(payload))
+          PY
+          fastlane deliver \
+            --ipa "$IPA_PATH" \
+            --api_key_path "$APP_STORE_KEY_JSON" \
+            --submit_for_review \
+            --automatic_release \
+            --skip_metadata \
+            --skip_screenshots \
+            --force
+
+  github-release:
+    name: GitHub release artifacts
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [android, ios]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: virya-*
+          path: artifacts
+          merge-multiple: true
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" artifacts/* --repo "$GITHUB_REPOSITORY" --generate-notes --verify-tag

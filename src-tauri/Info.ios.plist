@@ -3,6 +3,8 @@
 <plist version="1.0">
 <dict>
   <key>NSCameraUsageDescription</key>
-  <string>Virya Control używa aparatu wyłącznie do skanowania kodów QR biletów i check-in.</string>
+  <string>Virya używa aparatu wyłącznie do skanowania kodów QR biletów i wejściówek.</string>
+  <key>ITSAppUsesNonExemptEncryption</key>
+  <false/>
 </dict>
 </plist>

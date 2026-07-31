@@ -24,7 +24,10 @@ ui = (root / 'src/app.rs').read_text()
 native = (root / 'src-tauri/src/lib.rs').read_text()
 api = (root / 'src-tauri/src/api.rs').read_text()
 invoked = set(re.findall(
-    r'bridge::invoke(?:_unit)?::<.*?>\(\s*"([a-z_]+)"', ui, re.S
+    r'bridge::invoke(?:::<.*?>)?\(\s*"([a-z_]+)"', ui, re.S
+))
+invoked.update(re.findall(
+    r'bridge::invoke_unit\(\s*"([a-z_]+)"', ui, re.S
 ))
 registered_match = re.search(r'tauri::generate_handler!\[(.*?)\]', native, re.S)
 if not registered_match:
@@ -36,7 +39,9 @@ if missing:
 
 required_paths = [
     'public/events?limit=50', 'staff/admission/redeem', 'staff/coupons/redeem',
-    'staff/event-qr/overview', 'admin/admission/passes',
+    'staff/event-qr/overview', 'admin/event-qr/overview',
+    'admin/admission/passes', 'me/referral', 'me/events?limit=50',
+    'public/ticket-orders/{order_id}/wallet',
 ]
 for path in required_paths:
     if path not in api:
