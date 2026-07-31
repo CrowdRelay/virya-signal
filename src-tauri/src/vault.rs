@@ -81,9 +81,7 @@ fn ensure_pin(pin: &str) -> Result<(), AppError> {
     if (6..=128).contains(&pin.chars().count()) {
         Ok(())
     } else {
-        Err(AppError::InvalidInput(
-            "PIN musi mieć 6–128 znaków".into(),
-        ))
+        Err(AppError::InvalidInput("PIN musi mieć 6–128 znaków".into()))
     }
 }
 

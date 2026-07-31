@@ -5,7 +5,7 @@ use wasm_bindgen_futures::JsFuture;
 
 #[wasm_bindgen]
 extern "C" {
-    #[wasm_bindgen(js_namespace = [window, __TAURI__, core], js_name = invoke)]
+    #[wasm_bindgen(js_namespace = ["window", "__TAURI__", "core"], js_name = invoke)]
     fn tauri_invoke(command: &str, args: JsValue) -> Promise;
 }
 
@@ -55,6 +55,10 @@ pub async fn scan_qr() -> Result<String, String> {
 fn js_error(value: JsValue) -> String {
     value
         .as_string()
-        .or_else(|| js_sys::JSON::stringify(&value).ok().and_then(|v| v.as_string()))
+        .or_else(|| {
+            js_sys::JSON::stringify(&value)
+                .ok()
+                .and_then(|v| v.as_string())
+        })
         .unwrap_or_else(|| "Nieznany błąd aplikacji".to_owned())
 }

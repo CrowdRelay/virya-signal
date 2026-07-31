@@ -3,7 +3,10 @@ use zeroize::Zeroize;
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum OperatorRole { Owner, Staff }
+pub enum OperatorRole {
+    Owner,
+    Staff,
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, Zeroize)]
 #[zeroize(drop)]
@@ -24,7 +27,11 @@ pub struct SessionSummary {
 
 impl From<&OperatorProfile> for SessionSummary {
     fn from(value: &OperatorProfile) -> Self {
-        Self { display_name: value.display_name.clone(), api_base_url: value.api_base_url.clone(), role: value.role.clone() }
+        Self {
+            display_name: value.display_name.clone(),
+            api_base_url: value.api_base_url.clone(),
+            role: value.role.clone(),
+        }
     }
 }
 
@@ -36,7 +43,9 @@ pub struct SessionStatus {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct EventListResponse { pub events: Vec<PublicEvent> }
+pub struct EventListResponse {
+    pub events: Vec<PublicEvent>,
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PublicEvent {

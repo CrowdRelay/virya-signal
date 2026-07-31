@@ -6,8 +6,7 @@ use crate::{
     bridge,
     models::{
         AdmissionRedemption, CouponEnvelope, DashboardData, IssuePassInput, IssuedPass,
-        OperatorProfileInput, OperatorRole, PublicEvent, SessionStatus,
-        TicketingOverview,
+        OperatorProfileInput, OperatorRole, PublicEvent, SessionStatus, TicketingOverview,
     },
 };
 
@@ -136,7 +135,8 @@ fn AccessScreen(status: RwSignal<SessionStatus>, error: RwSignal<Option<String>>
         busy.set(true);
         spawn_local(async move {
             let current_pin = pin.get_untracked();
-            match bridge::invoke::<SessionStatus, _>("unlock", &PinArgs { pin: &current_pin }).await {
+            match bridge::invoke::<SessionStatus, _>("unlock", &PinArgs { pin: &current_pin }).await
+            {
                 Ok(value) => status.set(value),
                 Err(message) => error.set(Some(message)),
             }
@@ -153,15 +153,22 @@ fn AccessScreen(status: RwSignal<SessionStatus>, error: RwSignal<Option<String>>
             bearer_token: token.get(),
         };
         if current_pin.len() < 6 || profile.bearer_token.trim().len() < 24 {
-            error.set(Some("Podaj PIN (min. 6 znaków) i poprawny token urządzenia.".to_owned()));
+            error.set(Some(
+                "Podaj PIN (min. 6 znaków) i poprawny token urządzenia.".to_owned(),
+            ));
             return;
         }
         busy.set(true);
         spawn_local(async move {
             match bridge::invoke::<SessionStatus, _>(
                 "configure",
-                &ConfigureArgs { pin: &current_pin, profile: &profile },
-            ).await {
+                &ConfigureArgs {
+                    pin: &current_pin,
+                    profile: &profile,
+                },
+            )
+            .await
+            {
                 Ok(value) => status.set(value),
                 Err(message) => error.set(Some(message)),
             }
@@ -174,7 +181,7 @@ fn AccessScreen(status: RwSignal<SessionStatus>, error: RwSignal<Option<String>>
             <header class="hero compact">
                 <p class="eyebrow">PRIVATE BAND OPERATIONS</p>
                 <h1>Virya <em>Control</em></h1>
-                <p>Wejście, bilety, zniżki i koncertowy chaos — w jednym miejscu.</p>
+                <p>Wejście, bilety, zniżki i koncertowy chaos - w jednym miejscu.</p>
             </header>
 
             <div class="access-card">
@@ -223,7 +230,13 @@ fn AuthenticatedApp(
         }
     });
 
-    let role = move || status.get().session.map(|s| s.role).unwrap_or(OperatorRole::Staff);
+    let role = move || {
+        status
+            .get()
+            .session
+            .map(|s| s.role)
+            .unwrap_or(OperatorRole::Staff)
+    };
 
     view! {
         <section class="authenticated">
@@ -259,7 +272,12 @@ fn AuthenticatedApp(
 }
 
 #[component]
-fn NavButton(tab: RwSignal<Tab>, own: Tab, icon: &'static str, label: &'static str) -> impl IntoView {
+fn NavButton(
+    tab: RwSignal<Tab>,
+    own: Tab,
+    icon: &'static str,
+    label: &'static str,
+) -> impl IntoView {
     view! {
         <button class:active=move || tab.get() == own on:click=move |_| tab.set(own)>
             <span>{icon}</span><small>{label}</small>
@@ -307,18 +325,25 @@ fn Metric(value: String, label: &'static str) -> impl IntoView {
 
 #[component]
 fn EventCard(event: PublicEvent) -> impl IntoView {
-    let city = event.city.as_ref().map(|c| c.name.clone()).unwrap_or_default();
+    let city = event
+        .city
+        .as_ref()
+        .map(|c| c.name.clone())
+        .unwrap_or_default();
     view! {
         <article class="event-card">
             <div class="date-block"><strong>{day(&event.starts_at)}</strong><span>{month(&event.starts_at)}</span></div>
             <div><h4>{event.title}</h4><p>{event.venue.unwrap_or(city)}</p></div>
-            <span class="chevron">›</span>
+            <span class="chevron">></span>
         </article>
     }
 }
 
 #[component]
-fn Scanner(dashboard: RwSignal<Option<DashboardData>>, error: RwSignal<Option<String>>) -> impl IntoView {
+fn Scanner(
+    dashboard: RwSignal<Option<DashboardData>>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
     let event_slug = RwSignal::new(String::new());
     let manual = RwSignal::new(String::new());
     let result = RwSignal::new(None::<AdmissionRedemption>);
@@ -341,7 +366,15 @@ fn Scanner(dashboard: RwSignal<Option<DashboardData>>, error: RwSignal<Option<St
         busy.set(true);
         result.set(None);
         spawn_local(async move {
-            match bridge::invoke::<AdmissionRedemption, _>("redeem_admission", &RedeemArgs { event_slug: &event, code: &code }).await {
+            match bridge::invoke::<AdmissionRedemption, _>(
+                "redeem_admission",
+                &RedeemArgs {
+                    event_slug: &event,
+                    code: &code,
+                },
+            )
+            .await
+            {
                 Ok(value) => result.set(Some(value)),
                 Err(message) => error.set(Some(message)),
             }
@@ -354,7 +387,10 @@ fn Scanner(dashboard: RwSignal<Option<DashboardData>>, error: RwSignal<Option<St
         spawn_local(async move {
             match bridge::scan_qr().await {
                 Ok(code) => redeem_code(code),
-                Err(message) => { error.set(Some(message)); busy.set(false); }
+                Err(message) => {
+                    error.set(Some(message));
+                    busy.set(false);
+                }
             }
         });
     };
@@ -408,10 +444,17 @@ fn Tickets(
 
     let load = move |_| {
         let event = event_slug.get();
-        if event.is_empty() { return; }
+        if event.is_empty() {
+            return;
+        }
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<TicketingOverview, _>("ticketing_overview", &EventArgs { event_slug: &event }).await {
+            match bridge::invoke::<TicketingOverview, _>(
+                "ticketing_overview",
+                &EventArgs { event_slug: &event },
+            )
+            .await
+            {
                 Ok(value) => overview.set(Some(value)),
                 Err(message) => error.set(Some(message)),
             }
@@ -428,7 +471,8 @@ fn Tickets(
         };
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<IssuedPass, _>("issue_pass", &IssueArgs { input: &input }).await {
+            match bridge::invoke::<IssuedPass, _>("issue_pass", &IssueArgs { input: &input }).await
+            {
                 Ok(value) => issued.set(Some(value)),
                 Err(message) => error.set(Some(message)),
             }
@@ -440,7 +484,14 @@ fn Tickets(
         let reference = revoke_ref.get();
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<serde_json::Value, _>("revoke_pass", &ReferenceArgs { public_reference: &reference }).await {
+            match bridge::invoke::<serde_json::Value, _>(
+                "revoke_pass",
+                &ReferenceArgs {
+                    public_reference: &reference,
+                },
+            )
+            .await
+            {
                 Ok(_) => error.set(Some("Wejściówka została unieważniona.".to_owned())),
                 Err(message) => error.set(Some(message)),
             }
@@ -499,7 +550,15 @@ fn Discounts(error: RwSignal<Option<String>>) -> impl IntoView {
         let o = order.get();
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<CouponEnvelope, _>("redeem_coupon", &CouponArgs { code: &c, order_reference: &o }).await {
+            match bridge::invoke::<CouponEnvelope, _>(
+                "redeem_coupon",
+                &CouponArgs {
+                    code: &c,
+                    order_reference: &o,
+                },
+            )
+            .await
+            {
                 Ok(value) => result.set(Some(value)),
                 Err(message) => error.set(Some(message)),
             }
@@ -561,12 +620,20 @@ fn Settings(
             busy.set(false);
         });
     };
-    let lock = move |_| spawn_local(async move {
-        let _ = bridge::invoke::<SessionStatus, _>("lock", &EmptyArgs {}).await.map(|s| status.set(s));
-    });
-    let forget = move |_| spawn_local(async move {
-        let _ = bridge::invoke::<SessionStatus, _>("forget_device", &EmptyArgs {}).await.map(|s| status.set(s));
-    });
+    let lock = move |_| {
+        spawn_local(async move {
+            let _ = bridge::invoke::<SessionStatus, _>("lock", &EmptyArgs {})
+                .await
+                .map(|s| status.set(s));
+        })
+    };
+    let forget = move |_| {
+        spawn_local(async move {
+            let _ = bridge::invoke::<SessionStatus, _>("forget_device", &EmptyArgs {})
+                .await
+                .map(|s| status.set(s));
+        })
+    };
     view! {
         <section class="screen">
             <header class="screen-title"><p class="eyebrow">DEVICE</p><h2>Ustawienia</h2></header>
@@ -604,11 +671,24 @@ fn human_time(value: &str) -> String {
     value.replace('T', " • ").chars().take(16).collect()
 }
 
-fn day(value: &str) -> String { value.get(8..10).unwrap_or("--").to_owned() }
+fn day(value: &str) -> String {
+    value.get(8..10).unwrap_or("--").to_owned()
+}
 fn month(value: &str) -> String {
     match value.get(5..7).unwrap_or("") {
-        "01" => "STY", "02" => "LUT", "03" => "MAR", "04" => "KWI",
-        "05" => "MAJ", "06" => "CZE", "07" => "LIP", "08" => "SIE",
-        "09" => "WRZ", "10" => "PAŹ", "11" => "LIS", "12" => "GRU", _ => "---",
-    }.to_owned()
+        "01" => "STY",
+        "02" => "LUT",
+        "03" => "MAR",
+        "04" => "KWI",
+        "05" => "MAJ",
+        "06" => "CZE",
+        "07" => "LIP",
+        "08" => "SIE",
+        "09" => "WRZ",
+        "10" => "PAŹ",
+        "11" => "LIS",
+        "12" => "GRU",
+        _ => "---",
+    }
+    .to_owned()
 }
