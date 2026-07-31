@@ -1,0 +1,35 @@
+name: Check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - name: Install Tauri Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: Formatting
+        run: cargo fmt --all --check
+      - name: UI check
+        run: cargo check -p virya-mobile-ui --target wasm32-unknown-unknown
+      - name: Native shell check
+        run: cargo check -p virya-mobile
+      - name: Native tests
+        run: cargo test -p virya-mobile
+      - name: Clippy
+        run: cargo clippy -p virya-mobile --all-targets -- -D warnings
+      - name: Static contracts
+        run: python3 scripts/static-check.py
