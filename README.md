@@ -1,6 +1,6 @@
-# Virya Control Mobile
+# Crowdrelay Mobile
 
-Private iOS/Android application for the Virya team, backed by CrowdRelay.
+iOS/Android application for the Crowdrelay team, backed by CrowdRelay.
 
 ## Delivered MVP
 
@@ -47,7 +47,7 @@ Every push is checked by `.github/workflows/check.yml`: Rust formatting, WASM UI
 
 ## Pairing the first devices
 
-1. Deploy the supplied CrowdRelay mobile patch.
+1. Deploy the supplied Crowdrelay mobile patch.
 2. Owner device: use `CROWDRELAY_ADMIN_API_KEY` and role `owner`.
 3. Band-member devices: use `CROWDRELAY_STAFF_API_KEY` and role `staff`.
 4. Set a unique local PIN on every phone.
