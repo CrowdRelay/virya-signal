@@ -6,11 +6,10 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     bridge,
     models::{
-        AdmissionPass, AdmissionQr, AdmissionRedemption,
-        CouponEnvelope, CreateQrCampaignInput, DashboardData, FanAuthResult,
-        FanConfirmationInput, FanDashboardData, FanSessionStatus, FanSignupInput, IssuePassInput,
-        IssuedPass, OperatorProfileInput, OperatorRole, PublicEvent, PublicHomeData, QrCampaign,
-        SessionStatus, TicketWallet, TicketingOverview,
+        AdmissionPass, AdmissionQr, AdmissionRedemption, CouponEnvelope, CreateQrCampaignInput,
+        DashboardData, FanAuthResult, FanConfirmationInput, FanDashboardData, FanSessionStatus,
+        FanSignupInput, IssuePassInput, IssuedPass, OperatorProfileInput, OperatorRole,
+        PublicEvent, PublicHomeData, QrCampaign, SessionStatus, TicketWallet, TicketingOverview,
     },
 };
 
@@ -265,7 +264,8 @@ fn OperatorAccess(
         }
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<SessionStatus, _>("unlock", &PinArgs { pin: &current_pin }).await {
+            match bridge::invoke::<SessionStatus, _>("unlock", &PinArgs { pin: &current_pin }).await
+            {
                 Ok(value) => status.set(value),
                 Err(message) => error.set(Some(message)),
             }
@@ -289,8 +289,13 @@ fn OperatorAccess(
         spawn_local(async move {
             match bridge::invoke::<SessionStatus, _>(
                 "configure",
-                &ConfigureArgs { pin: &current_pin, profile: &profile },
-            ).await {
+                &ConfigureArgs {
+                    pin: &current_pin,
+                    profile: &profile,
+                },
+            )
+            .await
+            {
                 Ok(value) => status.set(value),
                 Err(message) => error.set(Some(message)),
             }
@@ -345,7 +350,13 @@ fn OperatorApp(
         }
     });
 
-    let role = move || status.get().session.map(|s| s.role).unwrap_or(OperatorRole::Staff);
+    let role = move || {
+        status
+            .get()
+            .session
+            .map(|s| s.role)
+            .unwrap_or(OperatorRole::Staff)
+    };
 
     view! {
         <section class="authenticated">
@@ -430,7 +441,10 @@ fn EventCard(event: PublicEvent) -> impl IntoView {
 }
 
 #[component]
-fn Scanner(dashboard: RwSignal<Option<DashboardData>>, error: RwSignal<Option<String>>) -> impl IntoView {
+fn Scanner(
+    dashboard: RwSignal<Option<DashboardData>>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
     let event_slug = RwSignal::new(String::new());
     let manual = RwSignal::new(String::new());
     let result = RwSignal::new(None::<AdmissionRedemption>);
@@ -444,7 +458,15 @@ fn Scanner(dashboard: RwSignal<Option<DashboardData>>, error: RwSignal<Option<St
         }
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<AdmissionRedemption, _>("redeem_admission", &RedeemArgs { event_slug: &slug, code: &code }).await {
+            match bridge::invoke::<AdmissionRedemption, _>(
+                "redeem_admission",
+                &RedeemArgs {
+                    event_slug: &slug,
+                    code: &code,
+                },
+            )
+            .await
+            {
                 Ok(value) => result.set(Some(value)),
                 Err(message) => error.set(Some(message)),
             }
@@ -492,23 +514,42 @@ fn Tickets(
 
     let load = move |_| {
         let slug = event_slug.get();
-        if slug.is_empty() { error.set(Some("Wybierz koncert.".to_owned())); return; }
+        if slug.is_empty() {
+            error.set(Some("Wybierz koncert.".to_owned()));
+            return;
+        }
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<TicketingOverview, _>("ticketing_overview", &EventArgs { event_slug: &slug }).await {
-                Ok(value) => overview.set(Some(value)), Err(message) => error.set(Some(message)),
+            match bridge::invoke::<TicketingOverview, _>(
+                "ticketing_overview",
+                &EventArgs { event_slug: &slug },
+            )
+            .await
+            {
+                Ok(value) => overview.set(Some(value)),
+                Err(message) => error.set(Some(message)),
             }
             busy.set(false);
         });
     };
 
     let issue = move |_| {
-        let input = IssuePassInput { event_slug: event_slug.get(), pool_slug: pool_slug.get(), fan_email: fan_email.get(), claim_expires_hours: 72 };
-        if input.event_slug.is_empty() || input.fan_email.trim().is_empty() { error.set(Some("Wybierz koncert i podaj e-mail fana.".to_owned())); return; }
+        let input = IssuePassInput {
+            event_slug: event_slug.get(),
+            pool_slug: pool_slug.get(),
+            fan_email: fan_email.get(),
+            claim_expires_hours: 72,
+        };
+        if input.event_slug.is_empty() || input.fan_email.trim().is_empty() {
+            error.set(Some("Wybierz koncert i podaj e-mail fana.".to_owned()));
+            return;
+        }
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<IssuedPass, _>("issue_pass", &IssueArgs { input: &input }).await {
-                Ok(value) => issued.set(Some(value)), Err(message) => error.set(Some(message)),
+            match bridge::invoke::<IssuedPass, _>("issue_pass", &IssueArgs { input: &input }).await
+            {
+                Ok(value) => issued.set(Some(value)),
+                Err(message) => error.set(Some(message)),
             }
             busy.set(false);
         });
@@ -518,8 +559,16 @@ fn Tickets(
         let reference = revoke_ref.get();
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<serde_json::Value, _>("revoke_pass", &ReferenceArgs { public_reference: &reference }).await {
-                Ok(_) => error.set(Some("Wejściówka została unieważniona.".to_owned())), Err(message) => error.set(Some(message)),
+            match bridge::invoke::<serde_json::Value, _>(
+                "revoke_pass",
+                &ReferenceArgs {
+                    public_reference: &reference,
+                },
+            )
+            .await
+            {
+                Ok(_) => error.set(Some("Wejściówka została unieważniona.".to_owned())),
+                Err(message) => error.set(Some(message)),
             }
             busy.set(false);
         });
@@ -547,12 +596,25 @@ fn Discounts(error: RwSignal<Option<String>>) -> impl IntoView {
     let result = RwSignal::new(None::<CouponEnvelope>);
     let busy = RwSignal::new(false);
     let redeem = move |_| {
-        let c = code.get(); let o = order.get();
-        if c.trim().is_empty() || o.trim().is_empty() { error.set(Some("Podaj kod i numer sprzedaży.".to_owned())); return; }
+        let c = code.get();
+        let o = order.get();
+        if c.trim().is_empty() || o.trim().is_empty() {
+            error.set(Some("Podaj kod i numer sprzedaży.".to_owned()));
+            return;
+        }
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<CouponEnvelope, _>("redeem_coupon", &CouponArgs { code: &c, order_reference: &o }).await {
-                Ok(value) => result.set(Some(value)), Err(message) => error.set(Some(message)),
+            match bridge::invoke::<CouponEnvelope, _>(
+                "redeem_coupon",
+                &CouponArgs {
+                    code: &c,
+                    order_reference: &o,
+                },
+            )
+            .await
+            {
+                Ok(value) => result.set(Some(value)),
+                Err(message) => error.set(Some(message)),
             }
             busy.set(false);
         });
@@ -563,7 +625,10 @@ fn Discounts(error: RwSignal<Option<String>>) -> impl IntoView {
 }
 
 #[component]
-fn Campaigns(dashboard: RwSignal<Option<DashboardData>>, error: RwSignal<Option<String>>) -> impl IntoView {
+fn Campaigns(
+    dashboard: RwSignal<Option<DashboardData>>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
     let event_slug = RwSignal::new(String::new());
     let label = RwSignal::new("Wejście główne".to_owned());
     let valid_from = RwSignal::new(String::new());
@@ -572,15 +637,38 @@ fn Campaigns(dashboard: RwSignal<Option<DashboardData>>, error: RwSignal<Option<
     let busy = RwSignal::new(false);
 
     let create = move |_| {
-        let Some(from) = local_to_rfc3339(&valid_from.get()) else { error.set(Some("Podaj poprawny początek ważności.".to_owned())); return; };
-        let Some(until) = local_to_rfc3339(&valid_until.get()) else { error.set(Some("Podaj poprawny koniec ważności.".to_owned())); return; };
+        let Some(from) = local_to_rfc3339(&valid_from.get()) else {
+            error.set(Some("Podaj poprawny początek ważności.".to_owned()));
+            return;
+        };
+        let Some(until) = local_to_rfc3339(&valid_until.get()) else {
+            error.set(Some("Podaj poprawny koniec ważności.".to_owned()));
+            return;
+        };
         let max = max_checkins.get().trim().parse::<u32>().ok();
-        let input = CreateQrCampaignInput { event_slug: event_slug.get(), label: label.get(), valid_from: from, valid_until: until, max_checkins: max };
-        if input.event_slug.is_empty() || input.label.trim().is_empty() { error.set(Some("Wybierz koncert i nazwij kampanię.".to_owned())); return; }
+        let input = CreateQrCampaignInput {
+            event_slug: event_slug.get(),
+            label: label.get(),
+            valid_from: from,
+            valid_until: until,
+            max_checkins: max,
+        };
+        if input.event_slug.is_empty() || input.label.trim().is_empty() {
+            error.set(Some("Wybierz koncert i nazwij kampanię.".to_owned()));
+            return;
+        }
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<QrCampaign, _>("create_qr_campaign", &CampaignArgs { input: &input }).await {
-                Ok(_) => { error.set(Some("Kampania QR utworzona.".to_owned())); refresh_operator_dashboard(dashboard, error); },
+            match bridge::invoke::<QrCampaign, _>(
+                "create_qr_campaign",
+                &CampaignArgs { input: &input },
+            )
+            .await
+            {
+                Ok(_) => {
+                    error.set(Some("Kampania QR utworzona.".to_owned()));
+                    refresh_operator_dashboard(dashboard, error);
+                }
                 Err(message) => error.set(Some(message)),
             }
             busy.set(false);
@@ -603,8 +691,18 @@ fn CampaignCard(
     let revoke = move |_| {
         let campaign_id = id.clone();
         spawn_local(async move {
-            match bridge::invoke::<serde_json::Value, _>("revoke_qr_campaign", &CampaignIdArgs { campaign_id: &campaign_id }).await {
-                Ok(_) => { error.set(Some("Kampania została wyłączona.".to_owned())); refresh_operator_dashboard(dashboard, error); },
+            match bridge::invoke::<serde_json::Value, _>(
+                "revoke_qr_campaign",
+                &CampaignIdArgs {
+                    campaign_id: &campaign_id,
+                },
+            )
+            .await
+            {
+                Ok(_) => {
+                    error.set(Some("Kampania została wyłączona.".to_owned()));
+                    refresh_operator_dashboard(dashboard, error);
+                }
                 Err(message) => error.set(Some(message)),
             }
         });
@@ -630,9 +728,27 @@ fn OperatorSettings(
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let busy = RwSignal::new(false);
-    let refresh = move |_| { busy.set(true); refresh_operator_dashboard(dashboard, error); busy.set(false); };
-    let lock = move |_| spawn_local(async move { match bridge::invoke::<SessionStatus, _>("lock", &EmptyArgs {}).await { Ok(value) => status.set(value), Err(message) => error.set(Some(message)) } });
-    let forget = move |_| spawn_local(async move { match bridge::invoke::<SessionStatus, _>("forget_device", &EmptyArgs {}).await { Ok(value) => status.set(value), Err(message) => error.set(Some(message)) } });
+    let refresh = move |_| {
+        busy.set(true);
+        refresh_operator_dashboard(dashboard, error);
+        busy.set(false);
+    };
+    let lock = move |_| {
+        spawn_local(async move {
+            match bridge::invoke::<SessionStatus, _>("lock", &EmptyArgs {}).await {
+                Ok(value) => status.set(value),
+                Err(message) => error.set(Some(message)),
+            }
+        })
+    };
+    let forget = move |_| {
+        spawn_local(async move {
+            match bridge::invoke::<SessionStatus, _>("forget_device", &EmptyArgs {}).await {
+                Ok(value) => status.set(value),
+                Err(message) => error.set(Some(message)),
+            }
+        })
+    };
     view! {
         <section class="screen"><header class="screen-title"><p class="eyebrow">DEVICE</p><h2>Ustawienia</h2></header><div class="settings-list"><article><div><strong>Połączenie</strong><p>{move || status.get().session.map(|s| s.api_base_url).unwrap_or_default()}</p></div><span class="online">ONLINE</span></article><article><div><strong>Uprawnienia</strong><p>{move || status.get().session.map(|s| s.role.label().to_owned()).unwrap_or_default()}</p></div></article><button on:click=refresh disabled=move || busy.get()>"Odśwież wszystkie dane"</button><button on:click=lock>"Zablokuj panel"</button><button class="danger ghost" on:click=forget>"Usuń profil operatora"</button></div><p class="security-note">Token operatora przechowuje zaszyfrowany sejf Stronghold. Warstwa WebView nigdy go nie odczytuje.</p></section>
     }
@@ -648,8 +764,16 @@ fn FanPortal(
     Effect::new(move |_| {
         if public.get().is_none() {
             spawn_local(async move {
-                match bridge::invoke::<PublicHomeData, _>("public_home", &ApiArgs { api_base_url: API_BASE }).await {
-                    Ok(value) => public.set(Some(value)), Err(message) => error.set(Some(message)),
+                match bridge::invoke::<PublicHomeData, _>(
+                    "public_home",
+                    &ApiArgs {
+                        api_base_url: API_BASE,
+                    },
+                )
+                .await
+                {
+                    Ok(value) => public.set(Some(value)),
+                    Err(message) => error.set(Some(message)),
                 }
             });
         }
@@ -684,23 +808,56 @@ fn FanAccess(
         let current_pin = pin.get();
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<FanSessionStatus, _>("fan_unlock", &PinArgs { pin: &current_pin }).await {
-                Ok(value) => status.set(value), Err(message) => error.set(Some(message)),
+            match bridge::invoke::<FanSessionStatus, _>(
+                "fan_unlock",
+                &PinArgs { pin: &current_pin },
+            )
+            .await
+            {
+                Ok(value) => status.set(value),
+                Err(message) => error.set(Some(message)),
             }
             busy.set(false);
         });
     };
 
     let signup = move |_| {
-        if !consent.get() { error.set(Some("Zgoda marketingowa jest wymagana do dołączenia do Sygnału.".to_owned())); return; }
+        if !consent.get() {
+            error.set(Some(
+                "Zgoda marketingowa jest wymagana do dołączenia do Sygnału.".to_owned(),
+            ));
+            return;
+        }
         let current_pin = pin.get();
-        let input = FanSignupInput { api_base_url: API_BASE.to_owned(), email: email.get(), display_name: optional(name.get()), city_slug: city.get(), locale: "pl".to_owned(), referral_code: optional(referral.get()), policy_version: POLICY_VERSION.to_owned() };
+        let input = FanSignupInput {
+            api_base_url: API_BASE.to_owned(),
+            email: email.get(),
+            display_name: optional(name.get()),
+            city_slug: city.get(),
+            locale: "pl".to_owned(),
+            referral_code: optional(referral.get()),
+            policy_version: POLICY_VERSION.to_owned(),
+        };
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<FanAuthResult, _>("fan_signup", &FanSignupArgs { input: &input, pin: &current_pin }).await {
+            match bridge::invoke::<FanAuthResult, _>(
+                "fan_signup",
+                &FanSignupArgs {
+                    input: &input,
+                    pin: &current_pin,
+                },
+            )
+            .await
+            {
                 Ok(result) => {
-                    if result.session_created { refresh_fan_status(status, error); }
-                    else { access_mode.set(FanAccessMode::Confirm); error.set(Some("Sprawdź e-mail i wklej kod potwierdzający.".to_owned())); }
+                    if result.session_created {
+                        refresh_fan_status(status, error);
+                    } else {
+                        access_mode.set(FanAccessMode::Confirm);
+                        error.set(Some(
+                            "Sprawdź e-mail i wklej kod potwierdzający.".to_owned(),
+                        ));
+                    }
                 }
                 Err(message) => error.set(Some(message)),
             }
@@ -710,11 +867,25 @@ fn FanAccess(
 
     let confirm = move |_| {
         let current_pin = pin.get();
-        let input = FanConfirmationInput { api_base_url: API_BASE.to_owned(), email: email.get(), display_name: optional(name.get()), token: token.get() };
+        let input = FanConfirmationInput {
+            api_base_url: API_BASE.to_owned(),
+            email: email.get(),
+            display_name: optional(name.get()),
+            token: token.get(),
+        };
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<FanAuthResult, _>("fan_confirm", &FanConfirmArgs { input: &input, pin: &current_pin }).await {
-                Ok(_) => refresh_fan_status(status, error), Err(message) => error.set(Some(message)),
+            match bridge::invoke::<FanAuthResult, _>(
+                "fan_confirm",
+                &FanConfirmArgs {
+                    input: &input,
+                    pin: &current_pin,
+                },
+            )
+            .await
+            {
+                Ok(_) => refresh_fan_status(status, error),
+                Err(message) => error.set(Some(message)),
             }
             busy.set(false);
         });
@@ -774,7 +945,12 @@ fn FanApp(
 }
 
 #[component]
-fn FanNavButton(tab: RwSignal<FanTab>, own: FanTab, icon: &'static str, label: &'static str) -> impl IntoView {
+fn FanNavButton(
+    tab: RwSignal<FanTab>,
+    own: FanTab,
+    icon: &'static str,
+    label: &'static str,
+) -> impl IntoView {
     view! { <button class:active=move || tab.get() == own on:click=move |_| tab.set(own)><span>{icon}</span><small>{label}</small></button> }
 }
 
@@ -834,18 +1010,31 @@ fn FanEvents(
 }
 
 #[component]
-fn FanEventCard(event: PublicEvent, dashboard: RwSignal<Option<FanDashboardData>>, error: RwSignal<Option<String>>) -> impl IntoView {
+fn FanEventCard(
+    event: PublicEvent,
+    dashboard: RwSignal<Option<FanDashboardData>>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
     let event_slug = event.slug.clone();
     let interested = Signal::derive(move || {
-        dashboard
-            .get()
-            .is_some_and(|data| data.interests.iter().any(|item| item.event.slug == event_slug))
+        dashboard.get().is_some_and(|data| {
+            data.interests
+                .iter()
+                .any(|item| item.event.slug == event_slug)
+        })
     });
     let interest_slug = event.slug.clone();
     let interest = move |_| {
         let event_slug = interest_slug.clone();
         spawn_local(async move {
-            match bridge::invoke::<serde_json::Value, _>("fan_register_interest", &EventArgs { event_slug: &event_slug }).await {
+            match bridge::invoke::<serde_json::Value, _>(
+                "fan_register_interest",
+                &EventArgs {
+                    event_slug: &event_slug,
+                },
+            )
+            .await
+            {
                 Ok(_) => {
                     error.set(Some("Koncert zapisany w Twoim Sygnale.".to_owned()));
                     refresh_fan_dashboard(dashboard, error);
@@ -879,12 +1068,18 @@ fn FanEventCard(event: PublicEvent, dashboard: RwSignal<Option<FanDashboardData>
 }
 
 #[component]
-fn ExternalLink(url: String, label: &'static str, error: RwSignal<Option<String>>) -> impl IntoView {
+fn ExternalLink(
+    url: String,
+    label: &'static str,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
     let open_url = url.clone();
     let open = move |_| {
         let current = open_url.clone();
         spawn_local(async move {
-            if let Err(message) = bridge::invoke_unit("open_external_url", &UrlArgs { url: &current }).await {
+            if let Err(message) =
+                bridge::invoke_unit("open_external_url", &UrlArgs { url: &current }).await
+            {
                 error.set(Some(message));
             }
         });
@@ -905,12 +1100,29 @@ fn FanWallet(
     let busy = RwSignal::new(false);
 
     let import = move |_| {
-        let order = order_id.get(); let token = checkout_token.get();
-        if order.trim().is_empty() || token.trim().is_empty() { error.set(Some("Podaj identyfikator zamówienia i prywatny token.".to_owned())); return; }
+        let order = order_id.get();
+        let token = checkout_token.get();
+        if order.trim().is_empty() || token.trim().is_empty() {
+            error.set(Some(
+                "Podaj identyfikator zamówienia i prywatny token.".to_owned(),
+            ));
+            return;
+        }
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<TicketWallet, _>("fan_import_wallet", &ImportWalletArgs { order_id: &order, checkout_token: &token }).await {
-                Ok(_) => { error.set(Some("Bilety zapisane w portfelu.".to_owned())); refresh_wallets(wallets, error); },
+            match bridge::invoke::<TicketWallet, _>(
+                "fan_import_wallet",
+                &ImportWalletArgs {
+                    order_id: &order,
+                    checkout_token: &token,
+                },
+            )
+            .await
+            {
+                Ok(_) => {
+                    error.set(Some("Bilety zapisane w portfelu.".to_owned()));
+                    refresh_wallets(wallets, error);
+                }
                 Err(message) => error.set(Some(message)),
             }
             busy.set(false);
@@ -921,8 +1133,18 @@ fn FanWallet(
         let token = claim_token.get();
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<AdmissionPass, _>("fan_claim_pass", &ClaimArgs { claim_token: &token }).await {
-                Ok(_) => { error.set(Some("Wejściówka przypisana do urządzenia.".to_owned())); refresh_fan_dashboard(dashboard, error); },
+            match bridge::invoke::<AdmissionPass, _>(
+                "fan_claim_pass",
+                &ClaimArgs {
+                    claim_token: &token,
+                },
+            )
+            .await
+            {
+                Ok(_) => {
+                    error.set(Some("Wejściówka przypisana do urządzenia.".to_owned()));
+                    refresh_fan_dashboard(dashboard, error);
+                }
                 Err(message) => error.set(Some(message)),
             }
             busy.set(false);
@@ -933,7 +1155,8 @@ fn FanWallet(
         busy.set(true);
         spawn_local(async move {
             match bridge::invoke::<AdmissionQr, _>("fan_admission_qr", &EmptyArgs {}).await {
-                Ok(value) => admission_qr.set(Some(value)), Err(message) => error.set(Some(message)),
+                Ok(value) => admission_qr.set(Some(value)),
+                Err(message) => error.set(Some(message)),
             }
             busy.set(false);
         });
@@ -952,8 +1175,14 @@ fn WalletCard(wallet: TicketWallet, error: RwSignal<Option<String>>) -> impl Int
     let resend = move |_| {
         let order = order_id.clone();
         spawn_local(async move {
-            match bridge::invoke::<serde_json::Value, _>("fan_request_delivery", &OrderArgs { order_id: &order }).await {
-                Ok(_) => error.set(Some("Wysłaliśmy ponownie portfel na e-mail.".to_owned())), Err(message) => error.set(Some(message)),
+            match bridge::invoke::<serde_json::Value, _>(
+                "fan_request_delivery",
+                &OrderArgs { order_id: &order },
+            )
+            .await
+            {
+                Ok(_) => error.set(Some("Wysłaliśmy ponownie portfel na e-mail.".to_owned())),
+                Err(message) => error.set(Some(message)),
             }
         });
     };
@@ -974,26 +1203,49 @@ fn FanProfileScreen(
     wallets: RwSignal<Vec<TicketWallet>>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
-    let refresh = move |_| { refresh_fan_dashboard(dashboard, error); refresh_wallets(wallets, error); };
-    let lock = move |_| spawn_local(async move { match bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await { Ok(value) => status.set(value), Err(message) => error.set(Some(message)) } });
-    let forget = move |_| spawn_local(async move { match bridge::invoke::<FanSessionStatus, _>("fan_forget", &EmptyArgs {}).await { Ok(value) => status.set(value), Err(message) => error.set(Some(message)) } });
+    let refresh = move |_| {
+        refresh_fan_dashboard(dashboard, error);
+        refresh_wallets(wallets, error);
+    };
+    let lock = move |_| {
+        spawn_local(async move {
+            match bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
+                Ok(value) => status.set(value),
+                Err(message) => error.set(Some(message)),
+            }
+        })
+    };
+    let forget = move |_| {
+        spawn_local(async move {
+            match bridge::invoke::<FanSessionStatus, _>("fan_forget", &EmptyArgs {}).await {
+                Ok(value) => status.set(value),
+                Err(message) => error.set(Some(message)),
+            }
+        })
+    };
     view! {
         <section class="screen"><header class="screen-title"><p class="eyebrow">MÓJ PROFIL</p><h2>Ustawienia Sygnału</h2></header>{move || status.get().session.map(|profile| view! { <div class="profile-card"><div class="avatar">V</div><div><strong>{profile.display_name.unwrap_or_else(|| "Fan Viryi".to_owned())}</strong><p>{profile.email}</p></div></div><div class="stats-grid"><Metric value=profile.wallet_count.to_string() label="zamówienia"/><Metric value=if profile.has_admission_pass { "1".to_owned() } else { "0".to_owned() } label="wejściówki"/><Metric value=dashboard.get().map(|d| d.referral.qualified_referrals.to_string()).unwrap_or_else(|| "—".to_owned()) label="polecenia"/></div> })}<div class="settings-list"><button on:click=refresh>"Odśwież dane"</button><button on:click=lock>"Zablokuj aplikację"</button><button class="danger ghost" on:click=forget>"Usuń profil i bilety z urządzenia"</button></div><p class="security-note">Sesja fana, wejściówka oraz prywatne tokeny portfela są przechowywane w osobnym, zaszyfrowanym sejfie Stronghold.</p></section>
     }
 }
 
 #[component]
-fn Skeleton() -> impl IntoView { view! { <div class="skeleton-stack"><i></i><i></i><i></i></div> } }
+fn Skeleton() -> impl IntoView {
+    view! { <div class="skeleton-stack"><i></i><i></i><i></i></div> }
+}
 
 #[component]
 fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
     view! { <Show when=move || error.get().is_some()><button class="toast" on:click=move |_| error.set(None)>{move || error.get().unwrap_or_default()}</button></Show> }
 }
 
-fn refresh_operator_dashboard(dashboard: RwSignal<Option<DashboardData>>, error: RwSignal<Option<String>>) {
+fn refresh_operator_dashboard(
+    dashboard: RwSignal<Option<DashboardData>>,
+    error: RwSignal<Option<String>>,
+) {
     spawn_local(async move {
         match bridge::invoke::<DashboardData, _>("dashboard", &EmptyArgs {}).await {
-            Ok(value) => dashboard.set(Some(value)), Err(message) => error.set(Some(message)),
+            Ok(value) => dashboard.set(Some(value)),
+            Err(message) => error.set(Some(message)),
         }
     });
 }
@@ -1001,15 +1253,20 @@ fn refresh_operator_dashboard(dashboard: RwSignal<Option<DashboardData>>, error:
 fn refresh_fan_status(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>) {
     spawn_local(async move {
         match bridge::invoke::<FanSessionStatus, _>("fan_status", &EmptyArgs {}).await {
-            Ok(value) => status.set(value), Err(message) => error.set(Some(message)),
+            Ok(value) => status.set(value),
+            Err(message) => error.set(Some(message)),
         }
     });
 }
 
-fn refresh_fan_dashboard(dashboard: RwSignal<Option<FanDashboardData>>, error: RwSignal<Option<String>>) {
+fn refresh_fan_dashboard(
+    dashboard: RwSignal<Option<FanDashboardData>>,
+    error: RwSignal<Option<String>>,
+) {
     spawn_local(async move {
         match bridge::invoke::<FanDashboardData, _>("fan_dashboard", &EmptyArgs {}).await {
-            Ok(value) => dashboard.set(Some(value)), Err(message) => error.set(Some(message)),
+            Ok(value) => dashboard.set(Some(value)),
+            Err(message) => error.set(Some(message)),
         }
     });
 }
@@ -1017,7 +1274,8 @@ fn refresh_fan_dashboard(dashboard: RwSignal<Option<FanDashboardData>>, error: R
 fn refresh_wallets(wallets: RwSignal<Vec<TicketWallet>>, error: RwSignal<Option<String>>) {
     spawn_local(async move {
         match bridge::invoke::<Vec<TicketWallet>, _>("fan_wallets", &EmptyArgs {}).await {
-            Ok(value) => wallets.set(value), Err(message) => error.set(Some(message)),
+            Ok(value) => wallets.set(value),
+            Err(message) => error.set(Some(message)),
         }
     });
 }
@@ -1026,16 +1284,33 @@ fn operator_events(dashboard: RwSignal<Option<DashboardData>>) -> Vec<PublicEven
     dashboard.get().map(|data| data.events).unwrap_or_default()
 }
 
-fn operator_qr_events(dashboard: RwSignal<Option<DashboardData>>) -> Vec<crate::models::StaffEvent> {
-    dashboard.get().and_then(|data| data.qr).map(|qr| qr.events).unwrap_or_default()
+fn operator_qr_events(
+    dashboard: RwSignal<Option<DashboardData>>,
+) -> Vec<crate::models::StaffEvent> {
+    dashboard
+        .get()
+        .and_then(|data| data.qr)
+        .map(|qr| qr.events)
+        .unwrap_or_default()
 }
 
 fn operator_campaigns(dashboard: RwSignal<Option<DashboardData>>) -> Vec<QrCampaign> {
-    dashboard.get().and_then(|data| data.qr).map(|qr| qr.campaigns).unwrap_or_default()
+    dashboard
+        .get()
+        .and_then(|data| data.qr)
+        .map(|qr| qr.campaigns)
+        .unwrap_or_default()
 }
 
-fn fan_events(dashboard: RwSignal<Option<FanDashboardData>>, public: RwSignal<Option<PublicHomeData>>) -> Vec<PublicEvent> {
-    dashboard.get().map(|data| data.events).or_else(|| public.get().map(|data| data.events)).unwrap_or_default()
+fn fan_events(
+    dashboard: RwSignal<Option<FanDashboardData>>,
+    public: RwSignal<Option<PublicHomeData>>,
+) -> Vec<PublicEvent> {
+    dashboard
+        .get()
+        .map(|data| data.events)
+        .or_else(|| public.get().map(|data| data.events))
+        .unwrap_or_default()
 }
 
 fn optional(value: String) -> Option<String> {
@@ -1044,17 +1319,61 @@ fn optional(value: String) -> Option<String> {
 }
 
 fn local_to_rfc3339(value: &str) -> Option<String> {
-    if value.trim().is_empty() { return None; }
+    if value.trim().is_empty() {
+        return None;
+    }
     let date = js_sys::Date::new(&JsValue::from_str(value));
     let time = date.get_time();
-    if time.is_nan() { None } else { date.to_iso_string().as_string() }
+    if time.is_nan() {
+        None
+    } else {
+        date.to_iso_string().as_string()
+    }
 }
 
-fn money(minor: i64, currency: &str) -> String { format!("{:.2} {}", minor as f64 / 100.0, currency.to_uppercase()) }
-fn human_time(value: &str) -> String { value.replace('T', " • ").replace('Z', "").chars().take(19).collect() }
-fn event_location(event: &PublicEvent) -> String { event.venue.clone().or_else(|| event.city.as_ref().map(|city| city.name.clone())).unwrap_or_else(|| "Szczegóły wkrótce".to_owned()) }
-fn event_time_location(starts_at: &str, venue: Option<&str>) -> String { format!("{} · {}", human_time(starts_at), venue.unwrap_or("miejsce wkrótce")) }
-fn day(value: &str) -> String { value.get(8..10).unwrap_or("--").to_owned() }
+fn money(minor: i64, currency: &str) -> String {
+    format!("{:.2} {}", minor as f64 / 100.0, currency.to_uppercase())
+}
+fn human_time(value: &str) -> String {
+    value
+        .replace('T', " • ")
+        .replace('Z', "")
+        .chars()
+        .take(19)
+        .collect()
+}
+fn event_location(event: &PublicEvent) -> String {
+    event
+        .venue
+        .clone()
+        .or_else(|| event.city.as_ref().map(|city| city.name.clone()))
+        .unwrap_or_else(|| "Szczegóły wkrótce".to_owned())
+}
+fn event_time_location(starts_at: &str, venue: Option<&str>) -> String {
+    format!(
+        "{} · {}",
+        human_time(starts_at),
+        venue.unwrap_or("miejsce wkrótce")
+    )
+}
+fn day(value: &str) -> String {
+    value.get(8..10).unwrap_or("--").to_owned()
+}
 fn month(value: &str) -> String {
-    match value.get(5..7).unwrap_or("") { "01" => "STY", "02" => "LUT", "03" => "MAR", "04" => "KWI", "05" => "MAJ", "06" => "CZE", "07" => "LIP", "08" => "SIE", "09" => "WRZ", "10" => "PAŹ", "11" => "LIS", "12" => "GRU", _ => "---" }.to_owned()
+    match value.get(5..7).unwrap_or("") {
+        "01" => "STY",
+        "02" => "LUT",
+        "03" => "MAR",
+        "04" => "KWI",
+        "05" => "MAJ",
+        "06" => "CZE",
+        "07" => "LIP",
+        "08" => "SIE",
+        "09" => "WRZ",
+        "10" => "PAŹ",
+        "11" => "LIS",
+        "12" => "GRU",
+        _ => "---",
+    }
+    .to_owned()
 }
