@@ -31,12 +31,12 @@ jobs:
       - name: Normalize formatting
         run: cargo fmt --all --check
       - name: UI check
-        run: cargo check -p virya-mobile-ui --target wasm32-unknown-unknown
+        run: cargo check -p crowdrelay-mobile-ui --target wasm32-unknown-unknown
       - name: Native shell check
-        run: cargo check -p virya-mobile
+        run: cargo check -p crowdrelay-mobile
       - name: Native tests
-        run: cargo test -p virya-mobile
+        run: cargo test -p crowdrelay-mobile
       - name: Clippy
-        run: cargo clippy -p virya-mobile --all-targets -- -D warnings
+        run: cargo clippy -p crowdrelay-mobile --all-targets -- -D warnings
       - name: Static contracts
         run: python3 scripts/static-check.py

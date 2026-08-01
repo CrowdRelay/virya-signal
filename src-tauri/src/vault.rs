@@ -115,7 +115,7 @@ fn save_at<T: Serialize>(
         std::fs::create_dir_all(parent)?;
     }
     let salt = load_or_create_salt(salt_path)?;
-    let stronghold = Stronghold::new(vault_path.to_path_buf(), password(pin, &salt)?)
+    let stronghold = Stronghold::new(vault_path, password(pin, &salt)?)
         .map_err(|_| AppError::StrongholdClient)?;
     let client = stronghold
         .load_client(client_path)
@@ -142,7 +142,7 @@ fn load_at<T: DeserializeOwned>(
         return Err(AppError::NotConfigured);
     }
     let salt = read_salt(salt_path)?;
-    let stronghold = Stronghold::new(vault_path.to_path_buf(), password(pin, &salt)?)
+    let stronghold = Stronghold::new(vault_path, password(pin, &salt)?)
         .map_err(|_| AppError::InvalidPin)?;
     let client = stronghold
         .load_client(client_path)

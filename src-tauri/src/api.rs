@@ -29,7 +29,7 @@ impl CrowdRelayClient {
     pub fn new() -> Result<Self, AppError> {
         let http = Client::builder()
             .timeout(Duration::from_secs(15))
-            .user_agent("virya-mobile/0.2")
+            .user_agent("crowdrelay-mobile/0.2")
             .https_only(!cfg!(debug_assertions))
             .build()?;
         Ok(Self { http })

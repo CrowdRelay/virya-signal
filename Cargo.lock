@@ -967,6 +967,42 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "61803da095bee82a81bb1a452ecc25d3b2f1416d1897eb86430c6159ef717c17"
 
 [[package]]
+name = "crowdrelay-mobile"
+version = "0.2.0"
+dependencies = [
+ "argon2",
+ "qrcode",
+ "rand 0.9.5",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-barcode-scanner",
+ "tauri-plugin-opener",
+ "tauri-plugin-stronghold",
+ "thiserror 2.0.19",
+ "tokio",
+ "url",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
+name = "crowdrelay-mobile-ui"
+version = "0.2.0"
+dependencies = [
+ "console_error_panic_hook",
+ "js-sys",
+ "leptos",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+]
+
+[[package]]
 name = "crunchy"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6236,42 +6272,6 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
-
-[[package]]
-name = "virya-mobile"
-version = "0.2.0"
-dependencies = [
- "argon2",
- "qrcode",
- "rand 0.9.5",
- "reqwest",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-barcode-scanner",
- "tauri-plugin-opener",
- "tauri-plugin-stronghold",
- "thiserror 2.0.19",
- "tokio",
- "url",
- "uuid",
- "zeroize",
-]
-
-[[package]]
-name = "virya-mobile-ui"
-version = "0.2.0"
-dependencies = [
- "console_error_panic_hook",
- "js-sys",
- "leptos",
- "serde",
- "serde-wasm-bindgen",
- "serde_json",
- "wasm-bindgen",
- "wasm-bindgen-futures",
-]
 
 [[package]]
 name = "vswhom"
