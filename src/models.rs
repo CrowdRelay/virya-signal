@@ -54,7 +54,7 @@ pub struct FanSummary {
     pub has_admission_pass: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct PublicHomeData {
     pub events: Vec<PublicEvent>,
     pub cities: Vec<CitySignal>,
@@ -68,7 +68,7 @@ pub struct CitySignal {
     pub fan_count: u64,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct DashboardData {
     pub events: Vec<PublicEvent>,
     pub qr: Option<ConcertQrOverview>,
@@ -313,7 +313,7 @@ pub struct FanAuthResult {
     pub session_created: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct FanDashboardData {
     pub events: Vec<PublicEvent>,
     pub referral: ReferralProgress,

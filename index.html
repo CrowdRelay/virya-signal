@@ -3,13 +3,32 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#090909" />
+    <meta name="theme-color" content="#080808" />
     <meta name="color-scheme" content="dark" />
-    <title>Virya Control</title>
+    <title>Virya Signal</title>
+    <style>
+      #boot-splash{position:fixed;inset:0;z-index:2147483647;display:grid;place-content:center;justify-items:center;gap:9px;padding:24px;background:radial-gradient(circle at 50% 35%,#2b2409 0,#080808 38%);color:#f5f5ef;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;text-align:center;transition:opacity .18s ease}
+      #boot-splash[aria-hidden="true"]{opacity:0;pointer-events:none}
+      .boot-signal{height:42px;display:flex;align-items:center;gap:6px}
+      .boot-signal i{display:block;width:5px;border-radius:3px;background:#f3c51a;box-shadow:0 0 22px #f3c51a55;animation:boot-pulse .72s ease-in-out infinite alternate}
+      .boot-signal i:nth-child(1){height:13px}.boot-signal i:nth-child(2){height:38px;animation-delay:.16s}.boot-signal i:nth-child(3){height:23px;animation-delay:.32s}
+      #boot-splash strong{margin-top:7px;font-size:clamp(42px,14vw,64px);line-height:.85;letter-spacing:-.075em}
+      #boot-splash strong span{color:#f3c51a}
+      #boot-status{margin:3px 0 0;color:#a9a89f;font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase}
+      @keyframes boot-pulse{to{opacity:.3;transform:scaleY(.52)}}
+      @media(prefers-reduced-motion:reduce){.boot-signal i{animation:none}}
+    </style>
     <link data-trunk rel="css" href="styles.css" />
-    <link data-trunk rel="rust" data-wasm-opt="z" />
+    <link data-trunk rel="copy-file" href="boot.js" />
+    <script src="boot.js" defer></script>
+    <link data-trunk rel="rust" data-wasm-opt="z" data-wasm-opt-params="--enable-bulk-memory --enable-bulk-memory-opt --enable-nontrapping-float-to-int" />
   </head>
   <body>
-    <noscript>Virya Control wymaga JavaScript/WASM.</noscript>
+    <section id="boot-splash" role="status" aria-live="polite">
+      <div class="boot-signal" aria-hidden="true"><i></i><i></i><i></i></div>
+      <strong>VIRYA <span>SIGNAL</span></strong>
+      <p id="boot-status">URUCHAMIAMY SYGNAŁ</p>
+    </section>
+    <noscript>Virya Signal wymaga JavaScript/WASM.</noscript>
   </body>
 </html>

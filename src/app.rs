@@ -6,10 +6,11 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     bridge,
     models::{
-        AdmissionPass, AdmissionQr, AdmissionRedemption, CouponEnvelope, CreateQrCampaignInput,
-        DashboardData, FanAuthResult, FanConfirmationInput, FanDashboardData, FanSessionStatus,
-        FanSignupInput, IssuePassInput, IssuedPass, OperatorProfileInput, OperatorRole,
-        PublicEvent, PublicHomeData, QrCampaign, SessionStatus, TicketWallet, TicketingOverview,
+        AdmissionPass, AdmissionQr, AdmissionRedemption, CitySignal, CouponEnvelope,
+        CreateQrCampaignInput, DashboardData, FanAuthResult, FanConfirmationInput,
+        FanDashboardData, FanEventInterest, FanSessionStatus, FanSignupInput, IssuePassInput,
+        IssuedPass, OperatorProfileInput, OperatorRole, PublicEvent, PublicHomeData, QrCampaign,
+        ReferralProgress, SessionStatus, TicketWallet, TicketingOverview,
     },
 };
 
@@ -45,6 +46,57 @@ enum FanTab {
 enum FanAccessMode {
     Signup,
     Confirm,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct FanLoadingState {
+    events: bool,
+    referral: bool,
+    interests: bool,
+    admission_pass: bool,
+    wallets: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct OperatorLoadingState {
+    events: bool,
+    qr: bool,
+}
+
+#[derive(Clone, Copy, Default)]
+struct PublicLoadingState {
+    events: bool,
+    cities: bool,
+}
+
+impl PublicLoadingState {
+    fn all() -> Self {
+        Self {
+            events: true,
+            cities: true,
+        }
+    }
+}
+
+impl OperatorLoadingState {
+    const fn all() -> Self {
+        Self {
+            events: true,
+            qr: true,
+        }
+    }
+}
+
+impl FanLoadingState {
+    const fn all() -> Self {
+        Self {
+            events: true,
+            referral: true,
+            interests: true,
+            admission_pass: true,
+            wallets: true,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -146,11 +198,15 @@ pub fn App() -> impl IntoView {
 
     Effect::new(move |_| {
         spawn_local(async move {
-            match bridge::invoke::<SessionStatus, _>("session_status", &EmptyArgs {}).await {
+            let (operator, fan) = futures::join!(
+                bridge::invoke::<SessionStatus, _>("session_status", &EmptyArgs {}),
+                bridge::invoke::<FanSessionStatus, _>("fan_status", &EmptyArgs {})
+            );
+            match operator {
                 Ok(value) => operator_status.set(value),
                 Err(message) => error.set(Some(message)),
             }
-            match bridge::invoke::<FanSessionStatus, _>("fan_status", &EmptyArgs {}).await {
+            match fan {
                 Ok(value) => fan_status.set(value),
                 Err(message) => error.set(Some(message)),
             }
@@ -183,8 +239,8 @@ fn Splash() -> impl IntoView {
     view! {
         <section class="splash">
             <div class="signal-mark"><span></span><span></span><span></span></div>
-            <h1>VIRYA</h1>
-            <p>SIGNAL / CONTROL</p>
+            <h1>VIRYA <em>SIGNAL</em></h1>
+            <p>ŁĄCZYMY Z BEZPIECZNYM SEJFEM</p>
         </section>
     }
 }
@@ -266,7 +322,10 @@ fn OperatorAccess(
         spawn_local(async move {
             match bridge::invoke::<SessionStatus, _>("unlock", &PinArgs { pin: &current_pin }).await
             {
-                Ok(value) => status.set(value),
+                Ok(value) => {
+                    pin.set(String::new());
+                    status.set(value);
+                }
                 Err(message) => error.set(Some(message)),
             }
             busy.set(false);
@@ -296,7 +355,11 @@ fn OperatorAccess(
             )
             .await
             {
-                Ok(value) => status.set(value),
+                Ok(value) => {
+                    pin.set(String::new());
+                    token.set(String::new());
+                    status.set(value);
+                }
                 Err(message) => error.set(Some(message)),
             }
             busy.set(false);
@@ -344,9 +407,11 @@ fn OperatorApp(
     tab: RwSignal<OperatorTab>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
+    let loading = RwSignal::new(OperatorLoadingState::all());
     Effect::new(move |_| {
         if status.get().unlocked && dashboard.get().is_none() {
-            refresh_operator_dashboard(dashboard, error);
+            dashboard.set(Some(DashboardData::default()));
+            refresh_operator_parts(dashboard, loading, error);
         }
     });
 
@@ -358,20 +423,34 @@ fn OperatorApp(
             .unwrap_or(OperatorRole::Staff)
     };
 
+    let close = move |_| {
+        spawn_local(async move {
+            match bridge::invoke::<SessionStatus, _>("lock", &EmptyArgs {}).await {
+                Ok(value) => {
+                    dashboard.set(None);
+                    loading.set(OperatorLoadingState::all());
+                    status.set(value);
+                    mode.set(RootMode::Launcher);
+                }
+                Err(message) => error.set(Some(message)),
+            }
+        });
+    };
+
     view! {
         <section class="authenticated">
             <header class="topbar">
                 <div><p class="eyebrow">VIRYA CONTROL</p><strong>{move || status.get().session.map(|s| s.display_name).unwrap_or_default()}</strong></div>
-                <div class="topbar-actions"><span class="role-pill">{move || role().label()}</span><button on:click=move |_| mode.set(RootMode::Launcher)>"×"</button></div>
+                <div class="topbar-actions"><span class="role-pill">{move || role().label()}</span><button aria-label="Zamknij i zablokuj panel" on:click=close>"×"</button></div>
             </header>
             <div class="content">
                 {move || match tab.get() {
-                    OperatorTab::Home => view! { <OperatorHome dashboard=dashboard /> }.into_any(),
-                    OperatorTab::Scan => view! { <Scanner dashboard=dashboard error=error /> }.into_any(),
-                    OperatorTab::Tickets => view! { <Tickets dashboard=dashboard error=error owner=Signal::derive(move || role() == OperatorRole::Owner) /> }.into_any(),
+                    OperatorTab::Home => view! { <OperatorHome dashboard=dashboard loading=loading /> }.into_any(),
+                    OperatorTab::Scan => view! { <Scanner dashboard=dashboard loading=loading error=error /> }.into_any(),
+                    OperatorTab::Tickets => view! { <Tickets dashboard=dashboard loading=loading error=error owner=Signal::derive(move || role() == OperatorRole::Owner) /> }.into_any(),
                     OperatorTab::Discounts => view! { <Discounts error=error /> }.into_any(),
-                    OperatorTab::Campaigns => view! { <Campaigns dashboard=dashboard error=error /> }.into_any(),
-                    OperatorTab::Settings => view! { <OperatorSettings status=status dashboard=dashboard error=error /> }.into_any(),
+                    OperatorTab::Campaigns => view! { <Campaigns dashboard=dashboard loading=loading error=error /> }.into_any(),
+                    OperatorTab::Settings => view! { <OperatorSettings status=status dashboard=dashboard loading=loading error=error /> }.into_any(),
                 }}
             </div>
             <nav class="bottom-nav six">
@@ -395,14 +474,21 @@ where
 }
 
 #[component]
-fn OperatorHome(dashboard: RwSignal<Option<DashboardData>>) -> impl IntoView {
+fn OperatorHome(
+    dashboard: RwSignal<Option<DashboardData>>,
+    loading: RwSignal<OperatorLoadingState>,
+) -> impl IntoView {
     view! {
         <section class="screen">
             <header class="screen-title"><p class="eyebrow">LIVE OPERATIONS</p><h2>Dzisiaj pod kontrolą</h2></header>
-            {move || dashboard.get().map(|data| {
+            <Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }>
+            {move || dashboard.with(|state| state.as_ref().map(|data| {
                 let next = data.events.first().cloned();
+                let event_count = data.events.len();
+                let events = data.events.iter().take(8).cloned().collect::<Vec<_>>();
                 let active = data.qr.as_ref().map(|q| q.campaigns.iter().filter(|c| c.active).count()).unwrap_or(0);
                 let checkins = data.qr.as_ref().map(|q| q.campaigns.iter().map(|c| c.checkin_count).sum::<u64>()).unwrap_or(0);
+                let qr_loading = loading.get().qr;
                 view! {
                     {next.map(|event| {
                         let location = event_location(&event);
@@ -412,11 +498,12 @@ fn OperatorHome(dashboard: RwSignal<Option<DashboardData>>) -> impl IntoView {
                             <article class="hero-card"><p class="eyebrow">NASTĘPNY KONCERT</p><h3>{title}</h3><p>{location}</p><time>{time}</time></article>
                         }
                     })}
-                    <div class="stats-grid"><Metric value=data.events.len().to_string() label="koncerty"/><Metric value=active.to_string() label="aktywne QR"/><Metric value=checkins.to_string() label="check-iny"/></div>
-                    <div class="section-head"><h3>Nadchodzące</h3><span>{data.events.len()}</span></div>
-                    <div class="card-list">{data.events.into_iter().take(8).map(|event| view! { <EventCard event=event /> }).collect_view()}</div>
+                    <div class="stats-grid"><Metric value=event_count.to_string() label="koncerty"/><Metric value=if qr_loading { "…".to_owned() } else { active.to_string() } label="aktywne QR"/><Metric value=if qr_loading { "…".to_owned() } else { checkins.to_string() } label="check-iny"/></div>
+                    <div class="section-head"><h3>Nadchodzące</h3><span>{event_count}</span></div>
+                    <div class="card-list">{events.into_iter().map(|event| view! { <EventCard event=event /> }).collect_view()}</div>
                 }
-            }.into_any()).unwrap_or_else(|| view! { <Skeleton /> }.into_any())}
+            }.into_any())).unwrap_or_else(|| view! { <Skeleton /> }.into_any())}
+            </Show>
         </section>
     }
 }
@@ -443,6 +530,7 @@ fn EventCard(event: PublicEvent) -> impl IntoView {
 #[component]
 fn Scanner(
     dashboard: RwSignal<Option<DashboardData>>,
+    loading: RwSignal<OperatorLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let event_slug = RwSignal::new(String::new());
@@ -487,7 +575,7 @@ fn Scanner(
     view! {
         <section class="screen">
             <header class="screen-title"><p class="eyebrow">GATE MODE</p><h2>Skanuj wejście</h2></header>
-            <label class="select-label">"Koncert"<select prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">"Wybierz wydarzenie"</option>{move || operator_events(dashboard).into_iter().map(|event| view! { <option value=event.slug.clone()>{event.title}</option> }).collect_view()}</select></label>
+            <label class="select-label">"Koncert"<select disabled=move || loading.get().events prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">{move || if loading.get().events { "Ładuję koncerty…" } else { "Wybierz wydarzenie" }}</option>{move || operator_events(dashboard).into_iter().map(|event| view! { <option value=event.slug.clone()>{event.title}</option> }).collect_view()}</select></label>
             <button class="scanner-button" on:click=scan disabled=move || busy.get()><span class="scanner-frame"></span><strong>{move || if busy.get() { "WERYFIKUJĘ…" } else { "URUCHOM APARAT" }}</strong><small>QR biletu lub wejściówki</small></button>
             <div class="manual-row"><input placeholder="Kod / public reference" prop:value=move || manual.get() on:input=move |e| manual.set(event_target_value(&e))/><button on:click=manual_submit disabled=move || busy.get()>"SPRAWDŹ"</button></div>
             {move || result.get().map(|entry| {
@@ -501,6 +589,7 @@ fn Scanner(
 #[component]
 fn Tickets(
     dashboard: RwSignal<Option<DashboardData>>,
+    loading: RwSignal<OperatorLoadingState>,
     error: RwSignal<Option<String>>,
     owner: Signal<bool>,
 ) -> impl IntoView {
@@ -557,6 +646,10 @@ fn Tickets(
 
     let revoke = move |_| {
         let reference = revoke_ref.get();
+        if reference.trim().is_empty() {
+            error.set(Some("Podaj public reference wejściówki.".to_owned()));
+            return;
+        }
         busy.set(true);
         spawn_local(async move {
             match bridge::invoke::<serde_json::Value, _>(
@@ -577,7 +670,7 @@ fn Tickets(
     view! {
         <section class="screen">
             <header class="screen-title"><p class="eyebrow">TICKETING</p><h2>Bilety i wejściówki</h2></header>
-            <div class="toolbar"><select prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">"Wybierz koncert"</option>{move || operator_events(dashboard).into_iter().map(|event| view! { <option value=event.slug.clone()>{event.title}</option> }).collect_view()}</select><button on:click=load disabled=move || busy.get()>"ODŚWIEŻ"</button></div>
+            <div class="toolbar"><select disabled=move || loading.get().events prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">{move || if loading.get().events { "Ładuję koncerty…" } else { "Wybierz koncert" }}</option>{move || operator_events(dashboard).into_iter().map(|event| view! { <option value=event.slug.clone()>{event.title}</option> }).collect_view()}</select><button on:click=load disabled=move || busy.get() || loading.get().events>"ODŚWIEŻ"</button></div>
             {move || overview.get().map(|data| view! {
                 <div class="stats-grid wide"><Metric value=data.paid_tickets.to_string() label="sprzedane"/><Metric value=data.sale.reserved.to_string() label="w trakcie"/><Metric value=data.sale.available.to_string() label="dostępne"/></div>
                 <div class="revenue-card"><p>OBRÓT BRUTTO</p><strong>{money(data.gross_sales_minor, &data.sale.currency)}</strong><span>{format!("zwroty: {}", money(data.refunded_minor, &data.sale.currency))}</span></div>
@@ -627,6 +720,7 @@ fn Discounts(error: RwSignal<Option<String>>) -> impl IntoView {
 #[component]
 fn Campaigns(
     dashboard: RwSignal<Option<DashboardData>>,
+    loading: RwSignal<OperatorLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let event_slug = RwSignal::new(String::new());
@@ -645,7 +739,24 @@ fn Campaigns(
             error.set(Some("Podaj poprawny koniec ważności.".to_owned()));
             return;
         };
-        let max = max_checkins.get().trim().parse::<u32>().ok();
+        let max_value = max_checkins.get();
+        let max = if max_value.trim().is_empty() {
+            None
+        } else {
+            match max_value.trim().parse::<u32>() {
+                Ok(value) if value > 0 => Some(value),
+                _ => {
+                    error.set(Some("Limit musi być dodatnią liczbą.".to_owned()));
+                    return;
+                }
+            }
+        };
+        if until <= from {
+            error.set(Some(
+                "Koniec kampanii musi być później niż początek.".to_owned(),
+            ));
+            return;
+        }
         let input = CreateQrCampaignInput {
             event_slug: event_slug.get(),
             label: label.get(),
@@ -667,7 +778,7 @@ fn Campaigns(
             {
                 Ok(_) => {
                     error.set(Some("Kampania QR utworzona.".to_owned()));
-                    refresh_operator_dashboard(dashboard, error);
+                    refresh_operator_qr(dashboard, loading, error);
                 }
                 Err(message) => error.set(Some(message)),
             }
@@ -676,7 +787,7 @@ fn Campaigns(
     };
 
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">CONCERT SIGNAL</p><h2>Kampanie QR</h2></header><div class="form-grid panel"><label>"Koncert"<select prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">"Wybierz koncert"</option>{move || operator_qr_events(dashboard).into_iter().map(|event| view! { <option value=event.slug.clone()>{event.title}</option> }).collect_view()}</select></label><label>"Nazwa punktu / kampanii"<input prop:value=move || label.get() on:input=move |e| label.set(event_target_value(&e))/></label><div class="two-cols"><label>"Ważna od"<input type="datetime-local" prop:value=move || valid_from.get() on:input=move |e| valid_from.set(event_target_value(&e))/></label><label>"Ważna do"<input type="datetime-local" prop:value=move || valid_until.get() on:input=move |e| valid_until.set(event_target_value(&e))/></label></div><label>"Limit check-inów (opcjonalnie)"<input inputmode="numeric" prop:value=move || max_checkins.get() on:input=move |e| max_checkins.set(event_target_value(&e))/></label><button class="primary" on:click=create disabled=move || busy.get()>"UTWÓRZ KAMPANIĘ"</button></div><div class="section-head"><h3>Aktywne i historyczne</h3></div><div class="card-list">{move || operator_campaigns(dashboard).into_iter().map(|campaign| view! { <CampaignCard campaign=campaign dashboard=dashboard error=error /> }).collect_view()}</div></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">CONCERT SIGNAL</p><h2>Kampanie QR</h2></header><div class="form-grid panel"><label>"Koncert"<select disabled=move || loading.get().qr prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">{move || if loading.get().qr { "Ładuję kampanie…" } else { "Wybierz koncert" }}</option>{move || operator_qr_events(dashboard).into_iter().map(|event| view! { <option value=event.slug.clone()>{event.title}</option> }).collect_view()}</select></label><label>"Nazwa punktu / kampanii"<input prop:value=move || label.get() on:input=move |e| label.set(event_target_value(&e))/></label><div class="two-cols"><label>"Ważna od"<input type="datetime-local" prop:value=move || valid_from.get() on:input=move |e| valid_from.set(event_target_value(&e))/></label><label>"Ważna do"<input type="datetime-local" prop:value=move || valid_until.get() on:input=move |e| valid_until.set(event_target_value(&e))/></label></div><label>"Limit check-inów (opcjonalnie)"<input inputmode="numeric" prop:value=move || max_checkins.get() on:input=move |e| max_checkins.set(event_target_value(&e))/></label><button class="primary" on:click=create disabled=move || busy.get() || loading.get().qr>"UTWÓRZ KAMPANIĘ"</button></div><div class="section-head"><h3>Aktywne i historyczne</h3></div><Show when=move || !loading.get().qr fallback=move || view! { <Skeleton /> }><div class="card-list">{move || operator_campaigns(dashboard).into_iter().map(|campaign| view! { <CampaignCard campaign=campaign dashboard=dashboard loading=loading error=error /> }).collect_view()}</div></Show></section>
     }
 }
 
@@ -684,6 +795,7 @@ fn Campaigns(
 fn CampaignCard(
     campaign: QrCampaign,
     dashboard: RwSignal<Option<DashboardData>>,
+    loading: RwSignal<OperatorLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let id = campaign.id.clone();
@@ -701,7 +813,7 @@ fn CampaignCard(
             {
                 Ok(_) => {
                     error.set(Some("Kampania została wyłączona.".to_owned()));
-                    refresh_operator_dashboard(dashboard, error);
+                    refresh_operator_qr(dashboard, loading, error);
                 }
                 Err(message) => error.set(Some(message)),
             }
@@ -725,18 +837,20 @@ fn CampaignCard(
 fn OperatorSettings(
     status: RwSignal<SessionStatus>,
     dashboard: RwSignal<Option<DashboardData>>,
+    loading: RwSignal<OperatorLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
-    let busy = RwSignal::new(false);
     let refresh = move |_| {
-        busy.set(true);
-        refresh_operator_dashboard(dashboard, error);
-        busy.set(false);
+        refresh_operator_parts(dashboard, loading, error);
     };
     let lock = move |_| {
         spawn_local(async move {
             match bridge::invoke::<SessionStatus, _>("lock", &EmptyArgs {}).await {
-                Ok(value) => status.set(value),
+                Ok(value) => {
+                    dashboard.set(None);
+                    loading.set(OperatorLoadingState::all());
+                    status.set(value);
+                }
                 Err(message) => error.set(Some(message)),
             }
         })
@@ -744,13 +858,17 @@ fn OperatorSettings(
     let forget = move |_| {
         spawn_local(async move {
             match bridge::invoke::<SessionStatus, _>("forget_device", &EmptyArgs {}).await {
-                Ok(value) => status.set(value),
+                Ok(value) => {
+                    dashboard.set(None);
+                    loading.set(OperatorLoadingState::all());
+                    status.set(value);
+                }
                 Err(message) => error.set(Some(message)),
             }
         })
     };
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">DEVICE</p><h2>Ustawienia</h2></header><div class="settings-list"><article><div><strong>Połączenie</strong><p>{move || status.get().session.map(|s| s.api_base_url).unwrap_or_default()}</p></div><span class="online">ONLINE</span></article><article><div><strong>Uprawnienia</strong><p>{move || status.get().session.map(|s| s.role.label().to_owned()).unwrap_or_default()}</p></div></article><button on:click=refresh disabled=move || busy.get()>"Odśwież wszystkie dane"</button><button on:click=lock>"Zablokuj panel"</button><button class="danger ghost" on:click=forget>"Usuń profil operatora"</button></div><p class="security-note">Token operatora przechowuje zaszyfrowany sejf Stronghold. Warstwa WebView nigdy go nie odczytuje.</p></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">DEVICE</p><h2>Ustawienia</h2></header><div class="settings-list"><article><div><strong>Połączenie</strong><p>{move || status.get().session.map(|s| s.api_base_url).unwrap_or_default()}</p></div><span class:online=move || !loading.get().events && !loading.get().qr>{move || if loading.get().events || loading.get().qr { "ŁĄCZĘ" } else { "ONLINE" }}</span></article><article><div><strong>Uprawnienia</strong><p>{move || status.get().session.map(|s| s.role.label().to_owned()).unwrap_or_default()}</p></div></article><button on:click=refresh disabled=move || loading.get().events || loading.get().qr>"Odśwież wszystkie dane"</button><button on:click=lock>"Zablokuj panel"</button><button class="danger ghost" on:click=forget>"Usuń profil operatora"</button></div><p class="security-note">Token operatora przechowuje zaszyfrowany sejf Stronghold. Warstwa WebView nigdy go nie odczytuje.</p></section>
     }
 }
 
@@ -761,28 +879,19 @@ fn FanPortal(
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let public = RwSignal::new(None::<PublicHomeData>);
+    let public_loading = RwSignal::new(PublicLoadingState::all());
     Effect::new(move |_| {
-        if public.get().is_none() {
-            spawn_local(async move {
-                match bridge::invoke::<PublicHomeData, _>(
-                    "public_home",
-                    &ApiArgs {
-                        api_base_url: API_BASE,
-                    },
-                )
-                .await
-                {
-                    Ok(value) => public.set(Some(value)),
-                    Err(message) => error.set(Some(message)),
-                }
-            });
+        if !status.get().unlocked && public.get().is_none() {
+            public.set(Some(PublicHomeData::default()));
+            refresh_public_events(public, public_loading, error);
+            refresh_public_cities(public, public_loading, error);
         }
     });
     view! {
         {move || if status.get().unlocked {
             view! { <FanApp mode=mode status=status public=public error=error /> }.into_any()
         } else {
-            view! { <FanAccess mode=mode status=status public=public error=error /> }.into_any()
+            view! { <FanAccess mode=mode status=status public=public public_loading=public_loading error=error /> }.into_any()
         }}
     }
 }
@@ -792,6 +901,7 @@ fn FanAccess(
     mode: RwSignal<RootMode>,
     status: RwSignal<FanSessionStatus>,
     public: RwSignal<Option<PublicHomeData>>,
+    public_loading: RwSignal<PublicLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let access_mode = RwSignal::new(FanAccessMode::Signup);
@@ -814,7 +924,10 @@ fn FanAccess(
             )
             .await
             {
-                Ok(value) => status.set(value),
+                Ok(value) => {
+                    pin.set(String::new());
+                    status.set(value);
+                }
                 Err(message) => error.set(Some(message)),
             }
             busy.set(false);
@@ -851,6 +964,7 @@ fn FanAccess(
             {
                 Ok(result) => {
                     if result.session_created {
+                        pin.set(String::new());
                         refresh_fan_status(status, error);
                     } else {
                         access_mode.set(FanAccessMode::Confirm);
@@ -884,7 +998,11 @@ fn FanAccess(
             )
             .await
             {
-                Ok(_) => refresh_fan_status(status, error),
+                Ok(_) => {
+                    pin.set(String::new());
+                    token.set(String::new());
+                    refresh_fan_status(status, error);
+                }
                 Err(message) => error.set(Some(message)),
             }
             busy.set(false);
@@ -899,20 +1017,23 @@ fn FanAccess(
                 <div class="access-card fan-card"><div class="segmented"><button class:active=move || access_mode.get() == FanAccessMode::Signup on:click=move |_| access_mode.set(FanAccessMode::Signup)>"DOŁĄCZAM"</button><button class:active=move || access_mode.get() == FanAccessMode::Confirm on:click=move |_| access_mode.set(FanAccessMode::Confirm)>"MAM KOD"</button></div>
                     <div class="form-grid fan-form"><label>"E-mail"<input type="email" autocomplete="email" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label><label>"Imię / nazwa (opcjonalnie)"<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/></label>
                     <Show when=move || access_mode.get() == FanAccessMode::Signup fallback=move || view! { <><label>"Kod z e-maila"<textarea rows="3" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label><label>"Nowy lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label><button class="primary" disabled=move || busy.get() on:click=confirm>"POTWIERDŹ I WEJDŹ"</button></> }>
-                        <><label>"Twoje miasto"<select prop:value=move || city.get() on:change=move |e| city.set(event_target_value(&e))><option value="">"Wybierz miasto"</option>{move || public.get().map(|data| data.cities.into_iter().map(|city_item| view! { <option value=city_item.slug.clone()>{format!("{} · {} fanów", city_item.name, city_item.fan_count)}</option> }).collect_view())}</select></label><label>"Kod polecający (opcjonalnie)"<input prop:value=move || referral.get() on:input=move |e| referral.set(event_target_value(&e))/></label><label>"Lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label><label class="check-label"><input type="checkbox" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/><span>Chcę otrzymywać informacje o koncertach, premierach i nagrodach Viryi.</span></label><button class="primary" disabled=move || busy.get() on:click=signup>"DOŁĄCZ DO SYGNAŁU"</button></>
+                        <><label>"Twoje miasto"<select disabled=move || public_loading.get().cities prop:value=move || city.get() on:change=move |e| city.set(event_target_value(&e))><option value="">{move || if public_loading.get().cities { "Ładuję miasta…" } else { "Wybierz miasto" }}</option>{move || public.with(|data| data.as_ref().map(|data| data.cities.iter().map(|city_item| view! { <option value=city_item.slug.clone()>{format!("{} · {} fanów", city_item.name, city_item.fan_count)}</option> }).collect_view()))}</select></label><label>"Kod polecający (opcjonalnie)"<input prop:value=move || referral.get() on:input=move |e| referral.set(event_target_value(&e))/></label><label>"Lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label><label class="check-label"><input type="checkbox" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/><span>Chcę otrzymywać informacje o koncertach, premierach i nagrodach Viryi.</span></label><button class="primary" disabled=move || busy.get() || public_loading.get().cities on:click=signup>"DOŁĄCZ DO SYGNAŁU"</button></>
                     </Show></div>
                 </div>
             }>
                 <div class="access-card fan-card"><p class="lock-copy">Twój profil, sesja fana i tokeny biletów są zaszyfrowane na urządzeniu.</p><div class="form-grid"><label>"PIN"<input type="password" autocomplete="current-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label><button class="primary" disabled=move || busy.get() on:click=unlock>"OTWÓRZ MÓJ SYGNAŁ"</button></div></div>
             </Show>
-            <PublicEventStrip public=public />
+            <PublicEventStrip public=public loading=public_loading />
         </section>
     }
 }
 
 #[component]
-fn PublicEventStrip(public: RwSignal<Option<PublicHomeData>>) -> impl IntoView {
-    view! { <div class="public-strip"><div class="section-head"><h3>Najbliższe koncerty</h3></div><div class="card-list">{move || public.get().map(|data| data.events.into_iter().take(4).map(|event| view! { <EventCard event=event /> }).collect_view())}</div></div> }
+fn PublicEventStrip(
+    public: RwSignal<Option<PublicHomeData>>,
+    loading: RwSignal<PublicLoadingState>,
+) -> impl IntoView {
+    view! { <div class="public-strip"><div class="section-head"><h3>Najbliższe koncerty</h3></div><Show when=move || !loading.get().events fallback=move || view! { <Skeleton rows=2 /> }><div class="card-list">{move || public.with(|data| data.as_ref().map(|data| data.events.iter().take(4).cloned().map(|event| view! { <EventCard event=event /> }).collect_view()))}</div></Show></div> }
 }
 
 #[component]
@@ -926,20 +1047,38 @@ fn FanApp(
     let dashboard = RwSignal::new(None::<FanDashboardData>);
     let wallets = RwSignal::new(Vec::<TicketWallet>::new());
     let admission_qr = RwSignal::new(None::<AdmissionQr>);
+    let loading = RwSignal::new(FanLoadingState::all());
 
     Effect::new(move |_| {
         if status.get().unlocked && dashboard.get().is_none() {
-            refresh_fan_dashboard(dashboard, error);
-            refresh_wallets(wallets, error);
+            dashboard.set(Some(FanDashboardData::default()));
+            refresh_fan_parts(dashboard, loading, error);
+            refresh_wallets(wallets, Some(loading), error);
         }
     });
 
+    let close = move |_| {
+        spawn_local(async move {
+            match bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
+                Ok(value) => {
+                    dashboard.set(None);
+                    wallets.set(Vec::new());
+                    admission_qr.set(None);
+                    loading.set(FanLoadingState::all());
+                    status.set(value);
+                    mode.set(RootMode::Launcher);
+                }
+                Err(message) => error.set(Some(message)),
+            }
+        });
+    };
+
     view! {
-        <section class="authenticated fan-authenticated"><header class="topbar fan-topbar"><div><p class="eyebrow">VIRYA SIGNAL</p><strong>{move || status.get().session.and_then(|s| s.display_name).unwrap_or_else(|| "Mój Sygnał".to_owned())}</strong></div><div class="topbar-actions"><span class="live-dot"></span><button on:click=move |_| mode.set(RootMode::Launcher)>"×"</button></div></header><div class="content">{move || match tab.get() {
-            FanTab::Signal => view! { <FanSignal dashboard=dashboard /> }.into_any(),
-            FanTab::Events => view! { <FanEvents dashboard=dashboard public=public error=error /> }.into_any(),
-            FanTab::Wallet => view! { <FanWallet dashboard=dashboard wallets=wallets admission_qr=admission_qr error=error /> }.into_any(),
-            FanTab::Profile => view! { <FanProfileScreen status=status dashboard=dashboard wallets=wallets error=error /> }.into_any(),
+        <section class="authenticated fan-authenticated"><header class="topbar fan-topbar"><div><p class="eyebrow">VIRYA SIGNAL</p><strong>{move || status.get().session.and_then(|s| s.display_name).unwrap_or_else(|| "Mój Sygnał".to_owned())}</strong></div><div class="topbar-actions"><span class="live-dot"></span><button aria-label="Zamknij i zablokuj Sygnał" on:click=close>"×"</button></div></header><div class="content">{move || match tab.get() {
+            FanTab::Signal => view! { <FanSignal dashboard=dashboard loading=loading /> }.into_any(),
+            FanTab::Events => view! { <FanEvents dashboard=dashboard public=public loading=loading error=error /> }.into_any(),
+            FanTab::Wallet => view! { <FanWallet dashboard=dashboard wallets=wallets admission_qr=admission_qr loading=loading error=error /> }.into_any(),
+            FanTab::Profile => view! { <FanProfileScreen status=status dashboard=dashboard wallets=wallets loading=loading error=error /> }.into_any(),
         }}</div><nav class="bottom-nav four"><FanNavButton tab=tab own=FanTab::Signal icon="◉" label="Sygnał"/><FanNavButton tab=tab own=FanTab::Events icon="⌁" label="Koncerty"/><FanNavButton tab=tab own=FanTab::Wallet icon="▣" label="Bilety"/><FanNavButton tab=tab own=FanTab::Profile icon="◎" label="Profil"/></nav></section>
     }
 }
@@ -955,17 +1094,20 @@ fn FanNavButton(
 }
 
 #[component]
-fn FanSignal(dashboard: RwSignal<Option<FanDashboardData>>) -> impl IntoView {
+fn FanSignal(
+    dashboard: RwSignal<Option<FanDashboardData>>,
+    loading: RwSignal<FanLoadingState>,
+) -> impl IntoView {
     view! {
         <section class="screen fan-screen">
             <header class="signal-dashboard-hero">
                 <p class="eyebrow">TWÓJ WPŁYW</p>
-                <h2>{move || dashboard.get().map(|d| d.referral.qualified_referrals.to_string()).unwrap_or_else(|| "—".to_owned())}</h2>
+                <h2>{move || dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).unwrap_or_else(|| "—".to_owned())}</h2>
                 <strong>potwierdzonych poleceń</strong>
-                <p>{move || dashboard.get().map(|d| format!("Kod: {}", d.referral.referral_code)).unwrap_or_else(|| "Ładowanie Sygnału…".to_owned())}</p>
+                <p>{move || dashboard.with(|state| state.as_ref().map(|d| format!("Kod: {}", d.referral.referral_code))).unwrap_or_else(|| "Ładowanie Sygnału…".to_owned())}</p>
             </header>
-            {move || dashboard.get().map(|data| {
-                let referral = data.referral;
+            <Show when=move || !loading.get().referral fallback=move || view! { <Skeleton /> }>
+            {move || dashboard.with(|state| state.as_ref().map(|data| data.referral.clone())).map(|referral| {
                 let entries_total = referral.draw_entries.iter().map(|draw| draw.total_entries).sum::<u32>();
                 let draw_count = referral.draw_entries.len();
                 let coupon_count = referral.coupons.len();
@@ -994,6 +1136,7 @@ fn FanSignal(dashboard: RwSignal<Option<FanDashboardData>>) -> impl IntoView {
                     {rewards_view}
                 }.into_any()
             }).unwrap_or_else(|| view! { <Skeleton /> }.into_any())}
+            </Show>
         </section>
     }
 }
@@ -1002,10 +1145,11 @@ fn FanSignal(dashboard: RwSignal<Option<FanDashboardData>>) -> impl IntoView {
 fn FanEvents(
     dashboard: RwSignal<Option<FanDashboardData>>,
     public: RwSignal<Option<PublicHomeData>>,
+    loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">GDZIE GRAMY</p><h2>Koncerty</h2></header><div class="card-list fan-event-list">{move || fan_events(dashboard, public).into_iter().map(|event| view! { <FanEventCard event=event dashboard=dashboard error=error /> }).collect_view()}</div></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">GDZIE GRAMY</p><h2>Koncerty</h2></header><Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }><div class="card-list fan-event-list">{move || fan_events(dashboard, public).into_iter().map(|event| view! { <FanEventCard event=event dashboard=dashboard loading=loading error=error /> }).collect_view()}</div></Show></section>
     }
 }
 
@@ -1013,19 +1157,27 @@ fn FanEvents(
 fn FanEventCard(
     event: PublicEvent,
     dashboard: RwSignal<Option<FanDashboardData>>,
+    loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let event_slug = event.slug.clone();
     let interested = Signal::derive(move || {
-        dashboard.get().is_some_and(|data| {
-            data.interests
-                .iter()
-                .any(|item| item.event.slug == event_slug)
+        dashboard.with(|state| {
+            state.as_ref().is_some_and(|data| {
+                data.interests
+                    .iter()
+                    .any(|item| item.event.slug == event_slug)
+            })
         })
     });
     let interest_slug = event.slug.clone();
+    let busy = RwSignal::new(false);
     let interest = move |_| {
+        if interested.get_untracked() || busy.get_untracked() {
+            return;
+        }
         let event_slug = interest_slug.clone();
+        busy.set(true);
         spawn_local(async move {
             match bridge::invoke::<serde_json::Value, _>(
                 "fan_register_interest",
@@ -1037,10 +1189,11 @@ fn FanEventCard(
             {
                 Ok(_) => {
                     error.set(Some("Koncert zapisany w Twoim Sygnale.".to_owned()));
-                    refresh_fan_dashboard(dashboard, error);
+                    refresh_fan_interests(dashboard, loading, error);
                 }
                 Err(message) => error.set(Some(message)),
             }
+            busy.set(false);
         });
     };
     let event_day = day(&event.starts_at);
@@ -1053,13 +1206,13 @@ fn FanEventCard(
     let title = event.title;
     view! {
         <article class="fan-event-card">
-            {image.map(|url| view! { <img src=url alt="" /> })}
+            {image.map(|url| view! { <img src=url alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" /> })}
             <div class="fan-event-body">
                 <div class="date-line"><span>{format!("{event_day} {event_month}")}</span><small>{event_time}</small></div>
                 <h3>{title}</h3><p>{location}</p>
                 {description.map(|text| view! { <p class="event-description">{text}</p> })}
                 <div class="event-actions">
-                    <button class:active=move || interested.get() on:click=interest>{move || if interested.get() { "✓ MAM TO" } else { "+ INTERESUJE MNIE" }}</button>
+                    <button class:active=move || interested.get() on:click=interest disabled=move || busy.get() || interested.get()>{move || if busy.get() { "ZAPISUJĘ…" } else if interested.get() { "✓ MAM TO" } else { "+ INTERESUJE MNIE" }}</button>
                     {ticket.map(|url| view! { <ExternalLink url=url label="BILETY ↗" error=error /> })}
                 </div>
             </div>
@@ -1092,6 +1245,7 @@ fn FanWallet(
     dashboard: RwSignal<Option<FanDashboardData>>,
     wallets: RwSignal<Vec<TicketWallet>>,
     admission_qr: RwSignal<Option<AdmissionQr>>,
+    loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let order_id = RwSignal::new(String::new());
@@ -1121,7 +1275,7 @@ fn FanWallet(
             {
                 Ok(_) => {
                     error.set(Some("Bilety zapisane w portfelu.".to_owned()));
-                    refresh_wallets(wallets, error);
+                    refresh_wallets(wallets, Some(loading), error);
                 }
                 Err(message) => error.set(Some(message)),
             }
@@ -1131,6 +1285,10 @@ fn FanWallet(
 
     let claim = move |_| {
         let token = claim_token.get();
+        if token.trim().is_empty() {
+            error.set(Some("Wklej token wejściówki.".to_owned()));
+            return;
+        }
         busy.set(true);
         spawn_local(async move {
             match bridge::invoke::<AdmissionPass, _>(
@@ -1143,7 +1301,7 @@ fn FanWallet(
             {
                 Ok(_) => {
                     error.set(Some("Wejściówka przypisana do urządzenia.".to_owned()));
-                    refresh_fan_dashboard(dashboard, error);
+                    refresh_fan_admission_pass(dashboard, loading, error);
                 }
                 Err(message) => error.set(Some(message)),
             }
@@ -1163,17 +1321,22 @@ fn FanWallet(
     };
 
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">MOBILE WALLET</p><h2>Bilety i wejście</h2></header>{move || dashboard.get().and_then(|d| d.admission_pass).map(|pass| view! { <article class="admission-card"><p class="eyebrow">WEJŚCIÓWKA VIRYA</p><h3>{pass.event_title}</h3><p>{event_time_location(&pass.starts_at, pass.venue.as_deref())}</p><strong>{pass.public_reference}</strong><span>{pass.status}</span><button class="primary" on:click=qr disabled=move || busy.get()>"POKAŻ QR NA WEJŚCIE"</button>{move || admission_qr.get().map(|value| view! { <QrPanel svg=value.qr_svg token=value.token expires=value.expires_at /> })}</article> })}
-        <Show when=move || dashboard.get().and_then(|d| d.admission_pass).is_none()><div class="claim-box"><p class="eyebrow">WYGRAŁEŚ WEJŚCIÓWKĘ?</p><h3>Przypisz ją do telefonu</h3><textarea rows="3" placeholder="Token z wiadomości" prop:value=move || claim_token.get() on:input=move |e| claim_token.set(event_target_value(&e))></textarea><button class="primary" on:click=claim disabled=move || busy.get()>"ODBIERZ WEJŚCIÓWKĘ"</button></div></Show>
-        <div class="section-head"><h3>Portfel biletów</h3><span>{move || wallets.get().len()}</span></div><div class="wallet-stack">{move || wallets.get().into_iter().map(|wallet| view! { <WalletCard wallet=wallet error=error /> }).collect_view()}</div><details class="import-box"><summary>"Dodaj istniejące zamówienie"</summary><div class="form-grid"><label>"Order ID"<input placeholder="UUID zamówienia" prop:value=move || order_id.get() on:input=move |e| order_id.set(event_target_value(&e))/></label><label>"Prywatny checkout token"<textarea rows="3" prop:value=move || checkout_token.get() on:input=move |e| checkout_token.set(event_target_value(&e))></textarea></label><button class="primary" on:click=import disabled=move || busy.get()>"DODAJ DO PORTFELA"</button></div></details></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">MOBILE WALLET</p><h2>Bilety i wejście</h2></header><Show when=move || !loading.get().admission_pass fallback=move || view! { <Skeleton rows=1 /> }>{move || dashboard.with(|state| state.as_ref().and_then(|d| d.admission_pass.clone())).map(|pass| view! { <article class="admission-card"><p class="eyebrow">WEJŚCIÓWKA VIRYA</p><h3>{pass.event_title}</h3><p>{event_time_location(&pass.starts_at, pass.venue.as_deref())}</p><strong>{pass.public_reference}</strong><span>{pass.status}</span><button class="primary" on:click=qr disabled=move || busy.get()>"POKAŻ QR NA WEJŚCIE"</button>{move || admission_qr.get().map(|value| view! { <QrPanel svg=value.qr_svg token=value.token expires=value.expires_at /> })}</article> })}
+        <Show when=move || dashboard.with(|state| state.as_ref().is_none_or(|d| d.admission_pass.is_none()))><div class="claim-box"><p class="eyebrow">WYGRAŁEŚ WEJŚCIÓWKĘ?</p><h3>Przypisz ją do telefonu</h3><textarea rows="3" placeholder="Token z wiadomości" prop:value=move || claim_token.get() on:input=move |e| claim_token.set(event_target_value(&e))></textarea><button class="primary" on:click=claim disabled=move || busy.get()>"ODBIERZ WEJŚCIÓWKĘ"</button></div></Show></Show>
+        <div class="section-head"><h3>Portfel biletów</h3><span>{move || wallets.get().len()}</span></div><Show when=move || !loading.get().wallets fallback=move || view! { <Skeleton rows=2 /> }><div class="wallet-stack">{move || wallets.get().into_iter().map(|wallet| view! { <WalletCard wallet=wallet error=error /> }).collect_view()}</div></Show><details class="import-box"><summary>"Dodaj istniejące zamówienie"</summary><div class="form-grid"><label>"Order ID"<input placeholder="UUID zamówienia" prop:value=move || order_id.get() on:input=move |e| order_id.set(event_target_value(&e))/></label><label>"Prywatny checkout token"<textarea rows="3" prop:value=move || checkout_token.get() on:input=move |e| checkout_token.set(event_target_value(&e))></textarea></label><button class="primary" on:click=import disabled=move || busy.get()>"DODAJ DO PORTFELA"</button></div></details></section>
     }
 }
 
 #[component]
 fn WalletCard(wallet: TicketWallet, error: RwSignal<Option<String>>) -> impl IntoView {
     let order_id = wallet.order.order_id.clone();
+    let busy = RwSignal::new(false);
     let resend = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
         let order = order_id.clone();
+        busy.set(true);
         spawn_local(async move {
             match bridge::invoke::<serde_json::Value, _>(
                 "fan_request_delivery",
@@ -1184,10 +1347,11 @@ fn WalletCard(wallet: TicketWallet, error: RwSignal<Option<String>>) -> impl Int
                 Ok(_) => error.set(Some("Wysłaliśmy ponownie portfel na e-mail.".to_owned())),
                 Err(message) => error.set(Some(message)),
             }
+            busy.set(false);
         });
     };
     view! {
-        <article class="wallet-card"><header><div><p class="eyebrow">{wallet.order.status}</p><h3>{wallet.order.event_title}</h3><p>{event_time_location(&wallet.order.starts_at, wallet.order.venue.as_deref())}</p></div><strong>{wallet.order.public_reference}</strong></header><div class="ticket-stack">{wallet.tickets.into_iter().map(|ticket| view! { <article class="ticket-card"><div><p class="eyebrow">{ticket.ticket_type_name}</p><strong>{ticket.public_reference}</strong><span>{ticket.holder_name.unwrap_or(ticket.holder_email_masked)}</span></div>{ticket.qr_svg.map(|svg| view! { <div class="mini-qr" inner_html=svg></div> })}<small>{format!("QR ważny do {}", human_time(&ticket.qr_expires_at))}</small></article> }).collect_view()}</div><button class="text-button" on:click=resend>"Wyślij bilety ponownie na e-mail"</button></article>
+        <article class="wallet-card"><header><div><p class="eyebrow">{wallet.order.status}</p><h3>{wallet.order.event_title}</h3><p>{event_time_location(&wallet.order.starts_at, wallet.order.venue.as_deref())}</p></div><strong>{wallet.order.public_reference}</strong></header><div class="ticket-stack">{wallet.tickets.into_iter().map(|ticket| view! { <article class="ticket-card"><div><p class="eyebrow">{ticket.ticket_type_name}</p><strong>{ticket.public_reference}</strong><span>{ticket.holder_name.unwrap_or(ticket.holder_email_masked)}</span></div>{ticket.qr_svg.map(|svg| view! { <div class="mini-qr" inner_html=svg></div> })}<small>{format!("QR ważny do {}", human_time(&ticket.qr_expires_at))}</small></article> }).collect_view()}</div><button class="text-button" on:click=resend disabled=move || busy.get()>{move || if busy.get() { "Wysyłam…" } else { "Wyślij bilety ponownie na e-mail" }}</button></article>
     }
 }
 
@@ -1201,16 +1365,22 @@ fn FanProfileScreen(
     status: RwSignal<FanSessionStatus>,
     dashboard: RwSignal<Option<FanDashboardData>>,
     wallets: RwSignal<Vec<TicketWallet>>,
+    loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let refresh = move |_| {
-        refresh_fan_dashboard(dashboard, error);
-        refresh_wallets(wallets, error);
+        refresh_fan_parts(dashboard, loading, error);
+        refresh_wallets(wallets, Some(loading), error);
     };
     let lock = move |_| {
         spawn_local(async move {
             match bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
-                Ok(value) => status.set(value),
+                Ok(value) => {
+                    dashboard.set(None);
+                    wallets.set(Vec::new());
+                    loading.set(FanLoadingState::all());
+                    status.set(value);
+                }
                 Err(message) => error.set(Some(message)),
             }
         })
@@ -1218,19 +1388,24 @@ fn FanProfileScreen(
     let forget = move |_| {
         spawn_local(async move {
             match bridge::invoke::<FanSessionStatus, _>("fan_forget", &EmptyArgs {}).await {
-                Ok(value) => status.set(value),
+                Ok(value) => {
+                    dashboard.set(None);
+                    wallets.set(Vec::new());
+                    loading.set(FanLoadingState::all());
+                    status.set(value);
+                }
                 Err(message) => error.set(Some(message)),
             }
         })
     };
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">MÓJ PROFIL</p><h2>Ustawienia Sygnału</h2></header>{move || status.get().session.map(|profile| view! { <div class="profile-card"><div class="avatar">V</div><div><strong>{profile.display_name.unwrap_or_else(|| "Fan Viryi".to_owned())}</strong><p>{profile.email}</p></div></div><div class="stats-grid"><Metric value=profile.wallet_count.to_string() label="zamówienia"/><Metric value=if profile.has_admission_pass { "1".to_owned() } else { "0".to_owned() } label="wejściówki"/><Metric value=dashboard.get().map(|d| d.referral.qualified_referrals.to_string()).unwrap_or_else(|| "—".to_owned()) label="polecenia"/></div> })}<div class="settings-list"><button on:click=refresh>"Odśwież dane"</button><button on:click=lock>"Zablokuj aplikację"</button><button class="danger ghost" on:click=forget>"Usuń profil i bilety z urządzenia"</button></div><p class="security-note">Sesja fana, wejściówka oraz prywatne tokeny portfela są przechowywane w osobnym, zaszyfrowanym sejfie Stronghold.</p></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">MÓJ PROFIL</p><h2>Ustawienia Sygnału</h2></header>{move || status.get().session.map(|profile| view! { <div class="profile-card"><div class="avatar">V</div><div><strong>{profile.display_name.unwrap_or_else(|| "Fan Viryi".to_owned())}</strong><p>{profile.email}</p></div></div><div class="stats-grid"><Metric value=profile.wallet_count.to_string() label="zamówienia"/><Metric value=if profile.has_admission_pass { "1".to_owned() } else { "0".to_owned() } label="wejściówki"/><Metric value=dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).unwrap_or_else(|| "—".to_owned()) label="polecenia"/></div> })}<div class="settings-list"><button on:click=refresh>"Odśwież dane"</button><button on:click=lock>"Zablokuj aplikację"</button><button class="danger ghost" on:click=forget>"Usuń profil i bilety z urządzenia"</button></div><p class="security-note">Sesja fana, wejściówka oraz prywatne tokeny portfela są przechowywane w osobnym, zaszyfrowanym sejfie Stronghold.</p></section>
     }
 }
 
 #[component]
-fn Skeleton() -> impl IntoView {
-    view! { <div class="skeleton-stack"><i></i><i></i><i></i></div> }
+fn Skeleton(#[prop(default = 3)] rows: usize) -> impl IntoView {
+    view! { <div class="skeleton-stack" aria-label="Ładowanie">{(0..rows).map(|_| view! { <i></i> }).collect_view()}</div> }
 }
 
 #[component]
@@ -1238,15 +1413,96 @@ fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
     view! { <Show when=move || error.get().is_some()><button class="toast" on:click=move |_| error.set(None)>{move || error.get().unwrap_or_default()}</button></Show> }
 }
 
-fn refresh_operator_dashboard(
+fn refresh_operator_parts(
     dashboard: RwSignal<Option<DashboardData>>,
+    loading: RwSignal<OperatorLoadingState>,
     error: RwSignal<Option<String>>,
 ) {
+    refresh_operator_events(dashboard, loading, error);
+    refresh_operator_qr(dashboard, loading, error);
+}
+
+fn refresh_public_events(
+    public: RwSignal<Option<PublicHomeData>>,
+    loading: RwSignal<PublicLoadingState>,
+    error: RwSignal<Option<String>>,
+) {
+    loading.update(|state| state.events = true);
     spawn_local(async move {
-        match bridge::invoke::<DashboardData, _>("dashboard", &EmptyArgs {}).await {
-            Ok(value) => dashboard.set(Some(value)),
+        match bridge::invoke::<Vec<PublicEvent>, _>(
+            "public_events",
+            &ApiArgs {
+                api_base_url: API_BASE,
+            },
+        )
+        .await
+        {
+            Ok(value) => public.update(|state| {
+                state.get_or_insert_with(PublicHomeData::default).events = value;
+            }),
             Err(message) => error.set(Some(message)),
         }
+        loading.update(|state| state.events = false);
+    });
+}
+
+fn refresh_public_cities(
+    public: RwSignal<Option<PublicHomeData>>,
+    loading: RwSignal<PublicLoadingState>,
+    error: RwSignal<Option<String>>,
+) {
+    loading.update(|state| state.cities = true);
+    spawn_local(async move {
+        match bridge::invoke::<Vec<CitySignal>, _>(
+            "public_cities",
+            &ApiArgs {
+                api_base_url: API_BASE,
+            },
+        )
+        .await
+        {
+            Ok(value) => public.update(|state| {
+                state.get_or_insert_with(PublicHomeData::default).cities = value;
+            }),
+            Err(message) => error.set(Some(message)),
+        }
+        loading.update(|state| state.cities = false);
+    });
+}
+
+fn refresh_operator_events(
+    dashboard: RwSignal<Option<DashboardData>>,
+    loading: RwSignal<OperatorLoadingState>,
+    error: RwSignal<Option<String>>,
+) {
+    loading.update(|state| state.events = true);
+    spawn_local(async move {
+        match bridge::invoke::<Vec<PublicEvent>, _>("operator_events", &EmptyArgs {}).await {
+            Ok(value) => dashboard.update(|state| {
+                state.get_or_insert_with(DashboardData::default).events = value;
+            }),
+            Err(message) => error.set(Some(message)),
+        }
+        loading.update(|state| state.events = false);
+    });
+}
+
+fn refresh_operator_qr(
+    dashboard: RwSignal<Option<DashboardData>>,
+    loading: RwSignal<OperatorLoadingState>,
+    error: RwSignal<Option<String>>,
+) {
+    loading.update(|state| state.qr = true);
+    spawn_local(async move {
+        match bridge::invoke::<crate::models::ConcertQrOverview, _>("operator_qr", &EmptyArgs {})
+            .await
+        {
+            Ok(value) => dashboard.update(|state| {
+                state.get_or_insert_with(DashboardData::default).qr = Some(value);
+            }),
+            Err(message) => error.set(Some(message)),
+        }
+        loading.update(|state| state.qr = false);
     });
 }
 
@@ -1259,47 +1515,139 @@ fn refresh_fan_status(status: RwSignal<FanSessionStatus>, error: RwSignal<Option
     });
 }
 
-fn refresh_fan_dashboard(
+fn refresh_fan_parts(
     dashboard: RwSignal<Option<FanDashboardData>>,
+    loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) {
+    loading.set(FanLoadingState::all());
+    refresh_fan_events(dashboard, loading, error);
+    refresh_fan_referral(dashboard, loading, error);
+    refresh_fan_interests(dashboard, loading, error);
+    refresh_fan_admission_pass(dashboard, loading, error);
+}
+
+fn refresh_fan_events(
+    dashboard: RwSignal<Option<FanDashboardData>>,
+    loading: RwSignal<FanLoadingState>,
+    error: RwSignal<Option<String>>,
+) {
+    loading.update(|state| state.events = true);
     spawn_local(async move {
-        match bridge::invoke::<FanDashboardData, _>("fan_dashboard", &EmptyArgs {}).await {
-            Ok(value) => dashboard.set(Some(value)),
+        match bridge::invoke::<Vec<PublicEvent>, _>("fan_events", &EmptyArgs {}).await {
+            Ok(value) => dashboard.update(|state| {
+                state.get_or_insert_with(FanDashboardData::default).events = value;
+            }),
             Err(message) => error.set(Some(message)),
         }
+        loading.update(|state| state.events = false);
     });
 }
 
-fn refresh_wallets(wallets: RwSignal<Vec<TicketWallet>>, error: RwSignal<Option<String>>) {
+fn refresh_fan_referral(
+    dashboard: RwSignal<Option<FanDashboardData>>,
+    loading: RwSignal<FanLoadingState>,
+    error: RwSignal<Option<String>>,
+) {
+    loading.update(|state| state.referral = true);
+    spawn_local(async move {
+        match bridge::invoke::<ReferralProgress, _>("fan_referral", &EmptyArgs {}).await {
+            Ok(value) => dashboard.update(|state| {
+                state.get_or_insert_with(FanDashboardData::default).referral = value;
+            }),
+            Err(message) => error.set(Some(message)),
+        }
+        loading.update(|state| state.referral = false);
+    });
+}
+
+fn refresh_fan_interests(
+    dashboard: RwSignal<Option<FanDashboardData>>,
+    loading: RwSignal<FanLoadingState>,
+    error: RwSignal<Option<String>>,
+) {
+    loading.update(|state| state.interests = true);
+    spawn_local(async move {
+        match bridge::invoke::<Vec<FanEventInterest>, _>("fan_interests", &EmptyArgs {}).await {
+            Ok(value) => dashboard.update(|state| {
+                state
+                    .get_or_insert_with(FanDashboardData::default)
+                    .interests = value;
+            }),
+            Err(message) => error.set(Some(message)),
+        }
+        loading.update(|state| state.interests = false);
+    });
+}
+
+fn refresh_fan_admission_pass(
+    dashboard: RwSignal<Option<FanDashboardData>>,
+    loading: RwSignal<FanLoadingState>,
+    error: RwSignal<Option<String>>,
+) {
+    loading.update(|state| state.admission_pass = true);
+    spawn_local(async move {
+        match bridge::invoke::<Option<AdmissionPass>, _>("fan_admission_pass", &EmptyArgs {}).await
+        {
+            Ok(value) => dashboard.update(|state| {
+                state
+                    .get_or_insert_with(FanDashboardData::default)
+                    .admission_pass = value;
+            }),
+            Err(message) => error.set(Some(message)),
+        }
+        loading.update(|state| state.admission_pass = false);
+    });
+}
+
+fn refresh_wallets(
+    wallets: RwSignal<Vec<TicketWallet>>,
+    loading: Option<RwSignal<FanLoadingState>>,
+    error: RwSignal<Option<String>>,
+) {
+    if let Some(loading) = loading {
+        loading.update(|state| state.wallets = true);
+    }
     spawn_local(async move {
         match bridge::invoke::<Vec<TicketWallet>, _>("fan_wallets", &EmptyArgs {}).await {
             Ok(value) => wallets.set(value),
             Err(message) => error.set(Some(message)),
         }
+        if let Some(loading) = loading {
+            loading.update(|state| state.wallets = false);
+        }
     });
 }
 
 fn operator_events(dashboard: RwSignal<Option<DashboardData>>) -> Vec<PublicEvent> {
-    dashboard.get().map(|data| data.events).unwrap_or_default()
+    dashboard.with(|state| {
+        state
+            .as_ref()
+            .map(|data| data.events.clone())
+            .unwrap_or_default()
+    })
 }
 
 fn operator_qr_events(
     dashboard: RwSignal<Option<DashboardData>>,
 ) -> Vec<crate::models::StaffEvent> {
-    dashboard
-        .get()
-        .and_then(|data| data.qr)
-        .map(|qr| qr.events)
-        .unwrap_or_default()
+    dashboard.with(|state| {
+        state
+            .as_ref()
+            .and_then(|data| data.qr.as_ref())
+            .map(|qr| qr.events.clone())
+            .unwrap_or_default()
+    })
 }
 
 fn operator_campaigns(dashboard: RwSignal<Option<DashboardData>>) -> Vec<QrCampaign> {
-    dashboard
-        .get()
-        .and_then(|data| data.qr)
-        .map(|qr| qr.campaigns)
-        .unwrap_or_default()
+    dashboard.with(|state| {
+        state
+            .as_ref()
+            .and_then(|data| data.qr.as_ref())
+            .map(|qr| qr.campaigns.clone())
+            .unwrap_or_default()
+    })
 }
 
 fn fan_events(
@@ -1307,9 +1655,8 @@ fn fan_events(
     public: RwSignal<Option<PublicHomeData>>,
 ) -> Vec<PublicEvent> {
     dashboard
-        .get()
-        .map(|data| data.events)
-        .or_else(|| public.get().map(|data| data.events))
+        .with(|state| state.as_ref().map(|data| data.events.clone()))
+        .or_else(|| public.with(|state| state.as_ref().map(|data| data.events.clone())))
         .unwrap_or_default()
 }
 
@@ -1332,15 +1679,28 @@ fn local_to_rfc3339(value: &str) -> Option<String> {
 }
 
 fn money(minor: i64, currency: &str) -> String {
-    format!("{:.2} {}", minor as f64 / 100.0, currency.to_uppercase())
+    let absolute = minor.unsigned_abs();
+    let sign = if minor < 0 { "-" } else { "" };
+    format!(
+        "{sign}{},{:02} {}",
+        absolute / 100,
+        absolute % 100,
+        currency.to_uppercase()
+    )
 }
 fn human_time(value: &str) -> String {
-    value
-        .replace('T', " • ")
-        .replace('Z', "")
-        .chars()
-        .take(19)
-        .collect()
+    let date = js_sys::Date::new(&JsValue::from_str(value));
+    if date.get_time().is_nan() {
+        return value.chars().take(32).collect();
+    }
+    format!(
+        "{:02}.{:02}.{} • {:02}:{:02}",
+        date.get_date(),
+        date.get_month() + 1,
+        date.get_full_year(),
+        date.get_hours(),
+        date.get_minutes()
+    )
 }
 fn event_location(event: &PublicEvent) -> String {
     event
@@ -1357,22 +1717,33 @@ fn event_time_location(starts_at: &str, venue: Option<&str>) -> String {
     )
 }
 fn day(value: &str) -> String {
-    value.get(8..10).unwrap_or("--").to_owned()
+    let date = js_sys::Date::new(&JsValue::from_str(value));
+    if date.get_time().is_nan() {
+        "--".to_owned()
+    } else {
+        format!("{:02}", date.get_date())
+    }
 }
 fn month(value: &str) -> String {
-    match value.get(5..7).unwrap_or("") {
-        "01" => "STY",
-        "02" => "LUT",
-        "03" => "MAR",
-        "04" => "KWI",
-        "05" => "MAJ",
-        "06" => "CZE",
-        "07" => "LIP",
-        "08" => "SIE",
-        "09" => "WRZ",
-        "10" => "PAŹ",
-        "11" => "LIS",
-        "12" => "GRU",
+    let date = js_sys::Date::new(&JsValue::from_str(value));
+    let month = if date.get_time().is_nan() {
+        u32::MAX
+    } else {
+        date.get_month()
+    };
+    match month {
+        0 => "STY",
+        1 => "LUT",
+        2 => "MAR",
+        3 => "KWI",
+        4 => "MAJ",
+        5 => "CZE",
+        6 => "LIP",
+        7 => "SIE",
+        8 => "WRZ",
+        9 => "PAŹ",
+        10 => "LIS",
+        11 => "GRU",
         _ => "---",
     }
     .to_owned()

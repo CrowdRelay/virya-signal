@@ -7,22 +7,25 @@ mod vault;
 use std::path::PathBuf;
 
 use api::CrowdRelayClient;
+use futures::{stream, StreamExt, TryStreamExt};
 use models::{
-    CreateQrCampaignInput, DashboardData, FanAuthResult, FanConfirmationInput, FanDashboardData,
-    FanProfile, FanSessionStatus, FanSignupInput, IssuePassInput, OperatorProfile, PublicHomeData,
-    SessionStatus, WalletCredential,
+    CitySignal, CreateQrCampaignInput, FanAuthResult, FanConfirmationInput, FanProfile,
+    FanSessionStatus, FanSignupInput, IssuePassInput, OperatorProfile, PublicEvent, SessionStatus,
+    WalletCredential,
 };
 use qrcode::{render::svg, QrCode};
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 use thiserror::Error;
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use zeroize::Zeroizing;
 
 pub struct AppState {
     session: RwLock<Option<OperatorProfile>>,
+    operator_mutation: Mutex<()>,
     fan_session: RwLock<Option<FanProfile>>,
     fan_pin: RwLock<Option<Zeroizing<String>>>,
+    fan_mutation: Mutex<()>,
     api: CrowdRelayClient,
     app_data_dir: PathBuf,
 }
@@ -43,6 +46,8 @@ pub enum AppError {
     InvalidInput(String),
     #[error("Konflikt: {0}")]
     Conflict(String),
+    #[error("Nie znaleziono danych")]
+    NotFound,
     #[error("CrowdRelay HTTP {status}: {detail}")]
     Remote { status: u16, detail: String },
     #[error("Błąd sieci: {0}")]
@@ -55,7 +60,12 @@ pub enum AppError {
     Io(#[from] std::io::Error),
     #[error("Błąd magazynu sejfu")]
     StrongholdClient,
+    #[error("Wewnętrzny błąd zadania")]
+    BackgroundTask,
 }
+
+const MAX_SECRET_BYTES: usize = 4096;
+const MAX_WALLETS: usize = 24;
 
 impl serde::Serialize for AppError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -68,8 +78,16 @@ impl serde::Serialize for AppError {
 
 #[tauri::command]
 fn open_external_url(app: AppHandle, url: String) -> Result<(), AppError> {
-    let parsed = url::Url::parse(url.trim())?;
-    if parsed.scheme() != "https" || parsed.username() != "" || parsed.password().is_some() {
+    let url = url.trim();
+    if url.len() > 2048 {
+        return Err(AppError::InvalidInput("Link jest zbyt długi".into()));
+    }
+    let parsed = url::Url::parse(url)?;
+    if parsed.scheme() != "https"
+        || parsed.host_str().is_none()
+        || parsed.username() != ""
+        || parsed.password().is_some()
+    {
         return Err(AppError::InvalidInput(
             "Można otwierać wyłącznie bezpieczne linki HTTPS".into(),
         ));
@@ -95,38 +113,59 @@ async fn configure(
     pin: String,
     mut profile: OperatorProfile,
 ) -> Result<SessionStatus, AppError> {
+    let _mutation = state.operator_mutation.lock().await;
     validate_operator_profile(&mut profile)?;
+    validate_pin(&pin)?;
     state.api.validate(&profile).await?;
-    vault::save(&state.app_data_dir, &pin, &profile)?;
+    let app_data_dir = state.app_data_dir.clone();
+    let stored_profile = profile.clone();
+    let pin = Zeroizing::new(pin);
+    run_blocking(move || vault::save(&app_data_dir, pin.as_str(), &stored_profile)).await?;
     *state.session.write().await = Some(profile);
+    drop(_mutation);
     session_status(state).await
 }
 
 #[tauri::command]
 async fn unlock(state: State<'_, AppState>, pin: String) -> Result<SessionStatus, AppError> {
-    let profile = vault::load(&state.app_data_dir, &pin)?;
-    state.api.validate(&profile).await?;
+    let _mutation = state.operator_mutation.lock().await;
+    validate_pin(&pin)?;
+    let app_data_dir = state.app_data_dir.clone();
+    let pin = Zeroizing::new(pin);
+    let profile = run_blocking(move || vault::load(&app_data_dir, pin.as_str())).await?;
     *state.session.write().await = Some(profile);
+    drop(_mutation);
     session_status(state).await
 }
 
 #[tauri::command]
 async fn lock(state: State<'_, AppState>) -> Result<SessionStatus, AppError> {
+    let _mutation = state.operator_mutation.lock().await;
     *state.session.write().await = None;
+    drop(_mutation);
     session_status(state).await
 }
 
 #[tauri::command]
 async fn forget_device(state: State<'_, AppState>) -> Result<SessionStatus, AppError> {
+    let _mutation = state.operator_mutation.lock().await;
     *state.session.write().await = None;
-    vault::remove(&state.app_data_dir)?;
+    let app_data_dir = state.app_data_dir.clone();
+    run_blocking(move || vault::remove(&app_data_dir)).await?;
+    drop(_mutation);
     session_status(state).await
 }
 
 #[tauri::command]
-async fn dashboard(state: State<'_, AppState>) -> Result<DashboardData, AppError> {
+async fn operator_events(state: State<'_, AppState>) -> Result<Vec<PublicEvent>, AppError> {
     let profile = operator_profile(&state).await?;
-    state.api.dashboard(&profile).await
+    state.api.operator_events(&profile).await
+}
+
+#[tauri::command]
+async fn operator_qr(state: State<'_, AppState>) -> Result<serde_json::Value, AppError> {
+    let profile = operator_profile(&state).await?;
+    state.api.operator_qr(&profile).await
 }
 
 #[tauri::command]
@@ -167,8 +206,9 @@ async fn redeem_coupon(
 #[tauri::command]
 async fn issue_pass(
     state: State<'_, AppState>,
-    input: IssuePassInput,
+    mut input: IssuePassInput,
 ) -> Result<serde_json::Value, AppError> {
+    validate_issue_pass(&mut input)?;
     let profile = operator_profile(&state).await?;
     state.api.issue_pass(&profile, &input).await
 }
@@ -185,8 +225,9 @@ async fn revoke_pass(
 #[tauri::command]
 async fn create_qr_campaign(
     state: State<'_, AppState>,
-    input: CreateQrCampaignInput,
+    mut input: CreateQrCampaignInput,
 ) -> Result<serde_json::Value, AppError> {
+    validate_campaign(&mut input)?;
     let profile = operator_profile(&state).await?;
     state.api.create_qr_campaign(&profile, &input).await
 }
@@ -201,12 +242,21 @@ async fn revoke_qr_campaign(
 }
 
 #[tauri::command]
-async fn public_home(
+async fn public_events(
     state: State<'_, AppState>,
     api_base_url: String,
-) -> Result<PublicHomeData, AppError> {
+) -> Result<Vec<PublicEvent>, AppError> {
     validate_api_base(&api_base_url)?;
-    state.api.public_home(&api_base_url).await
+    state.api.public_events(&api_base_url).await
+}
+
+#[tauri::command]
+async fn public_cities(
+    state: State<'_, AppState>,
+    api_base_url: String,
+) -> Result<Vec<CitySignal>, AppError> {
+    validate_api_base(&api_base_url)?;
+    state.api.public_cities(&api_base_url).await
 }
 
 #[tauri::command]
@@ -221,25 +271,35 @@ async fn fan_status(state: State<'_, AppState>) -> Result<FanSessionStatus, AppE
 
 #[tauri::command]
 async fn fan_unlock(state: State<'_, AppState>, pin: String) -> Result<FanSessionStatus, AppError> {
-    let profile = vault::load_fan(&state.app_data_dir, &pin)?;
-    state.api.fan_dashboard(&profile).await?;
+    let _mutation = state.fan_mutation.lock().await;
+    validate_pin(&pin)?;
+    let app_data_dir = state.app_data_dir.clone();
+    let vault_pin = Zeroizing::new(pin);
+    let pin_for_session = vault_pin.clone();
+    let profile = run_blocking(move || vault::load_fan(&app_data_dir, vault_pin.as_str())).await?;
     *state.fan_session.write().await = Some(profile);
-    *state.fan_pin.write().await = Some(Zeroizing::new(pin));
+    *state.fan_pin.write().await = Some(pin_for_session);
+    drop(_mutation);
     fan_status(state).await
 }
 
 #[tauri::command]
 async fn fan_lock(state: State<'_, AppState>) -> Result<FanSessionStatus, AppError> {
+    let _mutation = state.fan_mutation.lock().await;
     *state.fan_session.write().await = None;
     *state.fan_pin.write().await = None;
+    drop(_mutation);
     fan_status(state).await
 }
 
 #[tauri::command]
 async fn fan_forget(state: State<'_, AppState>) -> Result<FanSessionStatus, AppError> {
+    let _mutation = state.fan_mutation.lock().await;
     *state.fan_session.write().await = None;
     *state.fan_pin.write().await = None;
-    vault::remove_fan(&state.app_data_dir)?;
+    let app_data_dir = state.app_data_dir.clone();
+    run_blocking(move || vault::remove_fan(&app_data_dir)).await?;
+    drop(_mutation);
     fan_status(state).await
 }
 
@@ -249,7 +309,9 @@ async fn fan_signup(
     mut input: FanSignupInput,
     pin: String,
 ) -> Result<FanAuthResult, AppError> {
+    let _mutation = state.fan_mutation.lock().await;
     validate_fan_signup(&mut input, &pin)?;
+    let pin = Zeroizing::new(pin);
     let (result, session_token) = state.api.fan_signup(&input).await?;
     if let Some(session_token) = session_token {
         let profile = FanProfile {
@@ -260,9 +322,13 @@ async fn fan_signup(
             pass_session_token: None,
             wallets: Vec::new(),
         };
-        vault::save_fan(&state.app_data_dir, &pin, &profile)?;
+        let app_data_dir = state.app_data_dir.clone();
+        let stored_profile = profile.clone();
+        let vault_pin = pin.clone();
+        run_blocking(move || vault::save_fan(&app_data_dir, vault_pin.as_str(), &stored_profile))
+            .await?;
         *state.fan_session.write().await = Some(profile);
-        *state.fan_pin.write().await = Some(Zeroizing::new(pin));
+        *state.fan_pin.write().await = Some(pin);
     }
     Ok(result)
 }
@@ -273,7 +339,9 @@ async fn fan_confirm(
     mut input: FanConfirmationInput,
     pin: String,
 ) -> Result<FanAuthResult, AppError> {
+    let _mutation = state.fan_mutation.lock().await;
     validate_fan_confirmation(&mut input, &pin)?;
+    let pin = Zeroizing::new(pin);
     let (result, session_token) = state.api.fan_confirm(&input).await?;
     let profile = FanProfile {
         api_base_url: input.api_base_url,
@@ -283,16 +351,50 @@ async fn fan_confirm(
         pass_session_token: None,
         wallets: Vec::new(),
     };
-    vault::save_fan(&state.app_data_dir, &pin, &profile)?;
+    let app_data_dir = state.app_data_dir.clone();
+    let stored_profile = profile.clone();
+    let vault_pin = pin.clone();
+    run_blocking(move || vault::save_fan(&app_data_dir, vault_pin.as_str(), &stored_profile))
+        .await?;
     *state.fan_session.write().await = Some(profile);
-    *state.fan_pin.write().await = Some(Zeroizing::new(pin));
+    *state.fan_pin.write().await = Some(pin);
     Ok(result)
 }
 
 #[tauri::command]
-async fn fan_dashboard(state: State<'_, AppState>) -> Result<FanDashboardData, AppError> {
+async fn fan_events(state: State<'_, AppState>) -> Result<Vec<PublicEvent>, AppError> {
     let profile = fan_profile(&state).await?;
-    state.api.fan_dashboard(&profile).await
+    state.api.fan_events(&profile).await
+}
+
+#[tauri::command]
+async fn fan_referral(state: State<'_, AppState>) -> Result<serde_json::Value, AppError> {
+    let profile = fan_profile(&state).await?;
+    state.api.fan_referral(&profile).await
+}
+
+#[tauri::command]
+async fn fan_interests(state: State<'_, AppState>) -> Result<serde_json::Value, AppError> {
+    let profile = fan_profile(&state).await?;
+    state.api.fan_interests(&profile).await
+}
+
+#[tauri::command]
+async fn fan_admission_pass(
+    state: State<'_, AppState>,
+) -> Result<Option<serde_json::Value>, AppError> {
+    let _mutation = state.fan_mutation.lock().await;
+    let mut profile = fan_profile(&state).await?;
+    match state.api.fan_admission_pass(&profile).await {
+        Ok(value) => Ok(value),
+        Err(AppError::Unauthorized | AppError::NotFound) => {
+            profile.pass_session_token = None;
+            persist_fan(&state, &profile).await?;
+            *state.fan_session.write().await = Some(profile);
+            Ok(None)
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[tauri::command]
@@ -309,8 +411,10 @@ async fn fan_claim_pass(
     state: State<'_, AppState>,
     claim_token: String,
 ) -> Result<serde_json::Value, AppError> {
+    let _mutation = state.fan_mutation.lock().await;
+    let claim_token = bounded_secret(claim_token, "token wejściówki")?;
     let mut profile = fan_profile(&state).await?;
-    let (pass, pass_session_token) = state.api.claim_pass(&profile, &claim_token).await?;
+    let (pass, pass_session_token) = state.api.claim_pass(&profile, claim_token.as_str()).await?;
     profile.pass_session_token = Some(pass_session_token);
     persist_fan(&state, &profile).await?;
     *state.fan_session.write().await = Some(profile);
@@ -331,16 +435,30 @@ async fn fan_import_wallet(
     order_id: String,
     checkout_token: String,
 ) -> Result<serde_json::Value, AppError> {
+    let _mutation = state.fan_mutation.lock().await;
+    let order_id = uuid::Uuid::parse_str(order_id.trim())
+        .map(|value| value.to_string())
+        .map_err(|_| AppError::InvalidInput("Nieprawidłowy identyfikator zamówienia".into()))?;
+    let checkout_token = bounded_secret(checkout_token, "token zamówienia")?;
     let mut profile = fan_profile(&state).await?;
+    let already_imported = profile
+        .wallets
+        .iter()
+        .any(|wallet| wallet.order_id == order_id);
+    if !already_imported && profile.wallets.len() >= MAX_WALLETS {
+        return Err(AppError::InvalidInput(format!(
+            "Portfel może zawierać maksymalnie {MAX_WALLETS} zamówienia"
+        )));
+    }
     let mut wallet = state
         .api
-        .ticket_wallet(&profile.api_base_url, &order_id, &checkout_token)
+        .ticket_wallet(&profile.api_base_url, &order_id, checkout_token.as_str())
         .await?;
     attach_wallet_qrs(&mut wallet)?;
     profile.wallets.retain(|wallet| wallet.order_id != order_id);
     profile.wallets.push(WalletCredential {
         order_id,
-        checkout_token,
+        checkout_token: checkout_token.to_string(),
     });
     persist_fan(&state, &profile).await?;
     *state.fan_session.write().await = Some(profile);
@@ -350,20 +468,20 @@ async fn fan_import_wallet(
 #[tauri::command]
 async fn fan_wallets(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, AppError> {
     let profile = fan_profile(&state).await?;
-    let mut result = Vec::with_capacity(profile.wallets.len());
-    for wallet in &profile.wallets {
-        let mut value = state
-            .api
-            .ticket_wallet(
-                &profile.api_base_url,
-                &wallet.order_id,
-                &wallet.checkout_token,
-            )
-            .await?;
-        attach_wallet_qrs(&mut value)?;
-        result.push(value);
-    }
-    Ok(result)
+    let api = state.api.clone();
+    let api_base_url = profile.api_base_url.clone();
+    let requests = profile.wallets.iter().cloned().map(move |wallet| {
+        let api = api.clone();
+        let api_base_url = api_base_url.clone();
+        async move {
+            let mut value = api
+                .ticket_wallet(&api_base_url, &wallet.order_id, &wallet.checkout_token)
+                .await?;
+            attach_wallet_qrs(&mut value)?;
+            Ok::<_, AppError>(value)
+        }
+    });
+    stream::iter(requests).buffered(4).try_collect().await
 }
 
 #[tauri::command]
@@ -371,6 +489,9 @@ async fn fan_request_delivery(
     state: State<'_, AppState>,
     order_id: String,
 ) -> Result<serde_json::Value, AppError> {
+    let order_id = uuid::Uuid::parse_str(order_id.trim())
+        .map(|value| value.to_string())
+        .map_err(|_| AppError::InvalidInput("Nieprawidłowy identyfikator zamówienia".into()))?;
     let profile = fan_profile(&state).await?;
     let wallet = profile
         .wallets
@@ -414,6 +535,9 @@ fn attach_wallet_qrs(value: &mut serde_json::Value) -> Result<(), AppError> {
 }
 
 fn render_qr(token: &str) -> Result<String, AppError> {
+    if token.is_empty() || token.len() > MAX_SECRET_BYTES {
+        return Err(AppError::InvalidInput("Nieprawidłowy token QR".into()));
+    }
     let code = QrCode::new(token.as_bytes())
         .map_err(|_| AppError::InvalidInput("Nie udało się wygenerować kodu QR".into()))?;
     Ok(code
@@ -439,7 +563,19 @@ async fn fan_profile(state: &State<'_, AppState>) -> Result<FanProfile, AppError
 
 async fn persist_fan(state: &State<'_, AppState>, profile: &FanProfile) -> Result<(), AppError> {
     let pin = state.fan_pin.read().await.clone().ok_or(AppError::Locked)?;
-    vault::save_fan(&state.app_data_dir, pin.as_str(), profile)
+    let app_data_dir = state.app_data_dir.clone();
+    let profile = profile.clone();
+    run_blocking(move || vault::save_fan(&app_data_dir, pin.as_str(), &profile)).await
+}
+
+async fn run_blocking<T, F>(task: F) -> Result<T, AppError>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, AppError> + Send + 'static,
+{
+    tokio::task::spawn_blocking(task)
+        .await
+        .map_err(|_| AppError::BackgroundTask)?
 }
 
 fn validate_operator_profile(profile: &mut OperatorProfile) -> Result<(), AppError> {
@@ -469,7 +605,21 @@ fn validate_fan_signup(input: &mut FanSignupInput, pin: &str) -> Result<(), AppE
     input.display_name = clean_optional(input.display_name.take());
     input.referral_code = clean_optional(input.referral_code.take());
     validate_api_base(&input.api_base_url)?;
-    if !valid_email(&input.email) || input.city_slug.is_empty() || input.policy_version.is_empty() {
+    if !valid_email(&input.email)
+        || !valid_slug(&input.city_slug)
+        || input.locale.is_empty()
+        || input.locale.len() > 16
+        || input.policy_version.is_empty()
+        || input.policy_version.len() > 64
+        || input
+            .display_name
+            .as_ref()
+            .is_some_and(|value| value.chars().count() > 100)
+        || input
+            .referral_code
+            .as_ref()
+            .is_some_and(|value| value.len() > 128)
+    {
         return Err(AppError::InvalidInput(
             "Uzupełnij poprawnie dane fana".into(),
         ));
@@ -484,9 +634,51 @@ fn validate_fan_confirmation(input: &mut FanConfirmationInput, pin: &str) -> Res
     input.token = input.token.trim().to_owned();
     input.display_name = clean_optional(input.display_name.take());
     validate_api_base(&input.api_base_url)?;
-    if !valid_email(&input.email) || input.token.len() < 24 {
+    if !valid_email(&input.email)
+        || !(24..=MAX_SECRET_BYTES).contains(&input.token.len())
+        || input
+            .display_name
+            .as_ref()
+            .is_some_and(|value| value.chars().count() > 100)
+    {
         return Err(AppError::InvalidInput(
             "Nieprawidłowy e-mail lub token".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_issue_pass(input: &mut IssuePassInput) -> Result<(), AppError> {
+    input.event_slug = input.event_slug.trim().to_owned();
+    input.pool_slug = input.pool_slug.trim().to_owned();
+    input.fan_email = input.fan_email.trim().to_ascii_lowercase();
+    if !valid_slug(&input.event_slug)
+        || !valid_slug(&input.pool_slug)
+        || !valid_email(&input.fan_email)
+        || !(1..=720).contains(&input.claim_expires_hours)
+    {
+        return Err(AppError::InvalidInput(
+            "Nieprawidłowe dane wejściówki".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_campaign(input: &mut CreateQrCampaignInput) -> Result<(), AppError> {
+    input.event_slug = input.event_slug.trim().to_owned();
+    input.label = input.label.trim().to_owned();
+    input.valid_from = input.valid_from.trim().to_owned();
+    input.valid_until = input.valid_until.trim().to_owned();
+    if !valid_slug(&input.event_slug)
+        || input.label.is_empty()
+        || input.label.chars().count() > 100
+        || input.valid_from.len() > 64
+        || input.valid_until.len() > 64
+        || input.valid_until.as_str() <= input.valid_from.as_str()
+        || input.max_checkins == Some(0)
+    {
+        return Err(AppError::InvalidInput(
+            "Nieprawidłowe dane kampanii QR".into(),
         ));
     }
     Ok(())
@@ -504,28 +696,61 @@ fn validate_pin(pin: &str) -> Result<(), AppError> {
 
 fn validate_api_base(value: &str) -> Result<(), AppError> {
     let parsed = url::Url::parse(value.trim())?;
-    if parsed.scheme() != "https" && !cfg!(debug_assertions) {
+    let allowed_scheme =
+        parsed.scheme() == "https" || (cfg!(debug_assertions) && parsed.scheme() == "http");
+    if !allowed_scheme {
         return Err(AppError::InvalidInput("API musi używać HTTPS".into()));
     }
-    if parsed.username() != "" || parsed.password().is_some() {
+    if parsed.host_str().is_none()
+        || parsed.username() != ""
+        || parsed.password().is_some()
+        || parsed.query().is_some()
+        || parsed.fragment().is_some()
+    {
         return Err(AppError::InvalidInput(
-            "API URL nie może zawierać loginu".into(),
+            "Nieprawidłowy bazowy URL API".into(),
         ));
     }
     Ok(())
 }
 
 fn valid_email(value: &str) -> bool {
-    value.len() <= 320
-        && value
-            .split_once('@')
-            .is_some_and(|(local, domain)| !local.is_empty() && domain.contains('.'))
+    if value.len() > 320 || value.chars().any(char::is_whitespace) {
+        return false;
+    }
+    let mut parts = value.split('@');
+    let (Some(local), Some(domain), None) = (parts.next(), parts.next(), parts.next()) else {
+        return false;
+    };
+    !local.is_empty()
+        && local.len() <= 64
+        && !domain.starts_with('.')
+        && !domain.ends_with('.')
+        && domain.split('.').all(|part| !part.is_empty())
+        && domain.contains('.')
 }
 
 fn clean_optional(value: Option<String>) -> Option<String> {
     value
         .map(|value| value.trim().to_owned())
         .filter(|value| !value.is_empty())
+}
+
+fn valid_slug(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 200
+        && value
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
+}
+
+fn bounded_secret(value: String, label: &str) -> Result<Zeroizing<String>, AppError> {
+    let value = Zeroizing::new(value.trim().to_owned());
+    if value.is_empty() || value.len() > MAX_SECRET_BYTES {
+        Err(AppError::InvalidInput(format!("Nieprawidłowy {label}")))
+    } else {
+        Ok(value)
+    }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -538,8 +763,10 @@ pub fn run() {
             let app_data_dir = app.path().app_local_data_dir()?;
             app.manage(AppState {
                 session: RwLock::new(None),
+                operator_mutation: Mutex::new(()),
                 fan_session: RwLock::new(None),
                 fan_pin: RwLock::new(None),
+                fan_mutation: Mutex::new(()),
                 api: CrowdRelayClient::new()?,
                 app_data_dir,
             });
@@ -552,7 +779,8 @@ pub fn run() {
             unlock,
             lock,
             forget_device,
-            dashboard,
+            operator_events,
+            operator_qr,
             ticketing_overview,
             redeem_admission,
             redeem_coupon,
@@ -560,14 +788,18 @@ pub fn run() {
             revoke_pass,
             create_qr_campaign,
             revoke_qr_campaign,
-            public_home,
+            public_events,
+            public_cities,
             fan_status,
             fan_unlock,
             fan_lock,
             fan_forget,
             fan_signup,
             fan_confirm,
-            fan_dashboard,
+            fan_events,
+            fan_referral,
+            fan_interests,
+            fan_admission_pass,
             fan_register_interest,
             fan_claim_pass,
             fan_admission_qr,
@@ -576,5 +808,5 @@ pub fn run() {
             fan_request_delivery,
         ])
         .run(tauri::generate_context!())
-        .expect("failed to run Virya Mobile");
+        .expect("failed to run Virya Signal");
 }

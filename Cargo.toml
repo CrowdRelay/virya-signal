@@ -2,12 +2,13 @@
 name = "crowdrelay-mobile-ui"
 version = "0.2.0"
 edition = "2021"
-rust-version = "1.88"
-description = "Virya mobile operator and fan application UI"
+rust-version = "1.97"
+description = "Virya Signal mobile operator and fan application UI"
 license = "Apache-2.0"
 
 [dependencies]
 console_error_panic_hook = "0.1.7"
+futures = "0.3"
 js-sys = "0.3"
 leptos = { version = "0.8.20", features = ["csr"] }
 serde = { version = "1", features = ["derive"] }
@@ -15,7 +16,29 @@ serde-wasm-bindgen = "0.6"
 serde_json = "1"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
+web-sys = { version = "0.3", features = ["Event", "EventTarget", "Window"] }
 
 [workspace]
 members = ["src-tauri"]
 resolver = "2"
+
+[profile.dev]
+debug = 0
+incremental = true
+opt-level = 1
+strip = "debuginfo"
+
+# Password derivation is intentionally expensive. Optimizing it in debug builds
+# keeps local/mobile unlock latency representative without optimizing the app.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.scrypt]
+opt-level = 3
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = "thin"
+opt-level = "s"
+strip = "symbols"

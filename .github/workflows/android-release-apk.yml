@@ -21,6 +21,9 @@ concurrency:
 env:
   CI: "true"
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_NET_RETRY: "5"
+  RUST_BACKTRACE: "1"
   NDK_VERSION: "27.2.12479018"
   RELEASE_VERSION: ${{ startsWith(github.ref, 'refs/tags/apk-v') && github.ref_name || inputs.version }}
 
@@ -44,6 +47,7 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
       - name: Install Android SDK and NDK
         run: |
           yes | sdkmanager --licenses >/dev/null
@@ -52,15 +56,18 @@ jobs:
           echo "NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.88.0
-          targets: wasm32-unknown-unknown,aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+          toolchain: 1.97.0
+          targets: wasm32-unknown-unknown,aarch64-linux-android
       - uses: Swatinem/rust-cache@v2
-      - name: Install Tauri tools
-        run: |
-          cargo install trunk --version 0.21.14 --locked
-          cargo install tauri-cli --version '^2' --locked
+        with:
+          cache-on-failure: true
+          shared-key: android-release
+      - name: Install pinned Tauri tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: trunk@0.21.14,tauri-cli@2.11.4
       - name: Set release version
-        run: python3 scripts/set-release-version.py "${RELEASE_VERSION#apk-v}" --android-version-code "$GITHUB_RUN_NUMBER"
+        run: python3 scripts/set-release-version.py "${RELEASE_VERSION#apk-v}" --android-version-code auto
       - name: Generate Android project
         run: cargo tauri android init --ci --skip-targets-install
       - name: Generate mobile icons
@@ -71,7 +78,8 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/virya-upload.jks"
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/virya-upload.jks"
           cat > src-tauri/gen/android/keystore.properties <<EOF
           keyAlias=$ANDROID_KEY_ALIAS
           password=$ANDROID_KEY_PASSWORD
@@ -79,20 +87,22 @@ jobs:
           EOF
           python3 scripts/prepare-android.py --signing
       - name: Build signed APK
-        run: cargo tauri android build --ci --apk
+        run: cargo tauri android build --ci --apk --target aarch64
       - name: Collect APK
-        run: |
-          mkdir -p artifacts
-          APK="$(find src-tauri/gen/android/app/build/outputs/apk -type f -name '*.apk' | head -n 1)"
-          test -n "$APK"
-          cp "$APK" "artifacts/virya-${RELEASE_VERSION#apk-v}.apk"
+        run: python3 scripts/collect-mobile-artifact.py apk "artifacts/virya-signal-${RELEASE_VERSION#apk-v}.apk" --max-size-mib 150
       - uses: actions/upload-artifact@v4
         with:
-          name: virya-android-signed-${{ env.RELEASE_VERSION }}
-          path: artifacts/*.apk
+          name: virya-signal-android-signed-${{ env.RELEASE_VERSION }}
+          path: artifacts/*
+          if-no-files-found: error
           retention-days: 90
       - name: Create GitHub release
         if: startsWith(github.ref, 'refs/tags/apk-v')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" artifacts/* --repo "$GITHUB_REPOSITORY" --generate-notes --verify-tag
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" artifacts/* --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" artifacts/* --repo "$GITHUB_REPOSITORY" --generate-notes --verify-tag
+          fi

@@ -28,6 +28,9 @@ concurrency:
 env:
   CI: "true"
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_NET_RETRY: "5"
+  RUST_BACKTRACE: "1"
   NDK_VERSION: "27.2.12479018"
 
 jobs:
@@ -52,6 +55,7 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
       - name: Install Android SDK and NDK
         run: |
           yes | sdkmanager --licenses >/dev/null
@@ -60,15 +64,18 @@ jobs:
           echo "NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.88.0
+          toolchain: 1.97.0
           targets: wasm32-unknown-unknown,aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
       - uses: Swatinem/rust-cache@v2
-      - name: Install Tauri tools
-        run: |
-          cargo install trunk --version 0.21.14 --locked
-          cargo install tauri-cli --version '^2' --locked
+        with:
+          cache-on-failure: true
+          shared-key: android-release
+      - name: Install pinned Tauri tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: trunk@0.21.14,tauri-cli@2.11.4
       - name: Set release version
-        run: python3 scripts/set-release-version.py "${{ inputs.version }}" --android-version-code "$GITHUB_RUN_NUMBER"
+        run: python3 scripts/set-release-version.py "${{ inputs.version }}" --android-version-code auto
       - name: Generate Android project
         run: cargo tauri android init --ci --skip-targets-install
       - name: Generate mobile icons
@@ -79,7 +86,8 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/virya-upload.jks"
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/virya-upload.jks"
           cat > src-tauri/gen/android/keystore.properties <<EOF
           keyAlias=$ANDROID_KEY_ALIAS
           password=$ANDROID_KEY_PASSWORD
@@ -90,15 +98,13 @@ jobs:
         run: cargo tauri android build --ci --aab
       - name: Collect AAB
         run: |
-          mkdir -p artifacts
-          AAB="$(find src-tauri/gen/android/app/build/outputs/bundle -type f -name '*.aab' | head -n 1)"
-          test -n "$AAB"
-          cp "$AAB" "artifacts/virya-${{ inputs.version }}.aab"
-          echo "AAB_PATH=$GITHUB_WORKSPACE/artifacts/virya-${{ inputs.version }}.aab" >> "$GITHUB_ENV"
+          python3 scripts/collect-mobile-artifact.py aab "artifacts/virya-signal-${{ inputs.version }}.aab"
+          echo "AAB_PATH=$GITHUB_WORKSPACE/artifacts/virya-signal-${{ inputs.version }}.aab" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@v4
         with:
-          name: virya-android-play-${{ inputs.version }}
-          path: artifacts/*.aab
+          name: virya-signal-google-play-${{ inputs.version }}
+          path: artifacts/*
+          if-no-files-found: error
           retention-days: 90
       - name: Upload to Google Play
         uses: r0adkll/upload-google-play@v1

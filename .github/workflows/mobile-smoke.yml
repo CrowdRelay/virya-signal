@@ -6,6 +6,11 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "index.html"
+      - "boot.js"
+      - "Trunk.toml"
+      - "styles.css"
       - "src/**"
       - "src-tauri/**"
       - "scripts/**"
@@ -14,6 +19,11 @@ on:
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "index.html"
+      - "boot.js"
+      - "Trunk.toml"
+      - "styles.css"
       - "src/**"
       - "src-tauri/**"
       - "scripts/**"
@@ -30,6 +40,9 @@ concurrency:
 env:
   CI: "true"
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_NET_RETRY: "5"
+  RUST_BACKTRACE: "1"
   NDK_VERSION: "27.2.12479018"
 
 jobs:
@@ -43,6 +56,7 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v4
       - name: Install Android SDK and NDK
         run: |
           yes | sdkmanager --licenses >/dev/null
@@ -51,13 +65,16 @@ jobs:
           echo "NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.88.0
-          targets: wasm32-unknown-unknown,aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+          toolchain: 1.97.0
+          targets: wasm32-unknown-unknown,aarch64-linux-android
       - uses: Swatinem/rust-cache@v2
-      - name: Install Tauri tools
-        run: |
-          cargo install trunk --version 0.21.14 --locked
-          cargo install tauri-cli --version '^2' --locked
+        with:
+          cache-on-failure: true
+          shared-key: android-smoke
+      - name: Install pinned Tauri tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: trunk@0.21.14,tauri-cli@2.11.4
       - name: Generate Android project
         run: cargo tauri android init --ci --skip-targets-install
       - name: Generate mobile icons
@@ -65,15 +82,14 @@ jobs:
       - name: Target Android API 36
         run: python3 scripts/prepare-android.py
       - name: Build debug APK
-        run: cargo tauri android build --ci --debug --apk
+        run: cargo tauri android build --ci --debug --apk --target aarch64
       - name: Collect APK
-        run: |
-          mkdir -p artifacts
-          APK="$(find src-tauri/gen/android/app/build/outputs/apk -type f -name '*.apk' | head -n 1)"
-          test -n "$APK"
-          cp "$APK" artifacts/virya-debug.apk
+        run: python3 scripts/collect-mobile-artifact.py apk artifacts/virya-signal-debug.apk --max-size-mib 150
       - uses: actions/upload-artifact@v4
         with:
-          name: virya-android-debug
-          path: artifacts/virya-debug.apk
+          name: virya-signal-android-debug
+          path: |
+            artifacts/virya-signal-debug.apk
+            artifacts/virya-signal-debug.apk.sha256
+          if-no-files-found: error
           retention-days: 14

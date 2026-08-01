@@ -43,6 +43,7 @@ pub struct SessionStatus {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Zeroize)]
+#[zeroize(drop)]
 pub struct WalletCredential {
     pub order_id: String,
     pub checkout_token: String,
@@ -124,26 +125,6 @@ pub struct PublicEvent {
     pub trailer_url: Option<String>,
     pub external_event_url: Option<String>,
     pub updated_at: String,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct PublicHomeData {
-    pub events: Vec<PublicEvent>,
-    pub cities: Vec<CitySignal>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct DashboardData {
-    pub events: Vec<PublicEvent>,
-    pub qr: Option<serde_json::Value>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct FanDashboardData {
-    pub events: Vec<PublicEvent>,
-    pub referral: serde_json::Value,
-    pub interests: serde_json::Value,
-    pub admission_pass: Option<serde_json::Value>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

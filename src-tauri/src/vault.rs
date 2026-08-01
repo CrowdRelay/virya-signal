@@ -1,4 +1,8 @@
-use std::path::{Path, PathBuf};
+use std::{
+    fs::OpenOptions,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use argon2::Argon2;
 use rand::RngCore;
@@ -127,6 +131,7 @@ fn save_at<T: Serialize>(
         .insert(profile_key.to_vec(), bytes.to_vec(), None)
         .map_err(|_| AppError::StrongholdClient)?;
     stronghold.save().map_err(|_| AppError::StrongholdClient)?;
+    set_private_permissions(vault_path)?;
     Ok(())
 }
 
@@ -184,11 +189,19 @@ fn load_or_create_salt(path: &Path) -> Result<[u8; SALT_BYTES], AppError> {
     }
     let mut salt = [0_u8; SALT_BYTES];
     rand::rng().fill_bytes(&mut salt);
-    std::fs::write(path, salt)?;
-    Ok(salt)
+    match create_private_file(path, &salt) {
+        Ok(()) => Ok(salt),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => read_salt(path),
+        Err(error) => Err(error.into()),
+    }
 }
 
 fn read_salt(path: &Path) -> Result<[u8; SALT_BYTES], AppError> {
+    if std::fs::metadata(path)?.len() != SALT_BYTES as u64 {
+        return Err(AppError::InvalidInput(
+            "Uszkodzony profil urządzenia".into(),
+        ));
+    }
     let bytes = std::fs::read(path)?;
     bytes
         .try_into()
@@ -201,4 +214,32 @@ fn password(pin: &str, salt: &[u8; SALT_BYTES]) -> Result<Vec<u8>, AppError> {
         .hash_password_into(pin.as_bytes(), salt, &mut output)
         .map_err(|_| AppError::StrongholdClient)?;
     Ok(output.to_vec())
+}
+
+fn create_private_file(path: &Path, contents: &[u8]) -> Result<(), std::io::Error> {
+    let mut options = OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(path)?;
+    if let Err(error) = file.write_all(contents).and_then(|()| file.sync_all()) {
+        drop(file);
+        let _ = std::fs::remove_file(path);
+        return Err(error);
+    }
+    Ok(())
+}
+
+fn set_private_permissions(path: &Path) -> Result<(), AppError> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))?;
+    }
+    #[cfg(not(unix))]
+    let _ = path;
+    Ok(())
 }

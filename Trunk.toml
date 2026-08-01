@@ -3,7 +3,7 @@ target = "./index.html"
 dist = "dist"
 
 [watch]
-ignore = ["./src-tauri", "./docs", "./scripts"]
+ignore = ["./src-tauri", "./docs", "./scripts", "./artifacts"]
 
 [serve]
 port = 1420

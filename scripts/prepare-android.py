@@ -15,11 +15,14 @@ gradle = android / "app" / "build.gradle.kts"
 if not gradle.is_file():
     raise SystemExit(f"missing generated Android project: {gradle}")
 
-text = gradle.read_text()
+text = gradle.read_text(encoding="utf-8")
 text, compile_count = re.subn(r"\bcompileSdk\s*=\s*\d+", "compileSdk = 36", text)
 text, target_count = re.subn(r"\btargetSdk\s*=\s*\d+", "targetSdk = 36", text)
-if compile_count == 0 or target_count == 0:
-    raise SystemExit("could not locate compileSdk/targetSdk in generated Gradle file")
+if compile_count != 1 or target_count != 1:
+    raise SystemExit(
+        "expected exactly one compileSdk and targetSdk in generated Gradle file "
+        f"(found {compile_count}/{target_count})"
+    )
 
 if args.signing:
     properties = android / "keystore.properties"
@@ -70,5 +73,5 @@ if args.signing:
         else:
             raise SystemExit("could not locate release build type in generated Gradle file")
 
-gradle.write_text(text)
+gradle.write_text(text, encoding="utf-8")
 print(f"Android project prepared: API 36, signing={'on' if args.signing else 'off'}")

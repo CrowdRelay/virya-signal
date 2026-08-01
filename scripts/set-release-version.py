@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Set the bundle version without invalidating Cargo's dependency cache."""
+
 from __future__ import annotations
 
 import argparse
@@ -6,37 +8,67 @@ import json
 import re
 from pathlib import Path
 
-parser = argparse.ArgumentParser()
-parser.add_argument("version")
-parser.add_argument("--build-number")
-parser.add_argument("--android-version-code", type=int)
-args = parser.parse_args()
-version = args.version.removeprefix("v").strip()
-if not re.fullmatch(r"\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?", version):
-    raise SystemExit(f"invalid release version: {version}")
 
-root = Path(__file__).resolve().parents[1]
-for relative in ["Cargo.toml", "src-tauri/Cargo.toml"]:
-    path = root / relative
-    text = path.read_text()
-    text, count = re.subn(
-        r'(?m)^(version\s*=\s*")[^"]+("\s*)$',
-        rf'\g<1>{version}\g<2>',
-        text,
-        count=1,
-    )
-    if count != 1:
-        raise SystemExit(f"could not update package version in {relative}")
-    path.write_text(text)
+ROOT = Path(__file__).resolve().parents[1]
+SEMVER = re.compile(r"\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?")
 
-config_path = root / "src-tauri" / "tauri.conf.json"
-config = json.loads(config_path.read_text())
-config["version"] = version
-if args.build_number:
-    config.setdefault("bundle", {}).setdefault("iOS", {})["bundleVersion"] = str(args.build_number)
-if args.android_version_code is not None:
-    if not 1 <= args.android_version_code <= 2_100_000_000:
-        raise SystemExit("Android version code must be between 1 and 2100000000")
-    config.setdefault("bundle", {}).setdefault("android", {})["versionCode"] = args.android_version_code
-config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n")
-print(f"release version set to {version}")
+
+def normalize_version(raw: str) -> str:
+    version = raw.removeprefix("apk-v").removeprefix("v").strip()
+    if not SEMVER.fullmatch(version):
+        raise ValueError(f"invalid release version: {version}")
+    return version
+
+
+def derive_android_version_code(version: str) -> int:
+    stable = version.split("-", 1)[0].split("+", 1)[0]
+    major, minor, patch = map(int, stable.split("."))
+    if minor >= 1000 or patch >= 1000:
+        raise ValueError("minor and patch versions must be below 1000")
+    code = major * 1_000_000 + minor * 1_000 + patch
+    if not 1 <= code <= 2_100_000_000:
+        raise ValueError("derived Android version code is outside the supported range")
+    return code
+
+
+def update_config(
+    version: str,
+    build_number: str | None,
+    android_version_code: str | None,
+) -> None:
+    config_path = ROOT / "src-tauri" / "tauri.conf.json"
+    config = json.loads(config_path.read_text())
+    config["version"] = version
+    bundle = config.setdefault("bundle", {})
+    if build_number:
+        if not build_number.isdigit() or len(build_number) > 18:
+            raise ValueError("iOS build number must contain 1-18 digits")
+        bundle.setdefault("iOS", {})["bundleVersion"] = build_number
+    if android_version_code:
+        code = (
+            derive_android_version_code(version)
+            if android_version_code == "auto"
+            else int(android_version_code)
+        )
+        if not 1 <= code <= 2_100_000_000:
+            raise ValueError("Android version code must be between 1 and 2100000000")
+        bundle.setdefault("android", {})["versionCode"] = code
+    config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("version")
+    parser.add_argument("--build-number")
+    parser.add_argument("--android-version-code")
+    args = parser.parse_args()
+    try:
+        version = normalize_version(args.version)
+        update_config(version, args.build_number, args.android_version_code)
+    except (ValueError, OSError, json.JSONDecodeError) as error:
+        raise SystemExit(str(error)) from error
+    print(f"bundle release version set to {version}")
+
+
+if __name__ == "__main__":
+    main()
