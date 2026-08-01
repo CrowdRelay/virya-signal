@@ -218,8 +218,8 @@ impl CrowdRelayClient {
             .json(&serde_json::json!({"token": input.token.trim()}))
             .send()
             .await?;
-        let token =
-            response_cookie(response.headers(), FAN_COOKIE).ok_or_else(|| AppError::Remote {
+        let token = response_cookie(response.headers(), FAN_COOKIE)
+            .ok_or_else(|| AppError::Remote {
                 status: response.status().as_u16(),
                 detail: "Backend nie zwrócił sesji fana".into(),
             })?;
@@ -233,7 +233,10 @@ impl CrowdRelayClient {
         ))
     }
 
-    pub async fn fan_dashboard(&self, profile: &FanProfile) -> Result<FanDashboardData, AppError> {
+    pub async fn fan_dashboard(
+        &self,
+        profile: &FanProfile,
+    ) -> Result<FanDashboardData, AppError> {
         let events: EventListResponse = self
             .public_json_base(&profile.api_base_url, "public/events?limit=50")
             .await?;
@@ -291,8 +294,8 @@ impl CrowdRelayClient {
             .json(&serde_json::json!({"token": claim_token.trim()}))
             .send()
             .await?;
-        let session_token =
-            response_cookie(response.headers(), PASS_COOKIE).ok_or_else(|| AppError::Remote {
+        let session_token = response_cookie(response.headers(), PASS_COOKIE)
+            .ok_or_else(|| AppError::Remote {
                 status: response.status().as_u16(),
                 detail: "Backend nie zwrócił sesji wejściówki".into(),
             })?;
@@ -300,7 +303,10 @@ impl CrowdRelayClient {
         Ok((body, session_token))
     }
 
-    pub async fn admission_qr(&self, profile: &FanProfile) -> Result<serde_json::Value, AppError> {
+    pub async fn admission_qr(
+        &self,
+        profile: &FanProfile,
+    ) -> Result<serde_json::Value, AppError> {
         let token = profile
             .pass_session_token
             .as_deref()
@@ -407,10 +413,7 @@ impl CrowdRelayClient {
         let mut request = self
             .http
             .request(method, endpoint(&profile.api_base_url, path)?)
-            .header(
-                COOKIE,
-                format!("{FAN_COOKIE}={}", profile.fan_session_token),
-            )
+            .header(COOKIE, format!("{FAN_COOKIE}={}", profile.fan_session_token))
             .header("Idempotency-Key", Uuid::new_v4().to_string());
         if let Some(body) = body {
             request = request.json(body);
@@ -474,9 +477,7 @@ fn endpoint(base: &str, path: &str) -> Result<Url, AppError> {
         ));
     }
     if base.username() != "" || base.password().is_some() {
-        return Err(AppError::InvalidInput(
-            "API URL nie może zawierać danych logowania".into(),
-        ));
+        return Err(AppError::InvalidInput("API URL nie może zawierać danych logowania".into()));
     }
     if !base.path().ends_with('/') {
         base.set_path(&format!("{}/", base.path()));
@@ -520,9 +521,7 @@ fn response_cookie(headers: &HeaderMap, expected_name: &str) -> Option<String> {
         .filter_map(|header| header.to_str().ok())
         .filter_map(|header| header.split(';').next())
         .filter_map(|pair| pair.trim().split_once('='))
-        .find_map(|(name, value)| {
-            (name == expected_name && !value.is_empty()).then(|| value.to_owned())
-        })
+        .find_map(|(name, value)| (name == expected_name && !value.is_empty()).then(|| value.to_owned()))
 }
 
 fn normalized_optional(value: &Option<String>) -> Option<String> {

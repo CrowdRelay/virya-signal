@@ -7,12 +7,12 @@ mod vault;
 use std::path::PathBuf;
 
 use api::CrowdRelayClient;
+use qrcode::{render::svg, QrCode};
 use models::{
     CreateQrCampaignInput, DashboardData, FanAuthResult, FanConfirmationInput, FanDashboardData,
     FanProfile, FanSessionStatus, FanSignupInput, IssuePassInput, OperatorProfile, PublicHomeData,
     SessionStatus, WalletCredential,
 };
-use qrcode::{render::svg, QrCode};
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 use thiserror::Error;
@@ -70,9 +70,7 @@ impl serde::Serialize for AppError {
 fn open_external_url(app: AppHandle, url: String) -> Result<(), AppError> {
     let parsed = url::Url::parse(url.trim())?;
     if parsed.scheme() != "https" || parsed.username() != "" || parsed.password().is_some() {
-        return Err(AppError::InvalidInput(
-            "Można otwierać wyłącznie bezpieczne linki HTTPS".into(),
-        ));
+        return Err(AppError::InvalidInput("Można otwierać wyłącznie bezpieczne linki HTTPS".into()));
     }
     app.opener()
         .open_url(parsed.as_str(), None::<&str>)
@@ -220,7 +218,10 @@ async fn fan_status(state: State<'_, AppState>) -> Result<FanSessionStatus, AppE
 }
 
 #[tauri::command]
-async fn fan_unlock(state: State<'_, AppState>, pin: String) -> Result<FanSessionStatus, AppError> {
+async fn fan_unlock(
+    state: State<'_, AppState>,
+    pin: String,
+) -> Result<FanSessionStatus, AppError> {
     let profile = vault::load_fan(&state.app_data_dir, &pin)?;
     state.api.fan_dashboard(&profile).await?;
     *state.fan_session.write().await = Some(profile);
@@ -318,7 +319,9 @@ async fn fan_claim_pass(
 }
 
 #[tauri::command]
-async fn fan_admission_qr(state: State<'_, AppState>) -> Result<serde_json::Value, AppError> {
+async fn fan_admission_qr(
+    state: State<'_, AppState>,
+) -> Result<serde_json::Value, AppError> {
     let profile = fan_profile(&state).await?;
     let mut value = state.api.admission_qr(&profile).await?;
     attach_single_qr(&mut value)?;
@@ -348,7 +351,9 @@ async fn fan_import_wallet(
 }
 
 #[tauri::command]
-async fn fan_wallets(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, AppError> {
+async fn fan_wallets(
+    state: State<'_, AppState>,
+) -> Result<Vec<serde_json::Value>, AppError> {
     let profile = fan_profile(&state).await?;
     let mut result = Vec::with_capacity(profile.wallets.len());
     for wallet in &profile.wallets {
@@ -398,10 +403,7 @@ fn attach_single_qr(value: &mut serde_json::Value) -> Result<(), AppError> {
 }
 
 fn attach_wallet_qrs(value: &mut serde_json::Value) -> Result<(), AppError> {
-    let Some(tickets) = value
-        .get_mut("tickets")
-        .and_then(serde_json::Value::as_array_mut)
-    else {
+    let Some(tickets) = value.get_mut("tickets").and_then(serde_json::Value::as_array_mut) else {
         return Ok(());
     };
     for ticket in tickets {
@@ -438,7 +440,12 @@ async fn fan_profile(state: &State<'_, AppState>) -> Result<FanProfile, AppError
 }
 
 async fn persist_fan(state: &State<'_, AppState>, profile: &FanProfile) -> Result<(), AppError> {
-    let pin = state.fan_pin.read().await.clone().ok_or(AppError::Locked)?;
+    let pin = state
+        .fan_pin
+        .read()
+        .await
+        .clone()
+        .ok_or(AppError::Locked)?;
     vault::save_fan(&state.app_data_dir, pin.as_str(), profile)
 }
 
@@ -470,14 +477,15 @@ fn validate_fan_signup(input: &mut FanSignupInput, pin: &str) -> Result<(), AppE
     input.referral_code = clean_optional(input.referral_code.take());
     validate_api_base(&input.api_base_url)?;
     if !valid_email(&input.email) || input.city_slug.is_empty() || input.policy_version.is_empty() {
-        return Err(AppError::InvalidInput(
-            "Uzupełnij poprawnie dane fana".into(),
-        ));
+        return Err(AppError::InvalidInput("Uzupełnij poprawnie dane fana".into()));
     }
     Ok(())
 }
 
-fn validate_fan_confirmation(input: &mut FanConfirmationInput, pin: &str) -> Result<(), AppError> {
+fn validate_fan_confirmation(
+    input: &mut FanConfirmationInput,
+    pin: &str,
+) -> Result<(), AppError> {
     validate_pin(pin)?;
     input.api_base_url = input.api_base_url.trim().to_owned();
     input.email = input.email.trim().to_ascii_lowercase();
@@ -485,9 +493,7 @@ fn validate_fan_confirmation(input: &mut FanConfirmationInput, pin: &str) -> Res
     input.display_name = clean_optional(input.display_name.take());
     validate_api_base(&input.api_base_url)?;
     if !valid_email(&input.email) || input.token.len() < 24 {
-        return Err(AppError::InvalidInput(
-            "Nieprawidłowy e-mail lub token".into(),
-        ));
+        return Err(AppError::InvalidInput("Nieprawidłowy e-mail lub token".into()));
     }
     Ok(())
 }
@@ -496,9 +502,7 @@ fn validate_pin(pin: &str) -> Result<(), AppError> {
     if (6..=128).contains(&pin.chars().count()) {
         Ok(())
     } else {
-        Err(AppError::InvalidInput(
-            "PIN musi mieć co najmniej 6 znaków".into(),
-        ))
+        Err(AppError::InvalidInput("PIN musi mieć co najmniej 6 znaków".into()))
     }
 }
 
@@ -508,9 +512,7 @@ fn validate_api_base(value: &str) -> Result<(), AppError> {
         return Err(AppError::InvalidInput("API musi używać HTTPS".into()));
     }
     if parsed.username() != "" || parsed.password().is_some() {
-        return Err(AppError::InvalidInput(
-            "API URL nie może zawierać loginu".into(),
-        ));
+        return Err(AppError::InvalidInput("API URL nie może zawierać loginu".into()));
     }
     Ok(())
 }

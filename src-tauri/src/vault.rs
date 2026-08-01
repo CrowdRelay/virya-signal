@@ -6,10 +6,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use tauri_plugin_stronghold::stronghold::Stronghold;
 use zeroize::Zeroizing;
 
-use crate::{
-    models::{FanProfile, OperatorProfile},
-    AppError,
-};
+use crate::{models::{FanProfile, OperatorProfile}, AppError};
 
 const OPERATOR_CLIENT_PATH: &[u8] = b"virya-control-device";
 const OPERATOR_PROFILE_KEY: &[u8] = b"operator-profile-v1";
@@ -19,10 +16,7 @@ const SALT_BYTES: usize = 16;
 const PASSWORD_BYTES: usize = 32;
 
 pub fn exists(app_data_dir: &Path) -> bool {
-    exists_at(
-        &operator_vault_path(app_data_dir),
-        &operator_salt_path(app_data_dir),
-    )
+    exists_at(&operator_vault_path(app_data_dir), &operator_salt_path(app_data_dir))
 }
 
 pub fn save(app_data_dir: &Path, pin: &str, profile: &OperatorProfile) -> Result<(), AppError> {
@@ -47,10 +41,7 @@ pub fn load(app_data_dir: &Path, pin: &str) -> Result<OperatorProfile, AppError>
 }
 
 pub fn remove(app_data_dir: &Path) -> Result<(), AppError> {
-    remove_pair(
-        &operator_vault_path(app_data_dir),
-        &operator_salt_path(app_data_dir),
-    )
+    remove_pair(&operator_vault_path(app_data_dir), &operator_salt_path(app_data_dir))
 }
 
 pub fn fan_exists(app_data_dir: &Path) -> bool {
