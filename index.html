@@ -12,11 +12,13 @@
       .boot-signal{height:42px;display:flex;align-items:center;gap:6px}
       .boot-signal i{display:block;width:5px;border-radius:3px;background:#f3c51a;box-shadow:0 0 22px #f3c51a55;animation:boot-pulse .72s ease-in-out infinite alternate}
       .boot-signal i:nth-child(1){height:13px}.boot-signal i:nth-child(2){height:38px;animation-delay:.16s}.boot-signal i:nth-child(3){height:23px;animation-delay:.32s}
+      .boot-led{width:13px;height:13px;margin:2px 0 5px;border:2px solid #f8dc67;border-radius:50%;background:#f3c51a;box-shadow:0 0 10px #f3c51acc,0 0 28px #f3c51a88;animation:boot-led 1.05s steps(2,end) infinite}
       #boot-splash strong{margin-top:7px;font-size:clamp(42px,14vw,64px);line-height:.85;letter-spacing:-.075em}
       #boot-splash strong span{color:#f3c51a}
       #boot-status{margin:3px 0 0;color:#a9a89f;font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase}
       @keyframes boot-pulse{to{opacity:.3;transform:scaleY(.52)}}
-      @media(prefers-reduced-motion:reduce){.boot-signal i{animation:none}}
+      @keyframes boot-led{50%{opacity:.18;box-shadow:0 0 3px #f3c51a44}}
+      @media(prefers-reduced-motion:reduce){.boot-signal i,.boot-led{animation:none}}
     </style>
     <link data-trunk rel="css" href="styles.css" />
     <link data-trunk rel="copy-file" href="boot.js" />
@@ -26,6 +28,7 @@
   <body>
     <section id="boot-splash" role="status" aria-live="polite">
       <div class="boot-signal" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="boot-led" aria-hidden="true"></div>
       <strong>VIRYA <span>SIGNAL</span></strong>
       <p id="boot-status">URUCHAMIAMY SYGNAŁ</p>
     </section>

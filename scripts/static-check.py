@@ -2,6 +2,7 @@
 from pathlib import Path
 import json
 import re
+
 try:
     import tomllib
 except ModuleNotFoundError:
@@ -54,6 +55,8 @@ for path in required_paths:
 index = (root / 'index.html').read_text()
 if 'data-trunk rel="copy-dir" href="public"' in index:
     raise SystemExit('index.html references the optional public directory')
+if 'class="boot-led"' not in index or '@keyframes boot-led' not in index:
+    raise SystemExit('Virya Signal splash LED is missing or not animated')
 for wasm_feature in ['--enable-bulk-memory', '--enable-bulk-memory-opt', '--enable-nontrapping-float-to-int']:
     if wasm_feature not in index:
         raise SystemExit(f'Rust 1.97 wasm-opt compatibility flag is missing: {wasm_feature}')
@@ -87,5 +90,10 @@ if native_manifest.get('package', {}).get('rust-version') != '1.97' or ui_manife
     raise SystemExit('Cargo manifests must require Rust 1.97')
 if any(key.startswith('profile') for key in native_manifest):
     raise SystemExit('Cargo profiles must be declared at the workspace root')
+if native_manifest.get('dependencies', {}).get('rand') != '0.10':
+    raise SystemExit('native shell must use the validated rand 0.10 API')
+vault = (root / 'src-tauri/src/vault.rs').read_text()
+if 'use rand::Rng;' not in vault or 'use rand::RngCore;' in vault:
+    raise SystemExit('vault must import rand 0.10 trait rand::Rng')
 
 print(f'static configuration and IPC contract check: OK ({len(invoked)} used / {len(registered)} registered commands)')

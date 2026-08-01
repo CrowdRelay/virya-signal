@@ -5,7 +5,7 @@ use std::{
 };
 
 use argon2::Argon2;
-use rand::RngCore;
+use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use tauri_plugin_stronghold::stronghold::Stronghold;
 use zeroize::Zeroizing;
