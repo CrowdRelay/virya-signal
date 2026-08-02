@@ -94,7 +94,7 @@ jobs:
       - name: Capture Android dependency graph
         run: |
           mkdir -p artifacts
-          src-tauri/gen/android/gradlew -p src-tauri/gen/android :app:dependencies --configuration debugRuntimeClasspath > artifacts/android-debug-dependencies.txt
+          src-tauri/gen/android/gradlew -p src-tauri/gen/android :app:dependencies --configuration armDebugRuntimeClasspath > artifacts/android-debug-dependencies.txt
       - name: Collect APK
         run: python3 scripts/collect-mobile-artifact.py apk artifacts/virya-signal-debug.apk --max-size-mib 150
       - name: Inspect APK size and ABI
