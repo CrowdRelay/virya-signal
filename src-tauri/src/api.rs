@@ -360,9 +360,7 @@ impl CrowdRelayClient {
         let (summary_result, deliveries_result, outbox_result) =
             futures_util::future::join3(summary_request, deliveries_request, outbox_request).await;
         if summary_result.is_err() && deliveries_result.is_err() && outbox_result.is_err() {
-            return Err(summary_result
-                .err()
-                .expect("all operation control-plane requests failed"));
+            return Err(summary_result.expect_err("all operation control-plane requests failed"));
         }
         let mut unavailable_sources = Vec::new();
         let summary = match summary_result {

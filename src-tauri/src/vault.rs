@@ -5,7 +5,7 @@ use std::{
 };
 
 use argon2::Argon2;
-use iota_stronghold::Stronghold;
+use iota_stronghold::{KeyProvider, SnapshotPath, Stronghold};
 use rand::Rng;
 use serde::{de::DeserializeOwned, Serialize};
 use zeroize::Zeroizing;
@@ -66,36 +66,6 @@ pub fn remove(app_data_dir: &Path) -> Result<(), AppError> {
     )
 }
 
-/// Persists the encrypted offline show-mode snapshot and scan queue in the
-/// operator Stronghold. The store never contains raw QR tokens.
-pub fn save_show_mode(
-    app_data_dir: &Path,
-    pin: &str,
-    store: &ShowModeStore,
-) -> Result<(), AppError> {
-    save_at(
-        &operator_vault_path(app_data_dir),
-        &operator_salt_path(app_data_dir),
-        OPERATOR_CLIENT_PATH,
-        SHOW_MODE_STORE_KEY,
-        pin,
-        store,
-    )
-}
-
-/// Persists a pre-serialized show-mode store. Serialization happens while the
-/// in-memory cache is stable; Stronghold I/O remains on a blocking worker.
-pub fn save_show_mode_bytes(app_data_dir: &Path, pin: &str, bytes: &[u8]) -> Result<(), AppError> {
-    save_bytes_at(
-        &operator_vault_path(app_data_dir),
-        &operator_salt_path(app_data_dir),
-        OPERATOR_CLIENT_PATH,
-        SHOW_MODE_STORE_KEY,
-        pin,
-        bytes,
-    )
-}
-
 /// Saves the show-mode store with a password derived at operator unlock.
 pub fn save_show_mode_bytes_with_password(
     app_data_dir: &Path,
@@ -108,18 +78,6 @@ pub fn save_show_mode_bytes_with_password(
         SHOW_MODE_STORE_KEY,
         password,
         bytes,
-    )
-}
-
-/// Loads the encrypted show-mode store. Older operator profiles simply return
-/// an empty store, making the schema addition backwards compatible.
-pub fn load_show_mode(app_data_dir: &Path, pin: &str) -> Result<ShowModeStore, AppError> {
-    load_optional_at(
-        &operator_vault_path(app_data_dir),
-        &operator_salt_path(app_data_dir),
-        OPERATOR_CLIENT_PATH,
-        SHOW_MODE_STORE_KEY,
-        pin,
     )
 }
 
@@ -237,17 +195,30 @@ fn save_bytes_with_password_at(
     if let Some(parent) = vault_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    let stronghold =
-        Stronghold::new(vault_path, password.to_vec()).map_err(|_| AppError::StrongholdClient)?;
-    let client = stronghold
-        .load_client(client_path)
-        .or_else(|_| stronghold.create_client(client_path))
+
+    let snapshot_path = SnapshotPath::from_path(vault_path);
+    let key_provider = KeyProvider::try_from(Zeroizing::new(password.to_vec()))
         .map_err(|_| AppError::StrongholdClient)?;
+    let stronghold = Stronghold::default();
+    let client = if vault_path.exists() {
+        stronghold
+            .load_client_from_snapshot(client_path, &key_provider, &snapshot_path)
+            .map_err(|_| AppError::StrongholdClient)?
+    } else {
+        stronghold
+            .create_client(client_path)
+            .map_err(|_| AppError::StrongholdClient)?
+    };
     client
         .store()
         .insert(profile_key.to_vec(), bytes.to_vec(), None)
         .map_err(|_| AppError::StrongholdClient)?;
-    stronghold.save().map_err(|_| AppError::StrongholdClient)?;
+    stronghold
+        .write_client(client_path)
+        .map_err(|_| AppError::StrongholdClient)?;
+    stronghold
+        .commit_with_keyprovider(&snapshot_path, &key_provider)
+        .map_err(|_| AppError::StrongholdClient)?;
     set_private_permissions(vault_path)?;
     Ok(())
 }
@@ -264,10 +235,12 @@ fn load_at<T: DeserializeOwned>(
         return Err(AppError::NotConfigured);
     }
     let salt = read_salt(salt_path)?;
-    let stronghold =
-        Stronghold::new(vault_path, password(pin, &salt)?).map_err(|_| AppError::InvalidPin)?;
+    let key_provider = KeyProvider::try_from(Zeroizing::new(password(pin, &salt)?))
+        .map_err(|_| AppError::InvalidPin)?;
+    let snapshot_path = SnapshotPath::from_path(vault_path);
+    let stronghold = Stronghold::default();
     let client = stronghold
-        .load_client(client_path)
+        .load_client_from_snapshot(client_path, &key_provider, &snapshot_path)
         .map_err(|_| AppError::InvalidPin)?;
     let bytes = Zeroizing::new(
         client
@@ -276,34 +249,6 @@ fn load_at<T: DeserializeOwned>(
             .map_err(|_| AppError::StrongholdClient)?
             .ok_or(AppError::NotConfigured)?,
     );
-    serde_json::from_slice(bytes.as_ref()).map_err(AppError::from)
-}
-
-fn load_optional_at<T: DeserializeOwned + Default>(
-    vault_path: &Path,
-    salt_path: &Path,
-    client_path: &[u8],
-    profile_key: &[u8],
-    pin: &str,
-) -> Result<T, AppError> {
-    ensure_pin(pin)?;
-    if !exists_at(vault_path, salt_path) {
-        return Ok(T::default());
-    }
-    let salt = read_salt(salt_path)?;
-    let stronghold =
-        Stronghold::new(vault_path, password(pin, &salt)?).map_err(|_| AppError::InvalidPin)?;
-    let client = stronghold
-        .load_client(client_path)
-        .map_err(|_| AppError::InvalidPin)?;
-    let Some(bytes) = client
-        .store()
-        .get(profile_key)
-        .map_err(|_| AppError::StrongholdClient)?
-    else {
-        return Ok(T::default());
-    };
-    let bytes = Zeroizing::new(bytes);
     serde_json::from_slice(bytes.as_ref()).map_err(AppError::from)
 }
 
@@ -319,10 +264,12 @@ fn load_optional_with_password_at<T: DeserializeOwned + Default>(
     if password.len() != PASSWORD_BYTES {
         return Err(AppError::InvalidPin);
     }
-    let stronghold =
-        Stronghold::new(vault_path, password.to_vec()).map_err(|_| AppError::InvalidPin)?;
+    let key_provider = KeyProvider::try_from(Zeroizing::new(password.to_vec()))
+        .map_err(|_| AppError::InvalidPin)?;
+    let snapshot_path = SnapshotPath::from_path(vault_path);
+    let stronghold = Stronghold::default();
     let client = stronghold
-        .load_client(client_path)
+        .load_client_from_snapshot(client_path, &key_provider, &snapshot_path)
         .map_err(|_| AppError::InvalidPin)?;
     let Some(bytes) = client
         .store()

@@ -149,6 +149,7 @@ async fn configure(
     *state.operator_pin.write().await = Some(pin);
     *state.operator_vault_password.write().await = Some(vault_password);
     *state.show_mode_store.write().await = None;
+    drop(_show_mutation);
     drop(_mutation);
     session_status(state).await
 }
@@ -171,6 +172,7 @@ async fn unlock(state: State<'_, AppState>, pin: String) -> Result<SessionStatus
     *state.operator_pin.write().await = Some(pin);
     *state.operator_vault_password.write().await = Some(vault_password);
     *state.show_mode_store.write().await = None;
+    drop(_show_mutation);
     drop(_mutation);
     session_status(state).await
 }
@@ -183,6 +185,7 @@ async fn lock(state: State<'_, AppState>) -> Result<SessionStatus, AppError> {
     *state.operator_pin.write().await = None;
     *state.operator_vault_password.write().await = None;
     *state.show_mode_store.write().await = None;
+    drop(_show_mutation);
     drop(_mutation);
     session_status(state).await
 }
@@ -197,6 +200,7 @@ async fn forget_device(state: State<'_, AppState>) -> Result<SessionStatus, AppE
     *state.show_mode_store.write().await = None;
     let app_data_dir = state.app_data_dir.clone();
     run_blocking(move || vault::remove(&app_data_dir)).await?;
+    drop(_show_mutation);
     drop(_mutation);
     session_status(state).await
 }
@@ -520,16 +524,6 @@ fn parse_t1_reference(token: &str) -> Result<String, AppError> {
         return Err(AppError::InvalidInput("Nieprawidłowy bilet QR".into()));
     }
     Ok(reference)
-}
-
-async fn operator_pin(state: &State<'_, AppState>) -> Result<Zeroizing<String>, AppError> {
-    state
-        .operator_pin
-        .read()
-        .await
-        .as_ref()
-        .cloned()
-        .ok_or(AppError::Locked)
 }
 
 async fn operator_vault_password(
@@ -1199,12 +1193,25 @@ fn render_qr(token: &str) -> Result<String, AppError> {
     }
     let code = QrCode::new(token.as_bytes())
         .map_err(|_| AppError::InvalidInput("Nie udało się wygenerować kodu QR".into()))?;
-    Ok(code
+    let rendered = code
         .render::<svg::Color>()
         .min_dimensions(320, 320)
         .dark_color(svg::Color("#080808"))
         .light_color(svg::Color("#ffffff"))
-        .build())
+        .build();
+
+    // qrcode's SVG renderer prepends an XML declaration. The webview contract
+    // expects a standalone <svg> fragment suitable for direct DOM insertion.
+    let start = rendered
+        .find("<svg")
+        .ok_or_else(|| AppError::InvalidInput("Nie udało się wygenerować kodu QR".into()))?;
+    let svg = rendered[start..].trim();
+    if !svg.ends_with("</svg>") {
+        return Err(AppError::InvalidInput(
+            "Nie udało się wygenerować kodu QR".into(),
+        ));
+    }
+    Ok(svg.to_owned())
 }
 
 async fn operator_profile(state: &State<'_, AppState>) -> Result<Arc<OperatorProfile>, AppError> {
@@ -1412,10 +1419,82 @@ fn bounded_secret(value: String, label: &str) -> Result<Zeroizing<String>, AppEr
     }
 }
 
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            #[cfg(mobile)]
+            app.handle().plugin(tauri_plugin_barcode_scanner::init())?;
+            let app_data_dir = app.path().app_local_data_dir()?;
+            let api = CrowdRelayClient::new(app_data_dir.join("public-cache-v1.json"))?;
+            app.manage(AppState {
+                session: RwLock::new(None),
+                operator_pin: RwLock::new(None),
+                operator_vault_password: RwLock::new(None),
+                operator_mutation: Mutex::new(()),
+                show_mode_mutation: Mutex::new(()),
+                show_mode_store: RwLock::new(None),
+                fan_session: RwLock::new(None),
+                fan_pin: RwLock::new(None),
+                fan_mutation: Mutex::new(()),
+                wallet_qr_tokens: RwLock::new(HashMap::new()),
+                api,
+                app_data_dir,
+            });
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            open_external_url,
+            session_status,
+            configure,
+            unlock,
+            lock,
+            forget_device,
+            operator_events,
+            operator_qr,
+            operator_ops_overview,
+            operator_retry,
+            show_mode_prepare,
+            show_mode_status,
+            show_mode_scan,
+            show_mode_sync,
+            show_mode_clear,
+            ticketing_overview,
+            redeem_admission,
+            redeem_coupon,
+            issue_pass,
+            revoke_pass,
+            create_qr_campaign,
+            revoke_qr_campaign,
+            public_events,
+            public_cities,
+            fan_status,
+            fan_unlock,
+            fan_lock,
+            fan_forget,
+            fan_signup,
+            fan_confirm,
+            fan_events,
+            fan_area_wallet,
+            fan_referral,
+            fan_interests,
+            fan_admission_pass,
+            fan_register_interest,
+            fan_claim_pass,
+            fan_admission_qr,
+            fan_import_wallet,
+            fan_wallets,
+            render_wallet_qr,
+            fan_request_delivery,
+        ])
+        .run(tauri::generate_context!())
+        .expect("failed to run Virya Signal");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use base64::Engine as _;
 
     #[test]
     fn email_validation_rejects_malformed_and_whitespace() {
@@ -1604,77 +1683,4 @@ mod tests {
         let status = show_mode_status_for("virya-live", &store);
         assert_eq!((status.pending, status.synced, status.conflicts), (1, 0, 1));
     }
-}
-
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
-        .setup(|app| {
-            #[cfg(mobile)]
-            app.handle().plugin(tauri_plugin_barcode_scanner::init())?;
-            let app_data_dir = app.path().app_local_data_dir()?;
-            let api = CrowdRelayClient::new(app_data_dir.join("public-cache-v1.json"))?;
-            app.manage(AppState {
-                session: RwLock::new(None),
-                operator_pin: RwLock::new(None),
-                operator_vault_password: RwLock::new(None),
-                operator_mutation: Mutex::new(()),
-                show_mode_mutation: Mutex::new(()),
-                show_mode_store: RwLock::new(None),
-                fan_session: RwLock::new(None),
-                fan_pin: RwLock::new(None),
-                fan_mutation: Mutex::new(()),
-                wallet_qr_tokens: RwLock::new(HashMap::new()),
-                api,
-                app_data_dir,
-            });
-            Ok(())
-        })
-        .invoke_handler(tauri::generate_handler![
-            open_external_url,
-            session_status,
-            configure,
-            unlock,
-            lock,
-            forget_device,
-            operator_events,
-            operator_qr,
-            operator_ops_overview,
-            operator_retry,
-            show_mode_prepare,
-            show_mode_status,
-            show_mode_scan,
-            show_mode_sync,
-            show_mode_clear,
-            ticketing_overview,
-            redeem_admission,
-            redeem_coupon,
-            issue_pass,
-            revoke_pass,
-            create_qr_campaign,
-            revoke_qr_campaign,
-            public_events,
-            public_cities,
-            fan_status,
-            fan_unlock,
-            fan_lock,
-            fan_forget,
-            fan_signup,
-            fan_confirm,
-            fan_events,
-            fan_area_wallet,
-            fan_referral,
-            fan_interests,
-            fan_admission_pass,
-            fan_register_interest,
-            fan_claim_pass,
-            fan_admission_qr,
-            fan_import_wallet,
-            fan_wallets,
-            render_wallet_qr,
-            fan_request_delivery,
-        ])
-        .run(tauri::generate_context!())
-        .expect("failed to run Virya Signal");
 }
