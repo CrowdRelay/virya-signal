@@ -20,15 +20,25 @@ class PrepareAndroidTests(unittest.TestCase):
             scripts.mkdir()
             app.mkdir(parents=True)
             shutil.copy2(SCRIPT, scripts / SCRIPT.name)
-            icon_assets = root / "src-tauri" / "launcher-assets" / "android"
-            legacy = icon_assets / "mipmap-mdpi"
-            legacy.mkdir(parents=True)
-            # The preparer only copies bytes; tiny fixtures keep this test free
-            # from Pillow/ImageMagick dependencies.
-            png = b"\x89PNG\r\n\x1a\nfixture"
-            (icon_assets / "ic_launcher_foreground.png").write_bytes(png)
-            (legacy / "ic_launcher.png").write_bytes(png)
-            (legacy / "ic_launcher_round.png").write_bytes(png)
+
+            # In CI, `cargo tauri icon` runs before prepare-android.py.
+            # Model its generated adaptive resources instead of the obsolete
+            # hand-copied launcher-assets directory.
+            res = app / "src" / "main" / "res"
+            adaptive_v26 = res / "mipmap-anydpi-v26"
+            adaptive_v26.mkdir(parents=True)
+            adaptive_xml = """<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>
+"""
+            for filename in ("ic_launcher.xml", "ic_launcher_round.xml"):
+                (adaptive_v26 / filename).write_text(adaptive_xml)
+
+            # A generated Gradle fixture may contain only the release build
+            # type. The preparer must still configure release shrinking and
+            # must not require an explicit debug block.
             gradle = app / "build.gradle.kts"
             gradle.write_text(
                 """
@@ -53,22 +63,26 @@ android {
                 check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
+
             output = gradle.read_text()
             self.assertIn("compileSdk = 36", output)
             self.assertIn("targetSdk = 36", output)
             self.assertIn("isMinifyEnabled = true", output)
             self.assertIn("isShrinkResources = true", output)
             self.assertEqual(output.count("proguardFiles("), 1)
+
             properties = (android / "gradle.properties").read_text()
             self.assertIn("org.gradle.caching=true", properties)
             self.assertIn("org.gradle.parallel=true", properties)
-            res = app / "src" / "main" / "res"
-            self.assertTrue((res / "drawable" / "ic_launcher_foreground.png").is_file())
-            self.assertTrue((res / "mipmap-mdpi" / "ic_launcher.png").is_file())
-            self.assertIn(
-                "<monochrome",
-                (res / "mipmap-anydpi-v33" / "ic_launcher.xml").read_text(),
-            )
+
+            for filename in ("ic_launcher.xml", "ic_launcher_round.xml"):
+                generated = (res / "mipmap-anydpi-v33" / filename).read_text()
+                self.assertEqual(generated.count("<monochrome"), 1)
+                self.assertIn('@mipmap/ic_launcher_foreground', generated)
+                self.assertIn("<background", generated)
+                self.assertIn("<foreground", generated)
+
+            self.assertFalse((root / "src-tauri" / "launcher-assets").exists())
 
 
 if __name__ == "__main__":

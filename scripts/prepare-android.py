@@ -99,6 +99,15 @@ def _find_kotlin_named_block(source: str, name: str) -> tuple[int, int, str]:
     raise SystemExit(f"unterminated {name} build type in generated Gradle file")
 
 
+def _has_kotlin_named_block(source: str, name: str) -> bool:
+    patterns = (
+        rf'getByName\(\"{re.escape(name)}\"\)\s*\{{',
+        rf'named\(\"{re.escape(name)}\"\)\s*\{{',
+        rf'(?m)^[ \t]*{re.escape(name)}[ \t]*\{{',
+    )
+    return any(re.search(pattern, source) for pattern in patterns)
+
+
 def _set_kotlin_property(body: str, key: str, value: str, indent: str) -> str:
     pattern = rf'(?m)^[ \t]*{re.escape(key)}[ \t]*=[ \t]*(?:true|false)[ \t]*$'
     replacement = f"{indent}{key} = {value}"
@@ -140,18 +149,21 @@ def _patch_build_type(
     return source[: opening + 1] + body + source[closing:]
 
 
-text = _patch_build_type(text, "debug", minify=False, shrink=None, proguard=False)
+has_debug_build_type = _has_kotlin_named_block(text, "debug")
+if has_debug_build_type:
+    text = _patch_build_type(text, "debug", minify=False, shrink=None, proguard=False)
 text = _patch_build_type(text, "release", minify=True, shrink=True, proguard=True)
 
 # Verify the effective configuration after all mutations.
-debug_open, debug_close, _ = _find_kotlin_named_block(text, "debug")
-debug_body = text[debug_open + 1 : debug_close]
+if has_debug_build_type:
+    debug_open, debug_close, _ = _find_kotlin_named_block(text, "debug")
+    debug_body = text[debug_open + 1 : debug_close]
+    if "isMinifyEnabled = false" not in debug_body:
+        raise SystemExit("debug build must remain unminified")
+    if "isShrinkResources = true" in debug_body or "proguardFiles(" in debug_body:
+        raise SystemExit("release-only shrinker configuration leaked into debug build")
 release_open, release_close, _ = _find_kotlin_named_block(text, "release")
 release_body = text[release_open + 1 : release_close]
-if "isMinifyEnabled = false" not in debug_body:
-    raise SystemExit("debug build must remain unminified")
-if "isShrinkResources = true" in debug_body or "proguardFiles(" in debug_body:
-    raise SystemExit("release-only shrinker configuration leaked into debug build")
 for fragment in (
     "isMinifyEnabled = true",
     "isShrinkResources = true",
