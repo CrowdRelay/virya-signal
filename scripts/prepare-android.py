@@ -120,7 +120,7 @@ def _patch_build_type(
     body = source[opening + 1 : closing]
     body = _set_kotlin_property(body, "isMinifyEnabled", str(minify).lower(), indent)
 
-    shrink_pattern = r'(?m)^\s*isShrinkResources\s*=\s*(?:true|false)\s*\n?'
+    shrink_pattern = r'(?m)^[ \t]*isShrinkResources[ \t]*=[ \t]*(?:true|false)[ \t]*\n?'
     if shrink is None:
         body = re.sub(shrink_pattern, "", body)
     else:
@@ -221,6 +221,39 @@ if args.signing:
             raise SystemExit("could not locate release build type in generated Gradle file")
 
 gradle.write_text(text, encoding="utf-8")
+
+# Android 13+ themed icons require a v33 adaptive-icon resource with an
+# explicit monochrome layer. Reuse the foreground generated immediately before
+# this script by `cargo tauri icon`; never replace it with stale launcher assets.
+MONOCHROME_ADAPTIVE_ICON_DIR = "mipmap-anydpi-v33"
+
+
+def _install_monochrome_adaptive_icons() -> None:
+    resources = android / "app" / "src" / "main" / "res"
+    source_dir = resources / "mipmap-anydpi-v26"
+    target_dir = resources / MONOCHROME_ADAPTIVE_ICON_DIR
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    for filename in ("ic_launcher.xml", "ic_launcher_round.xml"):
+        source = source_dir / filename
+        if not source.is_file():
+            raise SystemExit(f"missing Tauri-generated adaptive icon: {source}")
+        xml = source.read_text(encoding="utf-8")
+        if "<adaptive-icon" not in xml or "</adaptive-icon>" not in xml:
+            raise SystemExit(f"invalid adaptive icon XML: {source}")
+
+        monochrome = (
+            '    <monochrome android:drawable="@mipmap/ic_launcher_foreground" />\n'
+        )
+        xml = xml.replace("</adaptive-icon>", monochrome + "</adaptive-icon>", 1)
+        if xml.count("<monochrome") != 1:
+            raise SystemExit(f"invalid monochrome layer count for {filename}")
+
+        target = target_dir / filename
+        target.write_text(xml, encoding="utf-8")
+
+
+_install_monochrome_adaptive_icons()
 
 # Launcher resources are owned by the preceding `cargo tauri icon` step.
 # Never overwrite them here with stale hand-copied Android assets.
