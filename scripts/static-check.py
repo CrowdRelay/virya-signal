@@ -51,6 +51,7 @@ required = [
     'src/app.rs', 'src/bridge.rs', 'src-tauri/capabilities/mobile.json',
     '.github/workflows/check.yml', '.github/workflows/mobile-smoke.yml',
     'rust-toolchain.toml', '.cargo/config.toml', 'scripts/collect-mobile-artifact.py', 'boot.js',
+    'boot-initializer.mjs',
     'scripts/test-boot.mjs', 'scripts/check-web-dist.py',
     'scripts/configure-android-signing.py',
     'scripts/analyze-android-package.py',
@@ -95,6 +96,7 @@ for path in required_paths:
 
 index = (root / 'index.html').read_text()
 boot = (root / 'boot.js').read_text()
+boot_initializer = (root / 'boot-initializer.mjs').read_text()
 main = (root / 'src/main.rs').read_text()
 if 'data-trunk rel="copy-dir" href="public"' in index:
     raise SystemExit('index.html references the optional public directory')
@@ -102,16 +104,20 @@ if 'class="boot-led"' not in index or '@keyframes boot-led' not in index:
     raise SystemExit('Virya Signal splash LED is missing or not animated')
 if '<script src="boot.js" defer>' in index:
     raise SystemExit('boot listener must execute before the deferred WASM module')
-boot_tag = '<script src="boot.js?v=0.4.2"></script>'
+boot_tag = '<script src="boot.js?v=0.4.2-startup-v6"></script>'
 if boot_tag not in index or index.find(boot_tag) > index.find('data-trunk rel="rust"'):
     raise SystemExit('boot listener must be declared before the WASM entrypoint')
-for contract in ['window.__VIRYA_BOOT__', 'data-virya-ready', '.app-shell .launcher', 'MutationObserver']:
+for contract in ['window.__VIRYA_BOOT__', 'data-virya-ready', '.app-shell .launcher', 'MutationObserver', 'unhandledrejection', 'retry-blocked']:
     if contract not in boot:
         raise SystemExit(f'boot recovery contract is missing: {contract}')
 if 'URUCHOM APLIKACJĘ PONOWNIE' in boot or '15_000' in boot:
     raise SystemExit('boot watchdog must not turn a slow but healthy mount into a fatal error')
 if main.find('mount_to_body') > main.rfind('virya_app_mounted();'):
     raise SystemExit('WASM must publish readiness only after mounting the app')
+if '#[wasm_bindgen(inline_js' in main or 'js_sys::Reflect' not in main:
+    raise SystemExit('startup must not depend on a generated inline-js snippet module')
+if 'data-initializer="boot-initializer.mjs"' not in index or 'boot()?.fail?.(error)' not in boot_initializer:
+    raise SystemExit('Trunk WASM failures must be routed into the visible boot recovery UI')
 if 'console_error_panic_hook::set_once();' not in main or '#[cfg(debug_assertions)]' in main:
     raise SystemExit('release startup panics must remain diagnosable')
 if 'futures::join!' in ui or 'fn Splash()' in ui:
@@ -148,7 +154,7 @@ if not page_size_ok:
     raise SystemExit('Android Rust libraries must be linked for 16 KiB pages')
 
 smoke = (root / '.github/workflows/mobile-smoke.yml').read_text()
-for trigger_path in ['index.html', 'boot.js', 'Trunk.toml', 'styles.css', 'rust-toolchain.toml']:
+for trigger_path in ['index.html', 'boot.js', 'boot-initializer.mjs', 'Trunk.toml', 'styles.css', 'rust-toolchain.toml']:
     if f'- "{trigger_path}"' not in smoke:
         raise SystemExit(f'Android smoke workflow does not watch {trigger_path}')
 if '--target aarch64' not in smoke or '--max-size-mib' not in smoke:
