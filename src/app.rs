@@ -105,102 +105,121 @@ impl FanLoadingState {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct EmptyArgs {}
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ApiArgs<'a> {
     api_base_url: &'a str,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct PinArgs<'a> {
     pin: &'a str,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ConfigureArgs<'a> {
     pin: &'a str,
     profile: &'a OperatorProfileInput,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct EventArgs<'a> {
     event_slug: &'a str,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct RedeemArgs<'a> {
     event_slug: &'a str,
     code: &'a str,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct CouponArgs<'a> {
     code: &'a str,
     order_reference: &'a str,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct IssueArgs<'a> {
     input: &'a IssuePassInput,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ReferenceArgs<'a> {
     public_reference: &'a str,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct CampaignArgs<'a> {
     input: &'a CreateQrCampaignInput,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct CampaignIdArgs<'a> {
     campaign_id: &'a str,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct RetryArgs<'a> {
     target_kind: &'a str,
     target_id: &'a str,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct FanSignupArgs<'a> {
     input: &'a FanSignupInput,
     pin: &'a str,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct FanConfirmArgs<'a> {
     input: &'a FanConfirmationInput,
     pin: &'a str,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ClaimArgs<'a> {
     claim_token: &'a str,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct ImportWalletArgs<'a> {
     order_id: &'a str,
     checkout_token: &'a str,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct OrderArgs<'a> {
     order_id: &'a str,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct WalletQrArgs<'a> {
     order_id: &'a str,
     public_reference: &'a str,
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct UrlArgs<'a> {
     url: &'a str,
 }
@@ -315,8 +334,8 @@ fn Launcher(
     view! {
         <section class="launcher">
             <header class="launcher-brand">
-                <div class="signal-mark small"><span></span><span></span><span></span></div>
-                <p class="eyebrow">VIRYA MOBILE</p>
+                <div class="signal-mark signal-logo" role="img" aria-label="Logo Virya Signal"><span></span><span></span><span></span></div>
+                <p class="eyebrow">VIRYA SIGNAL</p>
                 <h1>Sygnał w kieszeni.<br/><em>Kontrola na scenie.</em></h1>
                 <p>Koncerty, bilety, nagrody i wejście dla fanów. Sprzedaż, skanowanie i obsługa wydarzeń dla zespołu.</p>
             </header>

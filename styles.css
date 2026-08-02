@@ -286,3 +286,47 @@ button:disabled { opacity: .48; cursor: default; }
 @media (max-width: 520px) {
   .show-mode-actions { grid-template-columns: 1fr; }
 }
+
+/* Virya Signal canonical launcher logo.
+   The settled frame is also the source geometry of the Android app icon. */
+.signal-logo {
+  width: 76px;
+  height: 76px;
+  padding: 13px 15px;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid #ffffff18;
+  border-radius: 19px;
+  background:
+    radial-gradient(circle at 50% 38%, #3a2f08 0, #11100b 54%, #070707 100%);
+  box-shadow:
+    inset 0 0 0 1px #f3c51a0c,
+    0 18px 54px #0008;
+}
+.signal-logo span {
+  width: 7px;
+  border-radius: 999px;
+  box-shadow: 0 0 15px #f3c51a66, 0 0 34px #f3c51a25;
+  animation-name: signal-logo-lock;
+  animation-duration: 1.85s;
+  animation-timing-function: cubic-bezier(.22,.78,.22,1);
+  animation-iteration-count: 1;
+  animation-fill-mode: both;
+}
+.signal-logo span:nth-child(1) { height: 21px; animation-delay: 0s; }
+.signal-logo span:nth-child(2) { height: 46px; animation-delay: .08s; }
+.signal-logo span:nth-child(3) { height: 30px; animation-delay: .16s; }
+@keyframes signal-logo-lock {
+  0% { opacity: .24; transform: scaleY(.35); }
+  28% { opacity: 1; transform: scaleY(1.08); }
+  48% { opacity: .46; transform: scaleY(.58); }
+  72% { opacity: 1; transform: scaleY(1.04); }
+  100% { opacity: 1; transform: scaleY(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .signal-logo span {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
