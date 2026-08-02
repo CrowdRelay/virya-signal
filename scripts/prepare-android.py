@@ -246,10 +246,20 @@ def _install_monochrome_adaptive_icons() -> None:
     target_dir = resources / MONOCHROME_ADAPTIVE_ICON_DIR
     target_dir.mkdir(parents=True, exist_ok=True)
 
+    default_source = source_dir / "ic_launcher.xml"
+    if not default_source.is_file():
+        raise SystemExit(f"missing Tauri-generated adaptive icon: {default_source}")
+
     for filename in ("ic_launcher.xml", "ic_launcher_round.xml"):
         source = source_dir / filename
+        # Tauri may generate only the canonical adaptive icon. Android accepts
+        # the same adaptive layers for round launchers, so derive that alias
+        # instead of failing the whole APK build.
+        if not source.is_file() and filename == "ic_launcher_round.xml":
+            source = default_source
         if not source.is_file():
             raise SystemExit(f"missing Tauri-generated adaptive icon: {source}")
+
         xml = source.read_text(encoding="utf-8")
         if "<adaptive-icon" not in xml or "</adaptive-icon>" not in xml:
             raise SystemExit(f"invalid adaptive icon XML: {source}")
@@ -257,13 +267,14 @@ def _install_monochrome_adaptive_icons() -> None:
         monochrome = (
             '    <monochrome android:drawable="@mipmap/ic_launcher_foreground" />\n'
         )
-        xml = xml.replace("</adaptive-icon>", monochrome + "</adaptive-icon>", 1)
+        # Keep the operation idempotent in reused local or CI workspaces.
+        if "<monochrome" not in xml:
+            xml = xml.replace("</adaptive-icon>", monochrome + "</adaptive-icon>", 1)
         if xml.count("<monochrome") != 1:
             raise SystemExit(f"invalid monochrome layer count for {filename}")
 
         target = target_dir / filename
         target.write_text(xml, encoding="utf-8")
-
 
 _install_monochrome_adaptive_icons()
 

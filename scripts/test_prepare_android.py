@@ -33,8 +33,10 @@ class PrepareAndroidTests(unittest.TestCase):
     <foreground android:drawable="@mipmap/ic_launcher_foreground" />
 </adaptive-icon>
 """
-            for filename in ("ic_launcher.xml", "ic_launcher_round.xml"):
-                (adaptive_v26 / filename).write_text(adaptive_xml)
+            # Current Tauri CLI may emit only the canonical adaptive XML.
+            # prepare-android.py must derive the round v33 alias safely.
+            (adaptive_v26 / "ic_launcher.xml").write_text(adaptive_xml)
+            self.assertFalse((adaptive_v26 / "ic_launcher_round.xml").exists())
 
             # A generated Gradle fixture may contain only the release build
             # type. The preparer must still configure release shrinking and
