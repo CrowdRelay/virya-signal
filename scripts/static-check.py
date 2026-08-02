@@ -118,6 +118,35 @@ if '#[wasm_bindgen(inline_js' in main or 'js_sys::Reflect' not in main:
     raise SystemExit('startup must not depend on a generated inline-js snippet module')
 if 'data-initializer="boot-initializer.mjs"' not in index or 'boot()?.fail?.(error)' not in boot_initializer:
     raise SystemExit('Trunk WASM failures must be routed into the visible boot recovery UI')
+
+# Bundled Trunk WASM is loaded through same-origin fetch().
+tauri_config = json.loads((root / 'src-tauri/tauri.conf.json').read_text())
+tauri_csp = tauri_config.get('app', {}).get('security', {}).get('csp', '')
+connect_src = next(
+    (
+        directive.strip()
+        for directive in tauri_csp.split(';')
+        if directive.strip().startswith('connect-src ')
+    ),
+    '',
+)
+connect_tokens = connect_src.split()
+if connect_tokens.count("'self'") != 1:
+    raise SystemExit(
+        "Tauri CSP connect-src must contain exactly one 'self' "
+        "so Android WebView can fetch the bundled Trunk WASM"
+    )
+for required_connect_source in (
+    'ipc:',
+    'http://ipc.localhost',
+    'https://signal-api.virya.music',
+):
+    if required_connect_source not in connect_tokens:
+        raise SystemExit(
+            f'Tauri CSP connect-src lost required source: '
+            f'{required_connect_source}'
+        )
+
 if 'console_error_panic_hook::set_once();' not in main or '#[cfg(debug_assertions)]' in main:
     raise SystemExit('release startup panics must remain diagnosable')
 if 'futures::join!' in ui or 'fn Splash()' in ui:
