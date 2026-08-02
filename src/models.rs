@@ -16,7 +16,7 @@ impl OperatorRole {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct OperatorProfileInput {
     pub display_name: String,
     pub api_base_url: String,
@@ -24,131 +24,99 @@ pub struct OperatorProfileInput {
     pub bearer_token: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct SessionSummary {
     pub display_name: String,
     pub api_base_url: String,
     pub role: OperatorRole,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct SessionStatus {
     pub configured: bool,
     pub unlocked: bool,
     pub session: Option<SessionSummary>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct FanSessionStatus {
     pub configured: bool,
     pub unlocked: bool,
     pub session: Option<FanSummary>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct FanSummary {
-    pub api_base_url: String,
     pub email: String,
     pub display_name: Option<String>,
     pub wallet_count: usize,
     pub has_admission_pass: bool,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct PublicHomeData {
     pub events: Vec<PublicEvent>,
     pub cities: Vec<CitySignal>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CitySignal {
     pub slug: String,
     pub name: String,
-    pub country_code: String,
     pub fan_count: u64,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct DashboardData {
     pub events: Vec<PublicEvent>,
     pub qr: Option<ConcertQrOverview>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct ConcertQrOverview {
     pub events: Vec<StaffEvent>,
     pub campaigns: Vec<QrCampaign>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct StaffEvent {
-    pub id: String,
     pub slug: String,
     pub title: String,
-    pub venue: Option<String>,
-    pub starts_at: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct QrCampaign {
     pub id: String,
-    pub event_id: String,
-    pub event_slug: String,
     pub event_title: String,
-    pub venue: Option<String>,
-    pub starts_at: String,
     pub label: String,
-    pub valid_from: String,
-    pub valid_until: String,
     pub max_checkins: Option<u32>,
     pub checkin_count: u64,
     pub active: bool,
-    pub revoked_at: Option<String>,
-    pub created_at: String,
     pub token: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct PublicEvent {
-    pub id: String,
     pub slug: String,
     pub title: String,
     pub description: Option<String>,
     pub city: Option<EventCity>,
     pub venue: Option<String>,
-    pub venue_address: Option<String>,
-    pub timezone: String,
     pub starts_at: String,
-    pub doors_at: Option<String>,
-    pub ends_at: Option<String>,
     pub ticket_url: Option<String>,
-    pub listen_url: Option<String>,
     pub image_url: Option<String>,
-    pub trailer_url: Option<String>,
-    pub external_event_url: Option<String>,
-    pub updated_at: String,
+    #[serde(default)]
+    pub image_thumbnail_url: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct EventCity {
-    pub id: String,
-    pub slug: String,
     pub name: String,
-    pub country_code: String,
-    pub region: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct TicketingOverview {
     pub sale: TicketSale,
-    #[serde(default)]
-    pub reserved_orders: i64,
-    #[serde(default)]
-    pub checkout_created_orders: i64,
-    #[serde(default)]
-    pub reserved_tickets: i64,
-    #[serde(default)]
-    pub paid_orders: i64,
     #[serde(default)]
     pub paid_tickets: i64,
     #[serde(default)]
@@ -159,119 +127,50 @@ pub struct TicketingOverview {
     pub recent_orders: Vec<TicketOrder>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct TicketSale {
-    pub event_id: String,
-    pub event_slug: String,
-    pub event_title: String,
-    pub event_status: String,
-    pub venue: Option<String>,
-    pub timezone: String,
-    pub starts_at: String,
     pub currency: String,
-    pub vat_rate_basis_points: i32,
-    pub capacity: i32,
-    #[serde(default)]
-    pub sold: i32,
     #[serde(default)]
     pub reserved: i32,
     pub available: i32,
-    pub max_per_order: i32,
-    pub sales_open_at: String,
-    pub sales_close_at: String,
-    pub active: bool,
-    pub sales_state: String,
-    #[serde(default)]
-    pub ticket_types: Vec<TicketType>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct TicketType {
-    pub id: String,
-    pub slug: String,
-    pub name: String,
-    pub description: Option<String>,
-    pub price_gross_minor: i64,
-    pub capacity: Option<i32>,
-    #[serde(default)]
-    pub sold: i32,
-    #[serde(default)]
-    pub reserved: i32,
-    pub available: i32,
-    pub sort_order: i32,
-    pub active: bool,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct TicketOrder {
-    pub order_id: String,
     pub public_reference: String,
-    pub event_slug: String,
-    pub event_title: String,
-    pub venue: Option<String>,
-    pub timezone: String,
-    pub starts_at: String,
-    pub status: String,
     pub buyer_email_masked: String,
     pub buyer_name: Option<String>,
     pub currency: String,
     pub amount_gross_minor: i64,
-    #[serde(default)]
-    pub amount_refunded_minor: i64,
-    pub paid_at: Option<String>,
-    pub refunded_at: Option<String>,
-    #[serde(default)]
-    pub tickets: Vec<IssuedTicket>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct IssuedTicket {
-    pub pass_id: String,
-    pub public_reference: String,
-    pub status: String,
-    pub holder_name: Option<String>,
-    pub holder_email_masked: String,
-    pub redeemed_at: Option<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct AdmissionRedemption {
-    pub pass_id: String,
-    pub event_id: String,
     pub public_reference: String,
     pub holder_name: Option<String>,
     pub holder_email_masked: String,
     pub status: String,
-    pub redeemed_at: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CouponEnvelope {
     pub result: CouponRedemption,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct CouponRedemption {
-    pub coupon_id: String,
-    pub reward_grant_id: String,
     pub status: String,
     pub used_count: u32,
     pub max_uses: u32,
-    pub redeemed_at: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct IssuedPass {
-    pub pass_id: String,
-    pub event_id: String,
-    pub fan_id: String,
     pub public_reference: String,
     pub claim_token: String,
-    pub claim_expires_at: String,
-    pub created: bool,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct CreateQrCampaignInput {
     pub event_slug: String,
     pub label: String,
@@ -280,7 +179,7 @@ pub struct CreateQrCampaignInput {
     pub max_checkins: Option<u32>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct IssuePassInput {
     pub event_slug: String,
     pub pool_slug: String,
@@ -288,7 +187,7 @@ pub struct IssuePassInput {
     pub claim_expires_hours: u32,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct FanSignupInput {
     pub api_base_url: String,
     pub email: String,
@@ -299,7 +198,7 @@ pub struct FanSignupInput {
     pub policy_version: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct FanConfirmationInput {
     pub api_base_url: String,
     pub email: String,
@@ -307,13 +206,12 @@ pub struct FanConfirmationInput {
     pub token: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct FanAuthResult {
-    pub response: serde_json::Value,
     pub session_created: bool,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct FanDashboardData {
     pub events: Vec<PublicEvent>,
     pub referral: ReferralProgress,
@@ -322,20 +220,18 @@ pub struct FanDashboardData {
     pub admission_pass: Option<AdmissionPass>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct FanEventInterest {
     pub event: PublicEvent,
-    pub interested_at: String,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct ReferralProgress {
     pub referral_code: String,
     #[serde(default)]
     pub qualified_referrals: u32,
     #[serde(default)]
     pub pending_referrals: u32,
-    pub next_reward_threshold: Option<u32>,
     #[serde(default)]
     pub draw_entries: Vec<WeightedDrawEntry>,
     #[serde(default)]
@@ -344,112 +240,273 @@ pub struct ReferralProgress {
     pub physical_rewards: Vec<PhysicalRewardGrant>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct WeightedDrawEntry {
-    pub draw_id: String,
-    pub slug: String,
     pub name: String,
     pub prize_kind: String,
-    pub closes_at: String,
     pub draw_at: String,
-    pub qualified_referrals: u32,
-    pub base_entries: u32,
-    pub referral_entries: u32,
-    pub concert_checkins: u32,
-    pub checkin_entries: u32,
     pub total_entries: u32,
-    pub max_entries: u32,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct MerchCoupon {
-    pub id: String,
-    pub reward_grant_id: String,
-    pub reward_rule_id: String,
     pub code: String,
     pub discount_percent: u32,
-    pub max_uses: u32,
-    pub used_count: u32,
     pub status: String,
-    pub expires_at: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct PhysicalRewardGrant {
-    pub reward_grant_id: String,
-    pub reward_rule_id: String,
     pub item_name: String,
     pub sku: String,
     pub status: String,
-    pub granted_at: String,
-    pub expires_at: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct AdmissionPass {
-    pub pass_id: String,
-    pub session_id: Option<String>,
-    pub event_id: String,
-    pub event_slug: String,
     pub event_title: String,
     pub venue: Option<String>,
     pub starts_at: String,
-    pub holder_name: Option<String>,
-    pub holder_email_masked: String,
     pub public_reference: String,
     pub status: String,
-    pub session_expires_at: String,
-    pub redeemed_at: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct AdmissionQr {
     pub token: String,
     pub expires_at: String,
     pub qr_svg: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+// These response DTOs mirror the complete AREA wire contract. The current UI
+// intentionally renders only a subset; retained fields stay narrowly allowed.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaWallet {
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub token_balance: u32,
+    #[serde(default)]
+    pub reward_credits: u32,
+    #[serde(default)]
+    pub collection_size: u32,
+    #[serde(default)]
+    pub community: AreaCommunity,
+    #[serde(default)]
+    pub claims: Vec<AreaClaim>,
+    #[serde(default)]
+    pub vouchers: Vec<AreaVoucher>,
+    #[serde(default)]
+    pub live_drops: Vec<AreaLiveDrop>,
+    #[serde(default)]
+    pub migration_required: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct AreaCommunity {
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub current: u32,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub total: u32,
+    #[serde(default)]
+    pub percent: f64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaClaim {
+    pub drop_id: String,
+    pub number: String,
+    pub city: String,
+    pub line: String,
+    pub track: String,
+    pub edition: String,
+    #[allow(dead_code)]
+    pub claimed_at: String,
+    pub edition_number: Option<u32>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaVoucher {
+    #[allow(dead_code)]
+    pub code: String,
+    #[allow(dead_code)]
+    pub tokens: u32,
+    #[allow(dead_code)]
+    pub status: String,
+    #[allow(dead_code)]
+    pub expires_at: u64,
+    #[allow(dead_code)]
+    pub free_product_label: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct AreaLiveDrop {
+    #[allow(dead_code)]
+    pub id: String,
+}
+
+// Operator responses keep diagnostics that are not shown on the compact screen yet.
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct QueueSummary {
+    #[serde(default)]
+    pub pending: i64,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub processing: i64,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub delivered_24h: i64,
+    #[serde(default)]
+    pub dead: i64,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub oldest_pending_seconds: i64,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct OpsSummary {
+    #[serde(default)]
+    pub outbox: QueueSummary,
+    #[serde(default)]
+    pub deliveries: QueueSummary,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct OpsOutboxItem {
+    pub id: String,
+    pub event_type: String,
+    #[allow(dead_code)]
+    pub status: String,
+    pub attempts: i32,
+    pub max_attempts: i32,
+    pub last_error_kind: Option<String>,
+    #[allow(dead_code)]
+    pub dead_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct OpsDeliveryItem {
+    pub id: String,
+    pub event_type: String,
+    pub endpoint_name: String,
+    pub endpoint_active: bool,
+    #[allow(dead_code)]
+    pub status: String,
+    pub attempt_count: i32,
+    pub max_attempts: i32,
+    #[allow(dead_code)]
+    pub last_response_status: Option<i16>,
+    pub last_error_kind: Option<String>,
+    #[allow(dead_code)]
+    pub dead_at: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct OperatorOpsOverview {
+    #[serde(default)]
+    pub summary: OpsSummary,
+    #[serde(default)]
+    pub dead_deliveries: Vec<OpsDeliveryItem>,
+    #[serde(default)]
+    pub dead_outbox: Vec<OpsOutboxItem>,
+    #[serde(default)]
+    pub unavailable_sources: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct OpsRetryResult {
+    #[allow(dead_code)]
+    pub operation_id: String,
+    #[allow(dead_code)]
+    pub target_type: String,
+    #[allow(dead_code)]
+    pub target_id: String,
+    #[allow(dead_code)]
+    pub status: String,
+    pub replayed: bool,
+}
+
+// Show mode keeps the complete native response for stable IPC compatibility.
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct ShowModeStatus {
+    pub prepared: bool,
+    #[allow(dead_code)]
+    pub event_slug: String,
+    #[allow(dead_code)]
+    pub event_title: Option<String>,
+    #[allow(dead_code)]
+    pub expires_at: Option<String>,
+    pub eligible_passes: usize,
+    pub pending: usize,
+    #[allow(dead_code)]
+    pub synced: usize,
+    pub conflicts: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ShowModeScanState {
+    Pending,
+    Synced,
+    Conflict,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ShowModeScanResult {
+    #[allow(dead_code)]
+    pub accepted: bool,
+    pub duplicate: bool,
+    pub public_reference: String,
+    pub holder_name: Option<String>,
+    pub holder_email_masked: String,
+    #[allow(dead_code)]
+    pub state: ShowModeScanState,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct ShowModeSyncResult {
+    #[allow(dead_code)]
+    pub attempted: usize,
+    pub synced: usize,
+    pub conflicts: usize,
+    pub pending: usize,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct TicketWallet {
     pub order: WalletOrder,
     #[serde(default)]
     pub tickets: Vec<WalletTicket>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct WalletBatch {
+    #[serde(default)]
+    pub wallets: Vec<TicketWallet>,
+    #[serde(default)]
+    pub failed_count: usize,
+}
+
+#[derive(Clone, Debug, Deserialize)]
 pub struct WalletOrder {
     pub order_id: String,
     pub public_reference: String,
-    pub event_slug: String,
     pub event_title: String,
     pub venue: Option<String>,
-    pub timezone: String,
     pub starts_at: String,
     pub status: String,
-    pub buyer_email_masked: String,
-    pub buyer_name: Option<String>,
-    pub currency: String,
-    pub amount_gross_minor: i64,
-    #[serde(default)]
-    pub amount_refunded_minor: i64,
-    pub paid_at: Option<String>,
-    pub refunded_at: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct WalletTicket {
-    pub pass_id: String,
-    pub order_item_id: String,
-    pub ticket_type_slug: String,
     pub ticket_type_name: String,
-    pub sequence: i32,
     pub public_reference: String,
-    pub status: String,
     pub holder_name: Option<String>,
     pub holder_email_masked: String,
-    pub redeemed_at: Option<String>,
-    pub qr_token: Option<String>,
-    pub qr_not_before: String,
+    pub qr_available: bool,
     pub qr_expires_at: String,
-    pub qr_svg: Option<String>,
 }

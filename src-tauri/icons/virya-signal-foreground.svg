@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+  <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff2a5"/><stop offset=".24" stop-color="#ffd947"/><stop offset=".62" stop-color="#f3c51a"/><stop offset="1" stop-color="#a96800"/></linearGradient>
+  <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="10" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<g transform="translate(0 30) scale(.92) translate(44 44)">
+<g fill="none" stroke="url(#g)" stroke-linecap="round" filter="url(#glow)"><path d="M300 265 Q512 120 724 265" stroke-width="25"/><path d="M258 390 Q205 565 340 730" stroke-width="22" opacity=".8"/><path d="M766 390 Q819 565 684 730" stroke-width="22" opacity=".8"/></g>
+<path d="M315 330 L490 700 Q510 742 530 700" fill="none" stroke="url(#g)" stroke-width="105" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M710 330 L560 640" fill="none" stroke="url(#g)" stroke-width="98" stroke-linecap="round"/>
+<g fill="url(#g)" filter="url(#glow)"><rect x="418" y="420" width="19" height="66" rx="9.5"/><rect x="454" y="388" width="19" height="130" rx="9.5"/><rect x="490" y="350" width="19" height="205" rx="9.5"/><rect x="526" y="388" width="19" height="130" rx="9.5"/><rect x="562" y="420" width="19" height="66" rx="9.5"/></g>
+</g></svg>

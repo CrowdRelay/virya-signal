@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Release version, for example 0.2.0
+        description: Release version, for example 0.4.2
         required: true
-        default: 0.2.0
+        default: 0.4.2
       play_track:
         description: Google Play track
         required: true
@@ -39,6 +39,8 @@ env:
   CARGO_INCREMENTAL: "0"
   CARGO_NET_RETRY: "5"
   RUST_BACKTRACE: "1"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: sccache
   NDK_VERSION: "27.2.12479018"
   RELEASE_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.version }}
   PLAY_TRACK: ${{ inputs.play_track || 'internal' }}
@@ -68,21 +70,25 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: android-actions/setup-android@v3
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       - name: Install Android SDK and NDK
-        run: |
-          yes | sdkmanager --licenses >/dev/null
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}"
-          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
-          echo "NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+        run: scripts/install-android-sdk.sh
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.97.0
-          targets: wasm32-unknown-unknown,aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+          targets: wasm32-unknown-unknown,aarch64-linux-android
+      - uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: android-release
+          cache-targets: false
+          shared-key: android-arm64
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/trunk
+          key: trunk-${{ runner.os }}-0.21.14-${{ hashFiles('Cargo.lock') }}
       - name: Install pinned Tauri tools
         uses: taiki-e/install-action@v2
         with:
@@ -99,20 +105,20 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          umask 077
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/virya-upload.jks"
-          cat > src-tauri/gen/android/keystore.properties <<EOF
-          keyAlias=$ANDROID_KEY_ALIAS
-          password=$ANDROID_KEY_PASSWORD
-          storeFile=$RUNNER_TEMP/virya-upload.jks
-          EOF
+          python3 scripts/configure-android-signing.py "$RUNNER_TEMP/virya-upload.jks" src-tauri/gen/android/keystore.properties
           python3 scripts/prepare-android.py --signing
       - name: Build signed AAB
-        run: cargo tauri android build --ci --aab
+        run: cargo tauri android build --ci --aab --target aarch64
+      - name: Capture Android dependency graph
+        run: |
+          mkdir -p artifacts
+          src-tauri/gen/android/gradlew -p src-tauri/gen/android :app:dependencies --configuration releaseRuntimeClasspath > artifacts/android-release-dependencies.txt
       - name: Collect AAB
         run: |
           python3 scripts/collect-mobile-artifact.py aab "artifacts/virya-signal-${RELEASE_VERSION#v}.aab"
           echo "AAB_PATH=$GITHUB_WORKSPACE/artifacts/virya-signal-${RELEASE_VERSION#v}.aab" >> "$GITHUB_ENV"
+      - name: Inspect AAB size and ABI
+        run: python3 scripts/analyze-android-package.py "artifacts/virya-signal-${RELEASE_VERSION#v}.aab" --require-abi arm64-v8a --require-page-size 16384
       - uses: actions/upload-artifact@v4
         with:
           name: virya-signal-android-${{ env.RELEASE_VERSION }}
@@ -127,6 +133,9 @@ jobs:
           releaseFiles: ${{ env.AAB_PATH }}
           track: ${{ env.PLAY_TRACK }}
           status: completed
+      - name: Compiler cache statistics
+        if: always()
+        run: sccache --show-stats
 
   ios:
     name: iOS IPA and App Store Connect
@@ -155,9 +164,13 @@ jobs:
         with:
           toolchain: 1.97.0
           targets: wasm32-unknown-unknown,aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+      - uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
+          cache-targets: false
           shared-key: ios-release
       - name: Install pinned Tauri tools
         uses: taiki-e/install-action@v2

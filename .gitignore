@@ -1,7 +1,10 @@
 /dist
 /target
+/artifacts
 /src-tauri/target
 /src-tauri/gen
+__pycache__/
+*.py[cod]
 .DS_Store
 *.hold
 *.jks

@@ -3,7 +3,9 @@ name: Check
 on:
   push:
     branches: [main]
+    paths-ignore: ["**/*.md", "docs/**"]
   pull_request:
+    paths-ignore: ["**/*.md", "docs/**"]
   workflow_dispatch:
 
 permissions:
@@ -13,14 +15,30 @@ concurrency:
   group: check-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_NET_RETRY: "5"
+  RUST_BACKTRACE: "1"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: sccache
+
 jobs:
-  rust:
+  contracts:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
-    env:
-      CARGO_INCREMENTAL: "0"
-      CARGO_NET_RETRY: "5"
-      RUST_BACKTRACE: "1"
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static and release-tool contracts
+        run: |
+          python3 scripts/static-check.py
+          python3 scripts/test-principal-contract.py
+          python3 -m unittest discover -s scripts -p 'test_*.py'
+          bash -n scripts/*.sh
+          node scripts/test-boot.mjs
+
+  webassembly:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -28,27 +46,56 @@ jobs:
           toolchain: 1.97.0
           targets: wasm32-unknown-unknown
           components: rustfmt, clippy
+      - uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: check
-      - name: Normalize formatting
-        run: cargo fmt --all --check
-      - name: Static contracts
-        run: python3 scripts/static-check.py
-      - name: Release tooling tests
-        run: python3 -m unittest discover -s scripts -p 'test_*.py'
-      - name: UI check
-        run: cargo check --locked -p crowdrelay-mobile-ui --target wasm32-unknown-unknown
-      - name: UI Clippy
-        run: cargo clippy --locked -p crowdrelay-mobile-ui --target wasm32-unknown-unknown -- -D warnings
+          cache-targets: false
+          shared-key: wasm
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: trunk@0.21.14
+      - name: Format and UI quality
+        run: |
+          cargo fmt --all --check
+          cargo check --locked -p crowdrelay-mobile-ui --target wasm32-unknown-unknown
+          cargo clippy --locked -p crowdrelay-mobile-ui --target wasm32-unknown-unknown -- -D warnings
+      - name: Release frontend and size budget
+        run: |
+          trunk build --release
+          python3 scripts/check-web-dist.py dist
+      - name: Compiler cache statistics
+        if: always()
+        run: sccache --show-stats
+
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.97.0
+          components: rustfmt, clippy
+      - uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          cache-targets: false
+          shared-key: native
       - name: Install Tauri Linux dependencies
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
-      - name: Native shell check
-        run: cargo check --locked -p crowdrelay-mobile
-      - name: Native tests
-        run: cargo test --locked -p crowdrelay-mobile
-      - name: Clippy
-        run: cargo clippy --locked -p crowdrelay-mobile --all-targets -- -D warnings
+      - name: Native shell quality
+        run: |
+          cargo check --locked -p crowdrelay-mobile
+          cargo test --locked -p crowdrelay-mobile
+          cargo clippy --locked -p crowdrelay-mobile --all-targets -- -D warnings
+      - name: Compiler cache statistics
+        if: always()
+        run: sccache --show-stats

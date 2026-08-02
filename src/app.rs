@@ -6,11 +6,13 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     bridge,
     models::{
-        AdmissionPass, AdmissionQr, AdmissionRedemption, CitySignal, CouponEnvelope,
+        AdmissionPass, AdmissionQr, AdmissionRedemption, AreaWallet, CitySignal, CouponEnvelope,
         CreateQrCampaignInput, DashboardData, FanAuthResult, FanConfirmationInput,
         FanDashboardData, FanEventInterest, FanSessionStatus, FanSignupInput, IssuePassInput,
-        IssuedPass, OperatorProfileInput, OperatorRole, PublicEvent, PublicHomeData, QrCampaign,
-        ReferralProgress, SessionStatus, TicketWallet, TicketingOverview,
+        IssuedPass, OperatorOpsOverview, OperatorProfileInput, OperatorRole, OpsDeliveryItem,
+        OpsOutboxItem, OpsRetryResult, PublicEvent, PublicHomeData, QrCampaign, ReferralProgress,
+        SessionStatus, ShowModeScanResult, ShowModeStatus, ShowModeSyncResult, TicketWallet,
+        TicketingOverview, WalletBatch, WalletTicket,
     },
 };
 
@@ -38,6 +40,7 @@ enum OperatorTab {
 enum FanTab {
     Signal,
     Events,
+    Game,
     Wallet,
     Profile,
 }
@@ -55,6 +58,7 @@ struct FanLoadingState {
     interests: bool,
     admission_pass: bool,
     wallets: bool,
+    area: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -95,6 +99,7 @@ impl FanLoadingState {
             interests: true,
             admission_pass: true,
             wallets: true,
+            area: true,
         }
     }
 }
@@ -156,6 +161,12 @@ struct CampaignIdArgs<'a> {
 }
 
 #[derive(Serialize)]
+struct RetryArgs<'a> {
+    target_kind: &'a str,
+    target_id: &'a str,
+}
+
+#[derive(Serialize)]
 struct FanSignupArgs<'a> {
     input: &'a FanSignupInput,
     pin: &'a str,
@@ -184,6 +195,12 @@ struct OrderArgs<'a> {
 }
 
 #[derive(Serialize)]
+struct WalletQrArgs<'a> {
+    order_id: &'a str,
+    public_reference: &'a str,
+}
+
+#[derive(Serialize)]
 struct UrlArgs<'a> {
     url: &'a str,
 }
@@ -193,55 +210,79 @@ pub fn App() -> impl IntoView {
     let mode = RwSignal::new(RootMode::Launcher);
     let operator_status = RwSignal::new(SessionStatus::default());
     let fan_status = RwSignal::new(FanSessionStatus::default());
-    let loading = RwSignal::new(true);
+    let operator_status_loading = RwSignal::new(true);
+    let fan_status_loading = RwSignal::new(true);
+    let operator_status_failed = RwSignal::new(false);
+    let fan_status_failed = RwSignal::new(false);
+    let status_refresh = RwSignal::new(0_u32);
     let error = RwSignal::new(None::<String>);
 
     Effect::new(move |_| {
+        status_refresh.get();
+        operator_status_loading.set(true);
+        fan_status_loading.set(true);
+        operator_status_failed.set(false);
+        fan_status_failed.set(false);
         spawn_local(async move {
-            let (operator, fan) = futures::join!(
-                bridge::invoke::<SessionStatus, _>("session_status", &EmptyArgs {}),
-                bridge::invoke::<FanSessionStatus, _>("fan_status", &EmptyArgs {})
-            );
-            match operator {
-                Ok(value) => operator_status.set(value),
-                Err(message) => error.set(Some(message)),
+            match bridge::invoke_timeout::<SessionStatus, _>(
+                "session_status",
+                &EmptyArgs {},
+                10_000,
+            )
+            .await
+            {
+                Ok(value) => {
+                    operator_status.set(value);
+                    operator_status_failed.set(false);
+                }
+                Err(message) => {
+                    operator_status_failed.set(true);
+                    error.set(Some(message));
+                }
             }
-            match fan {
-                Ok(value) => fan_status.set(value),
-                Err(message) => error.set(Some(message)),
+            operator_status_loading.set(false);
+        });
+        spawn_local(async move {
+            match bridge::invoke_timeout::<FanSessionStatus, _>("fan_status", &EmptyArgs {}, 10_000)
+                .await
+            {
+                Ok(value) => {
+                    fan_status.set(value);
+                    fan_status_failed.set(false);
+                }
+                Err(message) => {
+                    fan_status_failed.set(true);
+                    error.set(Some(message));
+                }
             }
-            loading.set(false);
+            fan_status_loading.set(false);
         });
     });
 
     view! {
         <main class="app-shell">
-            <Show when=move || !loading.get() fallback=move || view! { <Splash /> }>
-                {move || match mode.get() {
-                    RootMode::Launcher => view! {
-                        <Launcher mode=mode fan_status=fan_status operator_status=operator_status />
-                    }.into_any(),
-                    RootMode::Fan => view! {
-                        <FanPortal mode=mode status=fan_status error=error />
-                    }.into_any(),
-                    RootMode::Team => view! {
-                        <OperatorPortal mode=mode status=operator_status error=error />
-                    }.into_any(),
-                }}
-            </Show>
+            {move || match mode.get() {
+                RootMode::Launcher => view! {
+                    <Launcher
+                        mode=mode
+                        fan_status=fan_status
+                        operator_status=operator_status
+                        fan_status_loading=fan_status_loading
+                        operator_status_loading=operator_status_loading
+                        fan_status_failed=fan_status_failed
+                        operator_status_failed=operator_status_failed
+                        status_refresh=status_refresh
+                    />
+                }.into_any(),
+                RootMode::Fan => view! {
+                    <FanPortal mode=mode status=fan_status status_loading=fan_status_loading error=error />
+                }.into_any(),
+                RootMode::Team => view! {
+                    <OperatorPortal mode=mode status=operator_status status_loading=operator_status_loading error=error />
+                }.into_any(),
+            }}
             <Toast error=error />
         </main>
-    }
-}
-
-#[component]
-fn Splash() -> impl IntoView {
-    view! {
-        <section class="splash">
-            <div class="signal-mark"><span></span><span></span><span></span></div>
-            <h1>VIRYA <em>SIGNAL</em></h1>
-            <p>ŁĄCZYMY Z BEZPIECZNYM SEJFEM</p>
-        </section>
     }
 }
 
@@ -250,7 +291,27 @@ fn Launcher(
     mode: RwSignal<RootMode>,
     fan_status: RwSignal<FanSessionStatus>,
     operator_status: RwSignal<SessionStatus>,
+    fan_status_loading: RwSignal<bool>,
+    operator_status_loading: RwSignal<bool>,
+    fan_status_failed: RwSignal<bool>,
+    operator_status_failed: RwSignal<bool>,
+    status_refresh: RwSignal<u32>,
 ) -> impl IntoView {
+    let open_fan = move |_| {
+        if fan_status_failed.get_untracked() {
+            status_refresh.update(|value| *value = value.wrapping_add(1));
+        } else {
+            mode.set(RootMode::Fan);
+        }
+    };
+    let open_team = move |_| {
+        if operator_status_failed.get_untracked() {
+            status_refresh.update(|value| *value = value.wrapping_add(1));
+        } else {
+            mode.set(RootMode::Team);
+        }
+    };
+
     view! {
         <section class="launcher">
             <header class="launcher-brand">
@@ -260,15 +321,15 @@ fn Launcher(
                 <p>Koncerty, bilety, nagrody i wejście dla fanów. Sprzedaż, skanowanie i obsługa wydarzeń dla zespołu.</p>
             </header>
             <div class="mode-grid">
-                <button class="mode-card fan-mode" on:click=move |_| mode.set(RootMode::Fan)>
+                <button class="mode-card fan-mode" on:click=open_fan>
                     <span class="mode-index">01</span>
                     <div><p class="eyebrow">DLA FANÓW</p><h2>Virya Signal</h2><p>Koncerty, polecenia, nagrody, bilety i QR na wejście.</p></div>
-                    <strong>{move || if fan_status.get().configured { "OTWÓRZ MÓJ SYGNAŁ" } else { "DOŁĄCZ DO SYGNAŁU" }}</strong>
+                    <strong>{move || if fan_status_loading.get() { "SPRAWDZAM PROFIL…" } else if fan_status_failed.get() { "PONÓW ODCZYT PROFILU" } else if fan_status.get().configured { "OTWÓRZ MÓJ SYGNAŁ" } else { "DOŁĄCZ DO SYGNAŁU" }}</strong>
                 </button>
-                <button class="mode-card team-mode" on:click=move |_| mode.set(RootMode::Team)>
+                <button class="mode-card team-mode" on:click=open_team>
                     <span class="mode-index">02</span>
                     <div><p class="eyebrow">DLA ZESPOŁU</p><h2>Virya Control</h2><p>Bramka, bilety, kupony, wejściówki i kampanie koncertowe.</p></div>
-                    <strong>{move || if operator_status.get().configured { "OTWÓRZ PANEL" } else { "SPARUJ URZĄDZENIE" }}</strong>
+                    <strong>{move || if operator_status_loading.get() { "SPRAWDZAM SEJF…" } else if operator_status_failed.get() { "PONÓW ODCZYT SEJFU" } else if operator_status.get().configured { "OTWÓRZ PANEL" } else { "SPARUJ URZĄDZENIE" }}</strong>
                 </button>
             </div>
             <p class="launcher-foot">CROWDRELAY POWERED / RUST NATIVE CORE</p>
@@ -285,13 +346,16 @@ fn BackButton(mode: RwSignal<RootMode>) -> impl IntoView {
 fn OperatorPortal(
     mode: RwSignal<RootMode>,
     status: RwSignal<SessionStatus>,
+    status_loading: RwSignal<bool>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let dashboard = RwSignal::new(None::<DashboardData>);
     let tab = RwSignal::new(OperatorTab::Home);
 
     view! {
-        {move || if status.get().unlocked {
+        {move || if status_loading.get() {
+            view! { <AccessLoader mode=mode label="SPRAWDZAM BEZPIECZNY SEJF" /> }.into_any()
+        } else if status.get().unlocked {
             view! { <OperatorApp mode=mode status=status dashboard=dashboard tab=tab error=error /> }.into_any()
         } else {
             view! { <OperatorAccess mode=mode status=status error=error /> }.into_any()
@@ -424,6 +488,7 @@ fn OperatorApp(
     };
 
     let close = move |_| {
+        bridge::invalidate_latest("operator:");
         spawn_local(async move {
             match bridge::invoke::<SessionStatus, _>("lock", &EmptyArgs {}).await {
                 Ok(value) => {
@@ -537,6 +602,41 @@ fn Scanner(
     let manual = RwSignal::new(String::new());
     let result = RwSignal::new(None::<AdmissionRedemption>);
     let busy = RwSignal::new(false);
+    let offline = RwSignal::new(false);
+    let show_mode = RwSignal::new(ShowModeStatus::default());
+    let show_message = RwSignal::new(String::new());
+
+    let refresh_show_status = move |slug: String| {
+        if slug.is_empty() {
+            show_mode.set(ShowModeStatus::default());
+            offline.set(false);
+            return;
+        }
+        spawn_local(async move {
+            match bridge::invoke::<ShowModeStatus, _>(
+                "show_mode_status",
+                &EventArgs { event_slug: &slug },
+            )
+            .await
+            {
+                Ok(value) => {
+                    if !value.prepared {
+                        offline.set(false);
+                    }
+                    show_mode.set(value);
+                }
+                Err(message) => error.set(Some(message)),
+            }
+        });
+    };
+
+    let select_event = move |event| {
+        let slug = event_target_value(&event);
+        event_slug.set(slug.clone());
+        result.set(None);
+        show_message.set(String::new());
+        refresh_show_status(slug);
+    };
 
     let redeem_code = move |code: String| {
         let slug = event_slug.get_untracked();
@@ -545,18 +645,47 @@ fn Scanner(
             return;
         }
         busy.set(true);
+        let use_offline = offline.get_untracked();
         spawn_local(async move {
-            match bridge::invoke::<AdmissionRedemption, _>(
-                "redeem_admission",
-                &RedeemArgs {
-                    event_slug: &slug,
-                    code: &code,
-                },
-            )
-            .await
-            {
-                Ok(value) => result.set(Some(value)),
-                Err(message) => error.set(Some(message)),
+            if use_offline {
+                match bridge::invoke::<ShowModeScanResult, _>(
+                    "show_mode_scan",
+                    &RedeemArgs {
+                        event_slug: &slug,
+                        code: &code,
+                    },
+                )
+                .await
+                {
+                    Ok(value) => {
+                        let status = if value.duplicate {
+                            "offline_duplicate"
+                        } else {
+                            "offline_queued"
+                        };
+                        result.set(Some(AdmissionRedemption {
+                            public_reference: value.public_reference,
+                            holder_name: value.holder_name,
+                            holder_email_masked: value.holder_email_masked,
+                            status: status.to_owned(),
+                        }));
+                        refresh_show_status(slug.clone());
+                    }
+                    Err(message) => error.set(Some(message)),
+                }
+            } else {
+                match bridge::invoke::<AdmissionRedemption, _>(
+                    "redeem_admission",
+                    &RedeemArgs {
+                        event_slug: &slug,
+                        code: &code,
+                    },
+                )
+                .await
+                {
+                    Ok(value) => result.set(Some(value)),
+                    Err(message) => error.set(Some(message)),
+                }
             }
             busy.set(false);
         });
@@ -572,14 +701,100 @@ fn Scanner(
     };
     let manual_submit = move |_| redeem_code(manual.get());
 
+    let prepare = move |_| {
+        let slug = event_slug.get();
+        if slug.is_empty() {
+            error.set(Some("Wybierz koncert.".to_owned()));
+            return;
+        }
+        busy.set(true);
+        show_message.set(String::new());
+        spawn_local(async move {
+            match bridge::invoke::<ShowModeStatus, _>(
+                "show_mode_prepare",
+                &EventArgs { event_slug: &slug },
+            )
+            .await
+            {
+                Ok(value) => {
+                    show_message.set(format!(
+                        "Snapshot gotowy: {} trwałych biletów.",
+                        value.eligible_passes
+                    ));
+                    offline.set(true);
+                    show_mode.set(value);
+                }
+                Err(message) => error.set(Some(message)),
+            }
+            busy.set(false);
+        });
+    };
+
+    let sync = move |_| {
+        let slug = event_slug.get();
+        if slug.is_empty() {
+            return;
+        }
+        busy.set(true);
+        show_message.set(String::new());
+        spawn_local(async move {
+            match bridge::invoke::<ShowModeSyncResult, _>(
+                "show_mode_sync",
+                &EventArgs { event_slug: &slug },
+            )
+            .await
+            {
+                Ok(value) => {
+                    show_message.set(format!(
+                        "Sync: {} zapisane, {} konfliktów, {} nadal czeka.",
+                        value.synced, value.conflicts, value.pending
+                    ));
+                    refresh_show_status(slug.clone());
+                }
+                Err(message) => error.set(Some(message)),
+            }
+            busy.set(false);
+        });
+    };
+
+    let clear = move |_| {
+        let slug = event_slug.get();
+        if slug.is_empty() {
+            return;
+        }
+        busy.set(true);
+        spawn_local(async move {
+            match bridge::invoke::<ShowModeStatus, _>(
+                "show_mode_clear",
+                &EventArgs { event_slug: &slug },
+            )
+            .await
+            {
+                Ok(value) => {
+                    show_mode.set(value);
+                    offline.set(false);
+                    show_message.set("Dane koncertu usunięte z urządzenia.".to_owned());
+                }
+                Err(message) => error.set(Some(message)),
+            }
+            busy.set(false);
+        });
+    };
+
     view! {
         <section class="screen">
             <header class="screen-title"><p class="eyebrow">GATE MODE</p><h2>Skanuj wejście</h2></header>
-            <label class="select-label">"Koncert"<select disabled=move || loading.get().events prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">{move || if loading.get().events { "Ładuję koncerty…" } else { "Wybierz wydarzenie" }}</option>{move || operator_events(dashboard).into_iter().map(|event| view! { <option value=event.slug.clone()>{event.title}</option> }).collect_view()}</select></label>
-            <button class="scanner-button" on:click=scan disabled=move || busy.get()><span class="scanner-frame"></span><strong>{move || if busy.get() { "WERYFIKUJĘ…" } else { "URUCHOM APARAT" }}</strong><small>QR biletu lub wejściówki</small></button>
-            <div class="manual-row"><input placeholder="Kod / public reference" prop:value=move || manual.get() on:input=move |e| manual.set(event_target_value(&e))/><button on:click=manual_submit disabled=move || busy.get()>"SPRAWDŹ"</button></div>
+            <label class="select-label">"Koncert"<select disabled=move || loading.get().events prop:value=move || event_slug.get() on:change=select_event><option value="">{move || if loading.get().events { "Ładuję koncerty…" } else { "Wybierz wydarzenie" }}</option><For each=move || operator_events(dashboard) key=|event| event.slug.clone() children=move |event| view! { <option value=event.slug.clone()>{event.title}</option> } /></select></label>
+            <article class:show-mode-active=move || offline.get() class="show-mode-card">
+                <div class="section-head"><div><p class="eyebrow">OFFLINE SHOW MODE</p><h3>{move || if offline.get() { "Bramka pracuje lokalnie" } else { "Odporność na brak LTE" }}</h3></div><button type="button" class:active=move || offline.get() disabled=move || !show_mode.get().prepared || busy.get() on:click=move |_| offline.update(|value| *value = !*value)>{move || if offline.get() { "OFFLINE ON" } else { "OFFLINE OFF" }}</button></div>
+                <p>{move || if show_mode.get().prepared { format!("{} biletów · {} oczekuje · {} konfliktów", show_mode.get().eligible_passes, show_mode.get().pending, show_mode.get().conflicts) } else { "Pobierz bezpieczny snapshot przed otwarciem bram.".to_owned() }}</p>
+                <div class="show-mode-actions"><button type="button" on:click=prepare disabled=move || busy.get() || event_slug.get().is_empty()>"PRZYGOTUJ OFFLINE"</button><button type="button" on:click=sync disabled=move || busy.get() || !show_mode.get().prepared>"SYNCHRONIZUJ"</button><button type="button" class="danger ghost" on:click=clear disabled=move || busy.get() || !show_mode.get().prepared>"WYCZYŚĆ"</button></div>
+                <Show when=move || !show_message.get().is_empty()><small>{move || show_message.get()}</small></Show>
+            </article>
+            <button class="scanner-button" on:click=scan disabled=move || busy.get()><span class="scanner-frame"></span><strong>{move || if busy.get() { "WERYFIKUJĘ…" } else if offline.get() { "SKANUJ LOKALNIE" } else { "URUCHOM APARAT" }}</strong><small>{move || if offline.get() { "Wyłącznie trwały QR biletu t1" } else { "QR biletu lub wejściówki" }}</small></button>
+            <Show when=move || !offline.get()><div class="manual-row"><input placeholder="Kod / public reference" prop:value=move || manual.get() on:input=move |e| manual.set(event_target_value(&e))/><button on:click=manual_submit disabled=move || busy.get()>"SPRAWDŹ"</button></div></Show>
             {move || result.get().map(|entry| {
-                let success = entry.status == "redeemed" || entry.status == "already_redeemed";
+                let success = matches!(entry.status.as_str(), "redeemed" | "already_redeemed" | "offline_queued" | "offline_duplicate");
                 view! { <article class:scan-success=success class:scan-warning=!success class="scan-result"><strong>{entry.status.to_uppercase()}</strong><span>{entry.public_reference}</span><p>{entry.holder_name.unwrap_or(entry.holder_email_masked)}</p></article> }
             })}
         </section>
@@ -652,7 +867,7 @@ fn Tickets(
         }
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<serde_json::Value, _>(
+            match bridge::invoke_unit(
                 "revoke_pass",
                 &ReferenceArgs {
                     public_reference: &reference,
@@ -787,7 +1002,7 @@ fn Campaigns(
     };
 
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">CONCERT SIGNAL</p><h2>Kampanie QR</h2></header><div class="form-grid panel"><label>"Koncert"<select disabled=move || loading.get().qr prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">{move || if loading.get().qr { "Ładuję kampanie…" } else { "Wybierz koncert" }}</option>{move || operator_qr_events(dashboard).into_iter().map(|event| view! { <option value=event.slug.clone()>{event.title}</option> }).collect_view()}</select></label><label>"Nazwa punktu / kampanii"<input prop:value=move || label.get() on:input=move |e| label.set(event_target_value(&e))/></label><div class="two-cols"><label>"Ważna od"<input type="datetime-local" prop:value=move || valid_from.get() on:input=move |e| valid_from.set(event_target_value(&e))/></label><label>"Ważna do"<input type="datetime-local" prop:value=move || valid_until.get() on:input=move |e| valid_until.set(event_target_value(&e))/></label></div><label>"Limit check-inów (opcjonalnie)"<input inputmode="numeric" prop:value=move || max_checkins.get() on:input=move |e| max_checkins.set(event_target_value(&e))/></label><button class="primary" on:click=create disabled=move || busy.get() || loading.get().qr>"UTWÓRZ KAMPANIĘ"</button></div><div class="section-head"><h3>Aktywne i historyczne</h3></div><Show when=move || !loading.get().qr fallback=move || view! { <Skeleton /> }><div class="card-list">{move || operator_campaigns(dashboard).into_iter().map(|campaign| view! { <CampaignCard campaign=campaign dashboard=dashboard loading=loading error=error /> }).collect_view()}</div></Show></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">CONCERT SIGNAL</p><h2>Kampanie QR</h2></header><div class="form-grid panel"><label>"Koncert"<select disabled=move || loading.get().qr prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">{move || if loading.get().qr { "Ładuję kampanie…" } else { "Wybierz koncert" }}</option><For each=move || operator_qr_events(dashboard) key=|event| event.slug.clone() children=move |event| view! { <option value=event.slug.clone()>{event.title}</option> } /></select></label><label>"Nazwa punktu / kampanii"<input prop:value=move || label.get() on:input=move |e| label.set(event_target_value(&e))/></label><div class="two-cols"><label>"Ważna od"<input type="datetime-local" prop:value=move || valid_from.get() on:input=move |e| valid_from.set(event_target_value(&e))/></label><label>"Ważna do"<input type="datetime-local" prop:value=move || valid_until.get() on:input=move |e| valid_until.set(event_target_value(&e))/></label></div><label>"Limit check-inów (opcjonalnie)"<input inputmode="numeric" prop:value=move || max_checkins.get() on:input=move |e| max_checkins.set(event_target_value(&e))/></label><button class="primary" on:click=create disabled=move || busy.get() || loading.get().qr>"UTWÓRZ KAMPANIĘ"</button></div><div class="section-head"><h3>Aktywne i historyczne</h3></div><Show when=move || !loading.get().qr fallback=move || view! { <Skeleton /> }><div class="card-list"><For each=move || operator_campaigns(dashboard) key=|campaign| campaign.id.clone() children=move |campaign| view! { <CampaignCard campaign=campaign dashboard=dashboard loading=loading error=error /> } /></div></Show></section>
     }
 }
 
@@ -803,7 +1018,7 @@ fn CampaignCard(
     let revoke = move |_| {
         let campaign_id = id.clone();
         spawn_local(async move {
-            match bridge::invoke::<serde_json::Value, _>(
+            match bridge::invoke_unit(
                 "revoke_qr_campaign",
                 &CampaignIdArgs {
                     campaign_id: &campaign_id,
@@ -840,8 +1055,24 @@ fn OperatorSettings(
     loading: RwSignal<OperatorLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
+    let ops = RwSignal::new(None::<OperatorOpsOverview>);
+    let ops_loading = RwSignal::new(false);
+    let owner = Signal::derive(move || {
+        status
+            .get()
+            .session
+            .is_some_and(|session| session.role == OperatorRole::Owner)
+    });
+    Effect::new(move |_| {
+        if owner.get() && ops.get().is_none() && !ops_loading.get() {
+            refresh_operator_ops(ops, ops_loading, error);
+        }
+    });
     let refresh = move |_| {
         refresh_operator_parts(dashboard, loading, error);
+        if owner.get_untracked() {
+            refresh_operator_ops(ops, ops_loading, error);
+        }
     };
     let lock = move |_| {
         spawn_local(async move {
@@ -868,31 +1099,151 @@ fn OperatorSettings(
         })
     };
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">DEVICE</p><h2>Ustawienia</h2></header><div class="settings-list"><article><div><strong>Połączenie</strong><p>{move || status.get().session.map(|s| s.api_base_url).unwrap_or_default()}</p></div><span class:online=move || !loading.get().events && !loading.get().qr>{move || if loading.get().events || loading.get().qr { "ŁĄCZĘ" } else { "ONLINE" }}</span></article><article><div><strong>Uprawnienia</strong><p>{move || status.get().session.map(|s| s.role.label().to_owned()).unwrap_or_default()}</p></div></article><button on:click=refresh disabled=move || loading.get().events || loading.get().qr>"Odśwież wszystkie dane"</button><button on:click=lock>"Zablokuj panel"</button><button class="danger ghost" on:click=forget>"Usuń profil operatora"</button></div><p class="security-note">Token operatora przechowuje zaszyfrowany sejf Stronghold. Warstwa WebView nigdy go nie odczytuje.</p></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">DEVICE</p><h2>Ustawienia</h2></header><div class="settings-list"><article><div><strong>Połączenie</strong><p>{move || status.get().session.map(|s| s.api_base_url).unwrap_or_default()}</p></div><span class:online=move || !loading.get().events && !loading.get().qr>{move || if loading.get().events || loading.get().qr { "ŁĄCZĘ" } else { "ONLINE" }}</span></article><article><div><strong>Uprawnienia</strong><p>{move || status.get().session.map(|s| s.role.label().to_owned()).unwrap_or_default()}</p></div></article><button on:click=refresh disabled=move || loading.get().events || loading.get().qr>"Odśwież wszystkie dane"</button><button on:click=lock>"Zablokuj panel"</button><button class="danger ghost" on:click=forget>"Usuń profil operatora"</button></div><Show when=move || owner.get()><OpsPanel overview=ops loading=ops_loading error=error /></Show><p class="security-note">Token operatora przechowuje zaszyfrowany sejf Stronghold. Warstwa WebView nigdy go nie odczytuje.</p></section>
     }
+}
+
+#[component]
+fn OpsPanel(
+    overview: RwSignal<Option<OperatorOpsOverview>>,
+    loading: RwSignal<bool>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let refresh = move |_| refresh_operator_ops(overview, loading, error);
+    view! {
+        <section class="ops-panel"><div class="section-head"><div><p class="eyebrow">CONTROL PLANE</p><h3>Kolejki i dostawy</h3></div><button class="text-button" on:click=refresh disabled=move || loading.get()>"Odśwież"</button></div>
+            <Show when=move || !loading.get() fallback=move || view! { <Skeleton rows=2 /> }>
+                {move || overview.get().map(|data| {
+                    let summary = data.summary;
+                    let deliveries = data.dead_deliveries;
+                    let outbox = data.dead_outbox;
+                    let unavailable_sources = data.unavailable_sources;
+                    let healthy = deliveries.is_empty() && outbox.is_empty() && unavailable_sources.is_empty();
+                    let degraded_view = (!unavailable_sources.is_empty()).then(|| view! {
+                        <p class="security-note warning">{format!("Cockpit działa częściowo. Niedostępne: {}.", unavailable_sources.join(", "))}</p>
+                    });
+                    let deliveries_view = (!deliveries.is_empty()).then(|| view! {
+                        <div class="section-head"><h3>Martwe dostawy</h3></div>
+                        <div class="ops-list"><For each=move || deliveries.clone() key=|item| item.id.clone() children=move |item| view! { <OpsDeliveryCard item=item overview=overview loading=loading error=error /> } /></div>
+                    });
+                    let outbox_view = (!outbox.is_empty()).then(|| view! {
+                        <div class="section-head"><h3>Martwy outbox</h3></div>
+                        <div class="ops-list"><For each=move || outbox.clone() key=|item| item.id.clone() children=move |item| view! { <OpsOutboxCard item=item overview=overview loading=loading error=error /> } /></div>
+                    });
+                    let healthy_view = healthy.then(|| view! { <p class="ops-healthy">Brak martwych wpisów. Tor dostaw jest czysty.</p> });
+                    view! {
+                        <div class="ops-metrics"><Metric value=summary.outbox.pending.to_string() label="outbox pending"/><Metric value=summary.outbox.dead.to_string() label="outbox dead"/><Metric value=summary.deliveries.pending.to_string() label="delivery pending"/><Metric value=summary.deliveries.dead.to_string() label="delivery dead"/></div>
+                        {degraded_view}
+                        {deliveries_view}
+                        {outbox_view}
+                        {healthy_view}
+                    }
+                })}
+            </Show>
+        </section>
+    }
+}
+
+#[component]
+fn OpsDeliveryCard(
+    item: OpsDeliveryItem,
+    overview: RwSignal<Option<OperatorOpsOverview>>,
+    loading: RwSignal<bool>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let target_id = item.id.clone();
+    let endpoint_active = item.endpoint_active;
+    let retry =
+        move |_| retry_operator_item("deliveries", target_id.clone(), overview, loading, error);
+    view! { <article class="ops-item"><div><strong>{item.event_type}</strong><p>{format!("{} · próba {}/{}", item.endpoint_name, item.attempt_count, item.max_attempts)}</p><small>{item.last_error_kind.unwrap_or_else(|| "brak kodu błędu".to_owned())}</small></div><button class="danger ghost" on:click=retry disabled=move || loading.get() || !endpoint_active>"RETRY"</button></article> }
+}
+
+#[component]
+fn OpsOutboxCard(
+    item: OpsOutboxItem,
+    overview: RwSignal<Option<OperatorOpsOverview>>,
+    loading: RwSignal<bool>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let target_id = item.id.clone();
+    let retry = move |_| retry_operator_item("outbox", target_id.clone(), overview, loading, error);
+    view! { <article class="ops-item"><div><strong>{item.event_type}</strong><p>{format!("próba {}/{}", item.attempts, item.max_attempts)}</p><small>{item.last_error_kind.unwrap_or_else(|| "brak kodu błędu".to_owned())}</small></div><button class="danger ghost" on:click=retry disabled=move || loading.get()>"RETRY"</button></article> }
+}
+
+fn retry_operator_item(
+    target_kind: &'static str,
+    target_id: String,
+    overview: RwSignal<Option<OperatorOpsOverview>>,
+    loading: RwSignal<bool>,
+    error: RwSignal<Option<String>>,
+) {
+    if loading.get_untracked() {
+        return;
+    }
+    loading.set(true);
+    spawn_local(async move {
+        match bridge::invoke::<OpsRetryResult, _>(
+            "operator_retry",
+            &RetryArgs {
+                target_kind,
+                target_id: &target_id,
+            },
+        )
+        .await
+        {
+            Ok(result) => {
+                error.set(Some(if result.replayed {
+                    "Retry był już wcześniej przyjęty.".to_owned()
+                } else {
+                    "Wpis wrócił do kolejki.".to_owned()
+                }));
+                refresh_operator_ops(overview, loading, error);
+            }
+            Err(message) => {
+                loading.set(false);
+                error.set(Some(message));
+            }
+        }
+    });
 }
 
 #[component]
 fn FanPortal(
     mode: RwSignal<RootMode>,
     status: RwSignal<FanSessionStatus>,
+    status_loading: RwSignal<bool>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let public = RwSignal::new(None::<PublicHomeData>);
     let public_loading = RwSignal::new(PublicLoadingState::all());
     Effect::new(move |_| {
-        if !status.get().unlocked && public.get().is_none() {
+        if !status_loading.get() && !status.get().unlocked && public.get().is_none() {
             public.set(Some(PublicHomeData::default()));
             refresh_public_events(public, public_loading, error);
             refresh_public_cities(public, public_loading, error);
         }
     });
     view! {
-        {move || if status.get().unlocked {
+        {move || if status_loading.get() {
+            view! { <AccessLoader mode=mode label="SPRAWDZAM TWÓJ SYGNAŁ" /> }.into_any()
+        } else if status.get().unlocked {
             view! { <FanApp mode=mode status=status public=public error=error /> }.into_any()
         } else {
             view! { <FanAccess mode=mode status=status public=public public_loading=public_loading error=error /> }.into_any()
         }}
+    }
+}
+
+#[component]
+fn AccessLoader(mode: RwSignal<RootMode>, label: &'static str) -> impl IntoView {
+    view! {
+        <section class="access-screen status-loader">
+            <BackButton mode=mode />
+            <div class="access-card">
+                <p class="eyebrow">{label}</p>
+                <Skeleton rows=2 />
+            </div>
+        </section>
     }
 }
 
@@ -1033,7 +1384,7 @@ fn PublicEventStrip(
     public: RwSignal<Option<PublicHomeData>>,
     loading: RwSignal<PublicLoadingState>,
 ) -> impl IntoView {
-    view! { <div class="public-strip"><div class="section-head"><h3>Najbliższe koncerty</h3></div><Show when=move || !loading.get().events fallback=move || view! { <Skeleton rows=2 /> }><div class="card-list">{move || public.with(|data| data.as_ref().map(|data| data.events.iter().take(4).cloned().map(|event| view! { <EventCard event=event /> }).collect_view()))}</div></Show></div> }
+    view! { <div class="public-strip"><div class="section-head"><h3>Najbliższe koncerty</h3></div><Show when=move || !loading.get().events fallback=move || view! { <Skeleton rows=2 /> }><div class="card-list"><For each=move || public.with(|data| data.as_ref().map(|data| data.events.iter().take(4).cloned().collect::<Vec<_>>()).unwrap_or_default()) key=|event| event.slug.clone() children=move |event| view! { <EventCard event=event /> } /></div></Show></div> }
 }
 
 #[component]
@@ -1047,6 +1398,7 @@ fn FanApp(
     let dashboard = RwSignal::new(None::<FanDashboardData>);
     let wallets = RwSignal::new(Vec::<TicketWallet>::new());
     let admission_qr = RwSignal::new(None::<AdmissionQr>);
+    let area = RwSignal::new(None::<AreaWallet>);
     let loading = RwSignal::new(FanLoadingState::all());
 
     Effect::new(move |_| {
@@ -1054,16 +1406,19 @@ fn FanApp(
             dashboard.set(Some(FanDashboardData::default()));
             refresh_fan_parts(dashboard, loading, error);
             refresh_wallets(wallets, Some(loading), error);
+            refresh_fan_area(area, loading, error);
         }
     });
 
     let close = move |_| {
+        bridge::invalidate_latest("fan:");
         spawn_local(async move {
             match bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
                 Ok(value) => {
                     dashboard.set(None);
                     wallets.set(Vec::new());
                     admission_qr.set(None);
+                    area.set(None);
                     loading.set(FanLoadingState::all());
                     status.set(value);
                     mode.set(RootMode::Launcher);
@@ -1077,9 +1432,10 @@ fn FanApp(
         <section class="authenticated fan-authenticated"><header class="topbar fan-topbar"><div><p class="eyebrow">VIRYA SIGNAL</p><strong>{move || status.get().session.and_then(|s| s.display_name).unwrap_or_else(|| "Mój Sygnał".to_owned())}</strong></div><div class="topbar-actions"><span class="live-dot"></span><button aria-label="Zamknij i zablokuj Sygnał" on:click=close>"×"</button></div></header><div class="content">{move || match tab.get() {
             FanTab::Signal => view! { <FanSignal dashboard=dashboard loading=loading /> }.into_any(),
             FanTab::Events => view! { <FanEvents dashboard=dashboard public=public loading=loading error=error /> }.into_any(),
+            FanTab::Game => view! { <FanGame area=area loading=loading error=error /> }.into_any(),
             FanTab::Wallet => view! { <FanWallet dashboard=dashboard wallets=wallets admission_qr=admission_qr loading=loading error=error /> }.into_any(),
-            FanTab::Profile => view! { <FanProfileScreen status=status dashboard=dashboard wallets=wallets loading=loading error=error /> }.into_any(),
-        }}</div><nav class="bottom-nav four"><FanNavButton tab=tab own=FanTab::Signal icon="◉" label="Sygnał"/><FanNavButton tab=tab own=FanTab::Events icon="⌁" label="Koncerty"/><FanNavButton tab=tab own=FanTab::Wallet icon="▣" label="Bilety"/><FanNavButton tab=tab own=FanTab::Profile icon="◎" label="Profil"/></nav></section>
+            FanTab::Profile => view! { <FanProfileScreen status=status dashboard=dashboard wallets=wallets area=area loading=loading error=error /> }.into_any(),
+        }}</div><nav class="bottom-nav five"><FanNavButton tab=tab own=FanTab::Signal icon="◉" label="Sygnał"/><FanNavButton tab=tab own=FanTab::Events icon="⌁" label="Koncerty"/><FanNavButton tab=tab own=FanTab::Game icon="◇" label="Gra"/><FanNavButton tab=tab own=FanTab::Wallet icon="▣" label="Bilety"/><FanNavButton tab=tab own=FanTab::Profile icon="◎" label="Profil"/></nav></section>
     }
 }
 
@@ -1149,7 +1505,7 @@ fn FanEvents(
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">GDZIE GRAMY</p><h2>Koncerty</h2></header><Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }><div class="card-list fan-event-list">{move || fan_events(dashboard, public).into_iter().map(|event| view! { <FanEventCard event=event dashboard=dashboard loading=loading error=error /> }).collect_view()}</div></Show></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">GDZIE GRAMY</p><h2>Koncerty</h2></header><Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }><div class="card-list fan-event-list"><For each=move || fan_events(dashboard, public) key=|event| event.slug.clone() children=move |event| view! { <FanEventCard event=event dashboard=dashboard loading=loading error=error /> } /></div></Show></section>
     }
 }
 
@@ -1179,7 +1535,7 @@ fn FanEventCard(
         let event_slug = interest_slug.clone();
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<serde_json::Value, _>(
+            match bridge::invoke_unit(
                 "fan_register_interest",
                 &EventArgs {
                     event_slug: &event_slug,
@@ -1200,13 +1556,24 @@ fn FanEventCard(
     let event_month = month(&event.starts_at);
     let event_time = human_time(&event.starts_at);
     let location = event_location(&event);
-    let image = event.image_url;
+    let image = event.image_thumbnail_url.or(event.image_url);
     let ticket = event.ticket_url;
     let description = event.description;
     let title = event.title;
     view! {
         <article class="fan-event-card">
-            {image.map(|url| view! { <img src=url alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" /> })}
+            {image.map(|url| view! {
+                <img
+                    src=url
+                    alt=""
+                    width="720"
+                    height="405"
+                    loading="lazy"
+                    decoding="async"
+                    fetchpriority="low"
+                    referrerpolicy="no-referrer"
+                />
+            })}
             <div class="fan-event-body">
                 <div class="date-line"><span>{format!("{event_day} {event_month}")}</span><small>{event_time}</small></div>
                 <h3>{title}</h3><p>{location}</p>
@@ -1238,6 +1605,62 @@ fn ExternalLink(
         });
     };
     view! { <button on:click=open>{label}</button> }
+}
+
+fn open_area_game(error: RwSignal<Option<String>>) {
+    spawn_local(async move {
+        let url = "https://virya.music/pl/area/#area-map";
+        if let Err(message) = bridge::invoke_unit("open_external_url", &UrlArgs { url }).await {
+            error.set(Some(message));
+        }
+    });
+}
+
+#[component]
+fn FanGame(
+    area: RwSignal<Option<AreaWallet>>,
+    loading: RwSignal<FanLoadingState>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let refresh = move |_| refresh_fan_area(area, loading, error);
+    view! {
+        <section class="screen fan-screen area-screen">
+            <header class="screen-title"><p class="eyebrow">VIRYA AREA</p><h2>Odblokuj sygnał</h2><p>Artefakty, miejski progres i nagrody z gry terenowej.</p></header>
+            <Show when=move || !loading.get().area fallback=move || view! { <Skeleton rows=3 /> }>
+                {move || area.get().map(|wallet| {
+                    let claimed = wallet.claims.len() as u32;
+                    let total = wallet.collection_size.max(1);
+                    let percent = (claimed.saturating_mul(100) / total).min(100);
+                    let claims = wallet.claims;
+                    let live_count = wallet.live_drops.len();
+                    let voucher_count = wallet.vouchers.len();
+                    let collection_size = wallet.collection_size;
+                    let reward_credits = wallet.reward_credits;
+                    let community_percent = wallet.community.percent.round();
+                    let migration_notice = wallet.migration_required.then(|| view! {
+                        <p class="security-note warning">Połącz portfel przeglądarkowy z kontem na stronie AREA, aby zachować cały postęp.</p>
+                    });
+                    view! {
+                        <div class="area-hero-card">
+                            <div><p class="eyebrow">POSTĘP KOLEKCJI</p><h3>{format!("{claimed} / {collection_size}")}</h3></div>
+                            <strong>{format!("{reward_credits} kredytów")}</strong>
+                            <div class="area-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow=percent><span style=format!("width:{percent}%")></span></div>
+                            <div class="area-stats"><span>{format!("{live_count} aktywne punkty")}</span><span>{format!("{voucher_count} nagrody")}</span><span>{format!("{community_percent}% społeczności")}</span></div>
+                        </div>
+                        {migration_notice}
+                        <div class="section-head"><h3>Odkryte artefakty</h3><span>{claimed}</span></div>
+                        <div class="artifact-list">
+                            <For each=move || claims.clone() key=|claim| claim.drop_id.clone() children=move |claim| view! {
+                                <article class="artifact-card"><span>{claim.number}</span><div><strong>{claim.track}</strong><p>{format!("{} · {}", claim.city, claim.edition)}</p><small>{claim.line}</small></div><em>{claim.edition_number.map(|number| format!("#{number}")).unwrap_or_else(|| "✓".to_owned())}</em></article>
+                            } />
+                        </div>
+                        <div class="area-actions"><button class="primary" on:click=move |_| open_area_game(error)>"OTWÓRZ PEŁNĄ GRĘ"</button><button class="ghost" on:click=refresh disabled=move || loading.get().area>"Odśwież progres"</button></div>
+                        <p class="security-note">Skanowanie i potwierdzenie lokalizacji odbywa się w pełnej grze. Aplikacja pokazuje tylko bezpieczny stan portfela; współrzędne dropów nie są pobierane.</p>
+                    }.into_any()
+                }).unwrap_or_else(|| view! { <div class="empty-state"><strong>AREA chwilowo niedostępna</strong><p>Odśwież dane albo otwórz pełną grę.</p><button class="primary" on:click=move |_| open_area_game(error)>"OTWÓRZ AREA"</button></div> }.into_any())}
+            </Show>
+        </section>
+    }
 }
 
 #[component]
@@ -1323,26 +1746,23 @@ fn FanWallet(
     view! {
         <section class="screen"><header class="screen-title"><p class="eyebrow">MOBILE WALLET</p><h2>Bilety i wejście</h2></header><Show when=move || !loading.get().admission_pass fallback=move || view! { <Skeleton rows=1 /> }>{move || dashboard.with(|state| state.as_ref().and_then(|d| d.admission_pass.clone())).map(|pass| view! { <article class="admission-card"><p class="eyebrow">WEJŚCIÓWKA VIRYA</p><h3>{pass.event_title}</h3><p>{event_time_location(&pass.starts_at, pass.venue.as_deref())}</p><strong>{pass.public_reference}</strong><span>{pass.status}</span><button class="primary" on:click=qr disabled=move || busy.get()>"POKAŻ QR NA WEJŚCIE"</button>{move || admission_qr.get().map(|value| view! { <QrPanel svg=value.qr_svg token=value.token expires=value.expires_at /> })}</article> })}
         <Show when=move || dashboard.with(|state| state.as_ref().is_none_or(|d| d.admission_pass.is_none()))><div class="claim-box"><p class="eyebrow">WYGRAŁEŚ WEJŚCIÓWKĘ?</p><h3>Przypisz ją do telefonu</h3><textarea rows="3" placeholder="Token z wiadomości" prop:value=move || claim_token.get() on:input=move |e| claim_token.set(event_target_value(&e))></textarea><button class="primary" on:click=claim disabled=move || busy.get()>"ODBIERZ WEJŚCIÓWKĘ"</button></div></Show></Show>
-        <div class="section-head"><h3>Portfel biletów</h3><span>{move || wallets.get().len()}</span></div><Show when=move || !loading.get().wallets fallback=move || view! { <Skeleton rows=2 /> }><div class="wallet-stack">{move || wallets.get().into_iter().map(|wallet| view! { <WalletCard wallet=wallet error=error /> }).collect_view()}</div></Show><details class="import-box"><summary>"Dodaj istniejące zamówienie"</summary><div class="form-grid"><label>"Order ID"<input placeholder="UUID zamówienia" prop:value=move || order_id.get() on:input=move |e| order_id.set(event_target_value(&e))/></label><label>"Prywatny checkout token"<textarea rows="3" prop:value=move || checkout_token.get() on:input=move |e| checkout_token.set(event_target_value(&e))></textarea></label><button class="primary" on:click=import disabled=move || busy.get()>"DODAJ DO PORTFELA"</button></div></details></section>
+        <div class="section-head"><h3>Portfel biletów</h3><span>{move || wallets.get().len()}</span></div><Show when=move || !loading.get().wallets fallback=move || view! { <Skeleton rows=2 /> }><div class="wallet-stack"><For each=move || wallets.get() key=|wallet| wallet.order.order_id.clone() children=move |wallet| view! { <WalletCard wallet=wallet error=error /> } /></div></Show><details class="import-box"><summary>"Dodaj istniejące zamówienie"</summary><div class="form-grid"><label>"Order ID"<input placeholder="UUID zamówienia" prop:value=move || order_id.get() on:input=move |e| order_id.set(event_target_value(&e))/></label><label>"Prywatny checkout token"<textarea rows="3" prop:value=move || checkout_token.get() on:input=move |e| checkout_token.set(event_target_value(&e))></textarea></label><button class="primary" on:click=import disabled=move || busy.get()>"DODAJ DO PORTFELA"</button></div></details></section>
     }
 }
 
 #[component]
 fn WalletCard(wallet: TicketWallet, error: RwSignal<Option<String>>) -> impl IntoView {
     let order_id = wallet.order.order_id.clone();
+    let delivery_order_id = order_id.clone();
     let busy = RwSignal::new(false);
     let resend = move |_| {
         if busy.get_untracked() {
             return;
         }
-        let order = order_id.clone();
+        let order = delivery_order_id.clone();
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<serde_json::Value, _>(
-                "fan_request_delivery",
-                &OrderArgs { order_id: &order },
-            )
-            .await
+            match bridge::invoke_unit("fan_request_delivery", &OrderArgs { order_id: &order }).await
             {
                 Ok(_) => error.set(Some("Wysłaliśmy ponownie portfel na e-mail.".to_owned())),
                 Err(message) => error.set(Some(message)),
@@ -1351,7 +1771,53 @@ fn WalletCard(wallet: TicketWallet, error: RwSignal<Option<String>>) -> impl Int
         });
     };
     view! {
-        <article class="wallet-card"><header><div><p class="eyebrow">{wallet.order.status}</p><h3>{wallet.order.event_title}</h3><p>{event_time_location(&wallet.order.starts_at, wallet.order.venue.as_deref())}</p></div><strong>{wallet.order.public_reference}</strong></header><div class="ticket-stack">{wallet.tickets.into_iter().map(|ticket| view! { <article class="ticket-card"><div><p class="eyebrow">{ticket.ticket_type_name}</p><strong>{ticket.public_reference}</strong><span>{ticket.holder_name.unwrap_or(ticket.holder_email_masked)}</span></div>{ticket.qr_svg.map(|svg| view! { <div class="mini-qr" inner_html=svg></div> })}<small>{format!("QR ważny do {}", human_time(&ticket.qr_expires_at))}</small></article> }).collect_view()}</div><button class="text-button" on:click=resend disabled=move || busy.get()>{move || if busy.get() { "Wysyłam…" } else { "Wyślij bilety ponownie na e-mail" }}</button></article>
+        <article class="wallet-card"><header><div><p class="eyebrow">{wallet.order.status}</p><h3>{wallet.order.event_title}</h3><p>{event_time_location(&wallet.order.starts_at, wallet.order.venue.as_deref())}</p></div><strong>{wallet.order.public_reference}</strong></header><div class="ticket-stack">{wallet.tickets.into_iter().map(|ticket| view! { <WalletTicketCard order_id=order_id.clone() ticket=ticket error=error /> }).collect_view()}</div><button class="text-button" on:click=resend disabled=move || busy.get()>{move || if busy.get() { "Wysyłam…" } else { "Wyślij bilety ponownie na e-mail" }}</button></article>
+    }
+}
+
+#[component]
+fn WalletTicketCard(
+    order_id: String,
+    ticket: WalletTicket,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let public_reference = ticket.public_reference.clone();
+    let qr_available = ticket.qr_available;
+    let qr_svg = RwSignal::new(None::<String>);
+    let qr_visible = RwSignal::new(false);
+    let busy = RwSignal::new(false);
+    let toggle_qr = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        if qr_svg.get_untracked().is_some() {
+            qr_visible.update(|visible| *visible = !*visible);
+            return;
+        }
+        let order_id = order_id.clone();
+        let public_reference = public_reference.clone();
+        busy.set(true);
+        spawn_local(async move {
+            match bridge::invoke::<String, _>(
+                "render_wallet_qr",
+                &WalletQrArgs {
+                    order_id: &order_id,
+                    public_reference: &public_reference,
+                },
+            )
+            .await
+            {
+                Ok(svg) => {
+                    qr_svg.set(Some(svg));
+                    qr_visible.set(true);
+                }
+                Err(message) => error.set(Some(message)),
+            }
+            busy.set(false);
+        });
+    };
+    view! {
+        <article class="ticket-card"><div><p class="eyebrow">{ticket.ticket_type_name}</p><strong>{ticket.public_reference}</strong><span>{ticket.holder_name.unwrap_or(ticket.holder_email_masked)}</span></div><button class="ticket-qr-button" on:click=toggle_qr disabled=move || busy.get() || !qr_available>{move || if busy.get() { "GENERUJĘ…" } else if qr_visible.get() { "UKRYJ QR" } else if qr_available { "POKAŻ QR" } else { "QR NIEDOSTĘPNY" }}</button><Show when=move || qr_visible.get()>{move || qr_svg.get().map(|svg| view! { <div class="mini-qr" inner_html=svg></div> })}</Show><small>{format!("QR ważny do {}", human_time(&ticket.qr_expires_at))}</small></article>
     }
 }
 
@@ -1365,12 +1831,14 @@ fn FanProfileScreen(
     status: RwSignal<FanSessionStatus>,
     dashboard: RwSignal<Option<FanDashboardData>>,
     wallets: RwSignal<Vec<TicketWallet>>,
+    area: RwSignal<Option<AreaWallet>>,
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let refresh = move |_| {
         refresh_fan_parts(dashboard, loading, error);
         refresh_wallets(wallets, Some(loading), error);
+        refresh_fan_area(area, loading, error);
     };
     let lock = move |_| {
         spawn_local(async move {
@@ -1378,6 +1846,7 @@ fn FanProfileScreen(
                 Ok(value) => {
                     dashboard.set(None);
                     wallets.set(Vec::new());
+                    area.set(None);
                     loading.set(FanLoadingState::all());
                     status.set(value);
                 }
@@ -1391,6 +1860,7 @@ fn FanProfileScreen(
                 Ok(value) => {
                     dashboard.set(None);
                     wallets.set(Vec::new());
+                    area.set(None);
                     loading.set(FanLoadingState::all());
                     status.set(value);
                 }
@@ -1399,7 +1869,7 @@ fn FanProfileScreen(
         })
     };
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">MÓJ PROFIL</p><h2>Ustawienia Sygnału</h2></header>{move || status.get().session.map(|profile| view! { <div class="profile-card"><div class="avatar">V</div><div><strong>{profile.display_name.unwrap_or_else(|| "Fan Viryi".to_owned())}</strong><p>{profile.email}</p></div></div><div class="stats-grid"><Metric value=profile.wallet_count.to_string() label="zamówienia"/><Metric value=if profile.has_admission_pass { "1".to_owned() } else { "0".to_owned() } label="wejściówki"/><Metric value=dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).unwrap_or_else(|| "—".to_owned()) label="polecenia"/></div> })}<div class="settings-list"><button on:click=refresh>"Odśwież dane"</button><button on:click=lock>"Zablokuj aplikację"</button><button class="danger ghost" on:click=forget>"Usuń profil i bilety z urządzenia"</button></div><p class="security-note">Sesja fana, wejściówka oraz prywatne tokeny portfela są przechowywane w osobnym, zaszyfrowanym sejfie Stronghold.</p></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">MÓJ PROFIL</p><h2>Ustawienia Sygnału</h2></header>{move || status.get().session.map(|profile| view! { <div class="profile-card"><div class="avatar">V</div><div><strong>{profile.display_name.unwrap_or_else(|| "Fan Viryi".to_owned())}</strong><p>{profile.email}</p></div></div><div class="stats-grid"><Metric value=profile.wallet_count.to_string() label="zamówienia"/><Metric value=if profile.has_admission_pass { "1".to_owned() } else { "0".to_owned() } label="wejściówki"/><Metric value=dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).unwrap_or_else(|| "—".to_owned()) label="polecenia"/></div> })}<div class="settings-list"><button on:click=refresh disabled=move || { let state = loading.get(); state.events || state.referral || state.interests || state.admission_pass || state.wallets }>{move || { let state = loading.get(); if state.events || state.referral || state.interests || state.admission_pass || state.wallets { "Odświeżam…" } else { "Odśwież dane" } }}</button><button on:click=lock>"Zablokuj aplikację"</button><button class="danger ghost" on:click=forget>"Usuń profil i bilety z urządzenia"</button></div><p class="security-note">Sesja fana, wejściówka oraz prywatne tokeny portfela są przechowywane w osobnym, zaszyfrowanym sejfie Stronghold.</p></section>
     }
 }
 
@@ -1429,17 +1899,20 @@ fn refresh_public_events(
 ) {
     loading.update(|state| state.events = true);
     spawn_local(async move {
-        match bridge::invoke::<Vec<PublicEvent>, _>(
+        match bridge::invoke_latest::<Vec<PublicEvent>, _>(
             "public_events",
             &ApiArgs {
                 api_base_url: API_BASE,
             },
+            15_000,
+            "public:events",
         )
         .await
         {
-            Ok(value) => public.update(|state| {
+            Ok(Some(value)) => public.update(|state| {
                 state.get_or_insert_with(PublicHomeData::default).events = value;
             }),
+            Ok(None) => return,
             Err(message) => error.set(Some(message)),
         }
         loading.update(|state| state.events = false);
@@ -1453,17 +1926,20 @@ fn refresh_public_cities(
 ) {
     loading.update(|state| state.cities = true);
     spawn_local(async move {
-        match bridge::invoke::<Vec<CitySignal>, _>(
+        match bridge::invoke_latest::<Vec<CitySignal>, _>(
             "public_cities",
             &ApiArgs {
                 api_base_url: API_BASE,
             },
+            15_000,
+            "public:cities",
         )
         .await
         {
-            Ok(value) => public.update(|state| {
+            Ok(Some(value)) => public.update(|state| {
                 state.get_or_insert_with(PublicHomeData::default).cities = value;
             }),
+            Ok(None) => return,
             Err(message) => error.set(Some(message)),
         }
         loading.update(|state| state.cities = false);
@@ -1477,10 +1953,18 @@ fn refresh_operator_events(
 ) {
     loading.update(|state| state.events = true);
     spawn_local(async move {
-        match bridge::invoke::<Vec<PublicEvent>, _>("operator_events", &EmptyArgs {}).await {
-            Ok(value) => dashboard.update(|state| {
+        match bridge::invoke_latest::<Vec<PublicEvent>, _>(
+            "operator_events",
+            &EmptyArgs {},
+            15_000,
+            "operator:events",
+        )
+        .await
+        {
+            Ok(Some(value)) => dashboard.update(|state| {
                 state.get_or_insert_with(DashboardData::default).events = value;
             }),
+            Ok(None) => return,
             Err(message) => error.set(Some(message)),
         }
         loading.update(|state| state.events = false);
@@ -1494,15 +1978,44 @@ fn refresh_operator_qr(
 ) {
     loading.update(|state| state.qr = true);
     spawn_local(async move {
-        match bridge::invoke::<crate::models::ConcertQrOverview, _>("operator_qr", &EmptyArgs {})
-            .await
+        match bridge::invoke_latest::<crate::models::ConcertQrOverview, _>(
+            "operator_qr",
+            &EmptyArgs {},
+            15_000,
+            "operator:qr",
+        )
+        .await
         {
-            Ok(value) => dashboard.update(|state| {
+            Ok(Some(value)) => dashboard.update(|state| {
                 state.get_or_insert_with(DashboardData::default).qr = Some(value);
             }),
+            Ok(None) => return,
             Err(message) => error.set(Some(message)),
         }
         loading.update(|state| state.qr = false);
+    });
+}
+
+fn refresh_operator_ops(
+    overview: RwSignal<Option<OperatorOpsOverview>>,
+    loading: RwSignal<bool>,
+    error: RwSignal<Option<String>>,
+) {
+    loading.set(true);
+    spawn_local(async move {
+        match bridge::invoke_latest::<OperatorOpsOverview, _>(
+            "operator_ops_overview",
+            &EmptyArgs {},
+            20_000,
+            "operator:ops",
+        )
+        .await
+        {
+            Ok(Some(value)) => overview.set(Some(value)),
+            Ok(None) => return,
+            Err(message) => error.set(Some(message)),
+        }
+        loading.set(false);
     });
 }
 
@@ -1534,10 +2047,18 @@ fn refresh_fan_events(
 ) {
     loading.update(|state| state.events = true);
     spawn_local(async move {
-        match bridge::invoke::<Vec<PublicEvent>, _>("fan_events", &EmptyArgs {}).await {
-            Ok(value) => dashboard.update(|state| {
+        match bridge::invoke_latest::<Vec<PublicEvent>, _>(
+            "fan_events",
+            &EmptyArgs {},
+            15_000,
+            "fan:events",
+        )
+        .await
+        {
+            Ok(Some(value)) => dashboard.update(|state| {
                 state.get_or_insert_with(FanDashboardData::default).events = value;
             }),
+            Ok(None) => return,
             Err(message) => error.set(Some(message)),
         }
         loading.update(|state| state.events = false);
@@ -1551,10 +2072,18 @@ fn refresh_fan_referral(
 ) {
     loading.update(|state| state.referral = true);
     spawn_local(async move {
-        match bridge::invoke::<ReferralProgress, _>("fan_referral", &EmptyArgs {}).await {
-            Ok(value) => dashboard.update(|state| {
+        match bridge::invoke_latest::<ReferralProgress, _>(
+            "fan_referral",
+            &EmptyArgs {},
+            15_000,
+            "fan:referral",
+        )
+        .await
+        {
+            Ok(Some(value)) => dashboard.update(|state| {
                 state.get_or_insert_with(FanDashboardData::default).referral = value;
             }),
+            Ok(None) => return,
             Err(message) => error.set(Some(message)),
         }
         loading.update(|state| state.referral = false);
@@ -1568,12 +2097,20 @@ fn refresh_fan_interests(
 ) {
     loading.update(|state| state.interests = true);
     spawn_local(async move {
-        match bridge::invoke::<Vec<FanEventInterest>, _>("fan_interests", &EmptyArgs {}).await {
-            Ok(value) => dashboard.update(|state| {
+        match bridge::invoke_latest::<Vec<FanEventInterest>, _>(
+            "fan_interests",
+            &EmptyArgs {},
+            15_000,
+            "fan:interests",
+        )
+        .await
+        {
+            Ok(Some(value)) => dashboard.update(|state| {
                 state
                     .get_or_insert_with(FanDashboardData::default)
                     .interests = value;
             }),
+            Ok(None) => return,
             Err(message) => error.set(Some(message)),
         }
         loading.update(|state| state.interests = false);
@@ -1587,16 +2124,46 @@ fn refresh_fan_admission_pass(
 ) {
     loading.update(|state| state.admission_pass = true);
     spawn_local(async move {
-        match bridge::invoke::<Option<AdmissionPass>, _>("fan_admission_pass", &EmptyArgs {}).await
+        match bridge::invoke_latest::<Option<AdmissionPass>, _>(
+            "fan_admission_pass",
+            &EmptyArgs {},
+            15_000,
+            "fan:admission",
+        )
+        .await
         {
-            Ok(value) => dashboard.update(|state| {
+            Ok(Some(value)) => dashboard.update(|state| {
                 state
                     .get_or_insert_with(FanDashboardData::default)
                     .admission_pass = value;
             }),
+            Ok(None) => return,
             Err(message) => error.set(Some(message)),
         }
         loading.update(|state| state.admission_pass = false);
+    });
+}
+
+fn refresh_fan_area(
+    area: RwSignal<Option<AreaWallet>>,
+    loading: RwSignal<FanLoadingState>,
+    error: RwSignal<Option<String>>,
+) {
+    loading.update(|state| state.area = true);
+    spawn_local(async move {
+        match bridge::invoke_latest::<AreaWallet, _>(
+            "fan_area_wallet",
+            &EmptyArgs {},
+            15_000,
+            "fan:area",
+        )
+        .await
+        {
+            Ok(Some(value)) => area.set(Some(value)),
+            Ok(None) => return,
+            Err(message) => error.set(Some(message)),
+        }
+        loading.update(|state| state.area = false);
     });
 }
 
@@ -1609,8 +2176,24 @@ fn refresh_wallets(
         loading.update(|state| state.wallets = true);
     }
     spawn_local(async move {
-        match bridge::invoke::<Vec<TicketWallet>, _>("fan_wallets", &EmptyArgs {}).await {
-            Ok(value) => wallets.set(value),
+        match bridge::invoke_latest::<WalletBatch, _>(
+            "fan_wallets",
+            &EmptyArgs {},
+            35_000,
+            "fan:wallets",
+        )
+        .await
+        {
+            Ok(Some(value)) => {
+                wallets.set(value.wallets);
+                if value.failed_count > 0 {
+                    error.set(Some(format!(
+                        "Nie udało się odświeżyć {} zamówień. Pozostałe bilety są dostępne.",
+                        value.failed_count
+                    )));
+                }
+            }
+            Ok(None) => return,
             Err(message) => error.set(Some(message)),
         }
         if let Some(loading) = loading {

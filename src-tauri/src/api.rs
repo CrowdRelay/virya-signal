@@ -1,34 +1,95 @@
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
 
 use reqwest::{
-    header::{HeaderMap, ACCEPT, COOKIE, SET_COOKIE},
+    header::{
+        HeaderMap, ACCEPT, COOKIE, ETAG, IF_MODIFIED_SINCE, IF_NONE_MATCH, LAST_MODIFIED,
+        SET_COOKIE,
+    },
     Client, Method, RequestBuilder, Response, StatusCode,
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use tokio::sync::{Mutex, RwLock};
 use url::Url;
 use uuid::Uuid;
 
 use crate::{
     models::{
-        CityListResponse, CitySignal, CreateQrCampaignInput, EventListResponse, FanAuthResult,
-        FanConfirmationInput, FanProfile, FanSignupInput, IssuePassInput, OperatorProfile,
-        OperatorRole, PublicEvent,
+        AdmissionPass, AreaWallet, CityListResponse, CitySignal, ConcertQrOverview,
+        CreateQrCampaignInput, EventListResponse, FanAuthResult, FanConfirmationInput,
+        FanEventInterest, FanProfile, FanSignupInput, IssuePassInput, OperatorOpsOverview,
+        OperatorProfile, OperatorRole, OpsDeliveryItem, OpsOutboxItem, OpsRetryResult, OpsSummary,
+        PublicEvent, ReferralProgress, ShowModeSnapshot, TicketWalletApi, TicketingOverview,
     },
     AppError,
 };
 
 const FAN_COOKIE: &str = "crowdrelay_fan";
+const AREA_COOKIE: &str = "virya-area-wallet";
+const AREA_WALLET_URL: &str = "https://virya.music/api/area/wallet";
 const PASS_COOKIE: &str = "crowdrelay_pass_session";
 const MAX_RESPONSE_BYTES: u64 = 2 * 1024 * 1024;
 const MAX_TOKEN_BYTES: usize = 4096;
+const WALLET_REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
+const EVENTS_CACHE_TTL: Duration = Duration::from_secs(30);
+const CITIES_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
+const EVENTS_STALE_TTL: Duration = Duration::from_secs(6 * 60 * 60);
+const CITIES_STALE_TTL: Duration = Duration::from_secs(24 * 60 * 60);
+const MAX_CACHE_ORIGINS: usize = 8;
+const PUBLIC_CACHE_VERSION: u8 = 1;
+const MAX_DISK_CACHE_BYTES: u64 = 2 * 1024 * 1024;
+
+struct CacheEntry<T> {
+    value: T,
+    fetched_at: Instant,
+    stored_at_unix_secs: u64,
+    etag: Option<String>,
+    last_modified: Option<String>,
+}
+
+#[derive(Default)]
+struct PublicCache {
+    events: HashMap<String, CacheEntry<Vec<PublicEvent>>>,
+    cities: HashMap<String, CacheEntry<Vec<CitySignal>>>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct DiskCacheEntry<T> {
+    value: T,
+    stored_at_unix_secs: u64,
+    etag: Option<String>,
+    last_modified: Option<String>,
+}
+
+#[derive(Default, Deserialize, Serialize)]
+struct DiskPublicCache {
+    version: u8,
+    events: HashMap<String, DiskCacheEntry<Vec<PublicEvent>>>,
+    cities: HashMap<String, DiskCacheEntry<Vec<CitySignal>>>,
+}
+
+#[derive(Default)]
+struct CacheValidators {
+    etag: Option<String>,
+    last_modified: Option<String>,
+}
 
 #[derive(Clone)]
 pub struct CrowdRelayClient {
     http: Client,
+    public_cache: Arc<RwLock<PublicCache>>,
+    events_fetch: Arc<Mutex<()>>,
+    cities_fetch: Arc<Mutex<()>>,
+    cache_file: Arc<PathBuf>,
+    cache_write: Arc<Mutex<()>>,
 }
 
 impl CrowdRelayClient {
-    pub fn new() -> Result<Self, AppError> {
+    pub fn new(cache_file: PathBuf) -> Result<Self, AppError> {
         // Ring is materially smaller and faster to compile for Android than the
         // default AWS-LC provider. Installing it once also makes the TLS choice
         // explicit instead of depending on transitive feature defaults.
@@ -42,7 +103,15 @@ impl CrowdRelayClient {
             .user_agent(concat!("crowdrelay-mobile/", env!("CARGO_PKG_VERSION")))
             .https_only(!cfg!(debug_assertions))
             .build()?;
-        Ok(Self { http })
+        let public_cache = load_public_cache(&cache_file).unwrap_or_default();
+        Ok(Self {
+            http,
+            public_cache: Arc::new(RwLock::new(public_cache)),
+            events_fetch: Arc::new(Mutex::new(())),
+            cities_fetch: Arc::new(Mutex::new(())),
+            cache_file: Arc::new(cache_file),
+            cache_write: Arc::new(Mutex::new(())),
+        })
     }
 
     pub async fn validate(&self, profile: &OperatorProfile) -> Result<(), AppError> {
@@ -60,42 +129,120 @@ impl CrowdRelayClient {
         &self,
         profile: &OperatorProfile,
     ) -> Result<Vec<PublicEvent>, AppError> {
-        let response: EventListResponse =
-            self.public_json(profile, "public/events?limit=50").await?;
-        Ok(response.events)
+        self.public_events(&profile.api_base_url).await
     }
 
     pub async fn operator_qr(
         &self,
         profile: &OperatorProfile,
-    ) -> Result<serde_json::Value, AppError> {
+    ) -> Result<ConcertQrOverview, AppError> {
         let qr_path = match profile.role {
             OperatorRole::Owner => "admin/event-qr/overview",
             OperatorRole::Staff => "staff/event-qr/overview",
         };
-        self.auth_json::<serde_json::Value, ()>(profile, Method::GET, qr_path, None)
+        self.auth_json::<ConcertQrOverview, ()>(profile, Method::GET, qr_path, None)
             .await
     }
 
     pub async fn public_events(&self, api_base_url: &str) -> Result<Vec<PublicEvent>, AppError> {
-        let response: EventListResponse = self
-            .public_json_base(api_base_url, "public/events?limit=50")
-            .await?;
-        Ok(response.events)
+        let cache_key = cache_key(api_base_url)?;
+        if let Some(events) = self.cached_events(&cache_key, EVENTS_CACHE_TTL).await {
+            return Ok(events);
+        }
+        let _fetch = self.events_fetch.lock().await;
+        if let Some(events) = self.cached_events(&cache_key, EVENTS_CACHE_TTL).await {
+            return Ok(events);
+        }
+        let stale = self.cached_events(&cache_key, EVENTS_STALE_TTL).await;
+        let validators = self.cache_validators(&cache_key, true).await;
+        let response = match self
+            .public_response_base(api_base_url, "public/events?limit=50", validators)
+            .await
+        {
+            Ok(response) => response,
+            Err(error) => return stale.ok_or(error),
+        };
+        if response.status() == StatusCode::NOT_MODIFIED {
+            let events = stale.ok_or_else(|| AppError::Remote {
+                status: StatusCode::NOT_MODIFIED.as_u16(),
+                detail: "Backend potwierdził nieistniejący cache koncertów".into(),
+            })?;
+            self.touch_cache(&cache_key, true).await;
+            self.persist_public_cache_in_background();
+            return Ok(events);
+        }
+        let (etag, last_modified) = response_validators(response.headers());
+        let response: EventListResponse = decode(response).await?;
+        let events = response.events;
+        let mut cache = self.public_cache.write().await;
+        prune_cache(&mut cache.events, EVENTS_STALE_TTL);
+        cache.events.insert(
+            cache_key,
+            CacheEntry {
+                value: events.clone(),
+                fetched_at: Instant::now(),
+                stored_at_unix_secs: unix_now(),
+                etag,
+                last_modified,
+            },
+        );
+        drop(cache);
+        self.persist_public_cache_in_background();
+        Ok(events)
     }
 
     pub async fn public_cities(&self, api_base_url: &str) -> Result<Vec<CitySignal>, AppError> {
-        let response: CityListResponse = self
-            .public_json_base(api_base_url, "public/cities?limit=100")
-            .await?;
-        Ok(response.items)
+        let cache_key = cache_key(api_base_url)?;
+        if let Some(cities) = self.cached_cities(&cache_key, CITIES_CACHE_TTL).await {
+            return Ok(cities);
+        }
+        let _fetch = self.cities_fetch.lock().await;
+        if let Some(cities) = self.cached_cities(&cache_key, CITIES_CACHE_TTL).await {
+            return Ok(cities);
+        }
+        let stale = self.cached_cities(&cache_key, CITIES_STALE_TTL).await;
+        let validators = self.cache_validators(&cache_key, false).await;
+        let response = match self
+            .public_response_base(api_base_url, "public/cities?limit=100", validators)
+            .await
+        {
+            Ok(response) => response,
+            Err(error) => return stale.ok_or(error),
+        };
+        if response.status() == StatusCode::NOT_MODIFIED {
+            let cities = stale.ok_or_else(|| AppError::Remote {
+                status: StatusCode::NOT_MODIFIED.as_u16(),
+                detail: "Backend potwierdził nieistniejący cache miast".into(),
+            })?;
+            self.touch_cache(&cache_key, false).await;
+            self.persist_public_cache_in_background();
+            return Ok(cities);
+        }
+        let (etag, last_modified) = response_validators(response.headers());
+        let response: CityListResponse = decode(response).await?;
+        let cities = response.items;
+        let mut cache = self.public_cache.write().await;
+        prune_cache(&mut cache.cities, CITIES_STALE_TTL);
+        cache.cities.insert(
+            cache_key,
+            CacheEntry {
+                value: cities.clone(),
+                fetched_at: Instant::now(),
+                stored_at_unix_secs: unix_now(),
+                etag,
+                last_modified,
+            },
+        );
+        drop(cache);
+        self.persist_public_cache_in_background();
+        Ok(cities)
     }
 
     pub async fn ticketing_overview(
         &self,
         profile: &OperatorProfile,
         event_slug: &str,
-    ) -> Result<serde_json::Value, AppError> {
+    ) -> Result<TicketingOverview, AppError> {
         let prefix = match profile.role {
             OperatorRole::Owner => "admin",
             OperatorRole::Staff => "staff",
@@ -191,6 +338,112 @@ impl CrowdRelayClient {
         .await
     }
 
+    pub async fn operator_ops_overview(
+        &self,
+        profile: &OperatorProfile,
+    ) -> Result<OperatorOpsOverview, AppError> {
+        require_owner(profile)?;
+        let summary_request =
+            self.auth_json::<OpsSummary, ()>(profile, Method::GET, "admin/ops/summary", None);
+        let deliveries_request = self.auth_json::<Vec<OpsDeliveryItem>, ()>(
+            profile,
+            Method::GET,
+            "admin/ops/deliveries?status=dead&limit=25",
+            None,
+        );
+        let outbox_request = self.auth_json::<Vec<OpsOutboxItem>, ()>(
+            profile,
+            Method::GET,
+            "admin/ops/outbox?status=dead&limit=25",
+            None,
+        );
+        let (summary_result, deliveries_result, outbox_result) =
+            futures_util::future::join3(summary_request, deliveries_request, outbox_request).await;
+        if summary_result.is_err() && deliveries_result.is_err() && outbox_result.is_err() {
+            return Err(summary_result
+                .err()
+                .expect("all operation control-plane requests failed"));
+        }
+        let mut unavailable_sources = Vec::new();
+        let summary = match summary_result {
+            Ok(value) => value,
+            Err(_) => {
+                unavailable_sources.push("summary".to_owned());
+                OpsSummary::default()
+            }
+        };
+        let dead_deliveries = match deliveries_result {
+            Ok(value) => value,
+            Err(_) => {
+                unavailable_sources.push("deliveries".to_owned());
+                Vec::new()
+            }
+        };
+        let dead_outbox = match outbox_result {
+            Ok(value) => value,
+            Err(_) => {
+                unavailable_sources.push("outbox".to_owned());
+                Vec::new()
+            }
+        };
+        Ok(OperatorOpsOverview {
+            summary,
+            dead_deliveries,
+            dead_outbox,
+            unavailable_sources,
+        })
+    }
+
+    pub async fn operator_retry(
+        &self,
+        profile: &OperatorProfile,
+        target_kind: &str,
+        target_id: &str,
+    ) -> Result<OpsRetryResult, AppError> {
+        require_owner(profile)?;
+        let target_kind = match target_kind {
+            "outbox" | "deliveries" => target_kind,
+            _ => return Err(AppError::InvalidInput("Nieprawidłowy typ kolejki".into())),
+        };
+        let target_id = uuid_segment(target_id)?;
+        self.auth_json::<OpsRetryResult, ()>(
+            profile,
+            Method::POST,
+            &format!("admin/ops/{target_kind}/{target_id}/retry"),
+            None,
+        )
+        .await
+    }
+
+    pub async fn show_mode_snapshot(
+        &self,
+        profile: &OperatorProfile,
+        event_slug: &str,
+    ) -> Result<ShowModeSnapshot, AppError> {
+        self.auth_json::<ShowModeSnapshot, ()>(
+            profile,
+            Method::GET,
+            &format!("staff/ops/show-snapshot/{}", segment(event_slug)?),
+            None,
+        )
+        .await
+    }
+
+    pub async fn fan_area_wallet(&self, profile: &FanProfile) -> Result<AreaWallet, AppError> {
+        let wallet_id = Uuid::parse_str(profile.area_wallet_id.trim()).map_err(|_| {
+            AppError::InvalidInput("Nieprawidłowy identyfikator portfela AREA".into())
+        })?;
+        let response = self
+            .http
+            .get(Url::parse(AREA_WALLET_URL)?)
+            .header(ACCEPT, "application/json")
+            .header(COOKIE, format!("{AREA_COOKIE}={wallet_id}"))
+            .timeout(WALLET_REQUEST_TIMEOUT)
+            .send()
+            .await?;
+        decode(response).await
+    }
+
     pub async fn fan_signup(
         &self,
         input: &FanSignupInput,
@@ -216,10 +469,9 @@ impl CrowdRelayClient {
             .send()
             .await?;
         let token = response_cookie(response.headers(), FAN_COOKIE);
-        let response_body: serde_json::Value = decode(response).await?;
+        let _: serde_json::Value = decode(response).await?;
         Ok((
             FanAuthResult {
-                response: response_body,
                 session_created: token.is_some(),
             },
             token,
@@ -243,10 +495,9 @@ impl CrowdRelayClient {
                 status: response.status().as_u16(),
                 detail: "Backend nie zwrócił sesji fana".into(),
             })?;
-        let response_body: serde_json::Value = decode(response).await?;
+        let _: serde_json::Value = decode(response).await?;
         Ok((
             FanAuthResult {
-                response: response_body,
                 session_created: true,
             },
             token,
@@ -254,29 +505,29 @@ impl CrowdRelayClient {
     }
 
     pub async fn fan_events(&self, profile: &FanProfile) -> Result<Vec<PublicEvent>, AppError> {
-        let response: EventListResponse = self
-            .public_json_base(&profile.api_base_url, "public/events?limit=50")
-            .await?;
-        Ok(response.events)
+        self.public_events(&profile.api_base_url).await
     }
 
-    pub async fn fan_referral(&self, profile: &FanProfile) -> Result<serde_json::Value, AppError> {
-        self.fan_json::<serde_json::Value, ()>(profile, Method::GET, "me/referral", None)
+    pub async fn fan_referral(&self, profile: &FanProfile) -> Result<ReferralProgress, AppError> {
+        self.fan_json::<ReferralProgress, ()>(profile, Method::GET, "me/referral", None)
             .await
     }
 
-    pub async fn fan_interests(&self, profile: &FanProfile) -> Result<serde_json::Value, AppError> {
-        self.fan_json::<serde_json::Value, ()>(profile, Method::GET, "me/events?limit=50", None)
+    pub async fn fan_interests(
+        &self,
+        profile: &FanProfile,
+    ) -> Result<Vec<FanEventInterest>, AppError> {
+        self.fan_json::<Vec<FanEventInterest>, ()>(profile, Method::GET, "me/events?limit=50", None)
             .await
     }
 
     pub async fn fan_admission_pass(
         &self,
         profile: &FanProfile,
-    ) -> Result<Option<serde_json::Value>, AppError> {
+    ) -> Result<Option<AdmissionPass>, AppError> {
         match profile.pass_session_token.as_deref() {
             Some(token) => self
-                .pass_json::<serde_json::Value, ()>(
+                .pass_json::<AdmissionPass, ()>(
                     &profile.api_base_url,
                     token,
                     Method::GET,
@@ -308,7 +559,7 @@ impl CrowdRelayClient {
         &self,
         profile: &FanProfile,
         claim_token: &str,
-    ) -> Result<(serde_json::Value, String), AppError> {
+    ) -> Result<(AdmissionPass, String), AppError> {
         let claim_token = bounded_required(claim_token, "token wejściówki", MAX_TOKEN_BYTES)?;
         let response = self
             .http
@@ -347,7 +598,7 @@ impl CrowdRelayClient {
         api_base_url: &str,
         order_id: &str,
         checkout_token: &str,
-    ) -> Result<serde_json::Value, AppError> {
+    ) -> Result<TicketWalletApi, AppError> {
         let order_id = uuid_segment(order_id)?;
         let checkout_token = bounded_required(checkout_token, "token zamówienia", MAX_TOKEN_BYTES)?;
         let response = self
@@ -358,6 +609,7 @@ impl CrowdRelayClient {
             )?)
             .header(ACCEPT, "application/json")
             .bearer_auth(checkout_token)
+            .timeout(WALLET_REQUEST_TIMEOUT)
             .send()
             .await?;
         decode(response).await
@@ -385,26 +637,113 @@ impl CrowdRelayClient {
         decode(response).await
     }
 
-    async fn public_json<T: DeserializeOwned>(
-        &self,
-        profile: &OperatorProfile,
-        path: &str,
-    ) -> Result<T, AppError> {
-        self.public_json_base(&profile.api_base_url, path).await
+    async fn cached_events(&self, cache_key: &str, max_age: Duration) -> Option<Vec<PublicEvent>> {
+        let cache = self.public_cache.read().await;
+        cache
+            .events
+            .get(cache_key)
+            .filter(|entry| entry.fetched_at.elapsed() < max_age)
+            .map(|entry| entry.value.clone())
     }
 
-    async fn public_json_base<T: DeserializeOwned>(
+    async fn cached_cities(&self, cache_key: &str, max_age: Duration) -> Option<Vec<CitySignal>> {
+        let cache = self.public_cache.read().await;
+        cache
+            .cities
+            .get(cache_key)
+            .filter(|entry| entry.fetched_at.elapsed() < max_age)
+            .map(|entry| entry.value.clone())
+    }
+
+    async fn cache_validators(&self, cache_key: &str, events: bool) -> CacheValidators {
+        let cache = self.public_cache.read().await;
+        let entry = if events {
+            cache
+                .events
+                .get(cache_key)
+                .map(|entry| (entry.etag.as_ref(), entry.last_modified.as_ref()))
+        } else {
+            cache
+                .cities
+                .get(cache_key)
+                .map(|entry| (entry.etag.as_ref(), entry.last_modified.as_ref()))
+        };
+        entry
+            .map(|(etag, last_modified)| CacheValidators {
+                etag: etag.cloned(),
+                last_modified: last_modified.cloned(),
+            })
+            .unwrap_or_default()
+    }
+
+    async fn touch_cache(&self, cache_key: &str, events: bool) {
+        let now = Instant::now();
+        let unix_now = unix_now();
+        let mut cache = self.public_cache.write().await;
+        if events {
+            if let Some(entry) = cache.events.get_mut(cache_key) {
+                entry.fetched_at = now;
+                entry.stored_at_unix_secs = unix_now;
+            }
+        } else if let Some(entry) = cache.cities.get_mut(cache_key) {
+            entry.fetched_at = now;
+            entry.stored_at_unix_secs = unix_now;
+        }
+    }
+
+    fn persist_public_cache_in_background(&self) {
+        let client = self.clone();
+        tokio::spawn(async move {
+            client.persist_public_cache().await;
+        });
+    }
+
+    async fn persist_public_cache(&self) {
+        let _write = self.cache_write.lock().await;
+        let disk_cache = {
+            let cache = self.public_cache.read().await;
+            DiskPublicCache {
+                version: PUBLIC_CACHE_VERSION,
+                events: cache
+                    .events
+                    .iter()
+                    .map(|(key, entry)| (key.clone(), disk_entry(entry)))
+                    .collect(),
+                cities: cache
+                    .cities
+                    .iter()
+                    .map(|(key, entry)| (key.clone(), disk_entry(entry)))
+                    .collect(),
+            }
+        };
+        let Ok(payload) = serde_json::to_vec(&disk_cache) else {
+            return;
+        };
+        if payload.len() > MAX_DISK_CACHE_BYTES as usize {
+            return;
+        }
+        let cache_file = self.cache_file.as_ref().clone();
+        let _ =
+            tokio::task::spawn_blocking(move || write_public_cache(&cache_file, &payload)).await;
+    }
+
+    async fn public_response_base(
         &self,
         api_base_url: &str,
         path: &str,
-    ) -> Result<T, AppError> {
-        let response = self
+        validators: CacheValidators,
+    ) -> Result<Response, AppError> {
+        let mut request = self
             .http
             .get(endpoint(api_base_url, path)?)
-            .header(ACCEPT, "application/json")
-            .send()
-            .await?;
-        decode(response).await
+            .header(ACCEPT, "application/json");
+        if let Some(etag) = validators.etag {
+            request = request.header(IF_NONE_MATCH, etag);
+        }
+        if let Some(last_modified) = validators.last_modified {
+            request = request.header(IF_MODIFIED_SINCE, last_modified);
+        }
+        Ok(request.send().await?)
     }
 
     async fn auth_json<T, B>(
@@ -485,29 +824,136 @@ impl CrowdRelayClient {
     }
 }
 
-async fn decode<T: DeserializeOwned>(response: Response) -> Result<T, AppError> {
+fn cache_key(api_base_url: &str) -> Result<String, AppError> {
+    let mut url = endpoint(api_base_url, "")?;
+    url.set_query(None);
+    url.set_fragment(None);
+    Ok(url.to_string())
+}
+
+fn unix_now() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+fn disk_entry<T: Clone>(entry: &CacheEntry<T>) -> DiskCacheEntry<T> {
+    DiskCacheEntry {
+        value: entry.value.clone(),
+        stored_at_unix_secs: entry.stored_at_unix_secs,
+        etag: entry.etag.clone(),
+        last_modified: entry.last_modified.clone(),
+    }
+}
+
+fn restore_entries<T>(
+    entries: HashMap<String, DiskCacheEntry<T>>,
+    max_age: Duration,
+) -> HashMap<String, CacheEntry<T>> {
+    let now_unix = unix_now();
+    let now = Instant::now();
+    let mut entries = entries
+        .into_iter()
+        .filter_map(|(key, entry)| {
+            let age = Duration::from_secs(now_unix.saturating_sub(entry.stored_at_unix_secs));
+            (age <= max_age).then_some((key, entry, age))
+        })
+        .collect::<Vec<_>>();
+    entries.sort_by_key(|(_, entry, _)| std::cmp::Reverse(entry.stored_at_unix_secs));
+    entries
+        .into_iter()
+        .take(MAX_CACHE_ORIGINS)
+        .map(|(key, entry, age)| {
+            (
+                key,
+                CacheEntry {
+                    value: entry.value,
+                    fetched_at: now.checked_sub(age).unwrap_or(now),
+                    stored_at_unix_secs: entry.stored_at_unix_secs,
+                    etag: entry.etag,
+                    last_modified: entry.last_modified,
+                },
+            )
+        })
+        .collect()
+}
+
+fn load_public_cache(path: &Path) -> Result<PublicCache, AppError> {
+    let metadata = std::fs::metadata(path)?;
+    if metadata.len() > MAX_DISK_CACHE_BYTES {
+        return Err(AppError::InvalidInput(
+            "Lokalny cache danych publicznych jest zbyt duży".into(),
+        ));
+    }
+    let disk: DiskPublicCache = serde_json::from_slice(&std::fs::read(path)?)?;
+    if disk.version != PUBLIC_CACHE_VERSION {
+        return Ok(PublicCache::default());
+    }
+    Ok(PublicCache {
+        events: restore_entries(disk.events, EVENTS_STALE_TTL),
+        cities: restore_entries(disk.cities, CITIES_STALE_TTL),
+    })
+}
+
+fn write_public_cache(path: &Path, payload: &[u8]) -> Result<(), std::io::Error> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let temporary = path.with_extension("tmp");
+    std::fs::write(&temporary, payload)?;
+    std::fs::rename(temporary, path)
+}
+
+fn response_validators(headers: &HeaderMap) -> (Option<String>, Option<String>) {
+    let read = |name| {
+        headers
+            .get(name)
+            .and_then(|value| value.to_str().ok())
+            .filter(|value| value.len() <= 1024)
+            .map(ToOwned::to_owned)
+    };
+    (read(ETAG), read(LAST_MODIFIED))
+}
+
+fn prune_cache<T>(cache: &mut HashMap<String, CacheEntry<T>>, ttl: Duration) {
+    cache.retain(|_, entry| entry.fetched_at.elapsed() < ttl);
+    if cache.len() >= MAX_CACHE_ORIGINS {
+        let oldest = cache
+            .iter()
+            .max_by_key(|(_, entry)| entry.fetched_at.elapsed())
+            .map(|(key, _)| key.clone());
+        if let Some(oldest) = oldest {
+            cache.remove(&oldest);
+        }
+    }
+}
+
+async fn decode<T: DeserializeOwned>(mut response: Response) -> Result<T, AppError> {
     let status = response.status();
-    if response
-        .content_length()
-        .is_some_and(|length| length > MAX_RESPONSE_BYTES)
-    {
+    let content_length = response.content_length();
+    if content_length.is_some_and(|length| length > MAX_RESPONSE_BYTES) {
         return Err(AppError::Remote {
             status: status.as_u16(),
             detail: "Odpowiedź CrowdRelay jest zbyt duża".into(),
         });
     }
-    let bytes = response.bytes().await?;
-    if bytes.len() as u64 > MAX_RESPONSE_BYTES {
-        return Err(AppError::Remote {
-            status: status.as_u16(),
-            detail: "Odpowiedź CrowdRelay jest zbyt duża".into(),
-        });
+    let initial_capacity = content_length.unwrap_or(0).min(MAX_RESPONSE_BYTES) as usize;
+    let mut bytes = Vec::with_capacity(initial_capacity);
+    while let Some(chunk) = response.chunk().await? {
+        if bytes.len().saturating_add(chunk.len()) > MAX_RESPONSE_BYTES as usize {
+            return Err(AppError::Remote {
+                status: status.as_u16(),
+                detail: "Odpowiedź CrowdRelay jest zbyt duża".into(),
+            });
+        }
+        bytes.extend_from_slice(&chunk);
     }
     if status.is_success() {
         return serde_json::from_slice(if bytes.is_empty() {
             b"null".as_slice()
         } else {
-            bytes.as_ref()
+            &bytes
         })
         .map_err(AppError::from);
     }
@@ -688,5 +1134,114 @@ mod tests {
     fn rejects_credentialed_or_fragmented_api_base() {
         assert!(endpoint("https://user@example.com/v1", "events").is_err());
         assert!(endpoint("https://example.com/v1#fragment", "events").is_err());
+    }
+
+    #[test]
+    fn cache_key_normalizes_trailing_slash() {
+        assert_eq!(
+            cache_key("https://signal-api.virya.music/v1").unwrap(),
+            "https://signal-api.virya.music/v1/"
+        );
+    }
+
+    #[test]
+    fn cache_pruning_bounds_origins() {
+        let mut cache = HashMap::new();
+        for index in 0..MAX_CACHE_ORIGINS {
+            cache.insert(
+                format!("origin-{index}"),
+                CacheEntry {
+                    value: index,
+                    fetched_at: Instant::now() - Duration::from_millis(index as u64),
+                    stored_at_unix_secs: unix_now().saturating_sub(index as u64),
+                    etag: None,
+                    last_modified: None,
+                },
+            );
+        }
+        prune_cache(&mut cache, Duration::from_secs(60));
+        assert_eq!(cache.len(), MAX_CACHE_ORIGINS - 1);
+        assert!(!cache.contains_key(&format!("origin-{}", MAX_CACHE_ORIGINS - 1)));
+    }
+
+    #[test]
+    fn cache_pruning_removes_expired_entries_before_capacity_eviction() {
+        let mut cache = HashMap::from([
+            (
+                "fresh".to_owned(),
+                CacheEntry {
+                    value: 1,
+                    fetched_at: Instant::now(),
+                    stored_at_unix_secs: unix_now(),
+                    etag: None,
+                    last_modified: None,
+                },
+            ),
+            (
+                "expired".to_owned(),
+                CacheEntry {
+                    value: 2,
+                    fetched_at: Instant::now() - Duration::from_secs(120),
+                    stored_at_unix_secs: unix_now().saturating_sub(120),
+                    etag: None,
+                    last_modified: None,
+                },
+            ),
+        ]);
+        prune_cache(&mut cache, Duration::from_secs(60));
+        assert_eq!(cache.len(), 1);
+        assert!(cache.contains_key("fresh"));
+    }
+
+    #[test]
+    fn disk_cache_restore_drops_expired_entries_and_preserves_validators() {
+        let now = unix_now();
+        let restored = restore_entries(
+            HashMap::from([
+                (
+                    "fresh".to_owned(),
+                    DiskCacheEntry {
+                        value: vec![1_u8],
+                        stored_at_unix_secs: now.saturating_sub(5),
+                        etag: Some("\"events-v2\"".to_owned()),
+                        last_modified: None,
+                    },
+                ),
+                (
+                    "expired".to_owned(),
+                    DiskCacheEntry {
+                        value: vec![2_u8],
+                        stored_at_unix_secs: now.saturating_sub(120),
+                        etag: None,
+                        last_modified: None,
+                    },
+                ),
+            ]),
+            Duration::from_secs(60),
+        );
+
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored["fresh"].value, vec![1]);
+        assert_eq!(restored["fresh"].etag.as_deref(), Some("\"events-v2\""));
+    }
+
+    #[test]
+    fn response_cache_validators_are_bounded() {
+        let mut headers = HeaderMap::new();
+        headers.insert(ETAG, "\"events-v2\"".parse().unwrap());
+        headers.insert(
+            LAST_MODIFIED,
+            "Sat, 01 Aug 2026 07:00:00 GMT".parse().unwrap(),
+        );
+
+        let (etag, last_modified) = response_validators(&headers);
+        assert_eq!(etag.as_deref(), Some("\"events-v2\""));
+        assert_eq!(
+            last_modified.as_deref(),
+            Some("Sat, 01 Aug 2026 07:00:00 GMT")
+        );
+
+        headers.insert(ETAG, "x".repeat(1025).parse().unwrap());
+        assert!(response_validators(&headers).0.is_none());
     }
 }

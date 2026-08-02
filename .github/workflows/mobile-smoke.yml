@@ -43,6 +43,8 @@ env:
   CARGO_INCREMENTAL: "0"
   CARGO_NET_RETRY: "5"
   RUST_BACKTRACE: "1"
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: sccache
   NDK_VERSION: "27.2.12479018"
 
 jobs:
@@ -56,21 +58,27 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: android-actions/setup-android@v3
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
       - name: Install Android SDK and NDK
-        run: |
-          yes | sdkmanager --licenses >/dev/null
-          sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;${NDK_VERSION}"
-          echo "ANDROID_NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
-          echo "NDK_HOME=${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+        run: scripts/install-android-sdk.sh
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.97.0
           targets: wasm32-unknown-unknown,aarch64-linux-android
+      - uses: mozilla-actions/sccache-action@v0.0.11
+        with:
+          version: "v0.16.0"
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          shared-key: android-smoke
+          cache-targets: false
+          shared-key: android-arm64
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/trunk
+          key: trunk-${{ runner.os }}-0.21.14-${{ hashFiles('Cargo.lock') }}
       - name: Install pinned Tauri tools
         uses: taiki-e/install-action@v2
         with:
@@ -83,13 +91,25 @@ jobs:
         run: python3 scripts/prepare-android.py
       - name: Build debug APK
         run: cargo tauri android build --ci --debug --apk --target aarch64
+      - name: Capture Android dependency graph
+        run: |
+          mkdir -p artifacts
+          src-tauri/gen/android/gradlew -p src-tauri/gen/android :app:dependencies --configuration debugRuntimeClasspath > artifacts/android-debug-dependencies.txt
       - name: Collect APK
         run: python3 scripts/collect-mobile-artifact.py apk artifacts/virya-signal-debug.apk --max-size-mib 150
+      - name: Inspect APK size and ABI
+        run: |
+          python3 scripts/analyze-android-package.py artifacts/virya-signal-debug.apk --require-abi arm64-v8a --require-page-size 16384
+          zipalign -c -P 16 -v 4 artifacts/virya-signal-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: virya-signal-android-debug
           path: |
             artifacts/virya-signal-debug.apk
             artifacts/virya-signal-debug.apk.sha256
+            artifacts/android-debug-dependencies.txt
           if-no-files-found: error
           retention-days: 14
+      - name: Compiler cache statistics
+        if: always()
+        run: sccache --show-stats
