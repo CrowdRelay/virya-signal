@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import shutil
 from pathlib import Path
 
 parser = argparse.ArgumentParser()
@@ -26,34 +25,140 @@ if compile_count != 1 or target_count != 1:
     )
 
 # Release APK/AAB builds should ship neither unused CameraX/ML Kit bytecode nor
-# dead Android resources. This is intentionally applied to the generated app
-# instead of checking generated files into source control.
-text, minify_count = re.subn(
-    r"isMinifyEnabled\s*=\s*false", "isMinifyEnabled = true", text, count=1
-)
-text, shrink_count = re.subn(
-    r"isShrinkResources\s*=\s*false", "isShrinkResources = true", text, count=1
-)
-release_patterns = [r'(getByName\("release"\)\s*\{)', r'(named\("release"\)\s*\{)']
-if minify_count == 0 and "isMinifyEnabled = true" not in text:
-    for pattern in release_patterns:
-        text, count = re.subn(pattern, r'\1\n            isMinifyEnabled = true', text, count=1)
-        if count:
+# dead Android resources. Debug APKs must remain unminified: Android/Tauri
+# plugins use generated entry points that are unsafe to shrink in smoke builds.
+def _find_kotlin_named_block(source: str, name: str) -> tuple[int, int, str]:
+    patterns = (
+        rf'getByName\(\"{re.escape(name)}\"\)\s*\{{',
+        rf'named\(\"{re.escape(name)}\"\)\s*\{{',
+        rf'(?m)^(?P<indent>\s*){re.escape(name)}\s*\{{',
+    )
+    match = None
+    for pattern in patterns:
+        match = re.search(pattern, source)
+        if match:
             break
+    if match is None:
+        raise SystemExit(f"could not locate {name} build type in generated Gradle file")
+
+    opening = source.find("{", match.start(), match.end())
+    if opening < 0:
+        raise SystemExit(f"could not locate opening brace for {name} build type")
+
+    depth = 0
+    quote: str | None = None
+    escaped = False
+    line_comment = False
+    block_comment = False
+    index = opening
+    while index < len(source):
+        char = source[index]
+        next_char = source[index + 1] if index + 1 < len(source) else ""
+        if line_comment:
+            if char == "\n":
+                line_comment = False
+            index += 1
+            continue
+        if block_comment:
+            if char == "*" and next_char == "/":
+                block_comment = False
+                index += 2
+            else:
+                index += 1
+            continue
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+            index += 1
+            continue
+        if char == "/" and next_char == "/":
+            line_comment = True
+            index += 2
+            continue
+        if char == "/" and next_char == "*":
+            block_comment = True
+            index += 2
+            continue
+        if char in ('"', "'"):
+            quote = char
+            index += 1
+            continue
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                line_start = source.rfind("\n", 0, match.start()) + 1
+                indent = source[line_start:match.start()]
+                return opening, index, indent
+        index += 1
+    raise SystemExit(f"unterminated {name} build type in generated Gradle file")
+
+
+def _set_kotlin_property(body: str, key: str, value: str, indent: str) -> str:
+    pattern = rf'(?m)^\s*{re.escape(key)}\s*=\s*(?:true|false)\s*$'
+    replacement = f"{indent}{key} = {value}"
+    if re.search(pattern, body):
+        return re.sub(pattern, replacement, body, count=1)
+    return f"\n{replacement}" + body
+
+
+def _patch_build_type(
+    source: str,
+    name: str,
+    *,
+    minify: bool,
+    shrink: bool | None,
+    proguard: bool,
+) -> str:
+    opening, closing, base_indent = _find_kotlin_named_block(source, name)
+    indent = base_indent + "    "
+    body = source[opening + 1 : closing]
+    body = _set_kotlin_property(body, "isMinifyEnabled", str(minify).lower(), indent)
+
+    shrink_pattern = r'(?m)^\s*isShrinkResources\s*=\s*(?:true|false)\s*\n?'
+    if shrink is None:
+        body = re.sub(shrink_pattern, "", body)
     else:
-        raise SystemExit("could not locate release build type for R8 configuration")
-if shrink_count == 0 and "isShrinkResources = true" not in text:
-    text = text.replace(
-        "isMinifyEnabled = true",
-        "isMinifyEnabled = true\n            isShrinkResources = true",
-        1,
+        body = _set_kotlin_property(body, "isShrinkResources", str(shrink).lower(), indent)
+
+    proguard_pattern = (
+        r'(?m)^\s*proguardFiles\(getDefaultProguardFile\('
+        r'\"proguard-android-optimize\.txt\"\),\s*\"proguard-rules\.pro\"\)\s*\n?'
     )
-if "proguardFiles(" not in text:
-    text = text.replace(
-        "isShrinkResources = true",
-        'isShrinkResources = true\n            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")',
-        1,
-    )
+    body = re.sub(proguard_pattern, "", body)
+    if proguard:
+        body = (
+            f'\n{indent}proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), '
+            f'"proguard-rules.pro")' + body
+        )
+
+    return source[: opening + 1] + body + source[closing:]
+
+
+text = _patch_build_type(text, "debug", minify=False, shrink=None, proguard=False)
+text = _patch_build_type(text, "release", minify=True, shrink=True, proguard=True)
+
+# Verify the effective configuration after all mutations.
+debug_open, debug_close, _ = _find_kotlin_named_block(text, "debug")
+debug_body = text[debug_open + 1 : debug_close]
+release_open, release_close, _ = _find_kotlin_named_block(text, "release")
+release_body = text[release_open + 1 : release_close]
+if "isMinifyEnabled = false" not in debug_body:
+    raise SystemExit("debug build must remain unminified")
+if "isShrinkResources = true" in debug_body or "proguardFiles(" in debug_body:
+    raise SystemExit("release-only shrinker configuration leaked into debug build")
+for fragment in (
+    "isMinifyEnabled = true",
+    "isShrinkResources = true",
+    'proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")',
+):
+    if fragment not in release_body:
+        raise SystemExit(f"release build invariant missing: {fragment}")
 
 if args.signing:
     properties = android / "keystore.properties"
@@ -106,58 +211,8 @@ if args.signing:
 
 gradle.write_text(text, encoding="utf-8")
 
-# Install deterministic professional launcher assets after Tauri generates the
-# Android project. This keeps source control free of the generated Gradle tree
-# while still shipping adaptive, round and legacy icons on every CI build.
-icon_assets = root / "src-tauri" / "launcher-assets" / "android"
-res = android / "app" / "src" / "main" / "res"
-if not icon_assets.is_dir():
-    raise SystemExit(f"missing Android icon assets: {icon_assets}")
-
-for source_dir in sorted(icon_assets.glob("mipmap-*")):
-    if not source_dir.is_dir():
-        continue
-    destination = res / source_dir.name
-    destination.mkdir(parents=True, exist_ok=True)
-    for source in source_dir.glob("*.png"):
-        shutil.copy2(source, destination / source.name)
-
-drawable = res / "drawable"
-drawable.mkdir(parents=True, exist_ok=True)
-shutil.copy2(icon_assets / "ic_launcher_foreground.png", drawable / "ic_launcher_foreground.png")
-(drawable / "ic_launcher_background.xml").write_text(
-    """<?xml version=\"1.0\" encoding=\"utf-8\"?>
-<shape xmlns:android=\"http://schemas.android.com/apk/res/android\" android:shape=\"rectangle\">
-    <solid android:color=\"#080808\" />
-</shape>
-""",
-    encoding="utf-8",
-)
-
-adaptive = """<?xml version=\"1.0\" encoding=\"utf-8\"?>
-<adaptive-icon xmlns:android=\"http://schemas.android.com/apk/res/android\">
-    <background android:drawable=\"@drawable/ic_launcher_background\" />
-    <foreground android:drawable=\"@drawable/ic_launcher_foreground\" />
-</adaptive-icon>
-"""
-for qualifier in ("mipmap-anydpi-v26",):
-    destination = res / qualifier
-    destination.mkdir(parents=True, exist_ok=True)
-    (destination / "ic_launcher.xml").write_text(adaptive, encoding="utf-8")
-    (destination / "ic_launcher_round.xml").write_text(adaptive, encoding="utf-8")
-
-themed = """<?xml version=\"1.0\" encoding=\"utf-8\"?>
-<adaptive-icon xmlns:android=\"http://schemas.android.com/apk/res/android\">
-    <background android:drawable=\"@drawable/ic_launcher_background\" />
-    <foreground android:drawable=\"@drawable/ic_launcher_foreground\" />
-    <monochrome android:drawable=\"@drawable/ic_launcher_foreground\" />
-</adaptive-icon>
-"""
-destination = res / "mipmap-anydpi-v33"
-destination.mkdir(parents=True, exist_ok=True)
-(destination / "ic_launcher.xml").write_text(themed, encoding="utf-8")
-(destination / "ic_launcher_round.xml").write_text(themed, encoding="utf-8")
-
+# Launcher resources are owned by the preceding `cargo tauri icon` step.
+# Never overwrite them here with stale hand-copied Android assets.
 gradle_properties = android / "gradle.properties"
 properties_text = gradle_properties.read_text(encoding="utf-8") if gradle_properties.exists() else ""
 managed_properties = {
@@ -178,5 +233,5 @@ gradle_properties.write_text(properties_text.lstrip(), encoding="utf-8")
 
 print(
     f"Android project prepared: API 36, R8/resource shrinking=on, "
-    f"signing={'on' if args.signing else 'off'}, professional-icons=on"
+    f"signing={'on' if args.signing else 'off'}, tauri-icons=on, debug-r8=off"
 )
