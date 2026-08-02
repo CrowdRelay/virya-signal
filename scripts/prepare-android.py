@@ -100,7 +100,7 @@ def _find_kotlin_named_block(source: str, name: str) -> tuple[int, int, str]:
 
 
 def _set_kotlin_property(body: str, key: str, value: str, indent: str) -> str:
-    pattern = rf'(?m)^\s*{re.escape(key)}\s*=\s*(?:true|false)\s*$'
+    pattern = rf'(?m)^[ \t]*{re.escape(key)}[ \t]*=[ \t]*(?:true|false)[ \t]*$'
     replacement = f"{indent}{key} = {value}"
     if re.search(pattern, body):
         return re.sub(pattern, replacement, body, count=1)
@@ -159,6 +159,17 @@ for fragment in (
 ):
     if fragment not in release_body:
         raise SystemExit(f"release build invariant missing: {fragment}")
+
+# Each Kotlin shrinker property must remain on its own physical line. The
+# property matcher above intentionally uses horizontal whitespace only because
+# Python's ``\s`` also matches newlines.
+for line_number, line in enumerate(text.splitlines(), start=1):
+    property_count = line.count("isMinifyEnabled") + line.count("isShrinkResources")
+    if property_count > 1:
+        raise SystemExit(
+            f"malformed Gradle build type at line {line_number}: "
+            "minify/shrink assignments were joined"
+        )
 
 if args.signing:
     properties = android / "keystore.properties"
