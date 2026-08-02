@@ -53,7 +53,7 @@ jobs:
     environment:
       name: ${{ (inputs.play_track == 'production') && 'production' || 'store-testing' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate Android secrets
         env:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -65,11 +65,11 @@ jobs:
           test -n "$ALIAS" || { echo "Missing ANDROID_KEY_ALIAS"; exit 1; }
           test -n "$PASSWORD" || { echo "Missing ANDROID_KEY_PASSWORD"; exit 1; }
           test -n "$PLAY_JSON" || { echo "Missing GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"; exit 1; }
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5.6.0
         with:
           distribution: temurin
           java-version: "21"
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
       - uses: gradle/actions/setup-gradle@v6
       - name: Install Android SDK and NDK
         run: scripts/install-android-sdk.sh
@@ -85,12 +85,12 @@ jobs:
           cache-on-failure: true
           cache-targets: false
           shared-key: android-arm64
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.cache/trunk
           key: trunk-${{ runner.os }}-0.21.14-${{ hashFiles('Cargo.lock') }}
       - name: Install pinned Tauri tools
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.5
         with:
           tool: trunk@0.21.14,tauri-cli@2.11.4
       - name: Set release version
@@ -119,7 +119,7 @@ jobs:
           echo "AAB_PATH=$GITHUB_WORKSPACE/artifacts/virya-signal-${RELEASE_VERSION#v}.aab" >> "$GITHUB_ENV"
       - name: Inspect AAB size and ABI
         run: python3 scripts/analyze-android-package.py "artifacts/virya-signal-${RELEASE_VERSION#v}.aab" --require-abi arm64-v8a --require-page-size 16384
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: virya-signal-android-${{ env.RELEASE_VERSION }}
           path: artifacts/*
@@ -144,7 +144,7 @@ jobs:
     environment:
       name: ${{ inputs.submit_ios_review && 'production' || 'store-testing' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate Apple secrets
         env:
           CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}
@@ -173,7 +173,7 @@ jobs:
           cache-targets: false
           shared-key: ios-release
       - name: Install pinned Tauri tools
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.5
         with:
           tool: trunk@0.21.14,tauri-cli@2.11.4
       - name: Set release version
@@ -206,7 +206,7 @@ jobs:
         run: |
           python3 scripts/collect-mobile-artifact.py ipa "artifacts/virya-${RELEASE_VERSION#v}.ipa"
           echo "IPA_PATH=$GITHUB_WORKSPACE/artifacts/virya-${RELEASE_VERSION#v}.ipa" >> "$GITHUB_ENV"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: virya-ios-${{ env.RELEASE_VERSION }}
           path: artifacts/*
@@ -255,7 +255,7 @@ jobs:
     needs: [android, ios]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: virya-*
           path: artifacts
