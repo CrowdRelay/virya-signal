@@ -54,13 +54,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
-      - uses: android-actions/setup-android@v3
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: android-actions/setup-android@v4
+      - uses: gradle/actions/setup-gradle@v6.2.0
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
       - name: Install Android SDK and NDK
@@ -77,12 +77,12 @@ jobs:
           cache-on-failure: true
           cache-targets: false
           shared-key: android-arm64
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.cache/trunk
           key: trunk-${{ runner.os }}-0.21.14-${{ hashFiles('Cargo.lock') }}
       - name: Install pinned Tauri tools
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.85.5
         with:
           tool: trunk@0.21.14,tauri-cli@2.11.4
       - name: Generate Android project
@@ -103,7 +103,7 @@ jobs:
         run: |
           python3 scripts/analyze-android-package.py artifacts/virya-signal-debug.apk --require-abi arm64-v8a --require-page-size 16384
           zipalign -c -P 16 -v 4 artifacts/virya-signal-debug.apk
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: virya-signal-android-debug
           path: |
