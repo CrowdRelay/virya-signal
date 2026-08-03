@@ -197,39 +197,6 @@ export async function viryaScanQr() {
   }
 }
 
-function viryaNormalizeCities(value) {
-  if (typeof value !== 'string') throw new Error('Nieprawidłowa odpowiedź listy miast.');
-  if (value.length > 512_000) throw new Error('Lista miast jest zbyt duża.');
-  let parsed;
-  try { parsed = JSON.parse(value); } catch { throw new Error('Nie udało się odczytać listy miast.'); }
-  if (!Array.isArray(parsed)) throw new Error('CrowdRelay zwrócił nieprawidłową listę miast.');
-  const unique = new Map();
-  for (const item of parsed) {
-    const slug = String(item?.slug ?? '').trim();
-    const name = String(item?.name ?? '').trim();
-    if (!slug || !name || slug.length > 128 || Array.from(name).length > 160) continue;
-    const rawCount = Number(item?.fan_count ?? item?.fanCount ?? 0);
-    const fanCount = Number.isFinite(rawCount) && rawCount >= 0
-      ? Math.min(Math.trunc(rawCount), Number.MAX_SAFE_INTEGER)
-      : 0;
-    if (!unique.has(slug)) unique.set(slug, { slug, name, fanCount });
-  }
-  return [...unique.values()]
-    .sort((a, b) => b.fanCount - a.fanCount || a.name.localeCompare(b.name, 'pl', { sensitivity: 'base' }) || a.slug.localeCompare(b.slug))
-    .slice(0, 250);
-}
-
-export async function viryaLoadPublicCities(apiBaseUrl) {
-  const value = await viryaInvokeLatest(
-    'public_cities',
-    { apiBaseUrl },
-    15_000,
-    'public:fan-access:cities',
-  );
-  if (value === undefined) return [];
-  return viryaNormalizeCities(value);
-}
-
 const VIRYA_FAILURE_STORAGE_KEY = 'virya:last-runtime-failure:v2';
 
 function viryaRuntimeMessage(error) {
@@ -389,9 +356,6 @@ extern "C" {
 
     #[wasm_bindgen(catch, js_name = viryaScanQr)]
     async fn scan_qr_js() -> Result<JsValue, JsValue>;
-
-    #[wasm_bindgen(catch, js_name = viryaLoadPublicCities)]
-    async fn load_public_cities_js(api_base_url: &str) -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(js_name = viryaInstallRuntimeGuards)]
     fn install_runtime_guards_js();

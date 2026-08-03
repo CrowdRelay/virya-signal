@@ -42,10 +42,11 @@ use crate::{
         AdmissionPass, AdmissionQr, AdmissionRedemption, AreaWallet, CouponEnvelope,
         CreateQrCampaignInput, DashboardData, FanAuthResult, FanConfirmationInput,
         FanDashboardData, FanEventInterest, FanSessionStatus, FanSignupInput, IssuePassInput,
-        IssuedPass, OperatorOpsOverview, OperatorProfileInput, OperatorRole, OpsDeliveryItem,
-        OpsOutboxItem, OpsRetryResult, PublicEvent, PublicHomeData, QrCampaign, ReferralProgress,
-        RequestedCityInput, RequestedCityResult, SessionStatus, ShowModeScanResult, ShowModeStatus,
-        ShowModeSyncResult, TicketWallet, TicketingOverview, WalletBatch, WalletTicket,
+        IssuedPass, OperatorOpsOverview, OperatorProfileInput, OperatorRole,
+        OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem, OpsRetryResult, PublicEvent,
+        PublicHomeData, QrCampaign, ReferralProgress, RequestedCityInput, RequestedCityResult,
+        SessionStatus, ShowModeScanResult, ShowModeStatus, ShowModeSyncResult, TicketWallet,
+        TicketingOverview, WalletBatch, WalletTicket,
     },
 };
 
@@ -62,6 +63,7 @@ enum RootMode {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum OperatorTab {
     Home,
+    Signal,
     Scan,
     Tickets,
     Discounts,
@@ -584,6 +586,10 @@ fn OperatorApp(
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let loading = RwSignal::new(OperatorLoadingState::all());
+
+    let signal_overview = RwSignal::new(None::<OperatorSignalOverview>);
+    let signal_loading = RwSignal::new(false);
+    let signal_requested = RwSignal::new(false);
     Effect::new(move |_| {
         if status.get().unlocked && dashboard.get().is_none() {
             dashboard.set(Some(DashboardData::default()));
@@ -599,6 +605,25 @@ fn OperatorApp(
             .value_or(OperatorRole::Staff)
     };
 
+    let owner = Signal::derive(move || {
+        status
+            .get()
+            .session
+            .is_some_and(|session| session.role == OperatorRole::Owner)
+    });
+
+    Effect::new(move |_| {
+        let should_load = status.get().unlocked
+            && owner.get()
+            && tab.get() == OperatorTab::Signal
+            && !signal_requested.get()
+            && !signal_loading.get();
+        if should_load {
+            signal_requested.set(true);
+            refresh_operator_signal(signal_overview, signal_loading, error);
+        }
+    });
+
     let close = move |_| {
         bridge::invalidate_latest("operator:");
         spawn_local(async move {
@@ -606,6 +631,9 @@ fn OperatorApp(
                 Ok(value) => {
                     dashboard.set(None);
                     loading.set(OperatorLoadingState::all());
+                    signal_overview.set(None);
+                    signal_loading.set(false);
+                    signal_requested.set(false);
                     status.set(value);
                     mode.set(RootMode::Launcher);
                 }
@@ -623,15 +651,17 @@ fn OperatorApp(
             <div class="content">
                 {move || match tab.get() {
                     OperatorTab::Home => view! { <OperatorHome dashboard=dashboard loading=loading /> }.into_any(),
+                    OperatorTab::Signal => view! { <OperatorSignal overview=signal_overview loading=signal_loading owner=owner error=error /> }.into_any(),
                     OperatorTab::Scan => view! { <Scanner dashboard=dashboard loading=loading error=error /> }.into_any(),
-                    OperatorTab::Tickets => view! { <Tickets dashboard=dashboard loading=loading error=error owner=Signal::derive(move || role() == OperatorRole::Owner) /> }.into_any(),
+                    OperatorTab::Tickets => view! { <Tickets dashboard=dashboard loading=loading error=error owner=owner /> }.into_any(),
                     OperatorTab::Discounts => view! { <Discounts error=error /> }.into_any(),
                     OperatorTab::Campaigns => view! { <Campaigns dashboard=dashboard loading=loading error=error /> }.into_any(),
                     OperatorTab::Settings => view! { <OperatorSettings status=status dashboard=dashboard loading=loading error=error /> }.into_any(),
                 }}
             </div>
-            <nav class="bottom-nav six">
+            <nav class="bottom-nav seven">
                 <NavButton tab=tab own=OperatorTab::Home icon="⌁" label="Start" />
+                <NavButton tab=tab own=OperatorTab::Signal icon="◉" label="Sygnał" />
                 <NavButton tab=tab own=OperatorTab::Scan icon="▣" label="Skan" />
                 <NavButton tab=tab own=OperatorTab::Tickets icon="▤" label="Bilety" />
                 <NavButton tab=tab own=OperatorTab::Discounts icon="%" label="Zniżki" />
@@ -701,6 +731,154 @@ fn EventCard(event: PublicEvent) -> impl IntoView {
             <div class="date-block"><strong>{event_day}</strong><span>{event_month}</span></div>
             <div><h4>{title}</h4><p>{location}</p></div><span class="chevron">">"</span>
         </article>
+    }
+}
+
+#[component]
+fn OperatorSignal(
+    overview: RwSignal<Option<OperatorSignalOverview>>,
+    loading: RwSignal<bool>,
+    owner: Signal<bool>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let refresh = move |_| {
+        if owner.get_untracked() {
+            refresh_operator_signal(overview, loading, error);
+        }
+    };
+
+    view! {
+        <section class="screen signal-admin-screen">
+            <header class="screen-title">
+                <p class="eyebrow">VIRYA SIGNAL</p>
+                <h2>Społeczność i wzrost</h2>
+                <p class="screen-copy">Zbiorczy obraz Sygnału bez danych osobowych fanów.</p>
+            </header>
+            <Show
+                when=move || owner.get()
+                fallback=move || view! {
+                    <div class="empty-state">
+                        <strong>"Widok tylko dla ownera"</strong>
+                        <p>"Statystyki zgód, wzrostu i miast są dostępne wyłącznie dla właściciela."</p>
+                    </div>
+                }
+            >
+                <div class="signal-admin-toolbar">
+                    <p>"Dane są agregowane w CrowdRelay i nie zawierają adresów e-mail ani identyfikatorów fanów."</p>
+                    <button class="text-button" on:click=refresh disabled=move || loading.get()>
+                        {move || if loading.get() { "ODŚWIEŻAM…" } else { "ODŚWIEŻ" }}
+                    </button>
+                </div>
+                <Show when=move || !loading.get() fallback=move || view! { <Skeleton rows=4 /> }>
+                    {move || {
+                        overview
+                            .get()
+                            .map(|data| view! { <SignalOverviewContent data=data /> }.into_any())
+                            .value_or_else(|| {
+                                view! {
+                                    <div class="empty-state">
+                                        <strong>"Brak snapshotu Sygnału"</strong>
+                                        <p>"Odśwież dane. Jeżeli backend jest jeszcze w trakcie wdrożenia, panel pokaże bezpieczny błąd zamiast pustego ekranu."</p>
+                                    </div>
+                                }
+                                .into_any()
+                            })
+                    }}
+                </Show>
+            </Show>
+        </section>
+    }
+}
+
+#[component]
+fn SignalOverviewContent(data: OperatorSignalOverview) -> impl IntoView {
+    let summary = data.summary;
+    let activity = data.activity;
+    let confirmation_base = summary.active_fans.saturating_add(summary.pending_fans);
+    let confirmation_rate = if confirmation_base > 0 {
+        format!(
+            "{:.0}%",
+            (summary.active_fans.max(0) as f64 * 100.0) / confirmation_base as f64
+        )
+    } else {
+        "—".to_owned()
+    };
+    let generated_at = human_time(&data.generated_at);
+    let unavailable = data.unavailable_sources;
+    let degraded_view = if unavailable.is_empty() {
+        None
+    } else {
+        Some(view! {
+            <p class="security-note warning">
+                {format!(
+                    "Snapshot częściowy. Niedostępne źródła: {}.",
+                    unavailable.join(", ")
+                )}
+            </p>
+        })
+    };
+    let city_count = data.top_cities.len();
+    let city_cards = data
+        .top_cities
+        .into_iter()
+        .map(|city| {
+            view! {
+                <article class="signal-city-card">
+                    <div>
+                        <strong>{city.name}</strong>
+                        <small>{city.country_code}</small>
+                    </div>
+                    <span>{format!("{} aktywnych", city.active_fans.max(0))}</span>
+                </article>
+            }
+        })
+        .collect_view();
+    let cities_view = if city_count == 0 {
+        view! {
+            <div class="empty-state compact">
+                <strong>"Brak agregatu miast"</strong>
+                <p>"Sygnał nie ma jeszcze potwierdzonych danych miejskich albo źródło jest chwilowo niedostępne."</p>
+            </div>
+        }
+        .into_any()
+    } else {
+        view! { <div class="signal-city-list">{city_cards}</div> }.into_any()
+    };
+
+    view! {
+        <div class="signal-admin-content">
+            <div class="stats-grid">
+                <Metric value=summary.active_fans.max(0).to_string() label="aktywni"/>
+                <Metric value=summary.marketing_opted_in.max(0).to_string() label="zgody marketingowe"/>
+                <Metric value=activity.new_fans_30d.max(0).to_string() label="nowi / 30 dni"/>
+            </div>
+            <article class="signal-health-card">
+                <div>
+                    <p class="eyebrow">ZDROWIE BAZY</p>
+                    <strong>{confirmation_rate}</strong>
+                    <span>"potwierdzonych spośród aktywnych i oczekujących"</span>
+                </div>
+                <dl>
+                    <div><dt>"wszyscy"</dt><dd>{summary.total_fans.max(0)}</dd></div>
+                    <div><dt>"oczekujący"</dt><dd>{summary.pending_fans.max(0)}</dd></div>
+                    <div><dt>"wypisani"</dt><dd>{summary.unsubscribed_fans.max(0)}</dd></div>
+                    <div><dt>"wyciszeni"</dt><dd>{summary.suppressed_fans.max(0)}</dd></div>
+                    <div><dt>"powiadomienia w pobliżu"</dt><dd>{summary.nearby_enabled.max(0)}</dd></div>
+                </dl>
+            </article>
+            <div class="section-head"><h3>"Aktywność"</h3><span>"30 dni / całość"</span></div>
+            <div class="signal-activity-grid">
+                <article><strong>{activity.new_fans_7d.max(0)}</strong><span>"nowi / 7 dni"</span></article>
+                <article><strong>{format!("{} / {}", activity.referral_attributions_30d.max(0), activity.referral_attributions_total.max(0))}</strong><span>"polecenia"</span></article>
+                <article><strong>{format!("{} / {}", activity.event_interests_30d.max(0), activity.event_interests_total.max(0))}</strong><span>"zainteresowania koncertami"</span></article>
+                <article><strong>{activity.nearby_notifications_30d.max(0)}</strong><span>"powiadomienia nearby"</span></article>
+                <article><strong>{activity.pending_city_requests.max(0)}</strong><span>"miasta do moderacji"</span></article>
+            </div>
+            {degraded_view}
+            <div class="section-head"><h3>"Najsilniejsze miasta"</h3><span>{city_count}</span></div>
+            {cities_view}
+            <p class="security-note">{format!("Snapshot: {generated_at}. Dane wyłącznie zagregowane.")}</p>
+        </div>
     }
 }
 
@@ -2193,6 +2371,32 @@ fn refresh_operator_qr(
             Err(message) => error.set(Some(message)),
         }
         loading.update(|state| state.qr = false);
+    });
+}
+
+fn refresh_operator_signal(
+    overview: RwSignal<Option<OperatorSignalOverview>>,
+    loading: RwSignal<bool>,
+    error: RwSignal<Option<String>>,
+) {
+    if loading.get_untracked() {
+        return;
+    }
+    loading.set(true);
+    spawn_local(async move {
+        let result = bridge::invoke_latest::<OperatorSignalOverview, _>(
+            "operator_signal_overview",
+            &EmptyArgs {},
+            20_000,
+            "operator:signal",
+        )
+        .await;
+        match result {
+            Ok(Some(value)) => overview.set(Some(value)),
+            Ok(None) => {}
+            Err(message) => error.set(Some(message)),
+        }
+        loading.set(false);
     });
 }
 

@@ -633,3 +633,39 @@ html[data-virya-scanner-active] .app-shell {
 #virya-runtime-failure button.ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.28); }
 #virya-runtime-failure .copy-status { display: block; min-height: 18px; margin-top: 10px; color: #ffc20a; }
 .city-stable-entry { margin-top: 2px; }
+
+/* ecosystem-v13-signal-control-plane */
+.bottom-nav.seven { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.bottom-nav.seven button { min-width: 0; }
+.bottom-nav.seven span { font-size: 18px; }
+.bottom-nav.seven small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.screen-copy { margin: 9px 0 0; color: var(--muted); line-height: 1.5; }
+.signal-admin-toolbar { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; padding: 14px; border: 1px solid var(--line); background: var(--surface); }
+.signal-admin-toolbar p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.signal-admin-toolbar button { align-self: stretch; }
+.signal-admin-content { display: grid; gap: 10px; }
+.signal-health-card { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 18px; padding: 18px; border: 1px solid #403718; background: linear-gradient(145deg, #1b1708, #111 68%); }
+.signal-health-card > div > strong { display: block; margin-top: 6px; color: var(--yellow); font-size: 42px; line-height: 1; }
+.signal-health-card > div > span { display: block; margin-top: 8px; color: var(--muted); font-size: 10px; line-height: 1.4; }
+.signal-health-card dl { margin: 0; display: grid; gap: 6px; }
+.signal-health-card dl div { display: flex; justify-content: space-between; gap: 14px; padding-bottom: 6px; border-bottom: 1px solid #2c291e; }
+.signal-health-card dt, .signal-health-card dd { margin: 0; }
+.signal-health-card dt { color: var(--muted); font-size: 10px; }
+.signal-health-card dd { color: #fff; font-weight: 900; }
+.signal-activity-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.signal-activity-grid article { min-width: 0; padding: 14px; border: 1px solid var(--line); background: var(--surface); }
+.signal-activity-grid strong { display: block; color: var(--yellow); font-size: 20px; overflow: hidden; text-overflow: ellipsis; }
+.signal-activity-grid span { display: block; margin-top: 5px; color: var(--muted); font-size: 9px; text-transform: uppercase; }
+.signal-city-list { display: grid; gap: 7px; }
+.signal-city-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 13px 14px; border: 1px solid var(--line); background: var(--surface); content-visibility: auto; contain-intrinsic-size: auto 64px; }
+.signal-city-card div { min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.signal-city-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.signal-city-card small { color: var(--muted); }
+.signal-city-card > span { flex: none; color: var(--yellow); font-size: 10px; font-weight: 850; }
+.empty-state.compact { min-height: 0; padding: 18px; }
+@media (max-width: 430px) {
+  .signal-admin-toolbar { grid-template-columns: 1fr; }
+  .signal-health-card { grid-template-columns: 1fr; }
+  .signal-activity-grid { grid-template-columns: 1fr; }
+}

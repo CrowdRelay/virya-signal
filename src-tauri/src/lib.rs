@@ -32,11 +32,11 @@ use futures_util::{stream, StreamExt};
 use models::{
     AdmissionPass, AreaWallet, ConcertQrOverview, CreateQrCampaignInput, FanAuthResult,
     FanConfirmationInput, FanEventInterest, FanProfile, FanSessionStatus, FanSignupInput,
-    IssuePassInput, OperatorOpsOverview, OperatorProfile, OpsRetryResult, PublicEvent,
-    ReferralProgress, RequestedCityInput, RequestedCityResult, SessionStatus, ShowModeQueuedScan,
-    ShowModeScanResult, ShowModeScanState, ShowModeSession, ShowModeStatus, ShowModeStore,
-    ShowModeSyncResult, StaffPairingPayload, TicketWallet, TicketWalletApi, TicketingOverview,
-    WalletBatch, WalletCredential, WalletTicket,
+    IssuePassInput, OperatorOpsOverview, OperatorProfile, OperatorSignalOverview, OpsRetryResult,
+    PublicEvent, ReferralProgress, RequestedCityInput, RequestedCityResult, SessionStatus,
+    ShowModeQueuedScan, ShowModeScanResult, ShowModeScanState, ShowModeSession, ShowModeStatus,
+    ShowModeStore, ShowModeSyncResult, StaffPairingPayload, TicketWallet, TicketWalletApi,
+    TicketingOverview, WalletBatch, WalletCredential, WalletTicket,
 };
 use qrcode::{render::svg, QrCode};
 use sha2::{Digest, Sha256};
@@ -525,6 +525,14 @@ async fn fan_confirm(
     *state.fan_pin.write().await = Some(pin);
     state.wallet_qr_tokens.write().await.clear();
     Ok(result)
+}
+
+#[tauri::command]
+async fn operator_signal_overview(
+    state: State<'_, AppState>,
+) -> Result<OperatorSignalOverview, AppError> {
+    let profile = operator_profile(&state).await?;
+    state.api.operator_signal_overview(&profile).await
 }
 
 #[tauri::command]
@@ -1596,6 +1604,7 @@ pub fn run() {
             forget_device,
             operator_events,
             operator_qr,
+            operator_signal_overview,
             operator_ops_overview,
             operator_retry,
             show_mode_prepare,

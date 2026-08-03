@@ -36,9 +36,9 @@ use crate::{
         AdmissionPass, AreaWallet, CityListResponse, CitySignal, ConcertQrOverview,
         CreateQrCampaignInput, EventListResponse, FanAuthResult, FanConfirmationInput,
         FanEventInterest, FanProfile, FanSignupInput, IssuePassInput, OperatorOpsOverview,
-        OperatorProfile, OperatorRole, OpsDeliveryItem, OpsOutboxItem, OpsRetryResult, OpsSummary,
-        PublicEvent, ReferralProgress, RequestedCityInput, RequestedCityResult, ShowModeSnapshot,
-        TicketWalletApi, TicketingOverview,
+        OperatorProfile, OperatorRole, OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem,
+        OpsRetryResult, OpsSummary, PublicEvent, ReferralProgress, RequestedCityInput,
+        RequestedCityResult, ShowModeSnapshot, TicketWalletApi, TicketingOverview,
     },
     AppError,
 };
@@ -359,6 +359,63 @@ impl CrowdRelayClient {
             Option::<&()>::None,
         )
         .await
+    }
+
+    pub async fn operator_signal_overview(
+        &self,
+        profile: &OperatorProfile,
+    ) -> Result<OperatorSignalOverview, AppError> {
+        require_owner(profile)?;
+        let mut overview = self
+            .auth_json::<OperatorSignalOverview, ()>(
+                profile,
+                Method::GET,
+                "admin/signal/overview",
+                None,
+            )
+            .await?;
+
+        let summary = &mut overview.summary;
+        summary.total_fans = summary.total_fans.max(0);
+        summary.active_fans = summary.active_fans.max(0);
+        summary.pending_fans = summary.pending_fans.max(0);
+        summary.unsubscribed_fans = summary.unsubscribed_fans.max(0);
+        summary.suppressed_fans = summary.suppressed_fans.max(0);
+        summary.marketing_opted_in = summary.marketing_opted_in.max(0);
+        summary.nearby_enabled = summary.nearby_enabled.max(0);
+
+        let activity = &mut overview.activity;
+        activity.new_fans_7d = activity.new_fans_7d.max(0);
+        activity.new_fans_30d = activity.new_fans_30d.max(0);
+        activity.referral_attributions_total = activity.referral_attributions_total.max(0);
+        activity.referral_attributions_30d = activity.referral_attributions_30d.max(0);
+        activity.event_interests_total = activity.event_interests_total.max(0);
+        activity.event_interests_30d = activity.event_interests_30d.max(0);
+        activity.nearby_notifications_30d = activity.nearby_notifications_30d.max(0);
+        activity.pending_city_requests = activity.pending_city_requests.max(0);
+
+        overview.top_cities.retain(|city| {
+            !city.name.trim().is_empty()
+                && city.name.chars().count() <= 160
+                && city.country_code.len() == 2
+                && city
+                    .country_code
+                    .bytes()
+                    .all(|byte| byte.is_ascii_uppercase())
+                && city.active_fans >= 0
+        });
+        overview.top_cities.truncate(10);
+        overview.unavailable_sources.retain(|source| {
+            !source.trim().is_empty()
+                && source.len() <= 64
+                && source
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+        });
+        overview.unavailable_sources.truncate(8);
+        overview.generated_at = overview.generated_at.chars().take(64).collect();
+
+        Ok(overview)
     }
 
     pub async fn operator_ops_overview(
