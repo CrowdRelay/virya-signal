@@ -43,15 +43,20 @@ pub struct CrowdRelayClient {
 impl CrowdRelayClient {
     pub fn new(cache_file: PathBuf) -> Result<Self, AppError> {
         let _ = rustls::crypto::ring::default_provider().install_default();
-        let http = Client::builder()
+        #[allow(unused_mut)]
+        let mut builder = Client::builder()
             .timeout(Duration::from_secs(15))
             .connect_timeout(Duration::from_secs(5))
             .pool_idle_timeout(Duration::from_secs(60))
             .pool_max_idle_per_host(4)
             .tcp_keepalive(Duration::from_secs(30))
             .user_agent(concat!("crowdrelay-mobile/", env!("CARGO_PKG_VERSION")))
-            .https_only(!cfg!(debug_assertions))
-            .build()?;
+            .https_only(!cfg!(debug_assertions));
+        #[cfg(target_os = "android")]
+        {
+            builder = builder.use_preconfigured_tls(android_tls_config());
+        }
+        let http = builder.build()?;
         let public_cache = match cache::load_public_cache(&cache_file) {
             Ok(cache) => cache,
             Err(error) => {
@@ -372,4 +377,13 @@ impl CrowdRelayClient {
         }
         Ok(request.send().await?)
     }
+}
+
+#[cfg(target_os = "android")]
+fn android_tls_config() -> rustls::ClientConfig {
+    let root_store =
+        rustls::RootCertStore::from_iter(webpki_root_certs::TLS_SERVER_ROOT_CERTS.iter().cloned());
+    rustls::ClientConfig::builder()
+        .with_root_certificates(root_store)
+        .with_no_client_auth()
 }

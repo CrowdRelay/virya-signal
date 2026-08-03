@@ -974,6 +974,7 @@ dependencies = [
  "tokio",
  "url",
  "uuid",
+ "webpki-root-certs 0.26.11",
  "zeroize",
 ]
 
@@ -4366,7 +4367,7 @@ dependencies = [
  "rustls-webpki",
  "security-framework",
  "security-framework-sys",
- "webpki-root-certs",
+ "webpki-root-certs 1.0.9",
  "windows-sys 0.61.2",
 ]
 
@@ -6344,6 +6345,15 @@ dependencies = [
  "pkg-config",
  "soup3-sys",
  "system-deps",
+]
+
+[[package]]
+name = "webpki-root-certs"
+version = "0.26.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75c7f0ef91146ebfb530314f5f1d24528d7f0767efbfd31dce919275413e393e"
+dependencies = [
+ "webpki-root-certs 1.0.9",
 ]
 
 [[package]]

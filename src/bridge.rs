@@ -77,6 +77,13 @@ export async function viryaInvoke(command, args, timeoutMs) {
     return result;
   } catch (error) {
     window.console?.warn?.('[virya:ipc]', command, 'failed', `${Date.now() - startedAt}ms`, error);
+    const msg = typeof error === 'string' ? error : error?.message ?? '';
+    if (msg.includes('native=panic') || msg.includes('native panic')) {
+      const report = viryaBuildRuntimeReport('native-panic', error);
+      report.operation = command;
+      viryaStoreRuntimeFailure(report);
+      viryaShowRuntimeFailure(report, false);
+    }
     throw error;
   } finally {
     clearTimeout(timer);

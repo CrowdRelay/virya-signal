@@ -69,6 +69,14 @@ function runtime({ ready = false, mounted = false, retryCount = 0 } = {}) {
     clearTimeout(id) {
       timers.delete(id);
     },
+    setInterval(callback, delay) {
+      const id = nextTimer++;
+      timers.set(id, { callback, due: now + delay, interval: delay });
+      return id;
+    },
+    clearInterval(id) {
+      timers.delete(id);
+    },
     addEventListener(type, listener) {
       const listeners = windowListeners.get(type) ?? [];
       listeners.push(listener);
@@ -109,8 +117,12 @@ function runtime({ ready = false, mounted = false, retryCount = 0 } = {}) {
           .sort((a, b) => a[1].due - b[1].due)[0];
         if (!pending) break;
         const [id, timer] = pending;
-        timers.delete(id);
         now = timer.due;
+        if (timer.interval) {
+          timer.due = now + timer.interval;
+        } else {
+          timers.delete(id);
+        }
         timer.callback();
       }
       now = target;
