@@ -61,6 +61,16 @@ struct FanLoadingState {
     area: bool,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+struct FanLoadedState {
+    referral: bool,
+    events: bool,
+    interests: bool,
+    admission_pass: bool,
+    wallets: bool,
+    area: bool,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct OperatorLoadingState {
     events: bool,
@@ -1520,9 +1530,9 @@ fn FanAccess(
                                     <label>"Twoje miasto"
                                         <select disabled=move || public_loading.get().cities prop:value=move || city.get() on:change=move |e| city.set(event_target_value(&e))>
                                             <option value="">{move || if public_loading.get().cities { "Ładuję miasta…" } else { "Wybierz miasto" }}</option>
-                                            <For each=move || public.with(|data| data.as_ref().map(|d| d.cities.clone()).unwrap_or_default())
-                                                key=|item| item.slug.clone()
-                                                children=move |item| view! { <option value=item.slug.clone()>{format!("{} · {} fanów", item.name, item.fan_count)}</option> } />
+                                            {move || stable_public_cities(public).into_iter().map(|item| view! {
+                                                <option value=item.slug.clone()>{format!("{} · {} fanów", item.name, item.fan_count)}</option>
+                                            }).collect_view()}
                                         </select>
                                     </label>
                                 </Show>
@@ -1583,14 +1593,81 @@ fn FanApp(
     let area = RwSignal::new(None::<AreaWallet>);
     let loading = RwSignal::new(FanLoadingState::all());
 
+    let loaded = RwSignal::new(FanLoadedState::default());
+
     Effect::new(move |_| {
-        if status.get().unlocked && dashboard.get().is_none() {
+        if !status.get().unlocked {
+            return;
+        }
+        if dashboard.get_untracked().is_none() {
             dashboard.set(Some(FanDashboardData::default()));
-            refresh_fan_parts(dashboard, loading, error);
-            refresh_wallets(wallets, Some(loading), error);
-            refresh_fan_area(area, loading, error);
+        }
+
+        match tab.get() {
+            FanTab::Signal => {
+                if !loaded.get_untracked().referral {
+                    loaded.update(|state| state.referral = true);
+                    refresh_fan_referral(dashboard, loading, error);
+                }
+            }
+            FanTab::Events => {
+                let state = loaded.get_untracked();
+                if !state.events {
+                    loaded.update(|value| value.events = true);
+                    refresh_fan_events(dashboard, loading, error);
+                }
+                if !state.interests {
+                    loaded.update(|value| value.interests = true);
+                    refresh_fan_interests(dashboard, loading, error);
+                }
+            }
+            FanTab::Game => {
+                if !loaded.get_untracked().area {
+                    loaded.update(|state| state.area = true);
+                    refresh_fan_area(area, loading, error);
+                }
+            }
+            FanTab::Wallet => {
+                let state = loaded.get_untracked();
+                if !state.admission_pass {
+                    loaded.update(|value| value.admission_pass = true);
+                    refresh_fan_admission_pass(dashboard, loading, error);
+                }
+                if !state.wallets {
+                    loaded.update(|value| value.wallets = true);
+                    refresh_wallets(wallets, Some(loading), error);
+                }
+            }
+            FanTab::Profile => {
+                let state = loaded.get_untracked();
+                if !state.referral {
+                    loaded.update(|value| value.referral = true);
+                    refresh_fan_referral(dashboard, loading, error);
+                }
+                if !state.events {
+                    loaded.update(|value| value.events = true);
+                    refresh_fan_events(dashboard, loading, error);
+                }
+                if !state.interests {
+                    loaded.update(|value| value.interests = true);
+                    refresh_fan_interests(dashboard, loading, error);
+                }
+                if !state.admission_pass {
+                    loaded.update(|value| value.admission_pass = true);
+                    refresh_fan_admission_pass(dashboard, loading, error);
+                }
+                if !state.wallets {
+                    loaded.update(|value| value.wallets = true);
+                    refresh_wallets(wallets, Some(loading), error);
+                }
+                if !state.area {
+                    loaded.update(|value| value.area = true);
+                    refresh_fan_area(area, loading, error);
+                }
+            }
         }
     });
+    on_cleanup(move || bridge::invalidate_latest("fan:"));
 
     let close = move |_| {
         bridge::invalidate_latest("fan:");
@@ -1687,7 +1764,9 @@ fn FanEvents(
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">GDZIE GRAMY</p><h2>Koncerty</h2></header><Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }><div class="card-list fan-event-list"><For each=move || fan_events(dashboard, public) key=|event| event.slug.clone() children=move |event| view! { <FanEventCard event=event dashboard=dashboard loading=loading error=error /> } /></div></Show></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">GDZIE GRAMY</p><h2>Koncerty</h2></header><Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }><div class="card-list fan-event-list">{move || fan_events(dashboard, public).into_iter().map(|event| view! {
+                    <FanEventCard event=event dashboard=dashboard loading=loading error=error />
+                }).collect_view()}</div></Show></section>
     }
 }
 
@@ -1928,7 +2007,9 @@ fn FanWallet(
     view! {
         <section class="screen"><header class="screen-title"><p class="eyebrow">MOBILE WALLET</p><h2>Bilety i wejście</h2></header><Show when=move || !loading.get().admission_pass fallback=move || view! { <Skeleton rows=1 /> }>{move || dashboard.with(|state| state.as_ref().and_then(|d| d.admission_pass.clone())).map(|pass| view! { <article class="admission-card"><p class="eyebrow">WEJŚCIÓWKA VIRYA</p><h3>{pass.event_title}</h3><p>{event_time_location(&pass.starts_at, pass.venue.as_deref())}</p><strong>{pass.public_reference}</strong><span>{pass.status}</span><button class="primary" on:click=qr disabled=move || busy.get()>"POKAŻ QR NA WEJŚCIE"</button>{move || admission_qr.get().map(|value| view! { <QrPanel svg=value.qr_svg token=value.token expires=value.expires_at /> })}</article> })}
         <Show when=move || dashboard.with(|state| state.as_ref().is_none_or(|d| d.admission_pass.is_none()))><div class="claim-box"><p class="eyebrow">WYGRAŁEŚ WEJŚCIÓWKĘ?</p><h3>Przypisz ją do telefonu</h3><textarea rows="3" placeholder="Token z wiadomości" prop:value=move || claim_token.get() on:input=move |e| claim_token.set(event_target_value(&e))></textarea><button class="primary" on:click=claim disabled=move || busy.get()>"ODBIERZ WEJŚCIÓWKĘ"</button></div></Show></Show>
-        <div class="section-head"><h3>Portfel biletów</h3><span>{move || wallets.get().len()}</span></div><Show when=move || !loading.get().wallets fallback=move || view! { <Skeleton rows=2 /> }><div class="wallet-stack"><For each=move || wallets.get() key=|wallet| wallet.order.order_id.clone() children=move |wallet| view! { <WalletCard wallet=wallet error=error /> } /></div></Show><details class="import-box"><summary>"Dodaj istniejące zamówienie"</summary><div class="form-grid"><label>"Order ID"<input placeholder="UUID zamówienia" prop:value=move || order_id.get() on:input=move |e| order_id.set(event_target_value(&e))/></label><label>"Prywatny checkout token"<textarea rows="3" prop:value=move || checkout_token.get() on:input=move |e| checkout_token.set(event_target_value(&e))></textarea></label><button class="primary" on:click=import disabled=move || busy.get()>"DODAJ DO PORTFELA"</button></div></details></section>
+        <div class="section-head"><h3>Portfel biletów</h3><span>{move || wallets.get().len()}</span></div><Show when=move || !loading.get().wallets fallback=move || view! { <Skeleton rows=2 /> }><div class="wallet-stack">{move || wallets.get().into_iter().map(|wallet| view! {
+            <WalletCard wallet=wallet error=error />
+        }).collect_view()}</div></Show><details class="import-box"><summary>"Dodaj istniejące zamówienie"</summary><div class="form-grid"><label>"Order ID"<input placeholder="UUID zamówienia" prop:value=move || order_id.get() on:input=move |e| order_id.set(event_target_value(&e))/></label><label>"Prywatny checkout token"<textarea rows="3" prop:value=move || checkout_token.get() on:input=move |e| checkout_token.set(event_target_value(&e))></textarea></label><button class="primary" on:click=import disabled=move || busy.get()>"DODAJ DO PORTFELA"</button></div></details></section>
     }
 }
 
@@ -2211,7 +2292,8 @@ fn refresh_fan_events(
         .await
         {
             Ok(Some(value)) => dashboard.update(|state| {
-                state.get_or_insert_with(FanDashboardData::default).events = value;
+                state.get_or_insert_with(FanDashboardData::default).events =
+                    stable_fan_events(value);
             }),
             Ok(None) => return,
             Err(message) => error.set(Some(message)),
@@ -2263,7 +2345,7 @@ fn refresh_fan_interests(
             Ok(Some(value)) => dashboard.update(|state| {
                 state
                     .get_or_insert_with(FanDashboardData::default)
-                    .interests = value;
+                    .interests = stable_fan_interests(value);
             }),
             Ok(None) => return,
             Err(message) => error.set(Some(message)),
@@ -2340,7 +2422,7 @@ fn refresh_wallets(
         .await
         {
             Ok(Some(value)) => {
-                wallets.set(value.wallets);
+                wallets.set(stable_wallets(value.wallets));
                 if value.failed_count > 0 {
                     error.set(Some(format!(
                         "Nie udało się odświeżyć {} zamówień. Pozostałe bilety są dostępne.",
@@ -2392,10 +2474,72 @@ fn fan_events(
     dashboard: RwSignal<Option<FanDashboardData>>,
     public: RwSignal<Option<PublicHomeData>>,
 ) -> Vec<PublicEvent> {
-    dashboard
-        .with(|state| state.as_ref().map(|data| data.events.clone()))
-        .or_else(|| public.with(|state| state.as_ref().map(|data| data.events.clone())))
-        .unwrap_or_default()
+    stable_fan_events(
+        dashboard
+            .with(|state| state.as_ref().map(|data| data.events.clone()))
+            .or_else(|| public.with(|state| state.as_ref().map(|data| data.events.clone())))
+            .unwrap_or_default(),
+    )
+}
+
+fn stable_public_cities(public: RwSignal<Option<PublicHomeData>>) -> Vec<CitySignal> {
+    let mut cities = public.with(|state| {
+        state
+            .as_ref()
+            .map(|data| data.cities.clone())
+            .unwrap_or_default()
+    });
+    cities.retain(|city| {
+        !city.slug.trim().is_empty()
+            && !city.name.trim().is_empty()
+            && city.slug.len() <= 128
+            && city.name.chars().count() <= 160
+    });
+    cities.sort_unstable_by(|left, right| {
+        right
+            .fan_count
+            .cmp(&left.fan_count)
+            .then_with(|| left.name.cmp(&right.name))
+            .then_with(|| left.slug.cmp(&right.slug))
+    });
+    cities.dedup_by(|left, right| left.slug == right.slug);
+    cities.truncate(250);
+    cities
+}
+
+fn stable_fan_events(mut events: Vec<PublicEvent>) -> Vec<PublicEvent> {
+    events.retain(|event| {
+        !event.slug.trim().is_empty()
+            && !event.title.trim().is_empty()
+            && event.slug.len() <= 128
+            && event.title.chars().count() <= 240
+    });
+    events.sort_unstable_by(|left, right| {
+        left.starts_at
+            .cmp(&right.starts_at)
+            .then_with(|| left.slug.cmp(&right.slug))
+    });
+    events.dedup_by(|left, right| left.slug == right.slug);
+    events.truncate(100);
+    events
+}
+
+fn stable_fan_interests(mut interests: Vec<FanEventInterest>) -> Vec<FanEventInterest> {
+    interests.retain(|interest| {
+        !interest.event.slug.trim().is_empty() && !interest.event.title.trim().is_empty()
+    });
+    interests.sort_unstable_by(|left, right| left.event.slug.cmp(&right.event.slug));
+    interests.dedup_by(|left, right| left.event.slug == right.event.slug);
+    interests.truncate(100);
+    interests
+}
+
+fn stable_wallets(mut wallets: Vec<TicketWallet>) -> Vec<TicketWallet> {
+    wallets.retain(|wallet| !wallet.order.order_id.trim().is_empty());
+    wallets.sort_unstable_by(|left, right| left.order.order_id.cmp(&right.order.order_id));
+    wallets.dedup_by(|left, right| left.order.order_id == right.order.order_id);
+    wallets.truncate(100);
+    wallets
 }
 
 fn optional(value: String) -> Option<String> {

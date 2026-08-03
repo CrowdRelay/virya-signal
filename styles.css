@@ -348,3 +348,27 @@ button:disabled { opacity: .48; cursor: default; }
 .radius-picker button { min-height: 38px; padding: 6px; font-size: .76rem; }
 .radius-picker button.active { border-color: #f3b900; color: #f3c51a; background: #f3b90015; }
 @media (max-width: 420px) { .radius-picker { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+
+/* V9.7: larger mode-switch control and safer mobile touch target. */
+.back-button {
+  z-index: 60;
+  top: max(14px, env(safe-area-inset-top));
+  left: 14px;
+  min-width: 104px;
+  min-height: 44px;
+  padding: 0 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #3a3a35;
+  background: #11110ff2;
+  color: #d7d7cf;
+  box-shadow: 0 8px 24px #0008;
+  font-size: 11px;
+  line-height: 1;
+}
+.back-button:active {
+  transform: translateY(1px);
+  border-color: var(--yellow);
+  color: var(--yellow);
+}
