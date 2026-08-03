@@ -1,21 +1,8 @@
 {
   "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "mobile-capability",
-  "description": "Minimal mobile capability for QR scanning",
-  "windows": [
-    "main"
-  ],
-  "platforms": [
-    "iOS",
-    "android"
-  ],
-  "permissions": [
-    "core:default",
-    "barcode-scanner:allow-scan",
-    "barcode-scanner:allow-cancel",
-    "barcode-scanner:allow-vibrate",
-    "barcode-scanner:allow-check-permissions",
-    "barcode-scanner:allow-request-permissions",
-    "barcode-scanner:allow-open-app-settings"
-  ]
+  "description": "Camera access for staff pairing and ticket QR scanning",
+  "windows": ["main"],
+  "platforms": ["iOS", "android"],
+  "permissions": ["barcode-scanner:default"]
 }

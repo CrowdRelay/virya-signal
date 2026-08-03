@@ -35,7 +35,7 @@ export async function viryaInvoke(command, args, timeoutMs) {
     if (elapsed >= 1_000) window.console?.info?.('[virya:ipc]', command, `${elapsed}ms`);
     return result;
   } catch (error) {
-    window.console?.warn?.('[virya:ipc]', command, 'failed', `${Date.now() - startedAt}ms`);
+    window.console?.warn?.('[virya:ipc]', command, 'failed', `${Date.now() - startedAt}ms`, error);
     throw error;
   } finally {
     clearTimeout(timer);
@@ -60,9 +60,31 @@ export function viryaInvalidateLatest(prefix) {
   }
 }
 
+function viryaPermissionState(value) {
+  if (typeof value === 'string') return value;
+  return value?.camera ?? value?.status ?? value?.state ?? 'prompt';
+}
+
+async function viryaEnsureCameraPermission(scanner) {
+  if (!scanner?.checkPermissions || !scanner?.requestPermissions) {
+    throw new Error('Moduł uprawnień aparatu nie jest dostępny w tej wersji aplikacji.');
+  }
+
+  let state = viryaPermissionState(await scanner.checkPermissions());
+  if (state === 'prompt' || state === 'prompt-with-rationale') {
+    state = viryaPermissionState(await scanner.requestPermissions());
+  }
+  if (state !== 'granted') {
+    throw new Error(
+      'Brak dostępu do aparatu. Włącz Aparat dla Virya Signal w ustawieniach aplikacji.',
+    );
+  }
+}
+
 export async function viryaScanQr() {
   const scanner = window.__TAURI__?.barcodeScanner;
   if (!scanner?.scan) throw new Error('Skaner jest dostępny tylko w aplikacji iOS/Android.');
+  await viryaEnsureCameraPermission(scanner);
   const format = scanner.Format?.QRCode ?? 'QR_CODE';
   const result = await scanner.scan({ formats: [format] });
   if (typeof result === 'string') return result;

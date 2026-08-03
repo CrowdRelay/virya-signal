@@ -82,12 +82,6 @@ struct PublicLoadingState {
     cities: bool,
 }
 
-impl PublicLoadingState {
-    fn all() -> Self {
-        Self { cities: true }
-    }
-}
-
 impl OperatorLoadingState {
     const fn all() -> Self {
         Self {
@@ -1309,19 +1303,10 @@ fn FanPortal(
     status_loading: RwSignal<bool>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
-    let public = RwSignal::new(None::<PublicHomeData>);
-    let public_loading = RwSignal::new(PublicLoadingState::all());
-    let load_started = RwSignal::new(false);
-
-    Effect::new(move |_| {
-        if status_loading.get() || status.get().unlocked || load_started.get_untracked() {
-            return;
-        }
-        load_started.set(true);
-        public.set(Some(PublicHomeData::default()));
-        refresh_public_cities(public, public_loading, error);
-    });
-    on_cleanup(move || bridge::invalidate_latest("public:fan-access:"));
+    // Entering the fan zone must be a local-only transition. City data is
+    // fetched only when the user explicitly asks for the canonical list.
+    let public = RwSignal::new(Some(PublicHomeData::default()));
+    let public_loading = RwSignal::new(PublicLoadingState::default());
 
     view! {
         {move || if status_loading.get() {
@@ -1359,7 +1344,7 @@ fn FanAccess(
     let email = RwSignal::new(String::new());
     let name = RwSignal::new(String::new());
     let city = RwSignal::new(String::new());
-    let custom_city = RwSignal::new(false);
+    let custom_city = RwSignal::new(true);
     let custom_city_name = RwSignal::new(String::new());
     let custom_region = RwSignal::new(String::new());
     let referral = RwSignal::new(String::new());
@@ -1369,6 +1354,22 @@ fn FanAccess(
     let nearby_enabled = RwSignal::new(true);
     let radius_km = RwSignal::new(150_u16);
     let busy = RwSignal::new(false);
+
+    let cities_started = RwSignal::new(false);
+    let toggle_city_mode = move |_| {
+        if custom_city.get_untracked() {
+            custom_city.set(false);
+            if !cities_started.get_untracked() {
+                cities_started.set(true);
+                refresh_public_cities(public, public_loading, error);
+            }
+        } else {
+            bridge::invalidate_latest("public:fan-access:");
+            custom_city.set(true);
+            city.set(String::new());
+        }
+    };
+    on_cleanup(move || bridge::invalidate_latest("public:fan-access:"));
 
     let unlock = move |_| {
         let current_pin = pin.get();
@@ -1536,10 +1537,7 @@ fn FanAccess(
                                         </select>
                                     </label>
                                 </Show>
-                                <button class="text-button city-toggle" type="button" on:click=move |_| {
-                                    custom_city.update(|value| *value = !*value);
-                                    city.set(String::new());
-                                }>{move || if custom_city.get() { "← WYBIERZ Z LISTY" } else { "NIE MA MOJEGO MIASTA" }}</button>
+                                <button class="text-button city-toggle" type="button" on:click=toggle_city_mode>{move || if custom_city.get() { "← WYBIERZ Z LISTY" } else { "NIE MA MOJEGO MIASTA" }}</button>
                                 <Show when=move || custom_city.get()>
                                     <div class="custom-city-fields">
                                         <label>"Miejscowość"<input placeholder="np. Bielawa" prop:value=move || custom_city_name.get() on:input=move |e| custom_city_name.set(event_target_value(&e))/></label>
