@@ -40,7 +40,7 @@ use models::{
 };
 use qrcode::{render::svg, QrCode};
 use sha2::{Digest, Sha256};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 use thiserror::Error;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
@@ -105,8 +105,46 @@ fn write_native_crash_report(report: &str) {
         return;
     };
     let bounded: String = report.chars().take(MAX_NATIVE_CRASH_REPORT_CHARS).collect();
-    if let Err(error) = std::fs::write(path, bounded) {
+    let temporary = path.with_extension("tmp");
+    let result = (|| -> std::io::Result<()> {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(true)
+            .write(true)
+            .open(&temporary)?;
+        std::io::Write::write_all(&mut file, bounded.as_bytes())?;
+        file.sync_all()?;
+        std::fs::rename(&temporary, path)?;
+        Ok(())
+    })();
+    if let Err(error) = result {
+        let _ = std::fs::remove_file(&temporary);
         eprintln!("[virya:native-panic] could not persist crash report: {error}");
+    }
+}
+
+#[tauri::command]
+fn native_crash_report(state: State<'_, AppState>) -> Result<Option<String>, AppError> {
+    let path = state.app_data_dir.join(NATIVE_CRASH_REPORT_FILE);
+    match std::fs::read_to_string(path) {
+        Ok(report) => Ok(Some(
+            report.chars().take(MAX_NATIVE_CRASH_REPORT_CHARS).collect(),
+        )),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(AppError::Io(error)),
+    }
+}
+
+#[tauri::command]
+fn acknowledge_native_crash(state: State<'_, AppState>) -> Result<(), AppError> {
+    let path = state.app_data_dir.join(NATIVE_CRASH_REPORT_FILE);
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(AppError::Io(error)),
     }
 }
 
@@ -1552,32 +1590,7 @@ pub fn run() {
             app.handle().plugin(tauri_plugin_barcode_scanner::init())?;
             let app_data_dir = app.path().app_local_data_dir()?;
             let crash_report_path = app_data_dir.join(NATIVE_CRASH_REPORT_FILE);
-            let _ = NATIVE_CRASH_REPORT_PATH.set(crash_report_path.clone());
-            let previous_crash = match std::fs::read_to_string(&crash_report_path) {
-                Ok(report) => {
-                    let _ = std::fs::remove_file(&crash_report_path);
-                    Some(
-                        report
-                            .chars()
-                            .take(MAX_NATIVE_CRASH_REPORT_CHARS)
-                            .collect::<String>(),
-                    )
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-                Err(error) => {
-                    eprintln!("[virya:native-panic] could not read previous report: {error}");
-                    None
-                }
-            };
-            if let Some(report) = previous_crash {
-                let handle = app.handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                    if let Err(error) = handle.emit("virya-native-crash", report) {
-                        eprintln!("[virya:native-panic] could not emit previous report: {error}");
-                    }
-                });
-            }
+            let _ = NATIVE_CRASH_REPORT_PATH.set(crash_report_path);
             let api = CrowdRelayClient::new(app_data_dir.join("public-cache-v1.json"))?;
             app.manage(AppState {
                 session: RwLock::new(None),
@@ -1597,6 +1610,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             open_external_url,
+            native_crash_report,
+            acknowledge_native_crash,
             session_status,
             configure,
             unlock,

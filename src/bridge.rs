@@ -25,12 +25,50 @@ const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
 const latestInvocations = new Map();
 let invocationSequence = 0;
 
+const VIRYA_OPERATION_STORAGE_KEY = 'virya:last-operation:v3';
+
+function viryaSafePath() {
+  return `${window.location.origin}${window.location.pathname}`.slice(0, 1_000);
+}
+
+function viryaStorageRead(key, fallback = null) {
+  try {
+    const raw = window.localStorage?.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function viryaStorageWrite(key, value) {
+  try {
+    window.localStorage?.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function viryaStorageRemove(key) {
+  try { window.localStorage?.removeItem(key); } catch {}
+}
+
+function viryaPersistOperation(operation) {
+  viryaStorageWrite(VIRYA_OPERATION_STORAGE_KEY, {
+    version: 3,
+    command: String(operation.command).slice(0, 160),
+    startedAt: Number(operation.startedAt) || Date.now(),
+    path: viryaSafePath(),
+  });
+}
+
 export async function viryaInvoke(command, args, timeoutMs) {
   const timeout = Math.max(1_000, Math.min(Number(timeoutMs) || 30_000, 60_000));
   const startedAt = Date.now();
   const deadline = Date.now() + timeout;
   const operation = { command: String(command), startedAt };
   window.__VIRYA_LAST_OPERATION__ = operation;
+  viryaPersistOperation(operation);
   let core;
 
   // Android can expose the page a moment before the injected Tauri bridge.
@@ -62,6 +100,7 @@ export async function viryaInvoke(command, args, timeoutMs) {
     clearTimeout(timer);
     if (window.__VIRYA_LAST_OPERATION__ === operation) {
       window.__VIRYA_LAST_OPERATION__ = undefined;
+      viryaStorageRemove(VIRYA_OPERATION_STORAGE_KEY);
     }
   }
 }
@@ -198,6 +237,8 @@ export async function viryaScanQr() {
 }
 
 const VIRYA_FAILURE_STORAGE_KEY = 'virya:last-runtime-failure:v2';
+const VIRYA_FAILURE_HISTORY_KEY = 'virya:runtime-failure-history:v3';
+const MAX_RUNTIME_FAILURES = 8;
 
 function viryaRuntimeMessage(error) {
   if (typeof error === 'string') return error;
@@ -219,14 +260,19 @@ function viryaBuildRuntimeReport(kind, error) {
     stack: viryaRuntimeStack(error),
     operation: String(operation).slice(0, 160),
     occurredAt: new Date().toISOString(),
-    href: String(window.location?.href ?? '').slice(0, 1_000),
+    path: viryaSafePath(),
     userAgent: String(window.navigator?.userAgent ?? '').slice(0, 1_000),
   };
 }
 
 function viryaStoreRuntimeFailure(report) {
-  try { window.localStorage?.setItem(VIRYA_FAILURE_STORAGE_KEY, JSON.stringify(report)); }
-  catch (error) { window.console?.warn?.('[virya:crash-store]', error); }
+  viryaStorageWrite(VIRYA_FAILURE_STORAGE_KEY, report);
+  const current = viryaStorageRead(VIRYA_FAILURE_HISTORY_KEY, []);
+  const history = [report, ...(Array.isArray(current) ? current : [])]
+    .slice(0, MAX_RUNTIME_FAILURES);
+  if (!viryaStorageWrite(VIRYA_FAILURE_HISTORY_KEY, history)) {
+    window.console?.warn?.('[virya:crash-store]', 'failure history was not persisted');
+  }
 }
 
 function viryaClearRuntimeFailure() {
@@ -238,6 +284,7 @@ function viryaFailureText(report) {
     `Rodzaj: ${report.kind}`,
     `Czas: ${report.occurredAt}`,
     report.operation ? `Operacja: ${report.operation}` : '',
+    report.path ? `Ścieżka: ${report.path}` : '',
     `Błąd: ${report.message}`,
     report.stack ? `\nStack:\n${report.stack}` : '',
   ];
@@ -291,18 +338,44 @@ function viryaShowRuntimeFailure(report, previous = false) {
   document.body.appendChild(node);
 }
 
-async function viryaInstallNativeCrashListener(report) {
+async function viryaWaitForNativeCore() {
   const deadline = Date.now() + 15_000;
-  let eventApi;
-  while (!(eventApi = window.__TAURI__?.event) && Date.now() < deadline) await sleep(50);
-  if (!eventApi?.listen) return;
+  let core;
+  while (!(core = window.__TAURI__?.core) && Date.now() < deadline) await sleep(50);
+  return core?.invoke ? core : undefined;
+}
+
+async function viryaRecoverNativeCrash(report) {
   try {
-    await eventApi.listen('virya-native-crash', (event) => {
-      report('native-panic', event?.payload ?? 'Natywny proces aplikacji zakończył się błędem.');
-    });
+    const core = await viryaWaitForNativeCore();
+    if (!core) return;
+    const previous = await core.invoke('native_crash_report');
+    if (typeof previous !== 'string' || previous.trim() === '') return;
+    report('native-panic', previous);
+    await core.invoke('acknowledge_native_crash');
   } catch (error) {
-    window.console?.warn?.('[virya:native-crash-listener]', error);
+    window.console?.warn?.('[virya:native-crash-recovery]', error);
   }
+}
+
+function viryaRecoverInterruptedOperation(report) {
+  const operation = viryaStorageRead(VIRYA_OPERATION_STORAGE_KEY);
+  if (!operation || typeof operation.command !== 'string') return;
+  report(
+    'interrupted-native-operation',
+    `Poprzednie uruchomienie przerwało operację ${operation.command}.`,
+  );
+  viryaStorageRemove(VIRYA_OPERATION_STORAGE_KEY);
+}
+
+function viryaRecoverBootDiagnostic(report) {
+  const diagnostic = window.__VIRYA_BOOT_DIAGNOSTIC__;
+  if (!diagnostic) return;
+  report(
+    String(diagnostic.kind || 'unexpected-foreground-termination'),
+    String(diagnostic.message || 'Poprzednie uruchomienie zakończyło się bez czystego zamknięcia.'),
+  );
+  window.__VIRYA_BOOT_DIAGNOSTIC__ = undefined;
 }
 
 export function viryaInstallRuntimeGuards() {
@@ -320,7 +393,9 @@ export function viryaInstallRuntimeGuards() {
     event.preventDefault();
     report('unhandled-rejection', event.reason);
   });
-  void viryaInstallNativeCrashListener(report);
+  viryaRecoverInterruptedOperation(report);
+  viryaRecoverBootDiagnostic(report);
+  void viryaRecoverNativeCrash(report);
   try {
     const raw = window.localStorage?.getItem(VIRYA_FAILURE_STORAGE_KEY);
     if (raw) {

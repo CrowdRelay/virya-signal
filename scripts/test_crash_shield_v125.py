@@ -25,13 +25,23 @@ class CrashShieldV125(unittest.TestCase):
         self.assertIn("VIRYA_FAILURE_STORAGE_KEY", BRIDGE)
         self.assertIn("KOPIUJ RAPORT", BRIDGE)
         self.assertIn("unhandledrejection", BRIDGE)
-        self.assertIn("virya-native-crash", BRIDGE)
+        self.assertIn("native_crash_report", BRIDGE)
+        self.assertIn("acknowledge_native_crash", BRIDGE)
+        self.assertIn("report('native-panic', previous)", BRIDGE)
+        self.assertLess(
+            BRIDGE.index("report('native-panic', previous)"),
+            BRIDGE.index("core.invoke('acknowledge_native_crash')"),
+        )
         self.assertIn("#virya-runtime-failure", STYLES)
 
     def test_native_panics_survive_process_restart(self):
         self.assertIn("NATIVE_CRASH_REPORT_PATH", NATIVE)
         self.assertIn("write_native_crash_report", NATIVE)
-        self.assertIn("handle.emit(\"virya-native-crash\"", NATIVE)
+        self.assertIn("fn native_crash_report(", NATIVE)
+        self.assertIn("fn acknowledge_native_crash(", NATIVE)
+        self.assertIn("file.sync_all()", NATIVE)
+        self.assertIn("std::fs::rename(&temporary, path)", NATIVE)
+        self.assertNotIn("handle.emit(\"virya-native-crash\"", NATIVE)
 
     def test_onboarding_debug_list_is_gone(self):
         self.assertNotIn("signal-onboarding-progress", APP)
