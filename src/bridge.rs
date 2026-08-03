@@ -81,14 +81,76 @@ async function viryaEnsureCameraPermission(scanner) {
   }
 }
 
+const VIRYA_SCAN_CANCELLED = '__VIRYA_SCAN_CANCELLED__';
+
+function viryaRemoveScannerOverlay() {
+  window.document?.getElementById('virya-scanner-overlay')?.remove();
+  window.document?.documentElement?.removeAttribute('data-virya-scanner-active');
+}
+
+function viryaMountScannerOverlay(scanner) {
+  const document = window.document;
+  if (!document?.body) {
+    return { cancelled: () => false, cleanup: () => {} };
+  }
+
+  viryaRemoveScannerOverlay();
+  document.documentElement.setAttribute('data-virya-scanner-active', 'true');
+
+  const overlay = document.createElement('div');
+  overlay.id = 'virya-scanner-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Skaner kodu QR');
+  overlay.innerHTML = `
+    <div class="virya-scanner-copy">
+      <strong>SKANUJ KOD QR</strong>
+      <span>Umieść kod wewnątrz ramki</span>
+    </div>
+    <div class="virya-scanner-frame" aria-hidden="true"></div>
+    <button id="virya-scanner-cancel" type="button">← ANULUJ SKANOWANIE</button>
+  `;
+
+  let wasCancelled = false;
+  const cancel = overlay.querySelector('#virya-scanner-cancel');
+  cancel?.addEventListener('click', async () => {
+    if (wasCancelled) return;
+    wasCancelled = true;
+    cancel.disabled = true;
+    cancel.textContent = 'ZAMYKAM…';
+    try {
+      await scanner.cancel?.();
+    } catch (error) {
+      window.console?.warn?.('[virya:scanner] cancel failed', error);
+    }
+  });
+
+  document.body.appendChild(overlay);
+  return {
+    cancelled: () => wasCancelled,
+    cleanup: viryaRemoveScannerOverlay,
+  };
+}
+
 export async function viryaScanQr() {
   const scanner = window.__TAURI__?.barcodeScanner;
-  if (!scanner?.scan) throw new Error('Skaner jest dostępny tylko w aplikacji iOS/Android.');
+  if (!scanner?.scan || !scanner?.cancel) {
+    throw new Error('Skaner jest dostępny tylko w aplikacji iOS/Android.');
+  }
   await viryaEnsureCameraPermission(scanner);
   const format = scanner.Format?.QRCode ?? 'QR_CODE';
-  const result = await scanner.scan({ formats: [format] });
-  if (typeof result === 'string') return result;
-  return result?.content ?? result?.rawValue ?? result?.text ?? '';
+  const overlay = viryaMountScannerOverlay(scanner);
+  try {
+    const result = await scanner.scan({ windowed: true, formats: [format] });
+    if (overlay.cancelled()) return VIRYA_SCAN_CANCELLED;
+    if (typeof result === 'string') return result;
+    return result?.content ?? result?.rawValue ?? result?.text ?? '';
+  } catch (error) {
+    if (overlay.cancelled()) return VIRYA_SCAN_CANCELLED;
+    throw error;
+  } finally {
+    overlay.cleanup();
+  }
 }
 "#)]
 extern "C" {
@@ -172,12 +234,21 @@ where
     Ok(())
 }
 
-pub async fn scan_qr() -> Result<String, String> {
+pub async fn scan_qr() -> Result<Option<String>, String> {
+    const CANCELLED: &str = "__VIRYA_SCAN_CANCELLED__";
     let value = scan_qr_js().await.map_err(js_error)?;
-    value
+    let value = value
         .as_string()
-        .filter(|value| !value.trim().is_empty())
-        .ok_or_else(|| "Skaner nie zwrócił kodu.".to_owned())
+        .ok_or_else(|| "Skaner nie zwrócił kodu.".to_owned())?;
+    if value == CANCELLED {
+        return Ok(None);
+    }
+    let value = value.trim();
+    if value.is_empty() {
+        Err("Skaner nie zwrócił kodu.".to_owned())
+    } else {
+        Ok(Some(value.to_owned()))
+    }
 }
 
 fn js_error(value: JsValue) -> String {

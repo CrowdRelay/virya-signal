@@ -463,7 +463,8 @@ fn OperatorAccess(
     let scan_pairing = move |_| {
         spawn_local(async move {
             match bridge::scan_qr().await {
-                Ok(value) => pair(value),
+                Ok(Some(value)) => pair(value),
+                Ok(None) => {}
                 Err(message) => error.set(Some(message)),
             }
         });
@@ -783,7 +784,8 @@ fn Scanner(
     let scan = move |_| {
         spawn_local(async move {
             match bridge::scan_qr().await {
-                Ok(code) => redeem_code(code),
+                Ok(Some(code)) => redeem_code(code),
+                Ok(None) => {}
                 Err(message) => error.set(Some(message)),
             }
         });
@@ -1344,6 +1346,7 @@ fn FanAccess(
     let email = RwSignal::new(String::new());
     let name = RwSignal::new(String::new());
     let city = RwSignal::new(String::new());
+    let selected_city_name = RwSignal::new(String::new());
     let custom_city = RwSignal::new(true);
     let custom_city_name = RwSignal::new(String::new());
     let custom_region = RwSignal::new(String::new());
@@ -1528,14 +1531,45 @@ fn FanAccess(
                         }>
                             <>
                                 <Show when=move || !custom_city.get()>
-                                    <label>"Twoje miasto"
-                                        <select disabled=move || public_loading.get().cities prop:value=move || city.get() on:change=move |e| city.set(event_target_value(&e))>
-                                            <option value="">{move || if public_loading.get().cities { "Ładuję miasta…" } else { "Wybierz miasto" }}</option>
-                                            {move || stable_public_cities(public).into_iter().map(|item| view! {
-                                                <option value=item.slug.clone()>{format!("{} · {} fanów", item.name, item.fan_count)}</option>
-                                            }).collect_view()}
-                                        </select>
-                                    </label>
+                                    <div class="city-browser">
+                                        <p class="city-browser-label">"Twoje miasto"</p>
+                                        <Show when=move || !public_loading.get().cities fallback=move || view! {
+                                            <div class="city-browser-loading"><Skeleton rows=2 /></div>
+                                        }>
+                                            <Show when=move || !stable_public_cities(public).is_empty() fallback=move || view! {
+                                                <div class="city-browser-empty">
+                                                    <p>Nie udało się pobrać listy miast.</p>
+                                                    <button type="button" class="ghost" on:click=move |_| refresh_public_cities(public, public_loading, error)>"SPRÓBUJ PONOWNIE"</button>
+                                                </div>
+                                            }>
+                                                <div class="city-choice-list">
+                                                    {move || stable_public_cities(public).into_iter().map(|item| {
+                                                        let active_slug = item.slug.clone();
+                                                        let selected_slug = item.slug.clone();
+                                                        let selected_name = item.name.clone();
+                                                        let label = item.name;
+                                                        let fan_count = item.fan_count;
+                                                        view! {
+                                                            <button
+                                                                type="button"
+                                                                class:active=move || city.get() == active_slug
+                                                                on:click=move |_| {
+                                                                    city.set(selected_slug.clone());
+                                                                    selected_city_name.set(selected_name.clone());
+                                                                }
+                                                            >
+                                                                <strong>{label}</strong>
+                                                                <span>{format!("{} fanów", fan_count)}</span>
+                                                            </button>
+                                                        }
+                                                    }).collect_view()}
+                                                </div>
+                                                <Show when=move || !city.get().is_empty()>
+                                                    <p class="city-selected">{move || format!("Wybrane: {}", selected_city_name.get())}</p>
+                                                </Show>
+                                            </Show>
+                                        </Show>
+                                    </div>
                                 </Show>
                                 <button class="text-button city-toggle" type="button" on:click=toggle_city_mode>{move || if custom_city.get() { "← WYBIERZ Z LISTY" } else { "NIE MA MOJEGO MIASTA" }}</button>
                                 <Show when=move || custom_city.get()>
