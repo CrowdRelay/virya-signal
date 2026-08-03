@@ -1,22 +1,4 @@
-trait OptionValueOrElseExt<T> {
-    fn value_or_else<F>(self, fallback: F) -> T
-    where
-        F: FnOnce() -> T;
-}
-
-impl<T> OptionValueOrElseExt<T> for Option<T> {
-    #[allow(clippy::manual_unwrap_or)]
-    fn value_or_else<F>(self, fallback: F) -> T
-    where
-        F: FnOnce() -> T,
-    {
-        match self {
-            Some(value) => value,
-            None => fallback(),
-        }
-    }
-}
-
+use crate::util::OptionValueOrElseExt;
 use serde::{de::DeserializeOwned, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -437,6 +419,7 @@ extern "C" {
 }
 
 const DEFAULT_IPC_TIMEOUT_MS: u32 = 30_000;
+const MIN_IPC_TIMEOUT_MS: u32 = 2_000;
 
 pub async fn invoke<T, A>(command: &str, args: &A) -> Result<T, String>
 where
@@ -451,11 +434,12 @@ where
     T: DeserializeOwned,
     A: Serialize + ?Sized,
 {
+    let timeout_ms = timeout_ms.max(MIN_IPC_TIMEOUT_MS);
     let args = serde_wasm_bindgen::to_value(args).map_err(|error| error.to_string())?;
     let value = invoke_js(command, args, timeout_ms)
         .await
         .map_err(js_error)?;
-    serde_wasm_bindgen::from_value(value).map_err(|error| error.to_string())
+    serde_wasm_bindgen::from_value(value).map_err(decode_error)
 }
 
 /// Runs a read request in a named UI scope. Starting a newer request in the
@@ -470,6 +454,7 @@ where
     T: DeserializeOwned,
     A: Serialize + ?Sized,
 {
+    let timeout_ms = timeout_ms.max(MIN_IPC_TIMEOUT_MS);
     let args = serde_wasm_bindgen::to_value(args).map_err(|error| error.to_string())?;
     let value = invoke_latest_js(command, args, timeout_ms, scope)
         .await
@@ -479,7 +464,7 @@ where
     } else {
         serde_wasm_bindgen::from_value(value)
             .map(Some)
-            .map_err(|error| error.to_string())
+            .map_err(decode_error)
     }
 }
 
@@ -517,6 +502,15 @@ pub async fn scan_qr() -> Result<Option<String>, String> {
 
 pub fn install_runtime_guards() {
     install_runtime_guards_js();
+}
+
+fn decode_error(error: serde_wasm_bindgen::Error) -> String {
+    let raw = error.to_string();
+    if raw.len() > 200 {
+        "Odpowiedź serwera ma nieoczekiwany format.".to_owned()
+    } else {
+        format!("Błąd odczytu odpowiedzi: {raw}")
+    }
 }
 
 fn js_error(value: JsValue) -> String {

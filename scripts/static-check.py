@@ -47,8 +47,8 @@ if tomllib is not None:
             raise SystemExit(f'invalid source TOML {path.relative_to(root)}: {error}') from error
 
 required = [
-    'src-tauri/src/lib.rs', 'src-tauri/src/api.rs', 'src-tauri/src/vault.rs',
-    'src/app.rs', 'src/bridge.rs', 'src-tauri/capabilities/mobile.json',
+    'src-tauri/src/lib.rs', 'src-tauri/src/api/mod.rs', 'src-tauri/src/vault.rs',
+    'src/app/mod.rs', 'src/bridge.rs', 'src-tauri/capabilities/mobile.json',
     '.github/workflows/check.yml', '.github/workflows/mobile-smoke.yml',
     'rust-toolchain.toml', '.cargo/config.toml', 'scripts/collect-mobile-artifact.py', 'boot.js',
     'boot-initializer.mjs',
@@ -66,9 +66,12 @@ for item in required:
     if not (root / item).is_file():
         raise SystemExit(f'missing {item}')
 
-ui = (root / 'src/app.rs').read_text()
+ui = (root / 'src/app/mod.rs').read_text()
 native = (root / 'src-tauri/src/lib.rs').read_text()
-api = (root / 'src-tauri/src/api.rs').read_text()
+api = '\n'.join(
+    path.read_text(encoding='utf-8')
+    for path in sorted((root / 'src-tauri/src/api').rglob('*.rs'))
+)
 bridge = (root / 'src/bridge.rs').read_text()
 invoked = set(re.findall(
     r'bridge::invoke(?:_timeout|_latest)?(?:::<.*?>)?\(\s*"([a-z_]+)"', ui, re.S
@@ -262,14 +265,18 @@ if futures_util.get('default-features') is not False or futures_util.get('featur
 vault = (root / 'src-tauri/src/vault.rs').read_text()
 if 'use rand::Rng;' not in vault or 'use rand::RngCore;' in vault:
     raise SystemExit('vault must import rand 0.10 trait rand::Rng')
-if not re.search(r'buffered\(8\)\s*\.collect::<Vec<_>>\(\)', native):
+native_src = '\\n'.join(
+    path.read_text(encoding='utf-8')
+    for path in sorted((root / 'src-tauri/src').rglob('*.rs'))
+)
+if not re.search(r'buffered\(8\)\s*\.collect::<Vec<_>>\(\)', native_src):
     raise SystemExit('wallet loading must isolate individual backend failures')
-if 'WALLET_REQUEST_TIMEOUT: Duration = Duration::from_secs(8)' not in api:
+if 'WALLET_REQUEST_TIMEOUT: Duration = Duration::from_secs(12)' not in api:
     raise SystemExit('wallet requests must fit inside the IPC deadline')
 if 'invoke_latest::<WalletBatch' not in ui or '35_000' not in ui:
     raise SystemExit('wallet IPC deadline must cover bounded parallel loading')
 wallet_model = re.search(r'pub struct WalletTicket \{(.*?)\n\}', (root / 'src/models.rs').read_text(), re.S)
-if 'attach_wallet_qrs' in native or (wallet_model and 'qr_svg' in wallet_model.group(1)):
+if 'attach_wallet_qrs' in native_src or (wallet_model and 'qr_svg' in wallet_model.group(1)):
     raise SystemExit('wallet QR codes must stay lazy and out of the refresh hot path')
 if 'render_wallet_qr' not in ui or 'render_wallet_qr' not in registered:
     raise SystemExit('lazy wallet QR command is not connected end to end')

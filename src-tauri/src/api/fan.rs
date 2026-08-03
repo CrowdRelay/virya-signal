@@ -1,0 +1,173 @@
+use reqwest::{header::ACCEPT, Method};
+use uuid::Uuid;
+
+use crate::{
+    models::{
+        AdmissionPass, FanAuthResult, FanConfirmationInput, FanEventInterest, FanProfile,
+        FanSignupInput, PublicEvent, ReferralProgress,
+    },
+    AppError,
+};
+
+use super::{
+    client::FAN_COOKIE,
+    http::{
+        bounded_required, decode, endpoint, normalized_optional, response_cookie, segment,
+        MAX_TOKEN_BYTES,
+    },
+};
+
+impl super::CrowdRelayClient {
+    pub async fn fan_events(&self, profile: &FanProfile) -> Result<Vec<PublicEvent>, AppError> {
+        self.public_events(&profile.api_base_url).await
+    }
+
+    pub async fn fan_referral(&self, profile: &FanProfile) -> Result<ReferralProgress, AppError> {
+        self.fan_json::<ReferralProgress, ()>(profile, Method::GET, "me/referral", None)
+            .await
+    }
+
+    pub async fn fan_interests(
+        &self,
+        profile: &FanProfile,
+    ) -> Result<Vec<FanEventInterest>, AppError> {
+        self.fan_json::<Vec<FanEventInterest>, ()>(profile, Method::GET, "me/events?limit=50", None)
+            .await
+    }
+
+    pub async fn fan_admission_pass(
+        &self,
+        profile: &FanProfile,
+    ) -> Result<Option<AdmissionPass>, AppError> {
+        match profile.pass_session_token.as_deref() {
+            Some(token) => self
+                .pass_json::<AdmissionPass, ()>(
+                    &profile.api_base_url,
+                    token,
+                    Method::GET,
+                    "me/pass",
+                    None,
+                )
+                .await
+                .map(Some),
+            None => Ok(None),
+        }
+    }
+
+    pub async fn register_interest(
+        &self,
+        profile: &FanProfile,
+        event_slug: &str,
+    ) -> Result<serde_json::Value, AppError> {
+        let body = serde_json::json!({"campaign_id": null, "source": "mobile_app"});
+        self.fan_json(
+            profile,
+            Method::POST,
+            &format!("events/{}/interest", segment(event_slug)?),
+            Some(&body),
+        )
+        .await
+    }
+
+    pub async fn claim_pass(
+        &self,
+        profile: &FanProfile,
+        claim_token: &str,
+    ) -> Result<(AdmissionPass, String), AppError> {
+        let claim_token = bounded_required(claim_token, "token wejściówki", MAX_TOKEN_BYTES)?;
+        let response = self
+            .http
+            .post(endpoint(&profile.api_base_url, "passes/claim")?)
+            .header(ACCEPT, "application/json")
+            .header("Idempotency-Key", Uuid::new_v4().to_string())
+            .json(&serde_json::json!({"token": claim_token}))
+            .send()
+            .await?;
+        let session_token = response_cookie(response.headers(), super::client::PASS_COOKIE)
+            .ok_or_else(|| AppError::Remote {
+                status: response.status().as_u16(),
+                detail: "Backend nie zwrócił sesji wejściówki".into(),
+            })?;
+        let body = decode(response).await?;
+        Ok((body, session_token))
+    }
+
+    pub async fn admission_qr(&self, profile: &FanProfile) -> Result<serde_json::Value, AppError> {
+        let token = profile
+            .pass_session_token
+            .as_deref()
+            .ok_or_else(|| AppError::InvalidInput("Najpierw odbierz wejściówkę".into()))?;
+        self.pass_json::<serde_json::Value, ()>(
+            &profile.api_base_url,
+            token,
+            Method::GET,
+            "me/pass/qr",
+            None,
+        )
+        .await
+    }
+
+    pub async fn fan_signup(
+        &self,
+        input: &FanSignupInput,
+    ) -> Result<(FanAuthResult, Option<String>), AppError> {
+        let body = serde_json::json!({
+            "email": input.email.trim(),
+            "display_name": normalized_optional(&input.display_name),
+            "city_slug": input.city_slug.trim(),
+            "locale": input.locale.trim(),
+            "referral_code": normalized_optional(&input.referral_code),
+            "campaign_id": null,
+            "consent": {
+                "marketing": true,
+                "policy_version": input.policy_version.trim(),
+            },
+            "nearby_gigs": {
+                "enabled": input.nearby_gigs_enabled,
+                "radius_km": input.nearby_radius_km,
+            }
+        });
+        let response = self
+            .http
+            .post(endpoint(&input.api_base_url, "fans")?)
+            .header(ACCEPT, "application/json")
+            .header("Idempotency-Key", Uuid::new_v4().to_string())
+            .json(&body)
+            .send()
+            .await?;
+        let token = response_cookie(response.headers(), FAN_COOKIE);
+        let _: serde_json::Value = decode(response).await?;
+        Ok((
+            FanAuthResult {
+                session_created: token.is_some(),
+            },
+            token,
+        ))
+    }
+
+    pub async fn fan_confirm(
+        &self,
+        input: &FanConfirmationInput,
+    ) -> Result<(FanAuthResult, String), AppError> {
+        let response = self
+            .http
+            .post(endpoint(&input.api_base_url, "fans/confirm")?)
+            .header(ACCEPT, "application/json")
+            .header("Idempotency-Key", Uuid::new_v4().to_string())
+            .json(&serde_json::json!({"token": input.token.trim()}))
+            .send()
+            .await?;
+        let token =
+            response_cookie(response.headers(), FAN_COOKIE).ok_or_else(|| AppError::Remote {
+                status: response.status().as_u16(),
+                detail: "Backend nie zwrócił sesji fana".into(),
+            })?;
+        let _: serde_json::Value = decode(response).await?;
+        Ok((
+            FanAuthResult {
+                session_created: true,
+            },
+            token,
+        ))
+    }
+}

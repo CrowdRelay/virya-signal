@@ -3,6 +3,7 @@
 mod app;
 mod bridge;
 mod models;
+mod util;
 
 use app::App;
 use leptos::prelude::*;
