@@ -56,14 +56,6 @@ pub struct FanSummary {
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct PublicHomeData {
     pub events: Vec<PublicEvent>,
-    pub cities: Vec<CitySignal>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct CitySignal {
-    pub slug: String,
-    pub name: String,
-    pub fan_count: u64,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]

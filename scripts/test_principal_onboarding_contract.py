@@ -34,7 +34,8 @@ class PrincipalOnboardingContract(unittest.TestCase):
         self.assertIn("configure_from_pairing", NATIVE)
         self.assertIn("parse_pairing_payload", NATIVE)
         self.assertIn("request_city", NATIVE)
-        self.assertIn("NIE MA MOJEGO MIASTA", APP)
+        self.assertIn("WPISZ WŁASNE", APP)
+        self.assertIn("bridge::pick_public_city(API_BASE)", APP)
         self.assertIn("150 km", APP)
 
     def test_three_bar_identity_is_centered(self):

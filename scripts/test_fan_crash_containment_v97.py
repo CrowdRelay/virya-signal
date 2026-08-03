@@ -7,12 +7,15 @@ STYLES = (ROOT / "styles.css").read_text(encoding="utf-8")
 
 
 class FanCrashContainmentV97(unittest.TestCase):
-    def test_registration_has_no_keyed_remote_city_list(self):
+    def test_registration_has_no_reactive_remote_city_collection(self):
         start = APP.index("fn FanAccess(")
         end = APP.index("fn FanApp(", start)
         block = APP[start:end]
         self.assertNotIn("<For", block)
-        self.assertIn("stable_public_cities(public).into_iter()", block)
+        self.assertNotIn("stable_public_cities", block)
+        self.assertNotIn("refresh_public_cities", block)
+        self.assertNotIn("PublicLoadingState", block)
+        self.assertIn("bridge::pick_public_city(API_BASE)", block)
 
     def test_authenticated_fan_loads_by_active_tab(self):
         start = APP.index("fn FanApp(")
@@ -28,9 +31,8 @@ class FanCrashContainmentV97(unittest.TestCase):
             block,
         )
 
-    def test_remote_fan_lists_are_stabilized(self):
+    def test_remote_dashboard_lists_are_stabilized(self):
         for helper in (
-            "stable_public_cities",
             "stable_fan_events",
             "stable_fan_interests",
             "stable_wallets",

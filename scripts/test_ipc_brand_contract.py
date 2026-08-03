@@ -22,7 +22,6 @@ class IpcAndBrandContractTests(unittest.TestCase):
             for match in ARGS_PATTERN.finditer(APP)
         }
         expected = {
-            "ApiArgs",
             "EventArgs",
             "RedeemArgs",
             "CouponArgs",
@@ -35,6 +34,7 @@ class IpcAndBrandContractTests(unittest.TestCase):
             "WalletQrArgs",
         }
         self.assertTrue(expected.issubset(found), expected - found.keys())
+        self.assertNotIn("ApiArgs", found)
         for name, attrs in found.items():
             self.assertIn(
                 '#[serde(rename_all = "camelCase")]',

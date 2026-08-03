@@ -6,7 +6,7 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     bridge,
     models::{
-        AdmissionPass, AdmissionQr, AdmissionRedemption, AreaWallet, CitySignal, CouponEnvelope,
+        AdmissionPass, AdmissionQr, AdmissionRedemption, AreaWallet, CouponEnvelope,
         CreateQrCampaignInput, DashboardData, FanAuthResult, FanConfirmationInput,
         FanDashboardData, FanEventInterest, FanSessionStatus, FanSignupInput, IssuePassInput,
         IssuedPass, OperatorOpsOverview, OperatorProfileInput, OperatorRole, OpsDeliveryItem,
@@ -77,11 +77,6 @@ struct OperatorLoadingState {
     qr: bool,
 }
 
-#[derive(Clone, Copy, Default)]
-struct PublicLoadingState {
-    cities: bool,
-}
-
 impl OperatorLoadingState {
     const fn all() -> Self {
         Self {
@@ -107,12 +102,6 @@ impl FanLoadingState {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct EmptyArgs {}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ApiArgs<'a> {
-    api_base_url: &'a str,
-}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1308,7 +1297,6 @@ fn FanPortal(
     // Entering the fan zone must be a local-only transition. City data is
     // fetched only when the user explicitly asks for the canonical list.
     let public = RwSignal::new(Some(PublicHomeData::default()));
-    let public_loading = RwSignal::new(PublicLoadingState::default());
 
     view! {
         {move || if status_loading.get() {
@@ -1316,7 +1304,7 @@ fn FanPortal(
         } else if status.get().unlocked {
             view! { <FanApp mode=mode status=status public=public error=error /> }.into_any()
         } else {
-            view! { <FanAccess mode=mode status=status public=public public_loading=public_loading error=error /> }.into_any()
+            view! { <FanAccess mode=mode status=status error=error /> }.into_any()
         }}
     }
 }
@@ -1338,8 +1326,6 @@ fn AccessLoader(mode: RwSignal<RootMode>, label: &'static str) -> impl IntoView 
 fn FanAccess(
     mode: RwSignal<RootMode>,
     status: RwSignal<FanSessionStatus>,
-    public: RwSignal<Option<PublicHomeData>>,
-    public_loading: RwSignal<PublicLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let access_mode = RwSignal::new(FanAccessMode::Signup);
@@ -1358,19 +1344,29 @@ fn FanAccess(
     let radius_km = RwSignal::new(150_u16);
     let busy = RwSignal::new(false);
 
-    let cities_started = RwSignal::new(false);
-    let toggle_city_mode = move |_| {
-        if custom_city.get_untracked() {
-            custom_city.set(false);
-            if !cities_started.get_untracked() {
-                cities_started.set(true);
-                refresh_public_cities(public, public_loading, error);
-            }
-        } else {
-            bridge::invalidate_latest("public:fan-access:");
-            custom_city.set(true);
-            city.set(String::new());
+    let city_picker_busy = RwSignal::new(false);
+    let open_city_picker = move |_| {
+        if city_picker_busy.get_untracked() {
+            return;
         }
+        city_picker_busy.set(true);
+        spawn_local(async move {
+            match bridge::pick_public_city(API_BASE).await {
+                Ok(Some((slug, name))) => {
+                    city.set(slug);
+                    selected_city_name.set(name);
+                    custom_city.set(false);
+                }
+                Ok(None) => {}
+                Err(message) => error.set(Some(message)),
+            }
+            city_picker_busy.set(false);
+        });
+    };
+    let use_custom_city = move |_| {
+        custom_city.set(true);
+        city.set(String::new());
+        selected_city_name.set(String::new());
     };
     on_cleanup(move || bridge::invalidate_latest("public:fan-access:"));
 
@@ -1531,47 +1527,19 @@ fn FanAccess(
                         }>
                             <>
                                 <Show when=move || !custom_city.get()>
-                                    <div class="city-browser">
-                                        <p class="city-browser-label">"Twoje miasto"</p>
-                                        <Show when=move || !public_loading.get().cities fallback=move || view! {
-                                            <div class="city-browser-loading"><Skeleton rows=2 /></div>
-                                        }>
-                                            <Show when=move || !stable_public_cities(public).is_empty() fallback=move || view! {
-                                                <div class="city-browser-empty">
-                                                    <p>Nie udało się pobrać listy miast.</p>
-                                                    <button type="button" class="ghost" on:click=move |_| refresh_public_cities(public, public_loading, error)>"SPRÓBUJ PONOWNIE"</button>
-                                                </div>
-                                            }>
-                                                <div class="city-choice-list">
-                                                    {move || stable_public_cities(public).into_iter().map(|item| {
-                                                        let active_slug = item.slug.clone();
-                                                        let selected_slug = item.slug.clone();
-                                                        let selected_name = item.name.clone();
-                                                        let label = item.name;
-                                                        let fan_count = item.fan_count;
-                                                        view! {
-                                                            <button
-                                                                type="button"
-                                                                class:active=move || city.get() == active_slug
-                                                                on:click=move |_| {
-                                                                    city.set(selected_slug.clone());
-                                                                    selected_city_name.set(selected_name.clone());
-                                                                }
-                                                            >
-                                                                <strong>{label}</strong>
-                                                                <span>{format!("{} fanów", fan_count)}</span>
-                                                            </button>
-                                                        }
-                                                    }).collect_view()}
-                                                </div>
-                                                <Show when=move || !city.get().is_empty()>
-                                                    <p class="city-selected">{move || format!("Wybrane: {}", selected_city_name.get())}</p>
-                                                </Show>
-                                            </Show>
-                                        </Show>
+                                    <div class="city-selection-summary">
+                                        <div><small>"Wybrane miasto"</small><strong>{move || selected_city_name.get()}</strong></div>
+                                        <span aria-hidden="true">"✓"</span>
                                     </div>
                                 </Show>
-                                <button class="text-button city-toggle" type="button" on:click=toggle_city_mode>{move || if custom_city.get() { "← WYBIERZ Z LISTY" } else { "NIE MA MOJEGO MIASTA" }}</button>
+                                <div class:two=move || !custom_city.get() class="city-picker-actions">
+                                    <button type="button" class="ghost" on:click=open_city_picker disabled=move || city_picker_busy.get()>
+                                        {move || if city_picker_busy.get() { "POBIERAM MIASTA…" } else if custom_city.get() { "WYBIERZ Z LISTY" } else { "ZMIEŃ MIASTO" }}
+                                    </button>
+                                    <Show when=move || !custom_city.get()>
+                                        <button type="button" class="text-button" on:click=use_custom_city>"WPISZ WŁASNE"</button>
+                                    </Show>
+                                </div>
                                 <Show when=move || custom_city.get()>
                                     <div class="custom-city-fields">
                                         <label>"Miejscowość"<input placeholder="np. Bielawa" prop:value=move || custom_city_name.get() on:input=move |e| custom_city_name.set(event_target_value(&e))/></label>
@@ -1593,7 +1561,7 @@ fn FanAccess(
                                 <label>"Kod polecający (opcjonalnie)"<input prop:value=move || referral.get() on:input=move |e| referral.set(event_target_value(&e))/></label>
                                 <label>"Lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
                                 <label class="check-label"><input type="checkbox" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/><span>Chcę otrzymywać informacje o koncertach, premierach i nagrodach Viryi.</span></label>
-                                <button class="primary" disabled=move || busy.get() || (!custom_city.get() && public_loading.get().cities) on:click=signup>"DOŁĄCZ DO SYGNAŁU"</button>
+                                <button class="primary" disabled=move || busy.get() || city_picker_busy.get() on:click=signup>"DOŁĄCZ DO SYGNAŁU"</button>
                             </>
                         </Show>
                     </div>
@@ -2187,33 +2155,6 @@ fn refresh_operator_parts(
     refresh_operator_qr(dashboard, loading, error);
 }
 
-fn refresh_public_cities(
-    public: RwSignal<Option<PublicHomeData>>,
-    loading: RwSignal<PublicLoadingState>,
-    error: RwSignal<Option<String>>,
-) {
-    loading.update(|state| state.cities = true);
-    spawn_local(async move {
-        match bridge::invoke_latest::<Vec<CitySignal>, _>(
-            "public_cities",
-            &ApiArgs {
-                api_base_url: API_BASE,
-            },
-            15_000,
-            "public:fan-access:cities",
-        )
-        .await
-        {
-            Ok(Some(value)) => public.update(|state| {
-                state.get_or_insert_with(PublicHomeData::default).cities = value;
-            }),
-            Ok(None) => return,
-            Err(message) => error.set(Some(message)),
-        }
-        loading.update(|state| state.cities = false);
-    });
-}
-
 fn refresh_operator_events(
     dashboard: RwSignal<Option<DashboardData>>,
     loading: RwSignal<OperatorLoadingState>,
@@ -2512,31 +2453,6 @@ fn fan_events(
             .or_else(|| public.with(|state| state.as_ref().map(|data| data.events.clone())))
             .unwrap_or_default(),
     )
-}
-
-fn stable_public_cities(public: RwSignal<Option<PublicHomeData>>) -> Vec<CitySignal> {
-    let mut cities = public.with(|state| {
-        state
-            .as_ref()
-            .map(|data| data.cities.clone())
-            .unwrap_or_default()
-    });
-    cities.retain(|city| {
-        !city.slug.trim().is_empty()
-            && !city.name.trim().is_empty()
-            && city.slug.len() <= 128
-            && city.name.chars().count() <= 160
-    });
-    cities.sort_unstable_by(|left, right| {
-        right
-            .fan_count
-            .cmp(&left.fan_count)
-            .then_with(|| left.name.cmp(&right.name))
-            .then_with(|| left.slug.cmp(&right.slug))
-    });
-    cities.dedup_by(|left, right| left.slug == right.slug);
-    cities.truncate(250);
-    cities
 }
 
 fn stable_fan_events(mut events: Vec<PublicEvent>) -> Vec<PublicEvent> {

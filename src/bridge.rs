@@ -1,4 +1,4 @@
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(inline_js = r#"
@@ -91,12 +91,11 @@ function viryaRemoveScannerOverlay() {
 function viryaMountScannerOverlay(scanner) {
   const document = window.document;
   if (!document?.body) {
-    return { cancelled: () => false, cleanup: () => {} };
+    return { cancelled: () => false, cancelPromise: new Promise(() => {}), cleanup: () => {} };
   }
 
   viryaRemoveScannerOverlay();
   document.documentElement.setAttribute('data-virya-scanner-active', 'true');
-
   const overlay = document.createElement('div');
   overlay.id = 'virya-scanner-overlay';
   overlay.setAttribute('role', 'dialog');
@@ -112,22 +111,35 @@ function viryaMountScannerOverlay(scanner) {
   `;
 
   let wasCancelled = false;
+  let resolveCancel;
+  const cancelPromise = new Promise((resolve) => { resolveCancel = resolve; });
   const cancel = overlay.querySelector('#virya-scanner-cancel');
-  cancel?.addEventListener('click', async () => {
+  cancel?.addEventListener('click', () => {
     if (wasCancelled) return;
     wasCancelled = true;
     cancel.disabled = true;
     cancel.textContent = 'ZAMYKAM…';
-    try {
-      await scanner.cancel?.();
-    } catch (error) {
-      window.console?.warn?.('[virya:scanner] cancel failed', error);
-    }
+
+    resolveCancel?.(VIRYA_SCAN_CANCELLED);
+
+    const nativeCancel = () => {
+      try {
+        return Promise.resolve(scanner.cancel?.()).catch((error) => {
+          window.console?.warn?.('[virya:scanner] cancel failed', error);
+        });
+      } catch (error) {
+        window.console?.warn?.('[virya:scanner] cancel threw', error);
+        return Promise.resolve();
+      }
+    };
+    void nativeCancel();
+    window.setTimeout(() => void nativeCancel(), 250);
   });
 
   document.body.appendChild(overlay);
   return {
     cancelled: () => wasCancelled,
+    cancelPromise,
     cleanup: viryaRemoveScannerOverlay,
   };
 }
@@ -137,20 +149,138 @@ export async function viryaScanQr() {
   if (!scanner?.scan || !scanner?.cancel) {
     throw new Error('Skaner jest dostępny tylko w aplikacji iOS/Android.');
   }
+
   await viryaEnsureCameraPermission(scanner);
   const format = scanner.Format?.QRCode ?? 'QR_CODE';
   const overlay = viryaMountScannerOverlay(scanner);
+  const scanPromise = Promise.resolve(scanner.scan({ windowed: true, formats: [format] }))
+    .then((result) => {
+      if (overlay.cancelled()) return VIRYA_SCAN_CANCELLED;
+      if (typeof result === 'string') return result;
+      return result?.content ?? result?.rawValue ?? result?.text ?? '';
+    })
+    .catch((error) => {
+      if (overlay.cancelled()) return VIRYA_SCAN_CANCELLED;
+      throw error;
+    });
+
   try {
-    const result = await scanner.scan({ windowed: true, formats: [format] });
-    if (overlay.cancelled()) return VIRYA_SCAN_CANCELLED;
-    if (typeof result === 'string') return result;
-    return result?.content ?? result?.rawValue ?? result?.text ?? '';
-  } catch (error) {
-    if (overlay.cancelled()) return VIRYA_SCAN_CANCELLED;
-    throw error;
+    const result = await Promise.race([scanPromise, overlay.cancelPromise]);
+    if (result === VIRYA_SCAN_CANCELLED) void scanPromise.catch(() => {});
+    return result;
   } finally {
     overlay.cleanup();
   }
+}
+
+function viryaRemoveCityPicker() {
+  window.document?.getElementById('virya-city-picker')?.remove();
+  window.document?.documentElement?.removeAttribute('data-virya-city-picker-active');
+}
+
+function viryaNormalizeCities(value) {
+  if (!Array.isArray(value)) return [];
+  const unique = new Map();
+  for (const item of value) {
+    const slug = String(item?.slug ?? '').trim();
+    const name = String(item?.name ?? '').trim();
+    if (!slug || !name || slug.length > 128 || Array.from(name).length > 160) continue;
+    const rawCount = Number(item?.fan_count ?? item?.fanCount ?? 0);
+    const fanCount = Number.isFinite(rawCount) && rawCount >= 0
+      ? Math.min(Math.trunc(rawCount), Number.MAX_SAFE_INTEGER)
+      : 0;
+    if (!unique.has(slug)) unique.set(slug, { slug, name, fanCount });
+  }
+  return [...unique.values()]
+    .sort((a, b) => b.fanCount - a.fanCount || a.name.localeCompare(b.name, 'pl', { sensitivity: 'base' }) || a.slug.localeCompare(b.slug))
+    .slice(0, 250);
+}
+
+function viryaOpenCityPicker(cities) {
+  const document = window.document;
+  if (!document?.body) return Promise.reject(new Error('Widok wyboru miasta nie jest dostępny.'));
+
+  viryaRemoveCityPicker();
+  document.documentElement.setAttribute('data-virya-city-picker-active', 'true');
+
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.id = 'virya-city-picker';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', 'Wybierz miasto');
+    overlay.innerHTML = `
+      <section class="virya-city-picker-panel">
+        <header>
+          <div><p>VIRYA SIGNAL</p><strong>Wybierz miasto</strong></div>
+          <button id="virya-city-picker-close" type="button" aria-label="Zamknij">×</button>
+        </header>
+        <input id="virya-city-picker-search" type="search" inputmode="search" autocomplete="off" placeholder="Szukaj miasta…" aria-label="Szukaj miasta" />
+        <div id="virya-city-picker-list" role="listbox"></div>
+        <p id="virya-city-picker-empty" hidden>Brak pasujących miast.</p>
+        <button id="virya-city-picker-cancel" type="button">← WRÓĆ</button>
+      </section>
+    `;
+
+    const list = overlay.querySelector('#virya-city-picker-list');
+    const empty = overlay.querySelector('#virya-city-picker-empty');
+    const search = overlay.querySelector('#virya-city-picker-search');
+    let settled = false;
+    const cleanup = () => {
+      window.removeEventListener('keydown', onKeyDown);
+      viryaRemoveCityPicker();
+    };
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(value);
+    };
+    const onKeyDown = (event) => { if (event.key === 'Escape') finish(null); };
+    const render = (query) => {
+      const needle = String(query ?? '').trim().toLocaleLowerCase('pl');
+      const visible = cities
+        .filter((city) => !needle || city.name.toLocaleLowerCase('pl').includes(needle))
+        .slice(0, 30);
+      const fragment = document.createDocumentFragment();
+      for (const city of visible) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.setAttribute('role', 'option');
+        const name = document.createElement('strong');
+        name.textContent = city.name;
+        const count = document.createElement('span');
+        count.textContent = `${city.fanCount} fanów`;
+        button.append(name, count);
+        button.addEventListener('click', () => finish({ slug: city.slug, name: city.name }));
+        fragment.appendChild(button);
+      }
+      list.replaceChildren(fragment);
+      empty.hidden = visible.length !== 0;
+    };
+
+    overlay.querySelector('#virya-city-picker-close')?.addEventListener('click', () => finish(null));
+    overlay.querySelector('#virya-city-picker-cancel')?.addEventListener('click', () => finish(null));
+    overlay.addEventListener('click', (event) => { if (event.target === overlay) finish(null); });
+    search?.addEventListener('input', () => render(search.value));
+    window.addEventListener('keydown', onKeyDown);
+    document.body.appendChild(overlay);
+    render('');
+    window.setTimeout(() => search?.focus(), 0);
+  });
+}
+
+export async function viryaPickPublicCity(apiBaseUrl) {
+  const value = await viryaInvokeLatest(
+    'public_cities',
+    { apiBaseUrl },
+    15_000,
+    'public:fan-access:cities',
+  );
+  if (value === undefined) return null;
+  const cities = viryaNormalizeCities(value);
+  if (cities.length === 0) throw new Error('CrowdRelay nie zwrócił żadnych dostępnych miast.');
+  return viryaOpenCityPicker(cities);
 }
 "#)]
 extern "C" {
@@ -170,6 +300,9 @@ extern "C" {
 
     #[wasm_bindgen(catch, js_name = viryaScanQr)]
     async fn scan_qr_js() -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(catch, js_name = viryaPickPublicCity)]
+    async fn pick_public_city_js(api_base_url: &str) -> Result<JsValue, JsValue>;
 }
 
 const DEFAULT_IPC_TIMEOUT_MS: u32 = 30_000;
@@ -249,6 +382,33 @@ pub async fn scan_qr() -> Result<Option<String>, String> {
     } else {
         Ok(Some(value.to_owned()))
     }
+}
+
+#[derive(Deserialize)]
+struct CityPickerSelection {
+    slug: String,
+    name: String,
+}
+
+pub async fn pick_public_city(api_base_url: &str) -> Result<Option<(String, String)>, String> {
+    let value = pick_public_city_js(api_base_url).await.map_err(js_error)?;
+    if value.is_null() || value.is_undefined() {
+        return Ok(None);
+    }
+    let selection: CityPickerSelection =
+        serde_wasm_bindgen::from_value(value).map_err(|error| error.to_string())?;
+    let slug = selection.slug.trim().to_owned();
+    let name = selection.name.trim().to_owned();
+    if slug.is_empty()
+        || slug.len() > 128
+        || name.is_empty()
+        || name.chars().count() > 160
+        || slug.chars().any(char::is_control)
+        || name.chars().any(char::is_control)
+    {
+        return Err("Wybrane miasto ma nieprawidłowe dane.".to_owned());
+    }
+    Ok(Some((slug, name)))
 }
 
 fn js_error(value: JsValue) -> String {

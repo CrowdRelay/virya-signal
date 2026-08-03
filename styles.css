@@ -497,3 +497,89 @@ html[data-virya-scanner-active] .app-shell {
   color: var(--muted);
   font-size: 12px;
 }
+
+/* V10.2 — imperative city picker, isolated from the Leptos form tree. */
+html[data-virya-city-picker-active],
+html[data-virya-city-picker-active] body { overflow: hidden; }
+#virya-city-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  align-items: end;
+  padding: max(18px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom));
+  background: #000b;
+  backdrop-filter: blur(10px);
+}
+.virya-city-picker-panel {
+  width: min(100%, 520px);
+  max-height: min(82dvh, 760px);
+  margin: 0 auto;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #3b3b36;
+  border-radius: 22px;
+  background: #090908fa;
+  box-shadow: 0 24px 80px #000d;
+}
+.virya-city-picker-panel header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.virya-city-picker-panel header p { margin: 0 0 3px; color: var(--yellow); font-size: 10px; font-weight: 900; letter-spacing: .14em; }
+.virya-city-picker-panel header strong { font-size: 20px; }
+#virya-city-picker-close {
+  width: 46px; height: 46px; padding: 0; border-radius: 50%;
+  border: 1px solid #ffffff44; background: #151513; color: #fff; font-size: 28px;
+}
+#virya-city-picker-search { min-height: 50px; font-size: 16px; }
+#virya-city-picker-list {
+  min-height: 90px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 2px;
+}
+#virya-city-picker-list button {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px solid #30302d;
+  background: #0e0e0d;
+  color: #f5f5ef;
+  text-align: left;
+}
+#virya-city-picker-list button strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#virya-city-picker-list button span { flex: 0 0 auto; color: var(--muted); font-size: 10px; }
+#virya-city-picker-list button:active { border-color: var(--yellow); background: var(--yellow-soft); color: var(--yellow); }
+#virya-city-picker-empty { margin: 0; padding: 12px; color: var(--muted); text-align: center; }
+#virya-city-picker-cancel {
+  min-height: 52px;
+  border: 1px solid #ffffff55;
+  background: #151513;
+  color: #fff;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+.city-selection-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 58px;
+  padding: 12px 14px;
+  border: 1px solid var(--yellow);
+  border-radius: 16px;
+  background: var(--yellow-soft);
+}
+.city-selection-summary small { display: block; margin-bottom: 3px; color: var(--muted); }
+.city-selection-summary strong, .city-selection-summary span { color: var(--yellow); }
+.city-selection-summary span { font-size: 20px; }
+.city-picker-actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
+.city-picker-actions.two { grid-template-columns: 1fr 1fr; }
+.city-picker-actions button { min-height: 48px; }
+@media (max-width: 390px) { .city-picker-actions.two { grid-template-columns: 1fr; } }
