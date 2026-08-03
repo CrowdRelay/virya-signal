@@ -15,7 +15,7 @@ use api::CrowdRelayClient;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use futures_util::{stream, StreamExt};
 use models::{
-    AdmissionPass, AreaWallet, CitySignal, ConcertQrOverview, CreateQrCampaignInput, FanAuthResult,
+    AdmissionPass, AreaWallet, ConcertQrOverview, CreateQrCampaignInput, FanAuthResult,
     FanConfirmationInput, FanEventInterest, FanProfile, FanSessionStatus, FanSignupInput,
     IssuePassInput, OperatorOpsOverview, OperatorProfile, OpsRetryResult, PublicEvent,
     ReferralProgress, RequestedCityInput, RequestedCityResult, SessionStatus, ShowModeQueuedScan,
@@ -383,9 +383,10 @@ async fn public_events(
 async fn public_cities(
     state: State<'_, AppState>,
     api_base_url: String,
-) -> Result<Vec<CitySignal>, AppError> {
+) -> Result<String, AppError> {
     validate_api_base(&api_base_url)?;
-    state.api.public_cities(&api_base_url).await
+    let cities = state.api.public_cities(&api_base_url).await?;
+    serde_json::to_string(&cities).map_err(AppError::from)
 }
 
 #[tauri::command]

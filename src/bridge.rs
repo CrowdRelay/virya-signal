@@ -179,7 +179,20 @@ function viryaRemoveCityPicker() {
 }
 
 function viryaNormalizeCities(value) {
-  if (!Array.isArray(value)) return [];
+  if (typeof value !== 'string') {
+    throw new Error('Aplikacja otrzymała nieprawidłową odpowiedź listy miast.');
+  }
+  if (value.length > 512_000) {
+    throw new Error('Lista miast jest zbyt duża. Spróbuj ponownie później.');
+  }
+  try {
+    value = JSON.parse(value);
+  } catch {
+    throw new Error('Nie udało się odczytać listy miast. Spróbuj ponownie.');
+  }
+  if (!Array.isArray(value)) {
+    throw new Error('CrowdRelay zwrócił nieprawidłową listę miast.');
+  }
   const unique = new Map();
   for (const item of value) {
     const slug = String(item?.slug ?? '').trim();
@@ -250,7 +263,7 @@ function viryaOpenCityPicker(cities) {
         const name = document.createElement('strong');
         name.textContent = city.name;
         const count = document.createElement('span');
-        count.textContent = `${city.fanCount} fanów`;
+        count.textContent = city.fanCount >= 25 ? `${city.fanCount} fanów` : 'Sygnał rośnie';
         button.append(name, count);
         button.addEventListener('click', () => finish({ slug: city.slug, name: city.name }));
         fragment.appendChild(button);

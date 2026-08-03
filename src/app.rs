@@ -1506,13 +1506,23 @@ fn FanAccess(
             <BackButton mode=mode />
             <header class="fan-access-hero">
                 <p class="eyebrow">VIRYA SIGNAL</p>
-                <h1>Wejdź do <em>środka.</em></h1>
-                <p>Koncerty w pobliżu, bilety, polecenia i nagrody.</p>
+                <h1>Koncerty, bilety<br/><em>i nagrody.</em></h1>
+                <p>Podaj e-mail i miasto. Potwierdź wiadomość, a reszta pojawi się w Twoim Sygnale.</p>
+                <div class="signal-purpose-grid" aria-label="Co daje Virya Signal">
+                    <span><b aria-hidden="true">"⌁"</b>" koncerty blisko Ciebie"</span>
+                    <span><b aria-hidden="true">"▣"</b>" bilety i QR w telefonie"</span>
+                    <span><b aria-hidden="true">"✦"</b>" nagrody za proste akcje"</span>
+                </div>
             </header>
             <Show when=move || status.get().configured fallback=move || view! {
                 <div class="access-card fan-card">
+                    <ol class="signal-onboarding-progress" aria-label="Postęp zakładania Sygnału">
+                        <li class:active=move || access_mode.get() == FanAccessMode::Signup><span>"1"</span><small>"Dane i miasto"</small></li>
+                        <li class:active=move || access_mode.get() == FanAccessMode::Confirm><span>"2"</span><small>"Kod z e-maila"</small></li>
+                        <li><span>"3"</span><small>"Gotowe"</small></li>
+                    </ol>
                     <div class="segmented">
-                        <button class:active=move || access_mode.get() == FanAccessMode::Signup on:click=move |_| access_mode.set(FanAccessMode::Signup)>"DOŁĄCZAM"</button>
+                        <button class:active=move || access_mode.get() == FanAccessMode::Signup on:click=move |_| access_mode.set(FanAccessMode::Signup)>"ZACZYNAM"</button>
                         <button class:active=move || access_mode.get() == FanAccessMode::Confirm on:click=move |_| access_mode.set(FanAccessMode::Confirm)>"MAM KOD"</button>
                     </div>
                     <div class="form-grid fan-form">
@@ -1534,7 +1544,7 @@ fn FanAccess(
                                 </Show>
                                 <div class:two=move || !custom_city.get() class="city-picker-actions">
                                     <button type="button" class="ghost" on:click=open_city_picker disabled=move || city_picker_busy.get()>
-                                        {move || if city_picker_busy.get() { "POBIERAM MIASTA…" } else if custom_city.get() { "WYBIERZ Z LISTY" } else { "ZMIEŃ MIASTO" }}
+                                        {move || if city_picker_busy.get() { "POBIERAM MIASTA…" } else if custom_city.get() { "SZUKAJ MIASTA" } else { "ZMIEŃ MIASTO" }}
                                     </button>
                                     <Show when=move || !custom_city.get()>
                                         <button type="button" class="text-button" on:click=use_custom_city>"WPISZ WŁASNE"</button>
@@ -1886,7 +1896,7 @@ fn FanGame(
     let refresh = move |_| refresh_fan_area(area, loading, error);
     view! {
         <section class="screen fan-screen area-screen">
-            <header class="screen-title"><p class="eyebrow">VIRYA AREA</p><h2>Odblokuj sygnał</h2><p>Artefakty, miejski progres i nagrody z gry terenowej.</p></header>
+            <header class="screen-title"><p class="eyebrow">VIRYA AREA</p><h2>Znajdź punkt w swoim mieście</h2><p>Otwórz mapę, wybierz aktywny punkt i przejdź do niego. Nie musisz zbierać wszystkiego ani jeździć po kraju.</p></header>
             <Show when=move || !loading.get().area fallback=move || view! { <Skeleton rows=3 /> }>
                 {move || area.get().map(|wallet| {
                     let claimed = wallet.claims.len() as u32;
@@ -1915,8 +1925,8 @@ fn FanGame(
                                 <article class="artifact-card"><span>{claim.number}</span><div><strong>{claim.track}</strong><p>{format!("{} · {}", claim.city, claim.edition)}</p><small>{claim.line}</small></div><em>{claim.edition_number.map(|number| format!("#{number}")).unwrap_or_else(|| "✓".to_owned())}</em></article>
                             } />
                         </div>
-                        <div class="area-actions"><button class="primary" on:click=move |_| open_area_game(error)>"OTWÓRZ PEŁNĄ GRĘ"</button><button class="ghost" on:click=refresh disabled=move || loading.get().area>"Odśwież progres"</button></div>
-                        <p class="security-note">Skanowanie i potwierdzenie lokalizacji odbywa się w pełnej grze. Aplikacja pokazuje tylko bezpieczny stan portfela; współrzędne dropów nie są pobierane.</p>
+                        <div class="area-actions"><button class="primary" on:click=move |_| open_area_game(error)>"OTWÓRZ MAPĘ I ZACZNIJ"</button><button class="ghost" on:click=refresh disabled=move || loading.get().area>"Odśwież progres"</button></div>
+                        <p class="security-note">Mapa pokazuje aktywne punkty i prowadzi do startu. Dokładna lokalizacja odsłania się w grze dopiero wtedy, gdy jest potrzebna.</p>
                     }.into_any()
                 }).unwrap_or_else(|| view! { <div class="empty-state"><strong>AREA chwilowo niedostępna</strong><p>Odśwież dane albo otwórz pełną grę.</p><button class="primary" on:click=move |_| open_area_game(error)>"OTWÓRZ AREA"</button></div> }.into_any())}
             </Show>

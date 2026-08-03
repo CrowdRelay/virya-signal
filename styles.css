@@ -583,3 +583,41 @@ html[data-virya-city-picker-active] body { overflow: hidden; }
 .city-picker-actions.two { grid-template-columns: 1fr 1fr; }
 .city-picker-actions button { min-height: 48px; }
 @media (max-width: 390px) { .city-picker-actions.two { grid-template-columns: 1fr; } }
+
+/* V11: immediate purpose and visible onboarding progress. */
+.signal-purpose-grid {
+  display: grid;
+  gap: .55rem;
+  margin-top: 1rem;
+}
+.signal-purpose-grid span {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  padding: .7rem .8rem;
+  border: 1px solid rgba(251, 191, 36, .18);
+  background: rgba(9, 9, 11, .58);
+  font-size: .82rem;
+}
+.signal-purpose-grid b { color: #fbbf24; min-width: 1.1rem; text-align: center; }
+.signal-onboarding-progress {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .45rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+.signal-onboarding-progress li { opacity: .52; display: grid; gap: .35rem; }
+.signal-onboarding-progress li.active { opacity: 1; }
+.signal-onboarding-progress span {
+  display: grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 1px solid rgba(251, 191, 36, .38);
+  border-radius: 999px;
+  color: #fbbf24;
+  font-weight: 800;
+}
+.signal-onboarding-progress small { font-size: .65rem; line-height: 1.25; }
