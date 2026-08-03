@@ -1,3 +1,5 @@
+#![deny(clippy::unwrap_used, clippy::expect_used)]
+
 mod app;
 mod bridge;
 mod models;
@@ -66,6 +68,7 @@ fn virya_app_mounted() {
 
 fn main() {
     console_error_panic_hook::set_once();
+    bridge::install_runtime_guards();
     virya_boot_phase("wasm-entered");
     mount_to_body(|| view! { <App /> });
     virya_app_mounted();

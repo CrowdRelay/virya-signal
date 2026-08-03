@@ -1,3 +1,22 @@
+trait OptionValueOrElseExt<T> {
+    fn value_or_else<F>(self, fallback: F) -> T
+    where
+        F: FnOnce() -> T;
+}
+
+impl<T> OptionValueOrElseExt<T> for Option<T> {
+    #[allow(clippy::manual_unwrap_or)]
+    fn value_or_else<F>(self, fallback: F) -> T
+    where
+        F: FnOnce() -> T,
+    {
+        match self {
+            Some(value) => value,
+            None => fallback(),
+        }
+    }
+}
+
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -10,6 +29,8 @@ export async function viryaInvoke(command, args, timeoutMs) {
   const timeout = Math.max(1_000, Math.min(Number(timeoutMs) || 30_000, 60_000));
   const startedAt = Date.now();
   const deadline = Date.now() + timeout;
+  const operation = { command: String(command), startedAt };
+  window.__VIRYA_LAST_OPERATION__ = operation;
   let core;
 
   // Android can expose the page a moment before the injected Tauri bridge.
@@ -39,6 +60,9 @@ export async function viryaInvoke(command, args, timeoutMs) {
     throw error;
   } finally {
     clearTimeout(timer);
+    if (window.__VIRYA_LAST_OPERATION__ === operation) {
+      window.__VIRYA_LAST_OPERATION__ = undefined;
+    }
   }
 }
 
@@ -173,28 +197,14 @@ export async function viryaScanQr() {
   }
 }
 
-function viryaRemoveCityPicker() {
-  window.document?.getElementById('virya-city-picker')?.remove();
-  window.document?.documentElement?.removeAttribute('data-virya-city-picker-active');
-}
-
 function viryaNormalizeCities(value) {
-  if (typeof value !== 'string') {
-    throw new Error('Aplikacja otrzymała nieprawidłową odpowiedź listy miast.');
-  }
-  if (value.length > 512_000) {
-    throw new Error('Lista miast jest zbyt duża. Spróbuj ponownie później.');
-  }
-  try {
-    value = JSON.parse(value);
-  } catch {
-    throw new Error('Nie udało się odczytać listy miast. Spróbuj ponownie.');
-  }
-  if (!Array.isArray(value)) {
-    throw new Error('CrowdRelay zwrócił nieprawidłową listę miast.');
-  }
+  if (typeof value !== 'string') throw new Error('Nieprawidłowa odpowiedź listy miast.');
+  if (value.length > 512_000) throw new Error('Lista miast jest zbyt duża.');
+  let parsed;
+  try { parsed = JSON.parse(value); } catch { throw new Error('Nie udało się odczytać listy miast.'); }
+  if (!Array.isArray(parsed)) throw new Error('CrowdRelay zwrócił nieprawidłową listę miast.');
   const unique = new Map();
-  for (const item of value) {
+  for (const item of parsed) {
     const slug = String(item?.slug ?? '').trim();
     const name = String(item?.name ?? '').trim();
     if (!slug || !name || slug.length > 128 || Array.from(name).length > 160) continue;
@@ -209,92 +219,58 @@ function viryaNormalizeCities(value) {
     .slice(0, 250);
 }
 
-function viryaOpenCityPicker(cities) {
-  const document = window.document;
-  if (!document?.body) return Promise.reject(new Error('Widok wyboru miasta nie jest dostępny.'));
-
-  viryaRemoveCityPicker();
-  document.documentElement.setAttribute('data-virya-city-picker-active', 'true');
-
-  return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.id = 'virya-city-picker';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', 'Wybierz miasto');
-    overlay.innerHTML = `
-      <section class="virya-city-picker-panel">
-        <header>
-          <div><p>VIRYA SIGNAL</p><strong>Wybierz miasto</strong></div>
-          <button id="virya-city-picker-close" type="button" aria-label="Zamknij">×</button>
-        </header>
-        <input id="virya-city-picker-search" type="search" inputmode="search" autocomplete="off" placeholder="Szukaj miasta…" aria-label="Szukaj miasta" />
-        <div id="virya-city-picker-list" role="listbox"></div>
-        <p id="virya-city-picker-empty" hidden>Brak pasujących miast.</p>
-        <button id="virya-city-picker-cancel" type="button">← WRÓĆ</button>
-      </section>
-    `;
-
-    const list = overlay.querySelector('#virya-city-picker-list');
-    const empty = overlay.querySelector('#virya-city-picker-empty');
-    const search = overlay.querySelector('#virya-city-picker-search');
-    let settled = false;
-    const cleanup = () => {
-      window.removeEventListener('keydown', onKeyDown);
-      viryaRemoveCityPicker();
-    };
-    const finish = (value) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
-      resolve(value);
-    };
-    const onKeyDown = (event) => { if (event.key === 'Escape') finish(null); };
-    const render = (query) => {
-      const needle = String(query ?? '').trim().toLocaleLowerCase('pl');
-      const visible = cities
-        .filter((city) => !needle || city.name.toLocaleLowerCase('pl').includes(needle))
-        .slice(0, 30);
-      const fragment = document.createDocumentFragment();
-      for (const city of visible) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.setAttribute('role', 'option');
-        const name = document.createElement('strong');
-        name.textContent = city.name;
-        const count = document.createElement('span');
-        count.textContent = city.fanCount >= 25 ? `${city.fanCount} fanów` : 'Sygnał rośnie';
-        button.append(name, count);
-        button.addEventListener('click', () => finish({ slug: city.slug, name: city.name }));
-        fragment.appendChild(button);
-      }
-      list.replaceChildren(fragment);
-      empty.hidden = visible.length !== 0;
-    };
-
-    overlay.querySelector('#virya-city-picker-close')?.addEventListener('click', () => finish(null));
-    overlay.querySelector('#virya-city-picker-cancel')?.addEventListener('click', () => finish(null));
-    overlay.addEventListener('click', (event) => { if (event.target === overlay) finish(null); });
-    search?.addEventListener('input', () => render(search.value));
-    window.addEventListener('keydown', onKeyDown);
-    document.body.appendChild(overlay);
-    render('');
-    window.setTimeout(() => search?.focus(), 0);
-  });
-}
-
-export async function viryaPickPublicCity(apiBaseUrl) {
+export async function viryaLoadPublicCities(apiBaseUrl) {
   const value = await viryaInvokeLatest(
     'public_cities',
     { apiBaseUrl },
     15_000,
     'public:fan-access:cities',
   );
-  if (value === undefined) return null;
-  const cities = viryaNormalizeCities(value);
-  if (cities.length === 0) throw new Error('CrowdRelay nie zwrócił żadnych dostępnych miast.');
-  return viryaOpenCityPicker(cities);
+  if (value === undefined) return [];
+  return viryaNormalizeCities(value);
 }
+
+function viryaRuntimeMessage(error) {
+  if (typeof error === 'string') return error;
+  if (typeof error?.message === 'string') return error.message;
+  try { return JSON.stringify(error); } catch { return 'Nieznany błąd aplikacji'; }
+}
+
+function viryaShowRuntimeFailure(message, operation) {
+  const document = window.document;
+  if (!document?.body) return;
+  let node = document.getElementById('virya-runtime-failure');
+  if (!node) {
+    node = document.createElement('button');
+    node.id = 'virya-runtime-failure';
+    node.type = 'button';
+    node.addEventListener('click', () => node.remove());
+    document.body.appendChild(node);
+  }
+  node.textContent = operation
+    ? `Błąd aplikacji (${operation}): ${message}. Dotknij, aby zamknąć.`
+    : `Błąd aplikacji: ${message}. Dotknij, aby zamknąć.`;
+}
+
+export function viryaInstallRuntimeGuards() {
+  if (window.__VIRYA_RUNTIME_GUARDS__) return;
+  window.__VIRYA_RUNTIME_GUARDS__ = true;
+  const report = (kind, error) => {
+    const message = viryaRuntimeMessage(error);
+    const operation = window.__VIRYA_LAST_OPERATION__?.command ?? '';
+    window.console?.error?.(`[virya:${kind}]`, message, { operation, error });
+    viryaShowRuntimeFailure(message, operation);
+    window.dispatchEvent(new CustomEvent('virya-runtime-error', {
+      detail: { kind, message, operation },
+    }));
+  };
+  window.addEventListener('error', (event) => report('window-error', event.error ?? event.message));
+  window.addEventListener('unhandledrejection', (event) => {
+    event.preventDefault();
+    report('unhandled-rejection', event.reason);
+  });
+}
+
 "#)]
 extern "C" {
     #[wasm_bindgen(catch, js_name = viryaInvoke)]
@@ -314,8 +290,11 @@ extern "C" {
     #[wasm_bindgen(catch, js_name = viryaScanQr)]
     async fn scan_qr_js() -> Result<JsValue, JsValue>;
 
-    #[wasm_bindgen(catch, js_name = viryaPickPublicCity)]
-    async fn pick_public_city_js(api_base_url: &str) -> Result<JsValue, JsValue>;
+    #[wasm_bindgen(catch, js_name = viryaLoadPublicCities)]
+    async fn load_public_cities_js(api_base_url: &str) -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(js_name = viryaInstallRuntimeGuards)]
+    fn install_runtime_guards_js();
 }
 
 const DEFAULT_IPC_TIMEOUT_MS: u32 = 30_000;
@@ -397,31 +376,38 @@ pub async fn scan_qr() -> Result<Option<String>, String> {
     }
 }
 
-#[derive(Deserialize)]
-struct CityPickerSelection {
-    slug: String,
-    name: String,
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PublicCity {
+    pub slug: String,
+    pub name: String,
+    #[serde(default)]
+    pub fan_count: u64,
 }
 
-pub async fn pick_public_city(api_base_url: &str) -> Result<Option<(String, String)>, String> {
-    let value = pick_public_city_js(api_base_url).await.map_err(js_error)?;
-    if value.is_null() || value.is_undefined() {
-        return Ok(None);
+pub async fn load_public_cities(api_base_url: &str) -> Result<Vec<PublicCity>, String> {
+    let value = load_public_cities_js(api_base_url)
+        .await
+        .map_err(js_error)?;
+    let mut cities: Vec<PublicCity> = serde_wasm_bindgen::from_value(value)
+        .map_err(|error| format!("Nie udało się odczytać listy miast: {error}"))?;
+    cities.retain(|city| {
+        !city.slug.trim().is_empty()
+            && city.slug.len() <= 128
+            && !city.name.trim().is_empty()
+            && city.name.chars().count() <= 160
+            && !city.slug.chars().any(char::is_control)
+            && !city.name.chars().any(char::is_control)
+    });
+    cities.truncate(250);
+    if cities.is_empty() {
+        return Err("CrowdRelay nie zwrócił żadnych dostępnych miast.".to_owned());
     }
-    let selection: CityPickerSelection =
-        serde_wasm_bindgen::from_value(value).map_err(|error| error.to_string())?;
-    let slug = selection.slug.trim().to_owned();
-    let name = selection.name.trim().to_owned();
-    if slug.is_empty()
-        || slug.len() > 128
-        || name.is_empty()
-        || name.chars().count() > 160
-        || slug.chars().any(char::is_control)
-        || name.chars().any(char::is_control)
-    {
-        return Err("Wybrane miasto ma nieprawidłowe dane.".to_owned());
-    }
-    Ok(Some((slug, name)))
+    Ok(cities)
+}
+
+pub fn install_runtime_guards() {
+    install_runtime_guards_js();
 }
 
 fn js_error(value: JsValue) -> String {
@@ -437,5 +423,5 @@ fn js_error(value: JsValue) -> String {
                 .ok()
                 .and_then(|v| v.as_string())
         })
-        .unwrap_or_else(|| "Nieznany błąd aplikacji".to_owned())
+        .value_or_else(|| "Nieznany błąd aplikacji".to_owned())
 }

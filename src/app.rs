@@ -1,3 +1,41 @@
+trait OptionValueOrExt<T> {
+    fn value_or(self, fallback: T) -> T;
+}
+
+impl<T> OptionValueOrExt<T> for Option<T> {
+    #[allow(clippy::manual_unwrap_or)]
+    fn value_or(self, fallback: T) -> T {
+        match self {
+            Some(value) => value,
+            None => fallback,
+        }
+    }
+}
+
+trait OptionValueOrElseExt<T> {
+    fn value_or_else<F>(self, fallback: F) -> T
+    where
+        F: FnOnce() -> T;
+}
+
+impl<T> OptionValueOrElseExt<T> for Option<T> {
+    #[allow(clippy::manual_unwrap_or)]
+    fn value_or_else<F>(self, fallback: F) -> T
+    where
+        F: FnOnce() -> T,
+    {
+        match self {
+            Some(value) => value,
+            None => fallback(),
+        }
+    }
+}
+
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+
 use leptos::prelude::*;
 use serde::Serialize;
 use wasm_bindgen::JsValue;
@@ -563,7 +601,7 @@ fn OperatorApp(
             .get()
             .session
             .map(|s| s.role)
-            .unwrap_or(OperatorRole::Staff)
+            .value_or(OperatorRole::Staff)
     };
 
     let close = move |_| {
@@ -584,7 +622,7 @@ fn OperatorApp(
     view! {
         <section class="authenticated">
             <header class="topbar">
-                <div><p class="eyebrow">VIRYA CONTROL</p><strong>{move || status.get().session.map(|s| s.display_name).unwrap_or_default()}</strong></div>
+                <div><p class="eyebrow">VIRYA CONTROL</p><strong>{move || status.get().session.map(|s| s.display_name).value_or_else(Default::default)}</strong></div>
                 <div class="topbar-actions"><span class="role-pill">{move || role().label()}</span><button aria-label="Zamknij i zablokuj panel" on:click=close>"×"</button></div>
             </header>
             <div class="content">
@@ -630,8 +668,8 @@ fn OperatorHome(
                 let next = data.events.first().cloned();
                 let event_count = data.events.len();
                 let events = data.events.iter().take(8).cloned().collect::<Vec<_>>();
-                let active = data.qr.as_ref().map(|q| q.campaigns.iter().filter(|c| c.active).count()).unwrap_or(0);
-                let checkins = data.qr.as_ref().map(|q| q.campaigns.iter().map(|c| c.checkin_count).sum::<u64>()).unwrap_or(0);
+                let active = data.qr.as_ref().map(|q| q.campaigns.iter().filter(|c| c.active).count()).value_or(0);
+                let checkins = data.qr.as_ref().map(|q| q.campaigns.iter().map(|c| c.checkin_count).sum::<u64>()).value_or(0);
                 let qr_loading = loading.get().qr;
                 view! {
                     {next.map(|event| {
@@ -646,7 +684,7 @@ fn OperatorHome(
                     <div class="section-head"><h3>Nadchodzące</h3><span>{event_count}</span></div>
                     <div class="card-list">{events.into_iter().map(|event| view! { <EventCard event=event /> }).collect_view()}</div>
                 }
-            }.into_any())).unwrap_or_else(|| view! { <Skeleton /> }.into_any())}
+            }.into_any())).value_or_else(|| view! { <Skeleton /> }.into_any())}
             </Show>
         </section>
     }
@@ -875,7 +913,7 @@ fn Scanner(
             <Show when=move || !offline.get()><div class="manual-row"><input placeholder="Kod / public reference" prop:value=move || manual.get() on:input=move |e| manual.set(event_target_value(&e))/><button on:click=manual_submit disabled=move || busy.get()>"SPRAWDŹ"</button></div></Show>
             {move || result.get().map(|entry| {
                 let success = matches!(entry.status.as_str(), "redeemed" | "already_redeemed" | "offline_queued" | "offline_duplicate");
-                view! { <article class:scan-success=success class:scan-warning=!success class="scan-result"><strong>{entry.status.to_uppercase()}</strong><span>{entry.public_reference}</span><p>{entry.holder_name.unwrap_or(entry.holder_email_masked)}</p></article> }
+                view! { <article class:scan-success=success class:scan-warning=!success class="scan-result"><strong>{entry.status.to_uppercase()}</strong><span>{entry.public_reference}</span><p>{entry.holder_name.value_or(entry.holder_email_masked)}</p></article> }
             })}
         </section>
     }
@@ -970,7 +1008,7 @@ fn Tickets(
                 <div class="stats-grid wide"><Metric value=data.paid_tickets.to_string() label="sprzedane"/><Metric value=data.sale.reserved.to_string() label="w trakcie"/><Metric value=data.sale.available.to_string() label="dostępne"/></div>
                 <div class="revenue-card"><p>OBRÓT BRUTTO</p><strong>{money(data.gross_sales_minor, &data.sale.currency)}</strong><span>{format!("zwroty: {}", money(data.refunded_minor, &data.sale.currency))}</span></div>
                 <div class="section-head"><h3>Ostatnie zamówienia</h3><span>{data.recent_orders.len()}</span></div>
-                <div class="card-list">{data.recent_orders.into_iter().map(|order| view! { <article class="order-card"><div><strong>{order.public_reference}</strong><p>{order.buyer_name.unwrap_or(order.buyer_email_masked)}</p></div><span>{money(order.amount_gross_minor, &order.currency)}</span></article> }).collect_view()}</div>
+                <div class="card-list">{data.recent_orders.into_iter().map(|order| view! { <article class="order-card"><div><strong>{order.public_reference}</strong><p>{order.buyer_name.value_or(order.buyer_email_masked)}</p></div><span>{money(order.amount_gross_minor, &order.currency)}</span></article> }).collect_view()}</div>
             })}
             <Show when=move || owner.get()><div class="admin-box"><p class="eyebrow">OWNER ONLY</p><h3>Ręczna wejściówka</h3><input placeholder="fan@email.com" prop:value=move || fan_email.get() on:input=move |e| fan_email.set(event_target_value(&e))/><input placeholder="pool slug" prop:value=move || pool_slug.get() on:input=move |e| pool_slug.set(event_target_value(&e))/><button class="primary" on:click=issue disabled=move || busy.get()>"WYDAJ WEJŚCIÓWKĘ"</button>{move || issued.get().map(|pass| view! { <div class="token-box"><strong>{pass.public_reference}</strong><p>Token roszczenia: {pass.claim_token}</p></div> })}<hr/><input placeholder="public reference do unieważnienia" prop:value=move || revoke_ref.get() on:input=move |e| revoke_ref.set(event_target_value(&e))/><button class="danger" on:click=revoke disabled=move || busy.get()>"UNIEWAŻNIJ"</button></div></Show>
         </section>
@@ -1124,7 +1162,7 @@ fn CampaignCard(
         None
     };
     view! {
-        <article class="campaign-card"><div class="campaign-head"><div><strong>{campaign.label}</strong><p>{campaign.event_title}</p></div><span class:online=active class:offline=!active>{if active { "ACTIVE" } else { "CLOSED" }}</span></div><div class="campaign-stats"><span>{format!("{} check-inów", campaign.checkin_count)}</span><span>{campaign.max_checkins.map(|v| format!("limit {v}")).unwrap_or_else(|| "bez limitu".to_owned())}</span></div>{campaign.token.map(|token| view! { <code>{token}</code> })}{revoke_button}</article>
+        <article class="campaign-card"><div class="campaign-head"><div><strong>{campaign.label}</strong><p>{campaign.event_title}</p></div><span class:online=active class:offline=!active>{if active { "ACTIVE" } else { "CLOSED" }}</span></div><div class="campaign-stats"><span>{format!("{} check-inów", campaign.checkin_count)}</span><span>{campaign.max_checkins.map(|v| format!("limit {v}")).value_or_else(|| "bez limitu".to_owned())}</span></div>{campaign.token.map(|token| view! { <code>{token}</code> })}{revoke_button}</article>
     }
 }
 
@@ -1179,7 +1217,7 @@ fn OperatorSettings(
         })
     };
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">DEVICE</p><h2>Ustawienia</h2></header><div class="settings-list"><article><div><strong>Połączenie</strong><p>{move || status.get().session.map(|s| s.api_base_url).unwrap_or_default()}</p></div><span class:online=move || !loading.get().events && !loading.get().qr>{move || if loading.get().events || loading.get().qr { "ŁĄCZĘ" } else { "ONLINE" }}</span></article><article><div><strong>Uprawnienia</strong><p>{move || status.get().session.map(|s| s.role.label().to_owned()).unwrap_or_default()}</p></div></article><button on:click=refresh disabled=move || loading.get().events || loading.get().qr>"Odśwież wszystkie dane"</button><button on:click=lock>"Zablokuj panel"</button><button class="danger ghost" on:click=forget>"Usuń profil operatora"</button></div><Show when=move || owner.get()><OpsPanel overview=ops loading=ops_loading error=error /></Show><p class="security-note">Token operatora przechowuje zaszyfrowany sejf Stronghold. Warstwa WebView nigdy go nie odczytuje.</p></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">DEVICE</p><h2>Ustawienia</h2></header><div class="settings-list"><article><div><strong>Połączenie</strong><p>{move || status.get().session.map(|s| s.api_base_url).value_or_else(Default::default)}</p></div><span class:online=move || !loading.get().events && !loading.get().qr>{move || if loading.get().events || loading.get().qr { "ŁĄCZĘ" } else { "ONLINE" }}</span></article><article><div><strong>Uprawnienia</strong><p>{move || status.get().session.map(|s| s.role.label().to_owned()).value_or_else(Default::default)}</p></div></article><button on:click=refresh disabled=move || loading.get().events || loading.get().qr>"Odśwież wszystkie dane"</button><button on:click=lock>"Zablokuj panel"</button><button class="danger ghost" on:click=forget>"Usuń profil operatora"</button></div><Show when=move || owner.get()><OpsPanel overview=ops loading=ops_loading error=error /></Show><p class="security-note">Token operatora przechowuje zaszyfrowany sejf Stronghold. Warstwa WebView nigdy go nie odczytuje.</p></section>
     }
 }
 
@@ -1235,7 +1273,7 @@ fn OpsDeliveryCard(
     let endpoint_active = item.endpoint_active;
     let retry =
         move |_| retry_operator_item("deliveries", target_id.clone(), overview, loading, error);
-    view! { <article class="ops-item"><div><strong>{item.event_type}</strong><p>{format!("{} · próba {}/{}", item.endpoint_name, item.attempt_count, item.max_attempts)}</p><small>{item.last_error_kind.unwrap_or_else(|| "brak kodu błędu".to_owned())}</small></div><button class="danger ghost" on:click=retry disabled=move || loading.get() || !endpoint_active>"RETRY"</button></article> }
+    view! { <article class="ops-item"><div><strong>{item.event_type}</strong><p>{format!("{} · próba {}/{}", item.endpoint_name, item.attempt_count, item.max_attempts)}</p><small>{item.last_error_kind.value_or_else(|| "brak kodu błędu".to_owned())}</small></div><button class="danger ghost" on:click=retry disabled=move || loading.get() || !endpoint_active>"RETRY"</button></article> }
 }
 
 #[component]
@@ -1247,7 +1285,7 @@ fn OpsOutboxCard(
 ) -> impl IntoView {
     let target_id = item.id.clone();
     let retry = move |_| retry_operator_item("outbox", target_id.clone(), overview, loading, error);
-    view! { <article class="ops-item"><div><strong>{item.event_type}</strong><p>{format!("próba {}/{}", item.attempts, item.max_attempts)}</p><small>{item.last_error_kind.unwrap_or_else(|| "brak kodu błędu".to_owned())}</small></div><button class="danger ghost" on:click=retry disabled=move || loading.get()>"RETRY"</button></article> }
+    view! { <article class="ops-item"><div><strong>{item.event_type}</strong><p>{format!("próba {}/{}", item.attempts, item.max_attempts)}</p><small>{item.last_error_kind.value_or_else(|| "brak kodu błędu".to_owned())}</small></div><button class="danger ghost" on:click=retry disabled=move || loading.get()>"RETRY"</button></article> }
 }
 
 fn retry_operator_item(
@@ -1336,6 +1374,10 @@ fn FanAccess(
     let custom_city = RwSignal::new(true);
     let custom_city_name = RwSignal::new(String::new());
     let custom_region = RwSignal::new(String::new());
+    let public_cities = RwSignal::new(Vec::<bridge::PublicCity>::new());
+    let city_query = RwSignal::new(String::new());
+    let city_picker_open = RwSignal::new(false);
+    let city_picker_alive = StoredValue::new(Arc::new(AtomicBool::new(true)));
     let referral = RwSignal::new(String::new());
     let token = RwSignal::new(String::new());
     let pin = RwSignal::new(String::new());
@@ -1345,30 +1387,23 @@ fn FanAccess(
     let busy = RwSignal::new(false);
 
     let city_picker_busy = RwSignal::new(false);
-    let open_city_picker = move |_| {
-        if city_picker_busy.get_untracked() {
-            return;
-        }
-        city_picker_busy.set(true);
-        spawn_local(async move {
-            match bridge::pick_public_city(API_BASE).await {
-                Ok(Some((slug, name))) => {
-                    city.set(slug);
-                    selected_city_name.set(name);
-                    custom_city.set(false);
-                }
-                Ok(None) => {}
-                Err(message) => error.set(Some(message)),
-            }
-            city_picker_busy.set(false);
-        });
+    let close_city_picker = move |_| {
+        city_picker_open.set(false);
+        city_query.set(String::new());
     };
     let use_custom_city = move |_| {
+        city_picker_open.set(false);
+        city_query.set(String::new());
         custom_city.set(true);
         city.set(String::new());
         selected_city_name.set(String::new());
     };
-    on_cleanup(move || bridge::invalidate_latest("public:fan-access:"));
+    on_cleanup(move || {
+        if let Some(alive) = city_picker_alive.try_read_value() {
+            alive.store(false, Ordering::Release);
+        }
+        bridge::invalidate_latest("public:fan-access:");
+    });
 
     let unlock = move |_| {
         let current_pin = pin.get();
@@ -1503,6 +1538,44 @@ fn FanAccess(
 
     view! {
         <section class="fan-access">
+            <Show when=move || city_picker_open.get()>
+                <div class="city-picker-backdrop" role="presentation">
+                    <section class="city-picker-panel" role="dialog" aria-modal="true" aria-label="Wybierz miasto">
+                        <header>
+                            <div><p class="eyebrow">VIRYA SIGNAL</p><h3>Wybierz miasto</h3></div>
+                            <button type="button" aria-label="Zamknij" on:click=close_city_picker>"×"</button>
+                        </header>
+                        <input type="search" inputmode="search" autocomplete="off" placeholder="Szukaj miasta…" aria-label="Szukaj miasta" prop:value=move || city_query.get() on:input=move |event| city_query.set(event_target_value(&event)) />
+                        <div class="city-picker-results" role="listbox">
+                            <For
+                                each=move || filtered_public_cities(&public_cities.get(), &city_query.get())
+                                key=|city| city.slug.clone()
+                                children=move |candidate| {
+                                    let slug = candidate.slug.clone();
+                                    let name = candidate.name.clone();
+                                    let fan_count = candidate.fan_count;
+                                    view! {
+                                        <button type="button" role="option" on:click=move |_| {
+                                            city.set(slug.clone());
+                                            selected_city_name.set(name.clone());
+                                            custom_city.set(false);
+                                            city_picker_open.set(false);
+                                            city_query.set(String::new());
+                                        }>
+                                            <strong>{candidate.name}</strong>
+                                            <span>{if fan_count >= 25 { format!("{fan_count} fanów") } else { "Sygnał rośnie".to_owned() }}</span>
+                                        </button>
+                                    }
+                                }
+                            />
+                            <Show when=move || filtered_public_cities(&public_cities.get(), &city_query.get()).is_empty()>
+                                <p class="city-picker-empty">Brak pasujących miast. Wróć i wpisz własne.</p>
+                            </Show>
+                        </div>
+                        <button type="button" class="ghost" on:click=use_custom_city>"WPISZ WŁASNE MIASTO"</button>
+                    </section>
+                </div>
+            </Show>
             <BackButton mode=mode />
             <header class="fan-access-hero">
                 <p class="eyebrow">VIRYA SIGNAL</p>
@@ -1543,7 +1616,20 @@ fn FanAccess(
                                     </div>
                                 </Show>
                                 <div class:two=move || !custom_city.get() class="city-picker-actions">
-                                    <button type="button" class="ghost" on:click=open_city_picker disabled=move || city_picker_busy.get()>
+                                    <button type="button" class="ghost" on:click=move |_| {
+                                        let Some(alive) = city_picker_alive.try_read_value() else {
+                                            return;
+                                        };
+                                        let alive = Arc::clone(&*alive);
+                                        open_public_city_picker(
+                                            public_cities,
+                                            city_query,
+                                            city_picker_open,
+                                            city_picker_busy,
+                                            alive,
+                                            error,
+                                        );
+                                    } disabled=move || city_picker_busy.get()>
                                         {move || if city_picker_busy.get() { "POBIERAM MIASTA…" } else if custom_city.get() { "SZUKAJ MIASTA" } else { "ZMIEŃ MIASTO" }}
                                     </button>
                                     <Show when=move || !custom_city.get()>
@@ -1698,7 +1784,7 @@ fn FanApp(
     };
 
     view! {
-        <section class="authenticated fan-authenticated"><header class="topbar fan-topbar"><div><p class="eyebrow">VIRYA SIGNAL</p><strong>{move || status.get().session.and_then(|s| s.display_name).unwrap_or_else(|| "Mój Sygnał".to_owned())}</strong></div><div class="topbar-actions"><span class="live-dot"></span><button aria-label="Zamknij i zablokuj Sygnał" on:click=close>"×"</button></div></header><div class="content">{move || match tab.get() {
+        <section class="authenticated fan-authenticated"><header class="topbar fan-topbar"><div><p class="eyebrow">VIRYA SIGNAL</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| "Mój Sygnał".to_owned())}</strong></div><div class="topbar-actions"><span class="live-dot"></span><button aria-label="Zamknij i zablokuj Sygnał" on:click=close>"×"</button></div></header><div class="content">{move || match tab.get() {
             FanTab::Signal => view! { <FanSignal dashboard=dashboard loading=loading /> }.into_any(),
             FanTab::Events => view! { <FanEvents dashboard=dashboard public=public loading=loading error=error /> }.into_any(),
             FanTab::Game => view! { <FanGame area=area loading=loading error=error /> }.into_any(),
@@ -1727,9 +1813,9 @@ fn FanSignal(
         <section class="screen fan-screen">
             <header class="signal-dashboard-hero">
                 <p class="eyebrow">TWÓJ WPŁYW</p>
-                <h2>{move || dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).unwrap_or_else(|| "—".to_owned())}</h2>
+                <h2>{move || dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned())}</h2>
                 <strong>potwierdzonych poleceń</strong>
-                <p>{move || dashboard.with(|state| state.as_ref().map(|d| format!("Kod: {}", d.referral.referral_code))).unwrap_or_else(|| "Ładowanie Sygnału…".to_owned())}</p>
+                <p>{move || dashboard.with(|state| state.as_ref().map(|d| format!("Kod: {}", d.referral.referral_code))).value_or_else(|| "Ładowanie Sygnału…".to_owned())}</p>
             </header>
             <Show when=move || !loading.get().referral fallback=move || view! { <Skeleton /> }>
             {move || dashboard.with(|state| state.as_ref().map(|data| data.referral.clone())).map(|referral| {
@@ -1760,7 +1846,7 @@ fn FanSignal(
                     {coupons_view}
                     {rewards_view}
                 }.into_any()
-            }).unwrap_or_else(|| view! { <Skeleton /> }.into_any())}
+            }).value_or_else(|| view! { <Skeleton /> }.into_any())}
             </Show>
         </section>
     }
@@ -1922,13 +2008,13 @@ fn FanGame(
                         <div class="section-head"><h3>Odkryte artefakty</h3><span>{claimed}</span></div>
                         <div class="artifact-list">
                             <For each=move || claims.clone() key=|claim| claim.drop_id.clone() children=move |claim| view! {
-                                <article class="artifact-card"><span>{claim.number}</span><div><strong>{claim.track}</strong><p>{format!("{} · {}", claim.city, claim.edition)}</p><small>{claim.line}</small></div><em>{claim.edition_number.map(|number| format!("#{number}")).unwrap_or_else(|| "✓".to_owned())}</em></article>
+                                <article class="artifact-card"><span>{claim.number}</span><div><strong>{claim.track}</strong><p>{format!("{} · {}", claim.city, claim.edition)}</p><small>{claim.line}</small></div><em>{claim.edition_number.map(|number| format!("#{number}")).value_or_else(|| "✓".to_owned())}</em></article>
                             } />
                         </div>
                         <div class="area-actions"><button class="primary" on:click=move |_| open_area_game(error)>"OTWÓRZ MAPĘ I ZACZNIJ"</button><button class="ghost" on:click=refresh disabled=move || loading.get().area>"Odśwież progres"</button></div>
                         <p class="security-note">Mapa pokazuje aktywne punkty i prowadzi do startu. Dokładna lokalizacja odsłania się w grze dopiero wtedy, gdy jest potrzebna.</p>
                     }.into_any()
-                }).unwrap_or_else(|| view! { <div class="empty-state"><strong>AREA chwilowo niedostępna</strong><p>Odśwież dane albo otwórz pełną grę.</p><button class="primary" on:click=move |_| open_area_game(error)>"OTWÓRZ AREA"</button></div> }.into_any())}
+                }).value_or_else(|| view! { <div class="empty-state"><strong>AREA chwilowo niedostępna</strong><p>Odśwież dane albo otwórz pełną grę.</p><button class="primary" on:click=move |_| open_area_game(error)>"OTWÓRZ AREA"</button></div> }.into_any())}
             </Show>
         </section>
     }
@@ -2090,7 +2176,7 @@ fn WalletTicketCard(
         });
     };
     view! {
-        <article class="ticket-card"><div><p class="eyebrow">{ticket.ticket_type_name}</p><strong>{ticket.public_reference}</strong><span>{ticket.holder_name.unwrap_or(ticket.holder_email_masked)}</span></div><button class="ticket-qr-button" on:click=toggle_qr disabled=move || busy.get() || !qr_available>{move || if busy.get() { "GENERUJĘ…" } else if qr_visible.get() { "UKRYJ QR" } else if qr_available { "POKAŻ QR" } else { "QR NIEDOSTĘPNY" }}</button><Show when=move || qr_visible.get()>{move || qr_svg.get().map(|svg| view! { <div class="mini-qr" inner_html=svg></div> })}</Show><small>{format!("QR ważny do {}", human_time(&ticket.qr_expires_at))}</small></article>
+        <article class="ticket-card"><div><p class="eyebrow">{ticket.ticket_type_name}</p><strong>{ticket.public_reference}</strong><span>{ticket.holder_name.value_or(ticket.holder_email_masked)}</span></div><button class="ticket-qr-button" on:click=toggle_qr disabled=move || busy.get() || !qr_available>{move || if busy.get() { "GENERUJĘ…" } else if qr_visible.get() { "UKRYJ QR" } else if qr_available { "POKAŻ QR" } else { "QR NIEDOSTĘPNY" }}</button><Show when=move || qr_visible.get()>{move || qr_svg.get().map(|svg| view! { <div class="mini-qr" inner_html=svg></div> })}</Show><small>{format!("QR ważny do {}", human_time(&ticket.qr_expires_at))}</small></article>
     }
 }
 
@@ -2142,7 +2228,7 @@ fn FanProfileScreen(
         })
     };
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">MÓJ PROFIL</p><h2>Ustawienia Sygnału</h2></header>{move || status.get().session.map(|profile| view! { <div class="profile-card"><div class="avatar">V</div><div><strong>{profile.display_name.unwrap_or_else(|| "Fan Viryi".to_owned())}</strong><p>{profile.email}</p></div></div><div class="stats-grid"><Metric value=profile.wallet_count.to_string() label="zamówienia"/><Metric value=if profile.has_admission_pass { "1".to_owned() } else { "0".to_owned() } label="wejściówki"/><Metric value=dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).unwrap_or_else(|| "—".to_owned()) label="polecenia"/></div> })}<div class="settings-list"><button on:click=refresh disabled=move || { let state = loading.get(); state.events || state.referral || state.interests || state.admission_pass || state.wallets }>{move || { let state = loading.get(); if state.events || state.referral || state.interests || state.admission_pass || state.wallets { "Odświeżam…" } else { "Odśwież dane" } }}</button><button on:click=lock>"Zablokuj aplikację"</button><button class="danger ghost" on:click=forget>"Usuń profil i bilety z urządzenia"</button></div><p class="security-note">Sesja fana, wejściówka oraz prywatne tokeny portfela są przechowywane w osobnym, zaszyfrowanym sejfie Stronghold.</p></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">MÓJ PROFIL</p><h2>Ustawienia Sygnału</h2></header>{move || status.get().session.map(|profile| view! { <div class="profile-card"><div class="avatar">V</div><div><strong>{profile.display_name.value_or_else(|| "Fan Viryi".to_owned())}</strong><p>{profile.email}</p></div></div><div class="stats-grid"><Metric value=profile.wallet_count.to_string() label="zamówienia"/><Metric value=if profile.has_admission_pass { "1".to_owned() } else { "0".to_owned() } label="wejściówki"/><Metric value=dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned()) label="polecenia"/></div> })}<div class="settings-list"><button on:click=refresh disabled=move || { let state = loading.get(); state.events || state.referral || state.interests || state.admission_pass || state.wallets }>{move || { let state = loading.get(); if state.events || state.referral || state.interests || state.admission_pass || state.wallets { "Odświeżam…" } else { "Odśwież dane" } }}</button><button on:click=lock>"Zablokuj aplikację"</button><button class="danger ghost" on:click=forget>"Usuń profil i bilety z urządzenia"</button></div><p class="security-note">Sesja fana, wejściówka oraz prywatne tokeny portfela są przechowywane w osobnym, zaszyfrowanym sejfie Stronghold.</p></section>
     }
 }
 
@@ -2153,7 +2239,7 @@ fn Skeleton(#[prop(default = 3)] rows: usize) -> impl IntoView {
 
 #[component]
 fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
-    view! { <Show when=move || error.get().is_some()><button class="toast" on:click=move |_| error.set(None)>{move || error.get().unwrap_or_default()}</button></Show> }
+    view! { <Show when=move || error.get().is_some()><button class="toast" on:click=move |_| error.set(None)>{move || error.get().value_or_else(Default::default)}</button></Show> }
 }
 
 fn refresh_operator_parts(
@@ -2427,7 +2513,7 @@ fn operator_events(dashboard: RwSignal<Option<DashboardData>>) -> Vec<PublicEven
         state
             .as_ref()
             .map(|data| data.events.clone())
-            .unwrap_or_default()
+            .value_or_else(Default::default)
     })
 }
 
@@ -2439,7 +2525,7 @@ fn operator_qr_events(
             .as_ref()
             .and_then(|data| data.qr.as_ref())
             .map(|qr| qr.events.clone())
-            .unwrap_or_default()
+            .value_or_else(Default::default)
     })
 }
 
@@ -2449,7 +2535,7 @@ fn operator_campaigns(dashboard: RwSignal<Option<DashboardData>>) -> Vec<QrCampa
             .as_ref()
             .and_then(|data| data.qr.as_ref())
             .map(|qr| qr.campaigns.clone())
-            .unwrap_or_default()
+            .value_or_else(Default::default)
     })
 }
 
@@ -2461,7 +2547,7 @@ fn fan_events(
         dashboard
             .with(|state| state.as_ref().map(|data| data.events.clone()))
             .or_else(|| public.with(|state| state.as_ref().map(|data| data.events.clone())))
-            .unwrap_or_default(),
+            .value_or_else(Default::default),
     )
 }
 
@@ -2498,6 +2584,53 @@ fn stable_wallets(mut wallets: Vec<TicketWallet>) -> Vec<TicketWallet> {
     wallets.dedup_by(|left, right| left.order.order_id == right.order.order_id);
     wallets.truncate(100);
     wallets
+}
+
+fn open_public_city_picker(
+    public_cities: RwSignal<Vec<bridge::PublicCity>>,
+    city_query: RwSignal<String>,
+    city_picker_open: RwSignal<bool>,
+    city_picker_busy: RwSignal<bool>,
+    alive: Arc<AtomicBool>,
+    error: RwSignal<Option<String>>,
+) {
+    if city_picker_busy.get_untracked() {
+        return;
+    }
+    city_query.set(String::new());
+    if !public_cities.get_untracked().is_empty() {
+        city_picker_open.set(true);
+        return;
+    }
+    city_picker_busy.set(true);
+    spawn_local(async move {
+        let result = bridge::load_public_cities(API_BASE).await;
+        if !alive.load(Ordering::Acquire) {
+            return;
+        }
+        match result {
+            Ok(cities) => {
+                public_cities.set(cities);
+                city_picker_open.set(true);
+            }
+            Err(message) => error.set(Some(message)),
+        }
+        city_picker_busy.set(false);
+    });
+}
+
+fn normalized_city_query(value: &str) -> String {
+    value.trim().to_lowercase()
+}
+
+fn filtered_public_cities(cities: &[bridge::PublicCity], query: &str) -> Vec<bridge::PublicCity> {
+    let needle = normalized_city_query(query);
+    cities
+        .iter()
+        .filter(|city| needle.is_empty() || city.name.to_lowercase().contains(&needle))
+        .take(40)
+        .cloned()
+        .collect()
 }
 
 fn optional(value: String) -> Option<String> {
@@ -2547,13 +2680,13 @@ fn event_location(event: &PublicEvent) -> String {
         .venue
         .clone()
         .or_else(|| event.city.as_ref().map(|city| city.name.clone()))
-        .unwrap_or_else(|| "Szczegóły wkrótce".to_owned())
+        .value_or_else(|| "Szczegóły wkrótce".to_owned())
 }
 fn event_time_location(starts_at: &str, venue: Option<&str>) -> String {
     format!(
         "{} · {}",
         human_time(starts_at),
-        venue.unwrap_or("miejsce wkrótce")
+        venue.value_or("miejsce wkrótce")
     )
 }
 fn day(value: &str) -> String {

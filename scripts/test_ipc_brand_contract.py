@@ -1,3 +1,4 @@
+import hashlib
 import re
 import struct
 import unittest
@@ -7,12 +8,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 APP = (ROOT / "src/app.rs").read_text(encoding="utf-8")
 STYLES = (ROOT / "styles.css").read_text(encoding="utf-8")
+APPROVED_ICON_SHA256 = "a8db1cdc69decb1e1cf1774a484cb02b8101a40da191d9374613060a663fce3a"
 
 ARGS_PATTERN = re.compile(
     r'#\[derive\(Serialize\)\]\n'
     r'(?P<attrs>(?:#\[[^\n]+\]\n)*)'
     r'struct\s+(?P<name>\w+Args)(?:<[^>]+>)?\s*\{'
 )
+
+
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 class IpcAndBrandContractTests(unittest.TestCase):
@@ -50,16 +56,16 @@ class IpcAndBrandContractTests(unittest.TestCase):
         self.assertIn("@keyframes signal-logo-lock", STYLES)
         self.assertIn("animation-fill-mode: both", STYLES)
 
-    def test_android_icon_uses_canonical_1024_source(self):
+    def test_android_icon_uses_exact_approved_1024_source(self):
         icon = ROOT / "src-tauri/icons/icon.png"
+        brand = ROOT / "src-tauri/icons/virya-signal-brand-full.png"
         raw = icon.read_bytes()
         self.assertEqual(raw[:8], b"\x89PNG\r\n\x1a\n")
         width, height = struct.unpack(">II", raw[16:24])
         self.assertEqual((width, height), (1024, 1024))
-        svg = (ROOT / "src-tauri/icons/virya-signal.svg").read_text()
-        self.assertIn('id="signal-bars"', svg)
-        signal_group = svg.split('id="signal-bars"', 1)[1].split("</g>", 1)[0]
-        self.assertEqual(signal_group.count("<rect"), 3)
+        self.assertEqual(sha256(icon), APPROVED_ICON_SHA256)
+        self.assertEqual(sha256(brand), APPROVED_ICON_SHA256)
+        self.assertEqual(icon.read_bytes(), brand.read_bytes())
 
 
 if __name__ == "__main__":

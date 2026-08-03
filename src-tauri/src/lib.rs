@@ -1,4 +1,19 @@
 #![forbid(unsafe_code)]
+#![deny(clippy::unwrap_used, clippy::expect_used)]
+
+trait OptionValueOrExt<T> {
+    fn value_or(self, fallback: T) -> T;
+}
+
+impl<T> OptionValueOrExt<T> for Option<T> {
+    #[allow(clippy::manual_unwrap_or)]
+    fn value_or(self, fallback: T) -> T {
+        match self {
+            Some(value) => value,
+            None => fallback,
+        }
+    }
+}
 
 mod api;
 mod models;
@@ -545,7 +560,7 @@ fn show_mode_checksum(snapshot: &models::ShowModeSnapshot) -> String {
     hash_field(&mut hasher, &snapshot.snapshot_id);
     hash_field(&mut hasher, &snapshot.event.slug);
     hash_field(&mut hasher, &snapshot.event.title);
-    hash_field(&mut hasher, snapshot.event.venue.as_deref().unwrap_or(""));
+    hash_field(&mut hasher, snapshot.event.venue.as_deref().value_or(""));
     hash_field(&mut hasher, &snapshot.event.starts_at);
     hash_field(&mut hasher, &snapshot.generated_at);
     hash_field(&mut hasher, &snapshot.expires_at);
@@ -553,11 +568,11 @@ fn show_mode_checksum(snapshot: &models::ShowModeSnapshot) -> String {
     // checksum and scan can stream the same stable order without allocating.
     for pass in &snapshot.passes {
         hash_field(&mut hasher, &pass.public_reference);
-        hash_field(&mut hasher, pass.holder_name.as_deref().unwrap_or(""));
+        hash_field(&mut hasher, pass.holder_name.as_deref().value_or(""));
         hash_field(&mut hasher, &pass.holder_email_masked);
-        hash_field(&mut hasher, pass.ticket_type_name.as_deref().unwrap_or(""));
+        hash_field(&mut hasher, pass.ticket_type_name.as_deref().value_or(""));
         hash_field(&mut hasher, if pass.offline_eligible { "1" } else { "0" });
-        hash_field(&mut hasher, pass.qr_sha256.as_deref().unwrap_or(""));
+        hash_field(&mut hasher, pass.qr_sha256.as_deref().value_or(""));
     }
     hex::encode(hasher.finalize())
 }
@@ -933,7 +948,7 @@ async fn show_mode_sync(
                     let status = value
                         .get("status")
                         .and_then(serde_json::Value::as_str)
-                        .unwrap_or("redeemed")
+                        .value_or("redeemed")
                         .to_owned();
                     scan.state = ShowModeScanState::Synced;
                     scan.result_status = Some(status);
@@ -1503,7 +1518,10 @@ fn bounded_secret(value: String, label: &str) -> Result<Zeroizing<String>, AppEr
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    std::panic::set_hook(Box::new(|panic_info| {
+        eprintln!("[virya:native-panic] {panic_info}");
+    }));
+    let runtime_result = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             #[cfg(mobile)]
@@ -1572,13 +1590,25 @@ pub fn run() {
             render_wallet_qr,
             fan_request_delivery,
         ])
-        .run(tauri::generate_context!())
-        .expect("failed to run Virya Signal");
+        .run(tauri::generate_context!());
+    if let Err(error) = runtime_result {
+        eprintln!("[virya:runtime] application terminated: {error}");
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_value<T, E>(result: Result<T, E>) -> T
+    where
+        E: std::fmt::Debug,
+    {
+        match result {
+            Ok(value) => value,
+            Err(error) => panic!("test setup failed: {error:?}"),
+        }
+    }
 
     #[test]
     fn email_validation_rejects_malformed_and_whitespace() {
@@ -1607,7 +1637,7 @@ mod tests {
 
     #[test]
     fn qr_render_is_bounded_and_produces_svg() {
-        let svg = render_qr("v1.test-token").expect("valid QR token");
+        let svg = test_value(render_qr("v1.test-token"));
         assert!(svg.starts_with("<svg"));
         assert!(render_qr("").is_err());
         assert!(render_qr(&"x".repeat(MAX_SECRET_BYTES + 1)).is_err());
@@ -1700,9 +1730,9 @@ mod tests {
     #[test]
     fn durable_t1_parser_extracts_only_bounded_public_reference() {
         let claims = serde_json::json!({"r": "VRY-TICKET-1"});
-        let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
+        let payload = URL_SAFE_NO_PAD.encode(test_value(serde_json::to_vec(&claims)));
         let token = format!("t1.{payload}.{}", "a".repeat(64));
-        assert_eq!(parse_t1_reference(&token).unwrap(), "VRY-TICKET-1");
+        assert_eq!(test_value(parse_t1_reference(&token)), "VRY-TICKET-1");
         assert!(parse_t1_reference("v1.not-durable").is_err());
         assert!(parse_t1_reference(&format!("t1.{payload}.short")).is_err());
     }

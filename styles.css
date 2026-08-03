@@ -498,25 +498,23 @@ html[data-virya-scanner-active] .app-shell {
   font-size: 12px;
 }
 
-/* V10.2 — imperative city picker, isolated from the Leptos form tree. */
-html[data-virya-city-picker-active],
-html[data-virya-city-picker-active] body { overflow: hidden; }
-#virya-city-picker {
+/* V12.6: typed Leptos city picker and visible runtime failures. */
+.city-picker-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 120;
+  z-index: 140;
   display: grid;
   align-items: end;
-  padding: max(18px, env(safe-area-inset-top)) 14px max(18px, env(safe-area-inset-bottom));
-  background: #000b;
+  padding: max(16px, env(safe-area-inset-top)) 12px max(16px, env(safe-area-inset-bottom));
+  background: #000c;
   backdrop-filter: blur(10px);
 }
-.virya-city-picker-panel {
-  width: min(100%, 520px);
-  max-height: min(82dvh, 760px);
+.city-picker-panel {
+  width: min(100%, 540px);
+  max-height: min(84dvh, 760px);
   margin: 0 auto;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 12px;
   padding: 16px;
   border: 1px solid #3b3b36;
@@ -524,100 +522,58 @@ html[data-virya-city-picker-active] body { overflow: hidden; }
   background: #090908fa;
   box-shadow: 0 24px 80px #000d;
 }
-.virya-city-picker-panel header { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
-.virya-city-picker-panel header p { margin: 0 0 3px; color: var(--yellow); font-size: 10px; font-weight: 900; letter-spacing: .14em; }
-.virya-city-picker-panel header strong { font-size: 20px; }
-#virya-city-picker-close {
-  width: 46px; height: 46px; padding: 0; border-radius: 50%;
-  border: 1px solid #ffffff44; background: #151513; color: #fff; font-size: 28px;
+.city-picker-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
-#virya-city-picker-search { min-height: 50px; font-size: 16px; }
-#virya-city-picker-list {
-  min-height: 90px;
+.city-picker-panel header button {
+  width: 46px;
+  height: 46px;
+  min-height: 46px;
+  padding: 0;
+  border-radius: 50%;
+}
+.city-picker-results {
   overflow-y: auto;
   overscroll-behavior: contain;
   display: grid;
   align-content: start;
   gap: 7px;
-  padding: 2px;
+  min-height: 96px;
 }
-#virya-city-picker-list button {
+.city-picker-results button {
   min-height: 54px;
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
-  padding: 11px 13px;
-  border: 1px solid #30302d;
-  background: #0e0e0d;
-  color: #f5f5ef;
   text-align: left;
 }
-#virya-city-picker-list button strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-#virya-city-picker-list button span { flex: 0 0 auto; color: var(--muted); font-size: 10px; }
-#virya-city-picker-list button:active { border-color: var(--yellow); background: var(--yellow-soft); color: var(--yellow); }
-#virya-city-picker-empty { margin: 0; padding: 12px; color: var(--muted); text-align: center; }
-#virya-city-picker-cancel {
+.city-picker-results span {
+  opacity: .68;
+  font-size: 12px;
+}
+.city-picker-empty {
+  padding: 20px 10px;
+  text-align: center;
+  opacity: .72;
+}
+#virya-runtime-failure {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 220;
+  width: auto;
   min-height: 52px;
-  border: 1px solid #ffffff55;
-  background: #151513;
-  color: #fff;
-  font-weight: 900;
-  letter-spacing: .08em;
-}
-.city-selection-summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 58px;
   padding: 12px 14px;
-  border: 1px solid var(--yellow);
-  border-radius: 16px;
-  background: var(--yellow-soft);
+  border: 1px solid #ef4444aa;
+  border-radius: 14px;
+  background: #260909f2;
+  color: #fff;
+  box-shadow: 0 20px 50px #000c;
+  text-align: left;
+  font: inherit;
 }
-.city-selection-summary small { display: block; margin-bottom: 3px; color: var(--muted); }
-.city-selection-summary strong, .city-selection-summary span { color: var(--yellow); }
-.city-selection-summary span { font-size: 20px; }
-.city-picker-actions { display: grid; grid-template-columns: 1fr; gap: 8px; }
-.city-picker-actions.two { grid-template-columns: 1fr 1fr; }
-.city-picker-actions button { min-height: 48px; }
-@media (max-width: 390px) { .city-picker-actions.two { grid-template-columns: 1fr; } }
-
-/* V11: immediate purpose and visible onboarding progress. */
-.signal-purpose-grid {
-  display: grid;
-  gap: .55rem;
-  margin-top: 1rem;
-}
-.signal-purpose-grid span {
-  display: flex;
-  align-items: center;
-  gap: .65rem;
-  padding: .7rem .8rem;
-  border: 1px solid rgba(251, 191, 36, .18);
-  background: rgba(9, 9, 11, .58);
-  font-size: .82rem;
-}
-.signal-purpose-grid b { color: #fbbf24; min-width: 1.1rem; text-align: center; }
-.signal-onboarding-progress {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: .45rem;
-  margin: 0 0 1rem;
-  padding: 0;
-  list-style: none;
-}
-.signal-onboarding-progress li { opacity: .52; display: grid; gap: .35rem; }
-.signal-onboarding-progress li.active { opacity: 1; }
-.signal-onboarding-progress span {
-  display: grid;
-  place-items: center;
-  width: 1.8rem;
-  height: 1.8rem;
-  border: 1px solid rgba(251, 191, 36, .38);
-  border-radius: 999px;
-  color: #fbbf24;
-  font-weight: 800;
-}
-.signal-onboarding-progress small { font-size: .65rem; line-height: 1.25; }

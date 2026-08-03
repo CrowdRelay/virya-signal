@@ -1,3 +1,17 @@
+trait OptionValueOrExt<T> {
+    fn value_or(self, fallback: T) -> T;
+}
+
+impl<T> OptionValueOrExt<T> for Option<T> {
+    #[allow(clippy::manual_unwrap_or)]
+    fn value_or(self, fallback: T) -> T {
+        match self {
+            Some(value) => value,
+            None => fallback,
+        }
+    }
+}
+
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -106,7 +120,13 @@ impl CrowdRelayClient {
             .user_agent(concat!("crowdrelay-mobile/", env!("CARGO_PKG_VERSION")))
             .https_only(!cfg!(debug_assertions))
             .build()?;
-        let public_cache = load_public_cache(&cache_file).unwrap_or_default();
+        let public_cache = match load_public_cache(&cache_file) {
+            Ok(cache) => cache,
+            Err(error) => {
+                eprintln!("[virya:cache] public cache ignored after read failure: {error}");
+                PublicCache::default()
+            }
+        };
         Ok(Self {
             http,
             public_cache: Arc::new(RwLock::new(public_cache)),
@@ -363,7 +383,10 @@ impl CrowdRelayClient {
         let (summary_result, deliveries_result, outbox_result) =
             futures_util::future::join3(summary_request, deliveries_request, outbox_request).await;
         if summary_result.is_err() && deliveries_result.is_err() && outbox_result.is_err() {
-            return Err(summary_result.expect_err("all operation control-plane requests failed"));
+            return match summary_result {
+                Err(error) => Err(error),
+                Ok(_) => Err(AppError::BackgroundTask),
+            };
         }
         let mut unavailable_sources = Vec::new();
         let summary = match summary_result {
@@ -689,12 +712,13 @@ impl CrowdRelayClient {
                 .get(cache_key)
                 .map(|entry| (entry.etag.as_ref(), entry.last_modified.as_ref()))
         };
-        entry
-            .map(|(etag, last_modified)| CacheValidators {
+        match entry {
+            Some((etag, last_modified)) => CacheValidators {
                 etag: etag.cloned(),
                 last_modified: last_modified.cloned(),
-            })
-            .unwrap_or_default()
+            },
+            None => CacheValidators::default(),
+        }
     }
 
     async fn touch_cache(&self, cache_key: &str, events: bool) {
@@ -883,10 +907,13 @@ fn cache_key(api_base_url: &str) -> Result<String, AppError> {
 }
 
 fn unix_now() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
+    match SystemTime::now().duration_since(UNIX_EPOCH) {
+        Ok(value) => value.as_secs(),
+        Err(error) => {
+            eprintln!("[virya:clock] system clock predates Unix epoch: {error}");
+            0
+        }
+    }
 }
 
 fn disk_entry<T: Clone>(entry: &CacheEntry<T>) -> DiskCacheEntry<T> {
@@ -920,7 +947,7 @@ fn restore_entries<T>(
                 key,
                 CacheEntry {
                     value: entry.value,
-                    fetched_at: now.checked_sub(age).unwrap_or(now),
+                    fetched_at: now.checked_sub(age).value_or(now),
                     stored_at_unix_secs: entry.stored_at_unix_secs,
                     etag: entry.etag,
                     last_modified: entry.last_modified,
@@ -989,7 +1016,7 @@ async fn decode<T: DeserializeOwned>(mut response: Response) -> Result<T, AppErr
             detail: "Odpowiedź CrowdRelay jest zbyt duża".into(),
         });
     }
-    let initial_capacity = content_length.unwrap_or(0).min(MAX_RESPONSE_BYTES) as usize;
+    let initial_capacity = content_length.value_or(0).min(MAX_RESPONSE_BYTES) as usize;
     let mut bytes = Vec::with_capacity(initial_capacity);
     while let Some(chunk) = response.chunk().await? {
         if bytes.len().saturating_add(chunk.len()) > MAX_RESPONSE_BYTES as usize {
@@ -1008,7 +1035,13 @@ async fn decode<T: DeserializeOwned>(mut response: Response) -> Result<T, AppErr
         })
         .map_err(AppError::from);
     }
-    let body = serde_json::from_slice(&bytes).unwrap_or_default();
+    let body = match serde_json::from_slice(&bytes) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("[virya:http] error response was not valid JSON: {error}");
+            serde_json::Value::Null
+        }
+    };
     let detail = remote_detail(&body);
     match status {
         StatusCode::UNAUTHORIZED => Err(AppError::Unauthorized),
@@ -1155,10 +1188,22 @@ fn require_owner(profile: &OperatorProfile) -> Result<(), AppError> {
 mod tests {
     use super::*;
 
+    fn test_value<T, E>(result: Result<T, E>) -> T
+    where
+        E: std::fmt::Debug,
+    {
+        match result {
+            Ok(value) => value,
+            Err(error) => panic!("test setup failed: {error:?}"),
+        }
+    }
+
     #[test]
     fn extracts_fragment_token() {
         assert_eq!(
-            normalize_scanned_code("https://virya.music/win#token=v1.abc").unwrap(),
+            test_value(normalize_scanned_code(
+                "https://virya.music/win#token=v1.abc"
+            )),
             "v1.abc"
         );
     }
@@ -1166,14 +1211,16 @@ mod tests {
     #[test]
     fn extracts_token_after_another_query_parameter() {
         assert_eq!(
-            normalize_scanned_code("https://virya.music/win?source=app&token=t1.abc").unwrap(),
+            test_value(normalize_scanned_code(
+                "https://virya.music/win?source=app&token=t1.abc"
+            )),
             "t1.abc"
         );
     }
 
     #[test]
     fn leaves_manual_reference() {
-        assert_eq!(normalize_scanned_code(" VRY-ABCD ").unwrap(), "VRY-ABCD");
+        assert_eq!(test_value(normalize_scanned_code(" VRY-ABCD ")), "VRY-ABCD");
     }
 
     #[test]
@@ -1190,7 +1237,7 @@ mod tests {
     #[test]
     fn cache_key_normalizes_trailing_slash() {
         assert_eq!(
-            cache_key("https://signal-api.virya.music/v1").unwrap(),
+            test_value(cache_key("https://signal-api.virya.music/v1")),
             "https://signal-api.virya.music/v1/"
         );
     }
@@ -1279,10 +1326,10 @@ mod tests {
     #[test]
     fn response_cache_validators_are_bounded() {
         let mut headers = HeaderMap::new();
-        headers.insert(ETAG, "\"events-v2\"".parse().unwrap());
+        headers.insert(ETAG, test_value("\"events-v2\"".parse()));
         headers.insert(
             LAST_MODIFIED,
-            "Sat, 01 Aug 2026 07:00:00 GMT".parse().unwrap(),
+            test_value("Sat, 01 Aug 2026 07:00:00 GMT".parse()),
         );
 
         let (etag, last_modified) = response_validators(&headers);
@@ -1292,7 +1339,7 @@ mod tests {
             Some("Sat, 01 Aug 2026 07:00:00 GMT")
         );
 
-        headers.insert(ETAG, "x".repeat(1025).parse().unwrap());
+        headers.insert(ETAG, test_value("x".repeat(1025).parse()));
         assert!(response_validators(&headers).0.is_none());
     }
 }

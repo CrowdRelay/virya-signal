@@ -35,9 +35,19 @@ class CameraAndSafeFanEntryContract(unittest.TestCase):
         end = APP.index("fn FanApp(", start)
         block = APP[start:end]
         self.assertIn("let custom_city = RwSignal::new(true);", block)
-        self.assertIn("let open_city_picker = move |_|", block)
-        self.assertIn("bridge::pick_public_city(API_BASE)", block)
+        self.assertIn("open_public_city_picker(", block)
+        self.assertIn("StoredValue::new(Arc::new(AtomicBool::new(true)))", block)
+        self.assertIn("city_picker_alive.try_read_value()", block)
+        self.assertIn("city_picker_alive", block)
+        self.assertEqual(APP.count("fn open_public_city_picker("), 1)
+        self.assertEqual(APP.count("fn normalized_city_query("), 1)
+        self.assertEqual(APP.count("fn filtered_public_cities("), 1)
+        self.assertIn("bridge::load_public_cities(API_BASE)", APP)
+        self.assertIn("alive.load(Ordering::Acquire)", APP)
+        self.assertNotIn("let open_city_picker", block)
+        self.assertNotIn("Rc<", APP)
         self.assertIn("WPISZ WŁASNE", block)
+        self.assertNotIn("bridge::pick_public_city", block)
         self.assertNotIn("refresh_public_cities", block)
 
 

@@ -577,9 +577,26 @@ pub struct IssuePassInput {
 mod tests {
     use super::*;
 
+    fn test_value<T, E>(result: Result<T, E>) -> T
+    where
+        E: std::fmt::Debug,
+    {
+        match result {
+            Ok(value) => value,
+            Err(error) => panic!("test setup failed: {error:?}"),
+        }
+    }
+
+    fn test_some<T>(value: Option<T>) -> T {
+        match value {
+            Some(value) => value,
+            None => panic!("test setup expected Some value"),
+        }
+    }
+
     #[test]
     fn public_event_ignores_backend_fields_outside_the_webview_contract() {
-        let event: PublicEvent = serde_json::from_value(serde_json::json!({
+        let event: PublicEvent = test_value(serde_json::from_value(serde_json::json!({
             "id": "backend-only",
             "slug": "virya-live",
             "title": "Virya Live",
@@ -590,15 +607,14 @@ mod tests {
             "ticket_url": "https://virya.music/tickets",
             "image_url": null,
             "large_backend_object": {"unused": true}
-        }))
-        .expect("valid event response");
+        })));
         assert_eq!(event.slug, "virya-live");
-        assert_eq!(event.city.expect("city").name, "Wrocław");
+        assert_eq!(test_some(event.city).name, "Wrocław");
     }
 
     #[test]
     fn ticketing_overview_keeps_only_rendered_fields() {
-        let overview: TicketingOverview = serde_json::from_value(serde_json::json!({
+        let overview: TicketingOverview = test_value(serde_json::from_value(serde_json::json!({
             "sale": {
                 "currency": "PLN",
                 "reserved": 3,
@@ -616,15 +632,14 @@ mod tests {
                 "amount_gross_minor": 9900,
                 "tickets": [{"private": "unused"}]
             }]
-        }))
-        .expect("valid ticketing response");
+        })));
         assert_eq!(overview.sale.available, 97);
         assert_eq!(overview.recent_orders.len(), 1);
     }
 
     #[test]
     fn referral_payload_accepts_extra_reward_metadata() {
-        let referral: ReferralProgress = serde_json::from_value(serde_json::json!({
+        let referral: ReferralProgress = test_value(serde_json::from_value(serde_json::json!({
             "referral_code": "VIRYA",
             "qualified_referrals": 2,
             "pending_referrals": 1,
@@ -637,8 +652,7 @@ mod tests {
             }],
             "coupons": [],
             "physical_rewards": []
-        }))
-        .expect("valid referral response");
+        })));
         assert_eq!(referral.draw_entries[0].total_entries, 4);
     }
 }
