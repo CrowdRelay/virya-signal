@@ -506,6 +506,31 @@ pub struct ShowModeSyncResult {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RequestedCityInput {
+    pub name: String,
+    pub region: Option<String>,
+    pub country_code: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct RequestedCityResult {
+    pub city_slug: String,
+    pub display_name: String,
+    pub status: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct StaffPairingPayload {
+    pub version: u8,
+    pub api_base_url: String,
+    pub display_name: String,
+    pub role: OperatorRole,
+    pub bearer_token: String,
+    pub expires_at: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FanSignupInput {
     pub api_base_url: String,
     pub email: String,
@@ -514,6 +539,8 @@ pub struct FanSignupInput {
     pub locale: String,
     pub referral_code: Option<String>,
     pub policy_version: String,
+    pub nearby_gigs_enabled: bool,
+    pub nearby_radius_km: u16,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

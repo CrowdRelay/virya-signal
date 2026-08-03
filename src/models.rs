@@ -188,6 +188,18 @@ pub struct IssuePassInput {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub struct RequestedCityInput {
+    pub name: String,
+    pub region: Option<String>,
+    pub country_code: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct RequestedCityResult {
+    pub city_slug: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct FanSignupInput {
     pub api_base_url: String,
     pub email: String,
@@ -196,6 +208,8 @@ pub struct FanSignupInput {
     pub locale: String,
     pub referral_code: Option<String>,
     pub policy_version: String,
+    pub nearby_gigs_enabled: bool,
+    pub nearby_radius_km: u16,
 }
 
 #[derive(Clone, Debug, Serialize)]

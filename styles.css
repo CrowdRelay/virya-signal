@@ -330,3 +330,21 @@ button:disabled { opacity: .48; cursor: default; }
     transform: none;
   }
 }
+
+
+/* Principal onboarding V9 */
+.signal-logo { align-items: center; }
+.signal-logo span:nth-child(1) { height: 21px; }
+.signal-logo span:nth-child(2) { height: 46px; }
+.signal-logo span:nth-child(3) { height: 30px; }
+.pairing-flow { display: grid; gap: 14px; }
+.pairing-scan { min-height: 132px; display: grid; place-items: center; gap: 5px; }
+.pairing-qr { font-size: 34px; }
+.pairing-divider { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; opacity: .55; }
+.pairing-divider span { height: 1px; background: currentColor; }
+.advanced-config, .custom-city-fields, .nearby-pref { display: grid; gap: 12px; padding: 14px; border: 1px solid #ffffff16; border-radius: 16px; background: #ffffff05; }
+.inline-note { margin: 0; font-size: .82rem; opacity: .72; }
+.radius-picker { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 7px; }
+.radius-picker button { min-height: 38px; padding: 6px; font-size: .76rem; }
+.radius-picker button.active { border-color: #f3b900; color: #f3c51a; background: #f3b90015; }
+@media (max-width: 420px) { .radius-picker { grid-template-columns: repeat(2,minmax(0,1fr)); } }

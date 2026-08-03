@@ -23,7 +23,8 @@ use crate::{
         CreateQrCampaignInput, EventListResponse, FanAuthResult, FanConfirmationInput,
         FanEventInterest, FanProfile, FanSignupInput, IssuePassInput, OperatorOpsOverview,
         OperatorProfile, OperatorRole, OpsDeliveryItem, OpsOutboxItem, OpsRetryResult, OpsSummary,
-        PublicEvent, ReferralProgress, ShowModeSnapshot, TicketWalletApi, TicketingOverview,
+        PublicEvent, ReferralProgress, RequestedCityInput, RequestedCityResult, ShowModeSnapshot,
+        TicketWalletApi, TicketingOverview,
     },
     AppError,
 };
@@ -33,6 +34,8 @@ const AREA_COOKIE: &str = "virya-area-wallet";
 const AREA_WALLET_URL: &str = "https://virya.music/api/area/wallet";
 const PASS_COOKIE: &str = "crowdrelay_pass_session";
 const MAX_RESPONSE_BYTES: u64 = 2 * 1024 * 1024;
+const MAX_PUBLIC_EVENTS: usize = 100;
+const MAX_PUBLIC_CITIES: usize = 250;
 const MAX_TOKEN_BYTES: usize = 4096;
 const WALLET_REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 const EVENTS_CACHE_TTL: Duration = Duration::from_secs(30);
@@ -173,7 +176,7 @@ impl CrowdRelayClient {
         }
         let (etag, last_modified) = response_validators(response.headers());
         let response: EventListResponse = decode(response).await?;
-        let events = response.events;
+        let events = sanitize_public_events(response.events);
         let mut cache = self.public_cache.write().await;
         prune_cache(&mut cache.events, EVENTS_STALE_TTL);
         cache.events.insert(
@@ -220,7 +223,7 @@ impl CrowdRelayClient {
         }
         let (etag, last_modified) = response_validators(response.headers());
         let response: CityListResponse = decode(response).await?;
-        let cities = response.items;
+        let cities = sanitize_public_cities(response.items);
         let mut cache = self.public_cache.write().await;
         prune_cache(&mut cache.cities, CITIES_STALE_TTL);
         cache.cities.insert(
@@ -442,6 +445,22 @@ impl CrowdRelayClient {
         decode(response).await
     }
 
+    pub async fn request_city(
+        &self,
+        api_base_url: &str,
+        input: &RequestedCityInput,
+    ) -> Result<RequestedCityResult, AppError> {
+        let response = self
+            .http
+            .post(endpoint(api_base_url, "public/cities/requests")?)
+            .header(ACCEPT, "application/json")
+            .header("Idempotency-Key", Uuid::new_v4().to_string())
+            .json(input)
+            .send()
+            .await?;
+        decode(response).await
+    }
+
     pub async fn fan_signup(
         &self,
         input: &FanSignupInput,
@@ -456,6 +475,10 @@ impl CrowdRelayClient {
             "consent": {
                 "marketing": true,
                 "policy_version": input.policy_version.trim(),
+            },
+            "nearby_gigs": {
+                "enabled": input.nearby_gigs_enabled,
+                "radius_km": input.nearby_radius_km,
             }
         });
         let response = self
@@ -820,6 +843,36 @@ impl CrowdRelayClient {
             request
         }
     }
+}
+
+fn sanitize_public_events(mut values: Vec<PublicEvent>) -> Vec<PublicEvent> {
+    values.retain(|value| {
+        !value.slug.trim().is_empty() && !value.title.trim().is_empty() && value.slug.len() <= 128
+    });
+    values.sort_unstable_by(|left, right| {
+        left.starts_at
+            .cmp(&right.starts_at)
+            .then_with(|| left.slug.cmp(&right.slug))
+    });
+    values.dedup_by(|left, right| left.slug == right.slug);
+    values.truncate(MAX_PUBLIC_EVENTS);
+    values
+}
+
+fn sanitize_public_cities(mut values: Vec<CitySignal>) -> Vec<CitySignal> {
+    values.retain(|value| {
+        !value.slug.trim().is_empty() && !value.name.trim().is_empty() && value.slug.len() <= 128
+    });
+    values.sort_unstable_by(|left, right| {
+        right
+            .fan_count
+            .cmp(&left.fan_count)
+            .then_with(|| left.name.cmp(&right.name))
+            .then_with(|| left.slug.cmp(&right.slug))
+    });
+    values.dedup_by(|left, right| left.slug == right.slug);
+    values.truncate(MAX_PUBLIC_CITIES);
+    values
 }
 
 fn cache_key(api_base_url: &str) -> Result<String, AppError> {

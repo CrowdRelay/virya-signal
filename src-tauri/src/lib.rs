@@ -18,9 +18,10 @@ use models::{
     AdmissionPass, AreaWallet, CitySignal, ConcertQrOverview, CreateQrCampaignInput, FanAuthResult,
     FanConfirmationInput, FanEventInterest, FanProfile, FanSessionStatus, FanSignupInput,
     IssuePassInput, OperatorOpsOverview, OperatorProfile, OpsRetryResult, PublicEvent,
-    ReferralProgress, SessionStatus, ShowModeQueuedScan, ShowModeScanResult, ShowModeScanState,
-    ShowModeSession, ShowModeStatus, ShowModeStore, ShowModeSyncResult, TicketWallet,
-    TicketWalletApi, TicketingOverview, WalletBatch, WalletCredential, WalletTicket,
+    ReferralProgress, RequestedCityInput, RequestedCityResult, SessionStatus, ShowModeQueuedScan,
+    ShowModeScanResult, ShowModeScanState, ShowModeSession, ShowModeStatus, ShowModeStore,
+    ShowModeSyncResult, StaffPairingPayload, TicketWallet, TicketWalletApi, TicketingOverview,
+    WalletBatch, WalletCredential, WalletTicket,
 };
 use qrcode::{render::svg, QrCode};
 use sha2::{Digest, Sha256};
@@ -112,6 +113,85 @@ fn open_external_url(app: AppHandle, url: String) -> Result<(), AppError> {
     app.opener()
         .open_url(parsed.as_str(), None::<&str>)
         .map_err(|error| AppError::InvalidInput(format!("Nie udało się otworzyć linku: {error}")))
+}
+
+#[tauri::command]
+async fn request_city(
+    state: State<'_, AppState>,
+    mut input: RequestedCityInput,
+) -> Result<RequestedCityResult, AppError> {
+    input.name = input.name.trim().to_owned();
+    input.region = clean_optional(input.region.take());
+    input.country_code = input.country_code.trim().to_ascii_uppercase();
+    if input.name.chars().count() < 2
+        || input.name.chars().count() > 120
+        || input.name.chars().any(char::is_control)
+        || input.country_code.len() != 2
+        || !input
+            .country_code
+            .bytes()
+            .all(|byte| byte.is_ascii_uppercase())
+    {
+        return Err(AppError::InvalidInput("Nieprawidłowa nazwa miasta".into()));
+    }
+    state
+        .api
+        .request_city("https://signal-api.virya.music/v1/", &input)
+        .await
+}
+
+#[tauri::command]
+async fn configure_from_pairing(
+    state: State<'_, AppState>,
+    pin: String,
+    payload: String,
+) -> Result<SessionStatus, AppError> {
+    let pairing = parse_pairing_payload(&payload)?;
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |value| value.as_secs());
+    if pairing.version != 1 || pairing.expires_at < now || pairing.expires_at > now + 1800 {
+        return Err(AppError::InvalidInput(
+            "Kod parowania wygasł albo jest nieprawidłowy".into(),
+        ));
+    }
+    configure(
+        state,
+        pin,
+        OperatorProfile {
+            display_name: pairing.display_name,
+            api_base_url: pairing.api_base_url,
+            role: pairing.role,
+            bearer_token: pairing.bearer_token,
+        },
+    )
+    .await
+}
+
+fn parse_pairing_payload(raw: &str) -> Result<StaffPairingPayload, AppError> {
+    let raw = raw.trim();
+    if raw.is_empty() || raw.len() > 8192 {
+        return Err(AppError::InvalidInput("Nieprawidłowy kod parowania".into()));
+    }
+    if raw.starts_with('{') {
+        return serde_json::from_str(raw).map_err(AppError::from);
+    }
+    let url = url::Url::parse(raw)?;
+    if url.scheme() != "virya-signal" || url.host_str() != Some("pair") {
+        return Err(AppError::InvalidInput("Nieprawidłowy kod parowania".into()));
+    }
+    let encoded = url
+        .query_pairs()
+        .find_map(|(key, value)| (key == "payload").then_some(value.into_owned()))
+        .ok_or_else(|| AppError::InvalidInput("Kod parowania nie zawiera danych".into()))?;
+    let mut padded = encoded;
+    while padded.len() % 4 != 0 {
+        padded.push('=');
+    }
+    let bytes = base64::engine::general_purpose::URL_SAFE
+        .decode(padded)
+        .map_err(|_| AppError::InvalidInput("Nieprawidłowy kod parowania".into()))?;
+    serde_json::from_slice(&bytes).map_err(AppError::from)
 }
 
 #[tauri::command]
@@ -1277,6 +1357,7 @@ fn validate_fan_signup(input: &mut FanSignupInput, pin: &str) -> Result<(), AppE
         || input.locale.len() > 16
         || input.policy_version.is_empty()
         || input.policy_version.len() > 64
+        || !(25..=500).contains(&input.nearby_radius_km)
         || input
             .display_name
             .as_ref()
@@ -1469,6 +1550,8 @@ pub fn run() {
             revoke_qr_campaign,
             public_events,
             public_cities,
+            request_city,
+            configure_from_pairing,
             fan_status,
             fan_unlock,
             fan_lock,

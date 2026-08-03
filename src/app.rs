@@ -11,8 +11,8 @@ use crate::{
         FanDashboardData, FanEventInterest, FanSessionStatus, FanSignupInput, IssuePassInput,
         IssuedPass, OperatorOpsOverview, OperatorProfileInput, OperatorRole, OpsDeliveryItem,
         OpsOutboxItem, OpsRetryResult, PublicEvent, PublicHomeData, QrCampaign, ReferralProgress,
-        SessionStatus, ShowModeScanResult, ShowModeStatus, ShowModeSyncResult, TicketWallet,
-        TicketingOverview, WalletBatch, WalletTicket,
+        RequestedCityInput, RequestedCityResult, SessionStatus, ShowModeScanResult, ShowModeStatus,
+        ShowModeSyncResult, TicketWallet, TicketingOverview, WalletBatch, WalletTicket,
     },
 };
 
@@ -69,16 +69,12 @@ struct OperatorLoadingState {
 
 #[derive(Clone, Copy, Default)]
 struct PublicLoadingState {
-    events: bool,
     cities: bool,
 }
 
 impl PublicLoadingState {
     fn all() -> Self {
-        Self {
-            events: true,
-            cities: true,
-        }
+        Self { cities: true }
     }
 }
 
@@ -216,6 +212,19 @@ struct OrderArgs<'a> {
 struct WalletQrArgs<'a> {
     order_id: &'a str,
     public_reference: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PairingArgs<'a> {
+    pin: &'a str,
+    payload: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RequestedCityArgs<'a> {
+    input: &'a RequestedCityInput,
 }
 
 #[derive(Serialize)]
@@ -389,10 +398,12 @@ fn OperatorAccess(
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let pin = RwSignal::new(String::new());
-    let name = RwSignal::new("Virya".to_owned());
+    let pairing = RwSignal::new(String::new());
+    let advanced = RwSignal::new(false);
+    let name = RwSignal::new("Virya staff".to_owned());
     let token = RwSignal::new(String::new());
     let api = RwSignal::new(API_BASE.to_owned());
-    let role = RwSignal::new(OperatorRole::Owner);
+    let role = RwSignal::new(OperatorRole::Staff);
     let busy = RwSignal::new(false);
 
     let unlock = move |_| {
@@ -415,7 +426,47 @@ fn OperatorAccess(
         });
     };
 
-    let configure = move |_| {
+    let pair = move |payload: String| {
+        let current_pin = pin.get();
+        if current_pin.chars().count() < 6 || payload.trim().is_empty() {
+            error.set(Some(
+                "Podaj PIN i zeskanuj albo wklej kod parowania.".to_owned(),
+            ));
+            return;
+        }
+        busy.set(true);
+        spawn_local(async move {
+            match bridge::invoke::<SessionStatus, _>(
+                "configure_from_pairing",
+                &PairingArgs {
+                    pin: &current_pin,
+                    payload: &payload,
+                },
+            )
+            .await
+            {
+                Ok(value) => {
+                    pin.set(String::new());
+                    pairing.set(String::new());
+                    status.set(value);
+                }
+                Err(message) => error.set(Some(message)),
+            }
+            busy.set(false);
+        });
+    };
+
+    let scan_pairing = move |_| {
+        spawn_local(async move {
+            match bridge::scan_qr().await {
+                Ok(value) => pair(value),
+                Err(message) => error.set(Some(message)),
+            }
+        });
+    };
+    let submit_pairing = move |_| pair(pairing.get());
+
+    let configure_manual = move |_| {
         let current_pin = pin.get();
         let profile = OperatorProfileInput {
             display_name: name.get(),
@@ -424,7 +475,7 @@ fn OperatorAccess(
             bearer_token: token.get(),
         };
         if current_pin.chars().count() < 6 || profile.bearer_token.trim().len() < 24 {
-            error.set(Some("Podaj PIN i poprawny token CrowdRelay.".to_owned()));
+            error.set(Some("Podaj PIN i poprawny token urządzenia.".to_owned()));
             return;
         }
         busy.set(true);
@@ -453,28 +504,43 @@ fn OperatorAccess(
         <section class="access-screen">
             <BackButton mode=mode />
             <header class="hero compact">
-                <p class="eyebrow">PRIVATE BAND OPERATIONS</p>
-                <h1>Virya <em>Control</em></h1>
-                <p>"Wejście, bilety, zniżki i koncertowy chaos - w jednym miejscu."</p>
+                <p class="eyebrow">VIRYA CONTROL</p>
+                <h1>Sparuj <em>urządzenie.</em></h1>
+                <p>Bez przepisywania API, roli i długiego sekretu.</p>
             </header>
             <div class="access-card">
                 <Show when=move || status.get().configured fallback=move || view! {
-                    <div class="form-grid">
-                        <label>"Nazwa urządzenia / osoby"<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e)) /></label>
-                        <label>"API CrowdRelay"<input prop:value=move || api.get() on:input=move |e| api.set(event_target_value(&e)) /></label>
-                        <div class="segmented">
-                            <button class:active=move || role.get() == OperatorRole::Owner on:click=move |_| role.set(OperatorRole::Owner)>"OWNER"</button>
-                            <button class:active=move || role.get() == OperatorRole::Staff on:click=move |_| role.set(OperatorRole::Staff)>"STAFF"</button>
-                        </div>
-                        <label>"Token urządzenia"<textarea rows="3" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
+                    <div class="pairing-flow">
+                        <button class="pairing-scan primary" on:click=scan_pairing disabled=move || busy.get()>
+                            <span class="pairing-qr">"▦"</span>
+                            <strong>{move || if busy.get() { "ŁĄCZĘ…" } else { "ZESKANUJ KOD QR" }}</strong>
+                            <small>Kod pokazany w panelu Virya</small>
+                        </button>
+                        <div class="pairing-divider"><span></span><small>ALBO</small><span></span></div>
+                        <label>"Kod parowania"<textarea rows="2" placeholder="virya-signal://pair?…" prop:value=move || pairing.get() on:input=move |e| pairing.set(event_target_value(&e))></textarea></label>
                         <label>"Lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e)) /></label>
-                        <button class="primary" disabled=move || busy.get() on:click=configure>{move || if busy.get() { "ŁĄCZĘ…" } else { "SPARUJ URZĄDZENIE" }}</button>
+                        <button class="primary" on:click=submit_pairing disabled=move || busy.get() || pairing.get().trim().is_empty()>"SPARUJ"</button>
+                        <button class="text-button" type="button" on:click=move |_| advanced.update(|v| *v = !*v)>
+                            {move || if advanced.get() { "UKRYJ USTAWIENIA RĘCZNE" } else { "USTAWIENIA ZAAWANSOWANE" }}
+                        </button>
+                        <Show when=move || advanced.get()>
+                            <div class="advanced-config">
+                                <label>"Nazwa urządzenia / osoby"<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e)) /></label>
+                                <label>"API CrowdRelay"<input prop:value=move || api.get() on:input=move |e| api.set(event_target_value(&e)) /></label>
+                                <div class="segmented">
+                                    <button class:active=move || role.get() == OperatorRole::Owner on:click=move |_| role.set(OperatorRole::Owner)>"OWNER"</button>
+                                    <button class:active=move || role.get() == OperatorRole::Staff on:click=move |_| role.set(OperatorRole::Staff)>"STAFF"</button>
+                                </div>
+                                <label>"Token urządzenia"<textarea rows="3" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
+                                <button class="ghost" on:click=configure_manual disabled=move || busy.get()>"ZAPISZ RĘCZNIE"</button>
+                            </div>
+                        </Show>
                     </div>
                 }>
                     <div class="form-grid">
-                        <p class="lock-copy">Profil operatora jest zaszyfrowany lokalnie. Token nigdy nie trafia do interfejsu po odblokowaniu.</p>
+                        <p class="lock-copy">Profil operatora jest zaszyfrowany lokalnie.</p>
                         <label>"PIN"<input type="password" autocomplete="current-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e)) /></label>
-                        <button class="primary" disabled=move || busy.get() on:click=unlock>{move || if busy.get() { "ODBLOKOWUJĘ…" } else { "ODBLOKUJ" }}</button>
+                        <button class="primary" disabled=move || busy.get() on:click=unlock>"ODBLOKUJ"</button>
                     </div>
                 </Show>
             </div>
@@ -1235,13 +1301,18 @@ fn FanPortal(
 ) -> impl IntoView {
     let public = RwSignal::new(None::<PublicHomeData>);
     let public_loading = RwSignal::new(PublicLoadingState::all());
+    let load_started = RwSignal::new(false);
+
     Effect::new(move |_| {
-        if !status_loading.get() && !status.get().unlocked && public.get().is_none() {
-            public.set(Some(PublicHomeData::default()));
-            refresh_public_events(public, public_loading, error);
-            refresh_public_cities(public, public_loading, error);
+        if status_loading.get() || status.get().unlocked || load_started.get_untracked() {
+            return;
         }
+        load_started.set(true);
+        public.set(Some(PublicHomeData::default()));
+        refresh_public_cities(public, public_loading, error);
     });
+    on_cleanup(move || bridge::invalidate_latest("public:fan-access:"));
+
     view! {
         {move || if status_loading.get() {
             view! { <AccessLoader mode=mode label="SPRAWDZAM TWÓJ SYGNAŁ" /> }.into_any()
@@ -1278,10 +1349,15 @@ fn FanAccess(
     let email = RwSignal::new(String::new());
     let name = RwSignal::new(String::new());
     let city = RwSignal::new(String::new());
+    let custom_city = RwSignal::new(false);
+    let custom_city_name = RwSignal::new(String::new());
+    let custom_region = RwSignal::new(String::new());
     let referral = RwSignal::new(String::new());
     let token = RwSignal::new(String::new());
     let pin = RwSignal::new(String::new());
     let consent = RwSignal::new(false);
+    let nearby_enabled = RwSignal::new(true);
+    let radius_km = RwSignal::new(150_u16);
     let busy = RwSignal::new(false);
 
     let unlock = move |_| {
@@ -1312,17 +1388,53 @@ fn FanAccess(
             return;
         }
         let current_pin = pin.get();
-        let input = FanSignupInput {
-            api_base_url: API_BASE.to_owned(),
-            email: email.get(),
-            display_name: optional(name.get()),
-            city_slug: city.get(),
-            locale: "pl".to_owned(),
-            referral_code: optional(referral.get()),
-            policy_version: POLICY_VERSION.to_owned(),
+        let requested = RequestedCityInput {
+            name: custom_city_name.get(),
+            region: optional(custom_region.get()),
+            country_code: "PL".to_owned(),
         };
+        let use_custom = custom_city.get();
+        let selected_city = city.get();
+        let input_email = email.get();
+        let input_name = optional(name.get());
+        let input_referral = optional(referral.get());
+        let nearby = nearby_enabled.get();
+        let radius = radius_km.get();
         busy.set(true);
         spawn_local(async move {
+            let city_slug = if use_custom {
+                match bridge::invoke::<RequestedCityResult, _>(
+                    "request_city",
+                    &RequestedCityArgs { input: &requested },
+                )
+                .await
+                {
+                    Ok(value) => value.city_slug,
+                    Err(message) => {
+                        error.set(Some(message));
+                        busy.set(false);
+                        return;
+                    }
+                }
+            } else {
+                selected_city
+            };
+            if city_slug.trim().is_empty() {
+                error.set(Some("Wybierz miasto albo wpisz własne.".to_owned()));
+                busy.set(false);
+                return;
+            }
+            let input = FanSignupInput {
+                api_base_url: API_BASE.to_owned(),
+                email: input_email,
+                display_name: input_name,
+                city_slug,
+                locale: "pl".to_owned(),
+                referral_code: input_referral,
+                policy_version: POLICY_VERSION.to_owned(),
+                nearby_gigs_enabled: nearby,
+                nearby_radius_km: radius,
+            };
             match bridge::invoke::<FanAuthResult, _>(
                 "fan_signup",
                 &FanSignupArgs {
@@ -1382,28 +1494,79 @@ fn FanAccess(
     view! {
         <section class="fan-access">
             <BackButton mode=mode />
-            <header class="fan-access-hero"><p class="eyebrow">VIRYA SIGNAL</p><h1>Nie obserwuj z boku.<br/><em>Wejdź do środka.</em></h1><p>Koncerty w Twoim mieście, własny link poleceń, losy, nagrody oraz wszystkie bilety w jednym miejscu.</p></header>
+            <header class="fan-access-hero">
+                <p class="eyebrow">VIRYA SIGNAL</p>
+                <h1>Wejdź do <em>środka.</em></h1>
+                <p>Koncerty w pobliżu, bilety, polecenia i nagrody.</p>
+            </header>
             <Show when=move || status.get().configured fallback=move || view! {
-                <div class="access-card fan-card"><div class="segmented"><button class:active=move || access_mode.get() == FanAccessMode::Signup on:click=move |_| access_mode.set(FanAccessMode::Signup)>"DOŁĄCZAM"</button><button class:active=move || access_mode.get() == FanAccessMode::Confirm on:click=move |_| access_mode.set(FanAccessMode::Confirm)>"MAM KOD"</button></div>
-                    <div class="form-grid fan-form"><label>"E-mail"<input type="email" autocomplete="email" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label><label>"Imię / nazwa (opcjonalnie)"<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/></label>
-                    <Show when=move || access_mode.get() == FanAccessMode::Signup fallback=move || view! { <><label>"Kod z e-maila"<textarea rows="3" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label><label>"Nowy lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label><button class="primary" disabled=move || busy.get() on:click=confirm>"POTWIERDŹ I WEJDŹ"</button></> }>
-                        <><label>"Twoje miasto"<select disabled=move || public_loading.get().cities prop:value=move || city.get() on:change=move |e| city.set(event_target_value(&e))><option value="">{move || if public_loading.get().cities { "Ładuję miasta…" } else { "Wybierz miasto" }}</option>{move || public.with(|data| data.as_ref().map(|data| data.cities.iter().map(|city_item| view! { <option value=city_item.slug.clone()>{format!("{} · {} fanów", city_item.name, city_item.fan_count)}</option> }).collect_view()))}</select></label><label>"Kod polecający (opcjonalnie)"<input prop:value=move || referral.get() on:input=move |e| referral.set(event_target_value(&e))/></label><label>"Lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label><label class="check-label"><input type="checkbox" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/><span>Chcę otrzymywać informacje o koncertach, premierach i nagrodach Viryi.</span></label><button class="primary" disabled=move || busy.get() || public_loading.get().cities on:click=signup>"DOŁĄCZ DO SYGNAŁU"</button></>
-                    </Show></div>
+                <div class="access-card fan-card">
+                    <div class="segmented">
+                        <button class:active=move || access_mode.get() == FanAccessMode::Signup on:click=move |_| access_mode.set(FanAccessMode::Signup)>"DOŁĄCZAM"</button>
+                        <button class:active=move || access_mode.get() == FanAccessMode::Confirm on:click=move |_| access_mode.set(FanAccessMode::Confirm)>"MAM KOD"</button>
+                    </div>
+                    <div class="form-grid fan-form">
+                        <label>"E-mail"<input type="email" autocomplete="email" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label>
+                        <label>"Imię / nazwa (opcjonalnie)"<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/></label>
+                        <Show when=move || access_mode.get() == FanAccessMode::Signup fallback=move || view! {
+                            <>
+                                <label>"Kod z e-maila"<textarea rows="3" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
+                                <label>"Lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
+                                <button class="primary" disabled=move || busy.get() on:click=confirm>"POTWIERDŹ I WEJDŹ"</button>
+                            </>
+                        }>
+                            <>
+                                <Show when=move || !custom_city.get()>
+                                    <label>"Twoje miasto"
+                                        <select disabled=move || public_loading.get().cities prop:value=move || city.get() on:change=move |e| city.set(event_target_value(&e))>
+                                            <option value="">{move || if public_loading.get().cities { "Ładuję miasta…" } else { "Wybierz miasto" }}</option>
+                                            <For each=move || public.with(|data| data.as_ref().map(|d| d.cities.clone()).unwrap_or_default())
+                                                key=|item| item.slug.clone()
+                                                children=move |item| view! { <option value=item.slug.clone()>{format!("{} · {} fanów", item.name, item.fan_count)}</option> } />
+                                        </select>
+                                    </label>
+                                </Show>
+                                <button class="text-button city-toggle" type="button" on:click=move |_| {
+                                    custom_city.update(|value| *value = !*value);
+                                    city.set(String::new());
+                                }>{move || if custom_city.get() { "← WYBIERZ Z LISTY" } else { "NIE MA MOJEGO MIASTA" }}</button>
+                                <Show when=move || custom_city.get()>
+                                    <div class="custom-city-fields">
+                                        <label>"Miejscowość"<input placeholder="np. Bielawa" prop:value=move || custom_city_name.get() on:input=move |e| custom_city_name.set(event_target_value(&e))/></label>
+                                        <label>"Województwo / region (opcjonalnie)"<input placeholder="dolnośląskie" prop:value=move || custom_region.get() on:input=move |e| custom_region.set(event_target_value(&e))/></label>
+                                        <p class="inline-note">Dodamy ją do mapy. Powiadomienia mogą działać jeszcze przed zatwierdzeniem.</p>
+                                    </div>
+                                </Show>
+                                <div class="nearby-pref">
+                                    <label class="check-label"><input type="checkbox" prop:checked=move || nearby_enabled.get() on:change=move |e| nearby_enabled.set(event_target_checked(&e))/><span>Powiadamiaj mnie o koncertach w pobliżu</span></label>
+                                    <Show when=move || nearby_enabled.get()>
+                                        <div class="radius-picker">
+                                            <button type="button" class:active=move || radius_km.get()==50 on:click=move |_| radius_km.set(50)>"50 km"</button>
+                                            <button type="button" class:active=move || radius_km.get()==100 on:click=move |_| radius_km.set(100)>"100 km"</button>
+                                            <button type="button" class:active=move || radius_km.get()==150 on:click=move |_| radius_km.set(150)>"150 km"</button>
+                                            <button type="button" class:active=move || radius_km.get()==250 on:click=move |_| radius_km.set(250)>"250 km"</button>
+                                        </div>
+                                    </Show>
+                                </div>
+                                <label>"Kod polecający (opcjonalnie)"<input prop:value=move || referral.get() on:input=move |e| referral.set(event_target_value(&e))/></label>
+                                <label>"Lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
+                                <label class="check-label"><input type="checkbox" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/><span>Chcę otrzymywać informacje o koncertach, premierach i nagrodach Viryi.</span></label>
+                                <button class="primary" disabled=move || busy.get() || (!custom_city.get() && public_loading.get().cities) on:click=signup>"DOŁĄCZ DO SYGNAŁU"</button>
+                            </>
+                        </Show>
+                    </div>
                 </div>
             }>
-                <div class="access-card fan-card"><p class="lock-copy">Twój profil, sesja fana i tokeny biletów są zaszyfrowane na urządzeniu.</p><div class="form-grid"><label>"PIN"<input type="password" autocomplete="current-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label><button class="primary" disabled=move || busy.get() on:click=unlock>"OTWÓRZ MÓJ SYGNAŁ"</button></div></div>
+                <div class="access-card fan-card">
+                    <p class="lock-copy">Twój profil i bilety są zaszyfrowane na urządzeniu.</p>
+                    <div class="form-grid">
+                        <label>"PIN"<input type="password" autocomplete="current-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
+                        <button class="primary" disabled=move || busy.get() on:click=unlock>"OTWÓRZ MÓJ SYGNAŁ"</button>
+                    </div>
+                </div>
             </Show>
-            <PublicEventStrip public=public loading=public_loading />
         </section>
     }
-}
-
-#[component]
-fn PublicEventStrip(
-    public: RwSignal<Option<PublicHomeData>>,
-    loading: RwSignal<PublicLoadingState>,
-) -> impl IntoView {
-    view! { <div class="public-strip"><div class="section-head"><h3>Najbliższe koncerty</h3></div><Show when=move || !loading.get().events fallback=move || view! { <Skeleton rows=2 /> }><div class="card-list"><For each=move || public.with(|data| data.as_ref().map(|data| data.events.iter().take(4).cloned().collect::<Vec<_>>()).unwrap_or_default()) key=|event| event.slug.clone() children=move |event| view! { <EventCard event=event /> } /></div></Show></div> }
 }
 
 #[component]
@@ -1911,33 +2074,6 @@ fn refresh_operator_parts(
     refresh_operator_qr(dashboard, loading, error);
 }
 
-fn refresh_public_events(
-    public: RwSignal<Option<PublicHomeData>>,
-    loading: RwSignal<PublicLoadingState>,
-    error: RwSignal<Option<String>>,
-) {
-    loading.update(|state| state.events = true);
-    spawn_local(async move {
-        match bridge::invoke_latest::<Vec<PublicEvent>, _>(
-            "public_events",
-            &ApiArgs {
-                api_base_url: API_BASE,
-            },
-            15_000,
-            "public:events",
-        )
-        .await
-        {
-            Ok(Some(value)) => public.update(|state| {
-                state.get_or_insert_with(PublicHomeData::default).events = value;
-            }),
-            Ok(None) => return,
-            Err(message) => error.set(Some(message)),
-        }
-        loading.update(|state| state.events = false);
-    });
-}
-
 fn refresh_public_cities(
     public: RwSignal<Option<PublicHomeData>>,
     loading: RwSignal<PublicLoadingState>,
@@ -1951,7 +2087,7 @@ fn refresh_public_cities(
                 api_base_url: API_BASE,
             },
             15_000,
-            "public:cities",
+            "public:fan-access:cities",
         )
         .await
         {

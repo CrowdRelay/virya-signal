@@ -58,7 +58,8 @@ class IpcAndBrandContractTests(unittest.TestCase):
         self.assertEqual((width, height), (1024, 1024))
         svg = (ROOT / "src-tauri/icons/virya-signal.svg").read_text()
         self.assertIn('id="signal-bars"', svg)
-        self.assertEqual(svg.count("<rect"), 5)
+        signal_group = svg.split('id="signal-bars"', 1)[1].split("</g>", 1)[0]
+        self.assertEqual(signal_group.count("<rect"), 3)
 
 
 if __name__ == "__main__":
