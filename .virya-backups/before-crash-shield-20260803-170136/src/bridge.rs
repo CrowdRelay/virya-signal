@@ -17,7 +17,7 @@ impl<T> OptionValueOrElseExt<T> for Option<T> {
     }
 }
 
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(inline_js = r#"
@@ -230,145 +230,45 @@ export async function viryaLoadPublicCities(apiBaseUrl) {
   return viryaNormalizeCities(value);
 }
 
-const VIRYA_FAILURE_STORAGE_KEY = 'virya:last-runtime-failure:v2';
-
 function viryaRuntimeMessage(error) {
   if (typeof error === 'string') return error;
   if (typeof error?.message === 'string') return error.message;
   try { return JSON.stringify(error); } catch { return 'Nieznany błąd aplikacji'; }
 }
 
-function viryaRuntimeStack(error) {
-  if (typeof error?.stack === 'string') return error.stack.slice(0, 12_000);
-  return '';
-}
-
-function viryaBuildRuntimeReport(kind, error) {
-  const operation = window.__VIRYA_LAST_OPERATION__?.command ?? '';
-  return {
-    version: 2,
-    kind: String(kind || 'unknown'),
-    message: viryaRuntimeMessage(error).slice(0, 4_000),
-    stack: viryaRuntimeStack(error),
-    operation: String(operation).slice(0, 160),
-    occurredAt: new Date().toISOString(),
-    href: String(window.location?.href ?? '').slice(0, 1_000),
-    userAgent: String(window.navigator?.userAgent ?? '').slice(0, 1_000),
-  };
-}
-
-function viryaStoreRuntimeFailure(report) {
-  try { window.localStorage?.setItem(VIRYA_FAILURE_STORAGE_KEY, JSON.stringify(report)); }
-  catch (error) { window.console?.warn?.('[virya:crash-store]', error); }
-}
-
-function viryaClearRuntimeFailure() {
-  try { window.localStorage?.removeItem(VIRYA_FAILURE_STORAGE_KEY); } catch {}
-}
-
-function viryaFailureText(report) {
-  const lines = [
-    `Rodzaj: ${report.kind}`,
-    `Czas: ${report.occurredAt}`,
-    report.operation ? `Operacja: ${report.operation}` : '',
-    `Błąd: ${report.message}`,
-    report.stack ? `\nStack:\n${report.stack}` : '',
-  ];
-  return lines.filter(Boolean).join('\n');
-}
-
-function viryaShowRuntimeFailure(report, previous = false) {
+function viryaShowRuntimeFailure(message, operation) {
   const document = window.document;
-  if (!document?.body) {
-    window.setTimeout(() => viryaShowRuntimeFailure(report, previous), 50);
-    return;
+  if (!document?.body) return;
+  let node = document.getElementById('virya-runtime-failure');
+  if (!node) {
+    node = document.createElement('button');
+    node.id = 'virya-runtime-failure';
+    node.type = 'button';
+    node.addEventListener('click', () => node.remove());
+    document.body.appendChild(node);
   }
-  document.getElementById('virya-runtime-failure')?.remove();
-  const node = document.createElement('section');
-  node.id = 'virya-runtime-failure';
-  node.setAttribute('role', 'alertdialog');
-  node.setAttribute('aria-modal', 'true');
-  node.innerHTML = `
-    <div class="virya-runtime-failure-card">
-      <p class="eyebrow">VIRYA SIGNAL / DIAGNOSTYKA</p>
-      <h2>${previous ? 'Poprzednie uruchomienie zakończyło się błędem' : 'Aplikacja zatrzymała błąd'}</h2>
-      <p>Nie ukrywamy awarii. Skopiuj raport i wyślij go razem z informacją, co było kliknięte.</p>
-      <pre></pre>
-      <div class="virya-runtime-failure-actions">
-        <button type="button" data-action="copy">KOPIUJ RAPORT</button>
-        <button type="button" data-action="reload">URUCHOM PONOWNIE</button>
-        <button type="button" data-action="close" class="ghost">ZAMKNIJ</button>
-      </div>
-      <small class="copy-status"></small>
-    </div>`;
-  const text = viryaFailureText(report);
-  const pre = node.querySelector('pre');
-  if (pre) pre.textContent = text;
-  node.querySelector('[data-action="copy"]')?.addEventListener('click', async () => {
-    const status = node.querySelector('.copy-status');
-    try {
-      await window.navigator?.clipboard?.writeText(text);
-      if (status) status.textContent = 'Raport skopiowany.';
-    } catch {
-      if (status) status.textContent = 'Przytrzymaj tekst raportu i skopiuj ręcznie.';
-    }
-  });
-  node.querySelector('[data-action="reload"]')?.addEventListener('click', () => {
-    viryaClearRuntimeFailure();
-    window.location.reload();
-  });
-  node.querySelector('[data-action="close"]')?.addEventListener('click', () => {
-    viryaClearRuntimeFailure();
-    node.remove();
-  });
-  document.body.appendChild(node);
-}
-
-async function viryaInstallNativeCrashListener(report) {
-  const deadline = Date.now() + 15_000;
-  let eventApi;
-  while (!(eventApi = window.__TAURI__?.event) && Date.now() < deadline) await sleep(50);
-  if (!eventApi?.listen) return;
-  try {
-    await eventApi.listen('virya-native-crash', (event) => {
-      report('native-panic', event?.payload ?? 'Natywny proces aplikacji zakończył się błędem.');
-    });
-  } catch (error) {
-    window.console?.warn?.('[virya:native-crash-listener]', error);
-  }
+  node.textContent = operation
+    ? `Błąd aplikacji (${operation}): ${message}. Dotknij, aby zamknąć.`
+    : `Błąd aplikacji: ${message}. Dotknij, aby zamknąć.`;
 }
 
 export function viryaInstallRuntimeGuards() {
   if (window.__VIRYA_RUNTIME_GUARDS__) return;
   window.__VIRYA_RUNTIME_GUARDS__ = true;
   const report = (kind, error) => {
-    const failure = viryaBuildRuntimeReport(kind, error);
-    window.console?.error?.(`[virya:${kind}]`, failure);
-    viryaStoreRuntimeFailure(failure);
-    viryaShowRuntimeFailure(failure, false);
-    window.dispatchEvent(new CustomEvent('virya-runtime-error', { detail: failure }));
+    const message = viryaRuntimeMessage(error);
+    const operation = window.__VIRYA_LAST_OPERATION__?.command ?? '';
+    window.console?.error?.(`[virya:${kind}]`, message, { operation, error });
+    viryaShowRuntimeFailure(message, operation);
+    window.dispatchEvent(new CustomEvent('virya-runtime-error', {
+      detail: { kind, message, operation },
+    }));
   };
   window.addEventListener('error', (event) => report('window-error', event.error ?? event.message));
   window.addEventListener('unhandledrejection', (event) => {
     event.preventDefault();
     report('unhandled-rejection', event.reason);
   });
-  void viryaInstallNativeCrashListener(report);
-  try {
-    const raw = window.localStorage?.getItem(VIRYA_FAILURE_STORAGE_KEY);
-    if (raw) {
-      const previous = JSON.parse(raw);
-      const age = Date.now() - Date.parse(previous?.occurredAt ?? '');
-      if (Number.isFinite(age) && age >= 0 && age < 24 * 60 * 60 * 1_000) {
-        viryaShowRuntimeFailure(previous, true);
-      } else {
-        viryaClearRuntimeFailure();
-      }
-    }
-  } catch (error) {
-    window.console?.warn?.('[virya:previous-crash]', error);
-    viryaClearRuntimeFailure();
-  }
 }
 
 "#)]
@@ -474,6 +374,36 @@ pub async fn scan_qr() -> Result<Option<String>, String> {
     } else {
         Ok(Some(value.to_owned()))
     }
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PublicCity {
+    pub slug: String,
+    pub name: String,
+    #[serde(default)]
+    pub fan_count: u64,
+}
+
+pub async fn load_public_cities(api_base_url: &str) -> Result<Vec<PublicCity>, String> {
+    let value = load_public_cities_js(api_base_url)
+        .await
+        .map_err(js_error)?;
+    let mut cities: Vec<PublicCity> = serde_wasm_bindgen::from_value(value)
+        .map_err(|error| format!("Nie udało się odczytać listy miast: {error}"))?;
+    cities.retain(|city| {
+        !city.slug.trim().is_empty()
+            && city.slug.len() <= 128
+            && !city.name.trim().is_empty()
+            && city.name.chars().count() <= 160
+            && !city.slug.chars().any(char::is_control)
+            && !city.name.chars().any(char::is_control)
+    });
+    cities.truncate(250);
+    if cities.is_empty() {
+        return Err("CrowdRelay nie zwrócił żadnych dostępnych miast.".to_owned());
+    }
+    Ok(cities)
 }
 
 pub fn install_runtime_guards() {

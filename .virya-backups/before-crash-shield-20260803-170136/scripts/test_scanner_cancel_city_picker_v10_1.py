@@ -22,6 +22,21 @@ class ScannerCancelAndCityPickerV101(unittest.TestCase):
             block = APP[match.start():match.start() + 300]
             self.assertIn("Ok(None) => {}", block)
 
+    def test_city_collection_is_typed_bounded_and_lifecycle_safe(self):
+        start = APP.index("fn FanAccess(")
+        end = APP.index("fn FanApp(", start)
+        fan = APP[start:end]
+        self.assertNotIn("<select", fan)
+        self.assertNotIn("stable_public_cities", fan)
+        self.assertNotIn("refresh_public_cities", fan)
+        self.assertNotIn("PublicLoadingState", fan)
+        self.assertIn("Vec::<bridge::PublicCity>::new()", fan)
+        self.assertIn("open_public_city_picker(", fan)
+        self.assertIn("city_picker_alive", fan)
+        self.assertIn("bridge::load_public_cities(API_BASE)", APP)
+        self.assertIn("city_picker_alive.try_read_value()", fan)
+        self.assertNotIn("let open_city_picker", fan)
+
     def test_overlays_have_touch_targets(self):
         self.assertIn("#virya-scanner-overlay", STYLES)
         self.assertIn(".city-picker-results button", STYLES)

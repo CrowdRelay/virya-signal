@@ -31,6 +31,11 @@ impl<T> OptionValueOrElseExt<T> for Option<T> {
     }
 }
 
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+
 use leptos::prelude::*;
 use serde::Serialize;
 use wasm_bindgen::JsValue;
@@ -905,7 +910,7 @@ fn Scanner(
                 <Show when=move || !show_message.get().is_empty()><small>{move || show_message.get()}</small></Show>
             </article>
             <button class="scanner-button" on:click=scan disabled=move || busy.get()><span class="scanner-frame"></span><strong>{move || if busy.get() { "WERYFIKUJĘ…" } else if offline.get() { "SKANUJ LOKALNIE" } else { "URUCHOM APARAT" }}</strong><small>{move || if offline.get() { "Wyłącznie trwały QR biletu t1" } else { "QR biletu lub wejściówki" }}</small></button>
-            <Show when=move || !offline.get()><div class="manual-row"><input placeholder="Kod QR lub numer wejściówki" prop:value=move || manual.get() on:input=move |e| manual.set(event_target_value(&e))/><button on:click=manual_submit disabled=move || busy.get()>"SPRAWDŹ"</button></div></Show>
+            <Show when=move || !offline.get()><div class="manual-row"><input placeholder="Kod / public reference" prop:value=move || manual.get() on:input=move |e| manual.set(event_target_value(&e))/><button on:click=manual_submit disabled=move || busy.get()>"SPRAWDŹ"</button></div></Show>
             {move || result.get().map(|entry| {
                 let success = matches!(entry.status.as_str(), "redeemed" | "already_redeemed" | "offline_queued" | "offline_duplicate");
                 view! { <article class:scan-success=success class:scan-warning=!success class="scan-result"><strong>{entry.status.to_uppercase()}</strong><span>{entry.public_reference}</span><p>{entry.holder_name.value_or(entry.holder_email_masked)}</p></article> }
@@ -1005,7 +1010,7 @@ fn Tickets(
                 <div class="section-head"><h3>Ostatnie zamówienia</h3><span>{data.recent_orders.len()}</span></div>
                 <div class="card-list">{data.recent_orders.into_iter().map(|order| view! { <article class="order-card"><div><strong>{order.public_reference}</strong><p>{order.buyer_name.value_or(order.buyer_email_masked)}</p></div><span>{money(order.amount_gross_minor, &order.currency)}</span></article> }).collect_view()}</div>
             })}
-            <Show when=move || owner.get()><div class="admin-box"><p class="eyebrow">OWNER ONLY</p><h3>Ręczna wejściówka</h3><p class="inline-note">"Numer wejściówki to bezpieczny publiczny identyfikator, np. VRY-... Nie jest tokenem QR ani prywatnym tokenem zamówienia."</p><input placeholder="fan@email.com" prop:value=move || fan_email.get() on:input=move |e| fan_email.set(event_target_value(&e))/><input placeholder="pool slug" prop:value=move || pool_slug.get() on:input=move |e| pool_slug.set(event_target_value(&e))/><button class="primary" on:click=issue disabled=move || busy.get()>"WYDAJ WEJŚCIÓWKĘ"</button>{move || issued.get().map(|pass| view! { <div class="token-box"><strong>{pass.public_reference}</strong><p>Token roszczenia: {pass.claim_token}</p></div> })}<hr/><input placeholder="Numer wejściówki, np. VRY-…" prop:value=move || revoke_ref.get() on:input=move |e| revoke_ref.set(event_target_value(&e))/><button class="danger" on:click=revoke disabled=move || busy.get()>"UNIEWAŻNIJ"</button></div></Show>
+            <Show when=move || owner.get()><div class="admin-box"><p class="eyebrow">OWNER ONLY</p><h3>Ręczna wejściówka</h3><input placeholder="fan@email.com" prop:value=move || fan_email.get() on:input=move |e| fan_email.set(event_target_value(&e))/><input placeholder="pool slug" prop:value=move || pool_slug.get() on:input=move |e| pool_slug.set(event_target_value(&e))/><button class="primary" on:click=issue disabled=move || busy.get()>"WYDAJ WEJŚCIÓWKĘ"</button>{move || issued.get().map(|pass| view! { <div class="token-box"><strong>{pass.public_reference}</strong><p>Token roszczenia: {pass.claim_token}</p></div> })}<hr/><input placeholder="public reference do unieważnienia" prop:value=move || revoke_ref.get() on:input=move |e| revoke_ref.set(event_target_value(&e))/><button class="danger" on:click=revoke disabled=move || busy.get()>"UNIEWAŻNIJ"</button></div></Show>
         </section>
     }
 }
@@ -1364,11 +1369,15 @@ fn FanAccess(
     let access_mode = RwSignal::new(FanAccessMode::Signup);
     let email = RwSignal::new(String::new());
     let name = RwSignal::new(String::new());
-    // City onboarding is deliberately local-first. The remote canonical list is
-    // not placed in Leptos reactive state: this removes a repeatedly crashing
-    // Android WebView/WASM path while preserving full signup functionality.
+    let city = RwSignal::new(String::new());
+    let selected_city_name = RwSignal::new(String::new());
+    let custom_city = RwSignal::new(true);
     let custom_city_name = RwSignal::new(String::new());
     let custom_region = RwSignal::new(String::new());
+    let public_cities = RwSignal::new(Vec::<bridge::PublicCity>::new());
+    let city_query = RwSignal::new(String::new());
+    let city_picker_open = RwSignal::new(false);
+    let city_picker_alive = StoredValue::new(Arc::new(AtomicBool::new(true)));
     let referral = RwSignal::new(String::new());
     let token = RwSignal::new(String::new());
     let pin = RwSignal::new(String::new());
@@ -1376,6 +1385,25 @@ fn FanAccess(
     let nearby_enabled = RwSignal::new(true);
     let radius_km = RwSignal::new(150_u16);
     let busy = RwSignal::new(false);
+
+    let city_picker_busy = RwSignal::new(false);
+    let close_city_picker = move |_| {
+        city_picker_open.set(false);
+        city_query.set(String::new());
+    };
+    let use_custom_city = move |_| {
+        city_picker_open.set(false);
+        city_query.set(String::new());
+        custom_city.set(true);
+        city.set(String::new());
+        selected_city_name.set(String::new());
+    };
+    on_cleanup(move || {
+        if let Some(alive) = city_picker_alive.try_read_value() {
+            alive.store(false, Ordering::Release);
+        }
+        bridge::invalidate_latest("public:fan-access:");
+    });
 
     let unlock = move |_| {
         let current_pin = pin.get();
@@ -1410,6 +1438,8 @@ fn FanAccess(
             region: optional(custom_region.get()),
             country_code: "PL".to_owned(),
         };
+        let use_custom = custom_city.get();
+        let selected_city = city.get();
         let input_email = email.get();
         let input_name = optional(name.get());
         let input_referral = optional(referral.get());
@@ -1417,18 +1447,22 @@ fn FanAccess(
         let radius = radius_km.get();
         busy.set(true);
         spawn_local(async move {
-            let city_slug = match bridge::invoke::<RequestedCityResult, _>(
-                "request_city",
-                &RequestedCityArgs { input: &requested },
-            )
-            .await
-            {
-                Ok(value) => value.city_slug,
-                Err(message) => {
-                    error.set(Some(format!("Nie udało się zapisać miasta: {message}")));
-                    busy.set(false);
-                    return;
+            let city_slug = if use_custom {
+                match bridge::invoke::<RequestedCityResult, _>(
+                    "request_city",
+                    &RequestedCityArgs { input: &requested },
+                )
+                .await
+                {
+                    Ok(value) => value.city_slug,
+                    Err(message) => {
+                        error.set(Some(message));
+                        busy.set(false);
+                        return;
+                    }
                 }
+            } else {
+                selected_city
             };
             if city_slug.trim().is_empty() {
                 error.set(Some("Wybierz miasto albo wpisz własne.".to_owned()));
@@ -1504,6 +1538,44 @@ fn FanAccess(
 
     view! {
         <section class="fan-access">
+            <Show when=move || city_picker_open.get()>
+                <div class="city-picker-backdrop" role="presentation">
+                    <section class="city-picker-panel" role="dialog" aria-modal="true" aria-label="Wybierz miasto">
+                        <header>
+                            <div><p class="eyebrow">VIRYA SIGNAL</p><h3>Wybierz miasto</h3></div>
+                            <button type="button" aria-label="Zamknij" on:click=close_city_picker>"×"</button>
+                        </header>
+                        <input type="search" inputmode="search" autocomplete="off" placeholder="Szukaj miasta…" aria-label="Szukaj miasta" prop:value=move || city_query.get() on:input=move |event| city_query.set(event_target_value(&event)) />
+                        <div class="city-picker-results" role="listbox">
+                            <For
+                                each=move || filtered_public_cities(&public_cities.get(), &city_query.get())
+                                key=|city| city.slug.clone()
+                                children=move |candidate| {
+                                    let slug = candidate.slug.clone();
+                                    let name = candidate.name.clone();
+                                    let fan_count = candidate.fan_count;
+                                    view! {
+                                        <button type="button" role="option" on:click=move |_| {
+                                            city.set(slug.clone());
+                                            selected_city_name.set(name.clone());
+                                            custom_city.set(false);
+                                            city_picker_open.set(false);
+                                            city_query.set(String::new());
+                                        }>
+                                            <strong>{candidate.name}</strong>
+                                            <span>{if fan_count >= 25 { format!("{fan_count} fanów") } else { "Sygnał rośnie".to_owned() }}</span>
+                                        </button>
+                                    }
+                                }
+                            />
+                            <Show when=move || filtered_public_cities(&public_cities.get(), &city_query.get()).is_empty()>
+                                <p class="city-picker-empty">Brak pasujących miast. Wróć i wpisz własne.</p>
+                            </Show>
+                        </div>
+                        <button type="button" class="ghost" on:click=use_custom_city>"WPISZ WŁASNE MIASTO"</button>
+                    </section>
+                </div>
+            </Show>
             <BackButton mode=mode />
             <header class="fan-access-hero">
                 <p class="eyebrow">VIRYA SIGNAL</p>
@@ -1517,6 +1589,11 @@ fn FanAccess(
             </header>
             <Show when=move || status.get().configured fallback=move || view! {
                 <div class="access-card fan-card">
+                    <ol class="signal-onboarding-progress" aria-label="Postęp zakładania Sygnału">
+                        <li class:active=move || access_mode.get() == FanAccessMode::Signup><span>"1"</span><small>"Dane i miasto"</small></li>
+                        <li class:active=move || access_mode.get() == FanAccessMode::Confirm><span>"2"</span><small>"Kod z e-maila"</small></li>
+                        <li><span>"3"</span><small>"Gotowe"</small></li>
+                    </ol>
                     <div class="segmented">
                         <button class:active=move || access_mode.get() == FanAccessMode::Signup on:click=move |_| access_mode.set(FanAccessMode::Signup)>"ZACZYNAM"</button>
                         <button class:active=move || access_mode.get() == FanAccessMode::Confirm on:click=move |_| access_mode.set(FanAccessMode::Confirm)>"MAM KOD"</button>
@@ -1532,12 +1609,40 @@ fn FanAccess(
                             </>
                         }>
                             <>
-                                <div class="custom-city-fields city-stable-entry">
+                                <Show when=move || !custom_city.get()>
+                                    <div class="city-selection-summary">
+                                        <div><small>"Wybrane miasto"</small><strong>{move || selected_city_name.get()}</strong></div>
+                                        <span aria-hidden="true">"✓"</span>
+                                    </div>
+                                </Show>
+                                <div class:two=move || !custom_city.get() class="city-picker-actions">
+                                    <button type="button" class="ghost" on:click=move |_| {
+                                        let Some(alive) = city_picker_alive.try_read_value() else {
+                                            return;
+                                        };
+                                        let alive = Arc::clone(&*alive);
+                                        open_public_city_picker(
+                                            public_cities,
+                                            city_query,
+                                            city_picker_open,
+                                            city_picker_busy,
+                                            alive,
+                                            error,
+                                        );
+                                    } disabled=move || city_picker_busy.get()>
+                                        {move || if city_picker_busy.get() { "POBIERAM MIASTA…" } else if custom_city.get() { "SZUKAJ MIASTA" } else { "ZMIEŃ MIASTO" }}
+                                    </button>
+                                    <Show when=move || !custom_city.get()>
+                                        <button type="button" class="text-button" on:click=use_custom_city>"WPISZ WŁASNE"</button>
+                                    </Show>
+                                </div>
+                                <Show when=move || custom_city.get()>
+                                    <div class="custom-city-fields">
                                         <label>"Miejscowość"<input placeholder="np. Bielawa" prop:value=move || custom_city_name.get() on:input=move |e| custom_city_name.set(event_target_value(&e))/></label>
                                         <label>"Województwo / region (opcjonalnie)"<input placeholder="dolnośląskie" prop:value=move || custom_region.get() on:input=move |e| custom_region.set(event_target_value(&e))/></label>
                                         <p class="inline-note">Dodamy ją do mapy. Powiadomienia mogą działać jeszcze przed zatwierdzeniem.</p>
-                                    <p class="inline-note">Wpisz miejscowość ręcznie. Zapiszemy ją bezpiecznie i dopasujemy do mapy Sygnału.</p>
-                                </div>
+                                    </div>
+                                </Show>
                                 <div class="nearby-pref">
                                     <label class="check-label"><input type="checkbox" prop:checked=move || nearby_enabled.get() on:change=move |e| nearby_enabled.set(event_target_checked(&e))/><span>Powiadamiaj mnie o koncertach w pobliżu</span></label>
                                     <Show when=move || nearby_enabled.get()>
@@ -1552,7 +1657,7 @@ fn FanAccess(
                                 <label>"Kod polecający (opcjonalnie)"<input prop:value=move || referral.get() on:input=move |e| referral.set(event_target_value(&e))/></label>
                                 <label>"Lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
                                 <label class="check-label"><input type="checkbox" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/><span>Chcę otrzymywać informacje o koncertach, premierach i nagrodach Viryi.</span></label>
-                                <button class="primary" disabled=move || busy.get() on:click=signup>"DOŁĄCZ DO SYGNAŁU"</button>
+                                <button class="primary" disabled=move || busy.get() || city_picker_busy.get() on:click=signup>"DOŁĄCZ DO SYGNAŁU"</button>
                             </>
                         </Show>
                     </div>
@@ -2479,6 +2584,53 @@ fn stable_wallets(mut wallets: Vec<TicketWallet>) -> Vec<TicketWallet> {
     wallets.dedup_by(|left, right| left.order.order_id == right.order.order_id);
     wallets.truncate(100);
     wallets
+}
+
+fn open_public_city_picker(
+    public_cities: RwSignal<Vec<bridge::PublicCity>>,
+    city_query: RwSignal<String>,
+    city_picker_open: RwSignal<bool>,
+    city_picker_busy: RwSignal<bool>,
+    alive: Arc<AtomicBool>,
+    error: RwSignal<Option<String>>,
+) {
+    if city_picker_busy.get_untracked() {
+        return;
+    }
+    city_query.set(String::new());
+    if !public_cities.get_untracked().is_empty() {
+        city_picker_open.set(true);
+        return;
+    }
+    city_picker_busy.set(true);
+    spawn_local(async move {
+        let result = bridge::load_public_cities(API_BASE).await;
+        if !alive.load(Ordering::Acquire) {
+            return;
+        }
+        match result {
+            Ok(cities) => {
+                public_cities.set(cities);
+                city_picker_open.set(true);
+            }
+            Err(message) => error.set(Some(message)),
+        }
+        city_picker_busy.set(false);
+    });
+}
+
+fn normalized_city_query(value: &str) -> String {
+    value.trim().to_lowercase()
+}
+
+fn filtered_public_cities(cities: &[bridge::PublicCity], query: &str) -> Vec<bridge::PublicCity> {
+    let needle = normalized_city_query(query);
+    cities
+        .iter()
+        .filter(|city| needle.is_empty() || city.name.to_lowercase().contains(&needle))
+        .take(40)
+        .cloned()
+        .collect()
 }
 
 fn optional(value: String) -> Option<String> {

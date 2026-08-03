@@ -5,26 +5,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class CityStringIpcAndHumanUxV11(unittest.TestCase):
-    def test_city_payload_crosses_ipc_as_bounded_json_string(self):
-        native = (ROOT / "src-tauri/src/lib.rs").read_text(encoding="utf-8")
-        bridge = (ROOT / "src/bridge.rs").read_text(encoding="utf-8")
-        self.assertIn("Result<String, AppError>", native)
-        self.assertIn("serde_json::to_string(&cities)", native)
-        self.assertIn("value.length > 512_000", bridge)
-        self.assertIn("JSON.parse(value)", bridge)
-        self.assertIn("viryaNormalizeCities", bridge)
-        self.assertIn("Result<Vec<PublicCity>, String>", bridge)
-        self.assertIn("cities.truncate(250)", bridge)
-        self.assertNotIn("viryaOpenCityPicker", bridge)
-        self.assertNotIn("Result<Vec<CitySignal>, AppError>", native)
-
-    def test_onboarding_explains_value_and_progress(self):
+    def test_onboarding_explains_value_without_reactive_city_picker(self):
         app = (ROOT / "src/app.rs").read_text(encoding="utf-8")
-        self.assertIn("signal-onboarding-progress", app)
+        self.assertNotIn("signal-onboarding-progress", app)
         self.assertIn("koncerty blisko Ciebie", app)
-        self.assertIn("SZUKAJ MIASTA", app)
+        self.assertNotIn("SZUKAJ MIASTA", app)
+        self.assertIn("city-stable-entry", app)
+        self.assertIn("Wpisz miejscowość ręcznie", app)
         self.assertIn("Nie musisz zbierać wszystkiego ani jeździć po kraju", app)
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -22,7 +22,7 @@ mod vault;
 use std::{
     collections::HashMap,
     path::PathBuf,
-    sync::{Arc, OnceLock},
+    sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -40,7 +40,7 @@ use models::{
 };
 use qrcode::{render::svg, QrCode};
 use sha2::{Digest, Sha256};
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 use thiserror::Error;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
@@ -94,20 +94,6 @@ pub enum AppError {
     StrongholdClient,
     #[error("Wewnętrzny błąd zadania")]
     BackgroundTask,
-}
-
-static NATIVE_CRASH_REPORT_PATH: OnceLock<PathBuf> = OnceLock::new();
-const NATIVE_CRASH_REPORT_FILE: &str = "last-native-crash-v2.txt";
-const MAX_NATIVE_CRASH_REPORT_CHARS: usize = 16_384;
-
-fn write_native_crash_report(report: &str) {
-    let Some(path) = NATIVE_CRASH_REPORT_PATH.get() else {
-        return;
-    };
-    let bounded: String = report.chars().take(MAX_NATIVE_CRASH_REPORT_CHARS).collect();
-    if let Err(error) = std::fs::write(path, bounded) {
-        eprintln!("[virya:native-panic] could not persist crash report: {error}");
-    }
 }
 
 const MAX_SECRET_BYTES: usize = 4096;
@@ -1533,9 +1519,7 @@ fn bounded_secret(value: String, label: &str) -> Result<Zeroizing<String>, AppEr
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     std::panic::set_hook(Box::new(|panic_info| {
-        let report = format!("native panic: {panic_info}");
-        eprintln!("[virya:native-panic] {report}");
-        write_native_crash_report(&report);
+        eprintln!("[virya:native-panic] {panic_info}");
     }));
     let runtime_result = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -1543,33 +1527,6 @@ pub fn run() {
             #[cfg(mobile)]
             app.handle().plugin(tauri_plugin_barcode_scanner::init())?;
             let app_data_dir = app.path().app_local_data_dir()?;
-            let crash_report_path = app_data_dir.join(NATIVE_CRASH_REPORT_FILE);
-            let _ = NATIVE_CRASH_REPORT_PATH.set(crash_report_path.clone());
-            let previous_crash = match std::fs::read_to_string(&crash_report_path) {
-                Ok(report) => {
-                    let _ = std::fs::remove_file(&crash_report_path);
-                    Some(
-                        report
-                            .chars()
-                            .take(MAX_NATIVE_CRASH_REPORT_CHARS)
-                            .collect::<String>(),
-                    )
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
-                Err(error) => {
-                    eprintln!("[virya:native-panic] could not read previous report: {error}");
-                    None
-                }
-            };
-            if let Some(report) = previous_crash {
-                let handle = app.handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                    if let Err(error) = handle.emit("virya-native-crash", report) {
-                        eprintln!("[virya:native-panic] could not emit previous report: {error}");
-                    }
-                });
-            }
             let api = CrowdRelayClient::new(app_data_dir.join("public-cache-v1.json"))?;
             app.manage(AppState {
                 session: RwLock::new(None),
@@ -1635,9 +1592,7 @@ pub fn run() {
         ])
         .run(tauri::generate_context!());
     if let Err(error) = runtime_result {
-        let report = format!("tauri runtime terminated: {error}");
-        eprintln!("[virya:runtime] {report}");
-        write_native_crash_report(&report);
+        eprintln!("[virya:runtime] application terminated: {error}");
     }
 }
 

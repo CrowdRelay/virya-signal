@@ -7,6 +7,23 @@ STYLES = (ROOT / "styles.css").read_text(encoding="utf-8")
 
 
 class FanCrashContainmentV97(unittest.TestCase):
+    def test_registration_uses_bounded_typed_city_collection(self):
+        start = APP.index("fn FanAccess(")
+        end = APP.index("fn FanApp(", start)
+        block = APP[start:end]
+        self.assertIn("Vec::<bridge::PublicCity>::new()", block)
+        self.assertIn("open_public_city_picker(", block)
+        self.assertIn("filtered_public_cities", block)
+        self.assertIn("city_picker_alive", block)
+        self.assertIn("bridge::load_public_cities(API_BASE)", APP)
+        self.assertIn("StoredValue::new(Arc::new(AtomicBool::new(true)))", block)
+        self.assertNotIn("Rc::", APP)
+        self.assertIn("<For", block)
+        self.assertNotIn("stable_public_cities", block)
+        self.assertNotIn("refresh_public_cities", block)
+        self.assertNotIn("PublicLoadingState", block)
+        self.assertNotIn("bridge::pick_public_city", block)
+
     def test_authenticated_fan_loads_by_active_tab(self):
         start = APP.index("fn FanApp(")
         end = APP.index("fn FanNavButton(", start)

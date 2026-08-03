@@ -18,17 +18,13 @@ class PrincipalOnboardingContract(unittest.TestCase):
         self.assertIn('label="SPRAWDZAM BEZPIECZNY SEJF"', APP)
         self.assertIn('label="SPRAWDZAM TWÓJ SYGNAŁ"', APP)
 
-    def test_registration_route_has_no_async_keyed_event_or_city_strip(self):
+    def test_registration_route_has_no_async_keyed_event_strip(self):
         start = APP.index("fn FanAccess(")
         end = APP.index("fn FanApp(", start)
         block = APP[start:end]
         self.assertNotIn("PublicEventStrip", block)
         self.assertNotIn("refresh_public_events", block)
-        self.assertNotIn('invalidate_latest("public:fan-access:")', block)
-        self.assertNotIn("bridge::load_public_cities", block)
-        self.assertNotIn("Vec::<bridge::PublicCity>::new()", block)
-        self.assertNotIn("city_picker_", block)
-        self.assertNotIn("<For", block)
+        self.assertIn('invalidate_latest("public:fan-access:")', APP)
 
     def test_native_core_sanitizes_keyed_lists(self):
         self.assertIn("sanitize_public_events", API)
@@ -36,16 +32,21 @@ class PrincipalOnboardingContract(unittest.TestCase):
         self.assertGreaterEqual(API.count("dedup_by"), 2)
         self.assertGreaterEqual(API.count("truncate(MAX_PUBLIC_"), 2)
 
-    def test_pairing_and_local_first_city_flow_exist(self):
+    def test_pairing_and_custom_city_flows_exist(self):
         self.assertIn("configure_from_pairing", NATIVE)
         self.assertIn("parse_pairing_payload", NATIVE)
         self.assertIn("request_city", NATIVE)
-        self.assertIn("city-stable-entry", APP)
-        self.assertIn("Wpisz miejscowość ręcznie", APP)
-        self.assertNotIn("bridge::load_public_cities(API_BASE)", APP)
-        self.assertNotIn("open_public_city_picker(", APP)
-        self.assertNotIn("StoredValue::new(Arc::new(AtomicBool::new(true)))", APP)
-        self.assertNotIn("city_picker_alive", APP)
+        self.assertIn("WPISZ WŁASNE", APP)
+        self.assertIn("bridge::load_public_cities(API_BASE)", APP)
+        self.assertIn("open_public_city_picker(", APP)
+        self.assertIn("on:click=move |_| {", APP)
+        self.assertIn("StoredValue::new(Arc::new(AtomicBool::new(true)))", APP)
+        self.assertIn("city_picker_alive.try_read_value()", APP)
+        self.assertEqual(APP.count("fn open_public_city_picker("), 1)
+        self.assertEqual(APP.count("fn normalized_city_query("), 1)
+        self.assertEqual(APP.count("fn filtered_public_cities("), 1)
+        self.assertNotIn("Rc<Cell<bool>>", APP)
+        self.assertNotIn("let open_city_picker", APP)
         self.assertNotIn("bridge::pick_public_city(API_BASE)", APP)
         self.assertIn("150 km", APP)
 

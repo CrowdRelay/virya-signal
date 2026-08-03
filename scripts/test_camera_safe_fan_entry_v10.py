@@ -23,33 +23,5 @@ class CameraAndSafeFanEntryContract(unittest.TestCase):
         self.assertIn("barcode-scanner:default", CAPABILITY["permissions"])
         self.assertIn("android", CAPABILITY["platforms"])
 
-    def test_fan_entry_has_no_automatic_city_request(self):
-        start = APP.index("fn FanPortal(")
-        end = APP.index("fn AccessLoader(", start)
-        block = APP[start:end]
-        self.assertNotIn("refresh_public_cities(", block)
-        self.assertNotIn("PublicLoadingState", block)
-
-    def test_custom_city_is_local_first_and_picker_is_explicit(self):
-        start = APP.index("fn FanAccess(")
-        end = APP.index("fn FanApp(", start)
-        block = APP[start:end]
-        self.assertIn("let custom_city = RwSignal::new(true);", block)
-        self.assertIn("open_public_city_picker(", block)
-        self.assertIn("StoredValue::new(Arc::new(AtomicBool::new(true)))", block)
-        self.assertIn("city_picker_alive.try_read_value()", block)
-        self.assertIn("city_picker_alive", block)
-        self.assertEqual(APP.count("fn open_public_city_picker("), 1)
-        self.assertEqual(APP.count("fn normalized_city_query("), 1)
-        self.assertEqual(APP.count("fn filtered_public_cities("), 1)
-        self.assertIn("bridge::load_public_cities(API_BASE)", APP)
-        self.assertIn("alive.load(Ordering::Acquire)", APP)
-        self.assertNotIn("let open_city_picker", block)
-        self.assertNotIn("Rc<", APP)
-        self.assertIn("WPISZ WŁASNE", block)
-        self.assertNotIn("bridge::pick_public_city", block)
-        self.assertNotIn("refresh_public_cities", block)
-
-
 if __name__ == "__main__":
     unittest.main()
