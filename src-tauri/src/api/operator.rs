@@ -1,12 +1,12 @@
 use reqwest::Method;
 
 use crate::{
+    AppError,
     models::{
         ConcertQrOverview, CreateQrCampaignInput, IssuePassInput, OperatorOpsOverview,
         OperatorProfile, OperatorRole, OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem,
         OpsRetryResult, OpsSummary, PublicEvent, ShowModeSnapshot, TicketingOverview,
     },
-    AppError,
 };
 
 use super::http::{require_owner, segment, uuid_segment};

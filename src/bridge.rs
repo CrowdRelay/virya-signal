@@ -1,5 +1,5 @@
 use crate::util::OptionValueOrElseExt;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(inline_js = r#"

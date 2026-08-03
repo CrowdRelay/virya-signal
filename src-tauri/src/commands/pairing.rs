@@ -3,13 +3,13 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use base64::{engine::general_purpose::URL_SAFE, Engine as _};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE};
 use tauri::State;
 
 use crate::{
+    AppError, AppState,
     commands::operator::configure,
     models::{OperatorProfile, SessionStatus, StaffPairingPayload},
-    AppError, AppState,
 };
 
 #[tauri::command]

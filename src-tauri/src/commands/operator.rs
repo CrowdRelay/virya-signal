@@ -7,6 +7,7 @@ use tauri::State;
 use zeroize::Zeroizing;
 
 use crate::{
+    AppError, AppState,
     models::{
         ConcertQrOverview, CreateQrCampaignInput, IssuePassInput, OperatorOpsOverview,
         OperatorProfile, OperatorSignalOverview, OpsRetryResult, PublicEvent, SessionStatus,
@@ -17,7 +18,7 @@ use crate::{
         validate_api_base, validate_campaign, validate_issue_pass, validate_operator_profile,
         validate_pin,
     },
-    vault, AppError, AppState,
+    vault,
 };
 
 #[tauri::command]

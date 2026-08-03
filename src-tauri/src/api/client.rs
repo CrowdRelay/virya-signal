@@ -5,22 +5,22 @@ use std::{
 };
 
 use reqwest::{
-    header::{ACCEPT, COOKIE, IF_MODIFIED_SINCE, IF_NONE_MATCH},
     Client, Method, Response,
+    header::{ACCEPT, COOKIE, IF_MODIFIED_SINCE, IF_NONE_MATCH},
 };
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
 use crate::{
-    models::{CitySignal, FanProfile, OperatorProfile, PublicEvent},
     AppError,
+    models::{CitySignal, FanProfile, OperatorProfile, PublicEvent},
 };
 
 use super::{
     cache::{
-        self, CacheEntry, CacheValidators, PublicCache, CITIES_CACHE_TTL, CITIES_STALE_TTL,
-        EVENTS_CACHE_TTL, EVENTS_STALE_TTL,
+        self, CITIES_CACHE_TTL, CITIES_STALE_TTL, CacheEntry, CacheValidators, EVENTS_CACHE_TTL,
+        EVENTS_STALE_TTL, PublicCache,
     },
     http::{decode, endpoint},
     retry::retry_idempotent,
@@ -381,8 +381,9 @@ impl CrowdRelayClient {
 
 #[cfg(target_os = "android")]
 fn android_tls_config() -> rustls::ClientConfig {
-    let root_store =
-        rustls::RootCertStore::from_iter(webpki_root_certs::TLS_SERVER_ROOT_CERTS.iter().cloned());
+    let root_store = rustls::RootCertStore {
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
+    };
     rustls::ClientConfig::builder()
         .with_root_certificates(root_store)
         .with_no_client_auth()

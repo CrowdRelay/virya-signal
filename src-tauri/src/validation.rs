@@ -6,11 +6,11 @@
 use zeroize::Zeroizing;
 
 use crate::{
+    AppError, MAX_SECRET_BYTES,
     models::{
         CreateQrCampaignInput, FanConfirmationInput, FanSignupInput, IssuePassInput,
         OperatorProfile,
     },
-    AppError, MAX_SECRET_BYTES,
 };
 
 pub(crate) fn validate_operator_profile(profile: &mut OperatorProfile) -> Result<(), AppError> {

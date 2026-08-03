@@ -6,21 +6,22 @@
 
 use std::sync::Arc;
 
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-use futures_util::{stream, StreamExt};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use futures_util::{StreamExt, stream};
 use sha2::{Digest, Sha256};
 use tauri::State;
-use time::{format_description::well_known::Rfc3339, OffsetDateTime};
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use zeroize::Zeroizing;
 
 use crate::{
+    AppError, AppState,
     models::{
         ShowModeQueuedScan, ShowModeScanResult, ShowModeScanState, ShowModeSession,
         ShowModeSnapshot, ShowModeStatus, ShowModeStore, ShowModeSyncResult,
     },
     session::{operator_profile, operator_vault_password, run_blocking},
     util::OptionValueOrExt,
-    vault, AppError, AppState,
+    vault,
 };
 
 const SHOW_MODE_SYNC_CONCURRENCY: usize = 4;
@@ -588,15 +589,19 @@ mod tests {
         );
         normalize_show_store(&mut store);
         let session = &store.sessions["virya-live"];
-        assert!(session
-            .snapshot
-            .passes
-            .windows(2)
-            .all(|w| w[0].public_reference <= w[1].public_reference));
-        assert!(session
-            .scans
-            .windows(2)
-            .all(|w| w[0].public_reference <= w[1].public_reference));
+        assert!(
+            session
+                .snapshot
+                .passes
+                .windows(2)
+                .all(|w| w[0].public_reference <= w[1].public_reference)
+        );
+        assert!(
+            session
+                .scans
+                .windows(2)
+                .all(|w| w[0].public_reference <= w[1].public_reference)
+        );
         let status = show_mode_status_for("virya-live", &store);
         assert_eq!((status.pending, status.synced, status.conflicts), (1, 0, 1));
     }

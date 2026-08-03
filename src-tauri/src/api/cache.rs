@@ -4,13 +4,13 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-use reqwest::header::{HeaderMap, ETAG, LAST_MODIFIED};
+use reqwest::header::{ETAG, HeaderMap, LAST_MODIFIED};
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    AppError,
     models::{CitySignal, PublicEvent},
     util::OptionValueOrExt,
-    AppError,
 };
 
 pub(super) const MAX_PUBLIC_EVENTS: usize = 100;

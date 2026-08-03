@@ -4,9 +4,9 @@ use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::{
+    AppError, AppState,
     models::{RequestedCityInput, RequestedCityResult},
     validation::clean_optional,
-    AppError, AppState,
 };
 
 #[tauri::command]

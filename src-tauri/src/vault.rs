@@ -7,12 +7,12 @@ use std::{
 use argon2::Argon2;
 use iota_stronghold::{KeyProvider, SnapshotPath, Stronghold};
 use rand::Rng;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use zeroize::Zeroizing;
 
 use crate::{
-    models::{FanProfile, OperatorProfile, ShowModeStore},
     AppError,
+    models::{FanProfile, OperatorProfile, ShowModeStore},
 };
 
 const OPERATOR_CLIENT_PATH: &[u8] = b"virya-control-device";

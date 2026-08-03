@@ -1,19 +1,19 @@
-use reqwest::{header::ACCEPT, Method};
+use reqwest::{Method, header::ACCEPT};
 use uuid::Uuid;
 
 use crate::{
+    AppError,
     models::{
         AdmissionPass, FanAuthResult, FanConfirmationInput, FanEventInterest, FanProfile,
         FanSignupInput, PublicEvent, ReferralProgress,
     },
-    AppError,
 };
 
 use super::{
     client::FAN_COOKIE,
     http::{
-        bounded_required, decode, endpoint, normalized_optional, response_cookie, segment,
-        MAX_TOKEN_BYTES,
+        MAX_TOKEN_BYTES, bounded_required, decode, endpoint, normalized_optional, response_cookie,
+        segment,
     },
 };
 

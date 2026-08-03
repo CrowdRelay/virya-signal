@@ -9,8 +9,9 @@ use tauri::State;
 use zeroize::Zeroizing;
 
 use crate::{
+    AppError, AppState,
     models::{FanProfile, OperatorProfile},
-    vault, AppError, AppState,
+    vault,
 };
 
 /// Runs a CPU/IO-bound closure on the blocking thread pool and converts a

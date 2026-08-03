@@ -1,12 +1,12 @@
 use reqwest::{
-    header::{HeaderMap, SET_COOKIE},
     Response, StatusCode,
+    header::{HeaderMap, SET_COOKIE},
 };
 use serde::de::DeserializeOwned;
 use url::Url;
 use uuid::Uuid;
 
-use crate::{util::OptionValueOrExt, AppError};
+use crate::{AppError, util::OptionValueOrExt};
 
 pub(super) const MAX_RESPONSE_BYTES: u64 = 2 * 1024 * 1024;
 pub(super) const MAX_TOKEN_BYTES: usize = 4096;
@@ -138,13 +138,12 @@ pub(super) fn normalize_scanned_code(value: &str) -> Result<String, AppError> {
             return bounded_required(token.as_ref(), "token QR", MAX_TOKEN_BYTES)
                 .map(ToOwned::to_owned);
         }
-        if let Some(fragment) = url.fragment() {
-            if let Some((_, token)) =
+        if let Some(fragment) = url.fragment()
+            && let Some((_, token)) =
                 url::form_urlencoded::parse(fragment.as_bytes()).find(|(name, _)| name == "token")
-            {
-                return bounded_required(token.as_ref(), "token QR", MAX_TOKEN_BYTES)
-                    .map(ToOwned::to_owned);
-            }
+        {
+            return bounded_required(token.as_ref(), "token QR", MAX_TOKEN_BYTES)
+                .map(ToOwned::to_owned);
         }
     }
     Ok(trimmed.to_owned())

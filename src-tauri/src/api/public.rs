@@ -2,13 +2,13 @@ use reqwest::header::ACCEPT;
 use uuid::Uuid;
 
 use crate::{
-    models::{AreaWallet, FanProfile, RequestedCityInput, RequestedCityResult, TicketWalletApi},
     AppError,
+    models::{AreaWallet, FanProfile, RequestedCityInput, RequestedCityResult, TicketWalletApi},
 };
 
 use super::{
     client::WALLET_REQUEST_TIMEOUT,
-    http::{bounded_required, decode, endpoint, uuid_segment, MAX_TOKEN_BYTES},
+    http::{MAX_TOKEN_BYTES, bounded_required, decode, endpoint, uuid_segment},
 };
 
 const AREA_COOKIE: &str = "virya-area-wallet";

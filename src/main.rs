@@ -52,15 +52,15 @@ fn virya_boot_phase(phase: &str) {
 
 fn virya_app_mounted() {
     let global = global();
-    if let Some(document) = property(&global, "document") {
-        if let Some(document_element) = property(&document, "documentElement") {
-            call2(
-                &document_element,
-                "setAttribute",
-                "data-virya-ready",
-                "true",
-            );
-        }
+    if let Some(document) = property(&global, "document")
+        && let Some(document_element) = property(&document, "documentElement")
+    {
+        call2(
+            &document_element,
+            "setAttribute",
+            "data-virya-ready",
+            "true",
+        );
     }
     if let Some(boot) = property(&global, "__VIRYA_BOOT__") {
         call0(&boot, "ready");

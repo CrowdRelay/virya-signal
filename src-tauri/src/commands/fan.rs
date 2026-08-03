@@ -5,12 +5,13 @@
 
 use std::{collections::HashMap, sync::Arc};
 
-use futures_util::{stream, StreamExt};
-use qrcode::{render::svg, QrCode};
+use futures_util::{StreamExt, stream};
+use qrcode::{QrCode, render::svg};
 use tauri::State;
 use zeroize::Zeroizing;
 
 use crate::{
+    AppError, AppState, MAX_SECRET_BYTES,
     models::{
         AdmissionPass, FanAuthResult, FanConfirmationInput, FanEventInterest, FanProfile,
         FanSessionStatus, FanSignupInput, PublicEvent, ReferralProgress, TicketWallet,
@@ -18,7 +19,7 @@ use crate::{
     },
     session::{fan_profile, persist_fan, run_blocking},
     validation::{bounded_secret, validate_fan_confirmation, validate_fan_signup, validate_pin},
-    vault, AppError, AppState, MAX_SECRET_BYTES,
+    vault,
 };
 
 const MAX_WALLETS: usize = 24;
@@ -302,10 +303,10 @@ pub(crate) async fn fan_wallets(state: State<'_, AppState>) -> Result<WalletBatc
             Err(_) => {}
         }
     }
-    if wallets.is_empty() {
-        if let Some(error) = first_error {
-            return Err(error);
-        }
+    if wallets.is_empty()
+        && let Some(error) = first_error
+    {
+        return Err(error);
     }
     let configured_orders = profile
         .wallets
