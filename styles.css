@@ -114,12 +114,20 @@ button:disabled { opacity: .48; cursor: default; }
 .event-card p, .order-card p { color: var(--muted); font-size: 11px; margin-top: 4px; }
 .chevron { color: var(--yellow); font-size: 28px; }
 .bottom-nav { position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; height: calc(68px + var(--safe-bottom)); padding-bottom: var(--safe-bottom); display: grid; background: #0c0c0c; border-top: 1px solid #272724; }
-.bottom-nav.six { grid-template-columns: repeat(6, 1fr); }
+.bottom-nav.three { grid-template-columns: repeat(3, 1fr); }
 .bottom-nav.four { grid-template-columns: repeat(4, 1fr); }
+.bottom-nav.five { grid-template-columns: repeat(5, 1fr); }
+.bottom-nav.six { grid-template-columns: repeat(6, 1fr); }
 .bottom-nav button { border: 0; background: none; color: #777; display: grid; place-content: center; gap: 3px; padding: 5px 0; }
 .bottom-nav button.active { color: var(--yellow); }
 .bottom-nav span { font-size: 20px; line-height: 1; }
 .bottom-nav small { font-size: 8px; font-weight: 800; }
+.overflow-backdrop { position: fixed; inset: 0; z-index: 50; background: #00000088; }
+.overflow-menu { position: fixed; z-index: 51; top: max(60px, calc(env(safe-area-inset-top) + 48px)); right: 14px; min-width: 180px; background: #161614; border: 1px solid #333; border-radius: 12px; box-shadow: 0 16px 48px #000a; padding: 6px; display: grid; gap: 2px; }
+.overflow-menu button { border: 0; background: transparent; color: #bbb; display: flex; align-items: center; gap: 10px; padding: 13px 16px; font-size: .88rem; font-weight: 600; border-radius: 8px; }
+.overflow-menu button:active, .overflow-menu button.active { background: #222; color: var(--yellow); }
+.overflow-menu button span { width: 22px; text-align: center; font-size: 1.1rem; }
+.menu-trigger { font-size: 20px !important; letter-spacing: 2px; }
 .scanner-button { margin-top: 14px; width: 100%; min-height: 300px; border: 1px solid #473d18; background: radial-gradient(circle, #2c260d, #10100d 54%, #0a0a0a); color: #fff; display: grid; place-content: center; justify-items: center; gap: 14px; }
 .scanner-frame { width: 142px; height: 142px; border: 2px solid var(--yellow); box-shadow: inset 0 0 34px #f3c51a16, 0 0 40px #f3c51a10; }
 .scanner-button strong { color: var(--yellow); letter-spacing: .08em; }
@@ -222,7 +230,6 @@ button:disabled { opacity: .48; cursor: default; }
 .skeleton-stack i { display: block; height: 82px; contain: strict; background: #1b1b19; animation: skeleton-pulse 1.1s ease-in-out infinite alternate; }
 @keyframes skeleton-pulse { to { opacity: .42; } }
 
-.bottom-nav.five { grid-template-columns: repeat(5, 1fr); }
 .area-screen .screen-title p:last-child { color: var(--muted); max-width: 34rem; }
 .area-hero-card { border: 1px solid rgba(231,200,74,.34); background: linear-gradient(145deg, rgba(231,200,74,.12), rgba(15,15,14,.95)); padding: 18px; display: grid; gap: 14px; }
 .area-hero-card h3 { margin: 3px 0 0; font-size: 34px; }
@@ -367,18 +374,21 @@ button:disabled { opacity: .48; cursor: default; }
   z-index: 60;
   top: max(14px, env(safe-area-inset-top));
   left: 14px;
-  min-width: 104px;
-  min-height: 44px;
-  padding: 0 15px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #3a3a35;
-  background: #11110ff2;
-  color: #d7d7cf;
-  box-shadow: 0 8px 24px #0008;
-  font-size: 11px;
+  gap: 5px;
+  border: 1px solid #2a2a27;
+  border-radius: 20px;
+  background: #0c0c0af0;
+  color: #999;
+  backdrop-filter: blur(8px);
+  font-size: 10px;
   line-height: 1;
+  transition: border-color .15s, color .15s;
 }
 .back-button:active {
   transform: translateY(1px);
@@ -648,11 +658,6 @@ html[data-virya-scanner-active] .app-shell {
 .city-stable-entry { margin-top: 2px; }
 
 /* ecosystem-v13-signal-control-plane */
-.bottom-nav.seven { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.bottom-nav.seven button { min-width: 0; }
-.bottom-nav.seven span { font-size: 18px; }
-.bottom-nav.seven small { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 .screen-copy { margin: 9px 0 0; color: var(--muted); line-height: 1.5; }
 .signal-admin-toolbar { display: grid; grid-template-columns: 1fr auto; gap: 14px; align-items: center; padding: 14px; border: 1px solid var(--line); background: var(--surface); }
 .signal-admin-toolbar p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }

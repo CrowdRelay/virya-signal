@@ -366,6 +366,7 @@ fn OperatorApp(
     let signal_overview = RwSignal::new(None::<OperatorSignalOverview>);
     let signal_loading = RwSignal::new(false);
     let signal_requested = RwSignal::new(false);
+    let menu_open = RwSignal::new(false);
     Effect::new(move |_| {
         if status.get().unlocked && dashboard.get().is_none() {
             dashboard.set(Some(DashboardData::default()));
@@ -421,9 +422,21 @@ fn OperatorApp(
     view! {
         <section class="authenticated">
             <header class="topbar">
-                <div><p class="eyebrow">VIRYA CONTROL</p><strong>{move || status.get().session.map(|s| s.display_name).value_or_else(Default::default)}</strong></div>
-                <div class="topbar-actions"><span class="role-pill">{move || role().label()}</span><button aria-label="Zamknij i zablokuj panel" on:click=close>"×"</button></div>
+                <div><p class="eyebrow">"VIRYA CONTROL"</p><strong>{move || status.get().session.map(|s| s.display_name).value_or_else(Default::default)}</strong></div>
+                <div class="topbar-actions">
+                    <span class="role-pill">{move || role().label()}</span>
+                    <button class="menu-trigger" aria-label="Więcej opcji" on:click=move |_| menu_open.update(|v| *v = !*v)>"⋯"</button>
+                    <button aria-label="Zamknij i zablokuj panel" on:click=close>"×"</button>
+                </div>
             </header>
+            <Show when=move || menu_open.get()>
+                <div class="overflow-backdrop" on:click=move |_| menu_open.set(false)></div>
+                <nav class="overflow-menu">
+                    <button class:active=move || tab.get() == OperatorTab::Discounts on:click=move |_| { tab.set(OperatorTab::Discounts); menu_open.set(false); }><span>"%"</span>"Zniżki"</button>
+                    <button class:active=move || tab.get() == OperatorTab::Campaigns on:click=move |_| { tab.set(OperatorTab::Campaigns); menu_open.set(false); }><span>"◫"</span>"Kody QR"</button>
+                    <button class:active=move || tab.get() == OperatorTab::Settings on:click=move |_| { tab.set(OperatorTab::Settings); menu_open.set(false); }><span>"⚙"</span>"Ustawienia"</button>
+                </nav>
+            </Show>
             <div class="content">
                 {move || match tab.get() {
                     OperatorTab::Home => view! { <OperatorHome dashboard=dashboard loading=loading /> }.into_any(),
@@ -435,14 +448,13 @@ fn OperatorApp(
                     OperatorTab::Settings => view! { <OperatorSettings status=status dashboard=dashboard loading=loading error=error /> }.into_any(),
                 }}
             </div>
-            <nav class="bottom-nav seven">
+            <nav class="bottom-nav" class:four=move || owner.get() class:three=move || !owner.get()>
                 <NavButton tab=tab own=OperatorTab::Home icon="⌁" label="Start" />
-                <NavButton tab=tab own=OperatorTab::Signal icon="◉" label="Sygnał" />
+                <Show when=move || owner.get()>
+                    <NavButton tab=tab own=OperatorTab::Signal icon="◉" label="Sygnał" />
+                </Show>
                 <NavButton tab=tab own=OperatorTab::Scan icon="▣" label="Skan" />
                 <NavButton tab=tab own=OperatorTab::Tickets icon="▤" label="Bilety" />
-                <NavButton tab=tab own=OperatorTab::Discounts icon="%" label="Zniżki" />
-                <NavButton tab=tab own=OperatorTab::Campaigns icon="◫" label="QR" />
-                <NavButton tab=tab own=OperatorTab::Settings icon="⚙" label="Opcje" />
             </nav>
         </section>
     }
