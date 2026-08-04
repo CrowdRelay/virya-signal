@@ -1476,9 +1476,28 @@ fn FanAccess(
                         refresh_fan_status(status, error);
                     } else {
                         access_mode.set(FanAccessMode::Confirm);
-                        error.set(Some(
-                            "Mail wysłany. Zeskanuj QR albo wklej kod z wiadomości.".to_owned(),
-                        ));
+                        let message = match result.email_queued {
+                            Some(true) if result.email_kind.as_deref() == Some("session_recovery") =>
+                                "Wysłaliśmy bezpieczny link dostępu. Zeskanuj QR albo wklej kod z wiadomości."
+                                    .to_owned(),
+                            Some(true) =>
+                                "Wysłaliśmy kod potwierdzający. Zeskanuj QR albo wklej kod z wiadomości."
+                                    .to_owned(),
+                            Some(false) => {
+                                let minutes = result
+                                    .retry_after_seconds
+                                    .map(|seconds| seconds.saturating_add(59) / 60)
+                                    .unwrap_or(15)
+                                    .max(1);
+                                format!(
+                                    "Nowa wiadomość nie została wysłana, bo poprzedni kod jest jeszcze ważny. Użyj poprzedniej wiadomości albo spróbuj ponownie za około {minutes} min."
+                                )
+                            }
+                            None =>
+                                "Zgłoszenie zostało przyjęte. Sprawdź skrzynkę i spam; jeśli wiadomości nie ma, spróbuj ponownie później."
+                                    .to_owned(),
+                        };
+                        error.set(Some(message));
                     }
                 }
                 Err(message) => error.set(Some(message)),

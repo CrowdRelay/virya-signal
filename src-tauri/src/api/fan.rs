@@ -19,6 +19,16 @@ use super::{
 };
 
 #[derive(Deserialize)]
+struct FanSignupApiResponse {
+    #[serde(default)]
+    email_kind: Option<String>,
+    #[serde(default)]
+    email_queued: Option<bool>,
+    #[serde(default)]
+    retry_after_seconds: Option<u32>,
+}
+
+#[derive(Deserialize)]
 struct FanConfirmationApiResponse {
     fan_session_token: Option<String>,
 }
@@ -142,10 +152,13 @@ impl super::CrowdRelayClient {
             .send()
             .await?;
         let token = response_cookie(response.headers(), FAN_COOKIE);
-        let _: serde_json::Value = decode(response).await?;
+        let body: FanSignupApiResponse = decode(response).await?;
         Ok((
             FanAuthResult {
                 session_created: token.is_some(),
+                email_kind: body.email_kind,
+                email_queued: body.email_queued,
+                retry_after_seconds: body.retry_after_seconds,
             },
             token,
         ))
@@ -190,6 +203,9 @@ impl super::CrowdRelayClient {
         Ok((
             FanAuthResult {
                 session_created: true,
+                email_kind: None,
+                email_queued: None,
+                retry_after_seconds: None,
             },
             session_token,
         ))

@@ -619,6 +619,12 @@ pub struct FanConfirmationInput {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FanAuthResult {
     pub session_created: bool,
+    #[serde(default)]
+    pub email_kind: Option<String>,
+    #[serde(default)]
+    pub email_queued: Option<bool>,
+    #[serde(default)]
+    pub retry_after_seconds: Option<u32>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
