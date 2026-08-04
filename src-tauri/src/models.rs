@@ -289,6 +289,7 @@ pub struct QrCampaignSummary {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct ReferralProgress {
+    #[serde(deserialize_with = "deserialize_string_or_bytes")]
     pub referral_code: String,
     #[serde(default)]
     pub qualified_referrals: u32,
@@ -304,23 +305,31 @@ pub struct ReferralProgress {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct WeightedDrawEntry {
+    #[serde(deserialize_with = "deserialize_string_or_bytes")]
     pub name: String,
+    #[serde(deserialize_with = "deserialize_string_or_bytes")]
     pub prize_kind: String,
+    #[serde(deserialize_with = "deserialize_string_or_bytes")]
     pub draw_at: String,
     pub total_entries: u32,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MerchCoupon {
+    #[serde(deserialize_with = "deserialize_string_or_bytes")]
     pub code: String,
     pub discount_percent: u32,
+    #[serde(deserialize_with = "deserialize_string_or_bytes")]
     pub status: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PhysicalRewardGrant {
+    #[serde(deserialize_with = "deserialize_string_or_bytes")]
     pub item_name: String,
+    #[serde(deserialize_with = "deserialize_string_or_bytes")]
     pub sku: String,
+    #[serde(deserialize_with = "deserialize_string_or_bytes")]
     pub status: String,
 }
 
@@ -771,6 +780,35 @@ mod tests {
             "physical_rewards": []
         })));
         assert_eq!(referral.draw_entries[0].total_entries, 4);
+    }
+
+    #[test]
+    fn referral_payload_accepts_legacy_byte_sequences_for_text_fields() {
+        let referral: ReferralProgress = test_value(serde_json::from_value(serde_json::json!({
+            "referral_code": b"VIRYA".to_vec(),
+            "qualified_referrals": 2,
+            "pending_referrals": 1,
+            "draw_entries": [{
+                "name": b"Backstage".to_vec(),
+                "prize_kind": b"pass".to_vec(),
+                "draw_at": b"2026-08-02T20:00:00Z".to_vec(),
+                "total_entries": 4
+            }],
+            "coupons": [{
+                "code": b"VIRYA10".to_vec(),
+                "discount_percent": 10,
+                "status": b"active".to_vec()
+            }],
+            "physical_rewards": [{
+                "item_name": b"Album".to_vec(),
+                "sku": b"ALBUM-01".to_vec(),
+                "status": b"granted".to_vec()
+            }]
+        })));
+        assert_eq!(referral.referral_code, "VIRYA");
+        assert_eq!(referral.draw_entries[0].name, "Backstage");
+        assert_eq!(referral.coupons[0].code, "VIRYA10");
+        assert_eq!(referral.physical_rewards[0].sku, "ALBUM-01");
     }
 }
 
