@@ -143,6 +143,12 @@ pub struct FanSessionStatus {
     pub session: Option<FanSummary>,
 }
 
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct LauncherStatus {
+    pub operator: SessionStatus,
+    pub fan: FanSessionStatus,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct EventListResponse {
     pub events: Vec<PublicEvent>,

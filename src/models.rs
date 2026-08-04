@@ -45,6 +45,12 @@ pub struct FanSessionStatus {
     pub session: Option<FanSummary>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct LauncherStatus {
+    pub operator: SessionStatus,
+    pub fan: FanSessionStatus,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct FanSummary {
     pub email: String,

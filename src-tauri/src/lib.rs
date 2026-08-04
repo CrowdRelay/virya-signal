@@ -23,7 +23,7 @@ use commands::{
         fan_register_interest, fan_request_delivery, fan_signup, fan_status, fan_unlock,
         fan_wallets, render_wallet_qr,
     },
-    misc::{open_external_url, request_city},
+    misc::{launcher_status, open_external_url, request_city},
     operator::{
         configure, create_qr_campaign, forget_device, issue_pass, lock, operator_events,
         operator_ops_overview, operator_qr, operator_retry, operator_signal_overview,
@@ -100,6 +100,7 @@ pub fn run() {
             crash::native_crash_report,
             crash::acknowledge_native_crash,
             session_status,
+            launcher_status,
             configure,
             unlock,
             lock,

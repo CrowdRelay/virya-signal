@@ -6,11 +6,9 @@
   const RECOVERY_MS = 30_000;
   const RETRY_KEY = "virya-signal-boot-retry-v1";
   const VIRYA_SESSION_STORAGE_KEY = "virya-signal-runtime-session-v3";
-  const SESSION_HEARTBEAT_MS = 10_000;
   const MAX_ABNORMAL_SESSION_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
   const startedAt = Date.now();
   let settled = false;
-  let observer;
   let slowTimer;
   let recoveryTimer;
   let lastPhase = "script-ready";
@@ -55,10 +53,6 @@
     writeSession(runtimeSession);
   };
   persistRuntimeSession();
-  const heartbeatTimer = window.setInterval(() => {
-    if (document.visibilityState !== "hidden") persistRuntimeSession("foreground");
-  }, SESSION_HEARTBEAT_MS);
-
 
   const splash = () => document.getElementById("boot-splash");
   const status = () => document.getElementById("boot-status");
@@ -111,7 +105,6 @@
     if (settled) return;
     settled = true;
     clearTimers();
-    observer?.disconnect();
     document.documentElement.setAttribute(READY_ATTRIBUTE, "true");
     try {
       window.sessionStorage?.removeItem(RETRY_KEY);
@@ -194,8 +187,6 @@
     reconcile();
     if (settled) return;
 
-    observer = new MutationObserver(reconcile);
-    observer.observe(document.body, { childList: true, subtree: true });
     slowTimer = window.setTimeout(() => {
       if (!settled && status()) {
         status().textContent = "JESZCZE CHWILA — KOŃCZĘ START";
@@ -220,7 +211,6 @@
     persistRuntimeSession(document.visibilityState === "hidden" ? "background" : "foreground");
   });
   window.addEventListener("pagehide", () => {
-    window.clearInterval(heartbeatTimer);
     persistRuntimeSession("background");
   });
   window.addEventListener("pageshow", () => persistRuntimeSession("foreground"));

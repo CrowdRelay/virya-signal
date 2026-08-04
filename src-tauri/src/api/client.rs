@@ -1,6 +1,9 @@
 use std::{
     path::PathBuf,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
     time::{Duration, Instant},
 };
 
@@ -38,6 +41,7 @@ pub struct CrowdRelayClient {
     cities_fetch: Arc<Mutex<()>>,
     pub(super) cache_file: Arc<PathBuf>,
     cache_write: Arc<Mutex<()>>,
+    cache_persisting: Arc<AtomicBool>,
 }
 
 impl CrowdRelayClient {
@@ -71,6 +75,7 @@ impl CrowdRelayClient {
             cities_fetch: Arc::new(Mutex::new(())),
             cache_file: Arc::new(cache_file),
             cache_write: Arc::new(Mutex::new(())),
+            cache_persisting: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -340,9 +345,13 @@ impl CrowdRelayClient {
     }
 
     pub(super) fn persist_public_cache_in_background(&self) {
+        if self.cache_persisting.swap(true, Ordering::SeqCst) {
+            return;
+        }
         let client = self.clone();
         tokio::spawn(async move {
             client.persist_public_cache().await;
+            client.cache_persisting.store(false, Ordering::SeqCst);
         });
     }
 

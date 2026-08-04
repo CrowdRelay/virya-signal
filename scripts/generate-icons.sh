@@ -12,6 +12,9 @@ SVG_FG="$ICONS_DIR/virya-signal-foreground.svg"
 render() {
   local input="$1" output="$2" size="$3"
   npx --yes resvg-cli "$input" "$output" --fit-width "$size" --fit-height "$size"
+  if command -v oxipng &>/dev/null; then
+    oxipng -o 4 --strip all --nc "$output"
+  fi
 }
 
 echo "=== Generating Virya Signal icons ==="

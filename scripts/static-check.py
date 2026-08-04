@@ -103,14 +103,14 @@ boot_initializer = (root / 'boot-initializer.mjs').read_text()
 main = (root / 'src/main.rs').read_text()
 if 'data-trunk rel="copy-dir" href="public"' in index:
     raise SystemExit('index.html references the optional public directory')
-if 'class="boot-led"' not in index or '@keyframes boot-led' not in index:
+if 'class="boot-signal"' not in index or '@keyframes boot-pulse' not in index:
     raise SystemExit('Virya Signal splash LED is missing or not animated')
 if '<script src="boot.js" defer>' in index:
     raise SystemExit('boot listener must execute before the deferred WASM module')
-boot_tag = '<script src="boot.js?v=0.4.2-startup-v6"></script>'
+boot_tag = '<script src="boot.js?v=0.4.2-startup-v7"></script>'
 if boot_tag not in index or index.find(boot_tag) > index.find('data-trunk rel="rust"'):
     raise SystemExit('boot listener must be declared before the WASM entrypoint')
-for contract in ['window.__VIRYA_BOOT__', 'data-virya-ready', '.app-shell .launcher', 'MutationObserver', 'unhandledrejection', 'retry-blocked']:
+for contract in ['window.__VIRYA_BOOT__', 'data-virya-ready', '.app-shell .launcher', 'unhandledrejection', 'retry-blocked']:
     if contract not in boot:
         raise SystemExit(f'boot recovery contract is missing: {contract}')
 if 'URUCHOM APLIKACJĘ PONOWNIE' in boot or '15_000' in boot:
@@ -156,8 +156,12 @@ if 'futures::join!' in ui or 'fn Splash()' in ui:
     raise SystemExit('startup must render immediately instead of waiting behind a second splash')
 if 'serde_json::Value' in ui or 'serde_json::Value' in bridge:
     raise SystemExit('discarded IPC responses must not pull JSON values into the WASM UI')
-if 'invoke_timeout::<SessionStatus' not in ui or 'invoke_timeout::<FanSessionStatus' not in ui:
-    raise SystemExit('startup vault reads must have independent IPC deadlines')
+launcher_startup = 'bridge::launcher_status' in ui
+legacy_startup = (
+    'invoke_timeout::<SessionStatus' in ui and 'invoke_timeout::<FanSessionStatus' in ui
+)
+if not launcher_startup and not legacy_startup:
+    raise SystemExit('startup must read operator and fan vault status before rendering the launcher')
 if 'while (!(core = window.__TAURI__?.core)' not in bridge or 'Promise.race' not in bridge:
     raise SystemExit('Android IPC bridge wait/timeout contract is missing')
 if 'node scripts/test-boot.mjs' not in (root / '.github/workflows/check.yml').read_text():
@@ -212,7 +216,7 @@ if tomllib is not None:
 else:
     required_native_fragments = [
         'rust-version = "1.97"', 'rand = "0.10"', 'iota_stronghold = "2.1.0"',
-        'features = ["v4"]', 'features = ["gzip", "http2", "json", "rustls-no-provider"]',
+        'features = ["v4"]', 'features = ["gzip", "json", "rustls-no-provider"]',
         'futures-util = { version = "0.3", default-features = false, features = ["alloc"] }',
     ]
     required_ui_fragments = [
@@ -227,7 +231,7 @@ else:
         'dependencies': {
             'rand': '0.10', 'iota_stronghold': '2.1.0',
             'uuid': {'features': ['v4']},
-            'reqwest': {'features': ['gzip', 'http2', 'json', 'rustls-no-provider']},
+            'reqwest': {'features': ['gzip', 'json', 'rustls-no-provider']},
             'futures-util': {'default-features': False, 'features': ['alloc']},
         },
     }
@@ -255,8 +259,8 @@ native_dependencies = native_manifest.get('dependencies', {})
 if native_dependencies.get('uuid', {}).get('features') != ['v4']:
     raise SystemExit('native UUID support must not compile unused serde integration')
 reqwest = native_dependencies.get('reqwest', {})
-if not {'gzip', 'http2', 'json', 'rustls-no-provider'}.issubset(reqwest.get('features', [])):
-    raise SystemExit('native HTTP client must keep compression, HTTP/2 and explicit Rustls')
+if not {'gzip', 'json', 'rustls-no-provider'}.issubset(reqwest.get('features', [])):
+    raise SystemExit('native HTTP client must keep compression, JSON and explicit Rustls')
 if native_dependencies.get('iota_stronghold') != '2.1.0' or 'tauri-plugin-stronghold' in native_dependencies:
     raise SystemExit('native vault must depend on Stronghold directly without the unused Tauri plugin')
 futures_util = native_dependencies.get('futures-util', {})

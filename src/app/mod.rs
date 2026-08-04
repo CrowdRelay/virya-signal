@@ -43,37 +43,20 @@ pub fn App() -> impl IntoView {
         operator_status_failed.set(false);
         fan_status_failed.set(false);
         spawn_local(async move {
-            match bridge::invoke_timeout::<SessionStatus, _>(
-                "session_status",
-                &EmptyArgs {},
-                10_000,
-            )
-            .await
-            {
-                Ok(value) => {
-                    operator_status.set(value);
+            match bridge::launcher_status().await {
+                Ok(status) => {
+                    operator_status.set(status.operator);
                     operator_status_failed.set(false);
-                }
-                Err(message) => {
-                    operator_status_failed.set(true);
-                    error.set(Some(message));
-                }
-            }
-            operator_status_loading.set(false);
-        });
-        spawn_local(async move {
-            match bridge::invoke_timeout::<FanSessionStatus, _>("fan_status", &EmptyArgs {}, 10_000)
-                .await
-            {
-                Ok(value) => {
-                    fan_status.set(value);
+                    fan_status.set(status.fan);
                     fan_status_failed.set(false);
                 }
                 Err(message) => {
+                    operator_status_failed.set(true);
                     fan_status_failed.set(true);
                     error.set(Some(message));
                 }
             }
+            operator_status_loading.set(false);
             fan_status_loading.set(false);
         });
     });

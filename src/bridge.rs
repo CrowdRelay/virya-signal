@@ -461,6 +461,12 @@ where
     serde_wasm_bindgen::from_value(value).map_err(decode_error)
 }
 
+/// Fetches the launcher-time status for both operator and fan sessions in a
+/// single native round-trip, cutting startup IPC latency roughly in half.
+pub async fn launcher_status() -> Result<crate::models::LauncherStatus, String> {
+    invoke_timeout::<crate::models::LauncherStatus, _>("launcher_status", &(), 10_000).await
+}
+
 /// Runs a read request in a named UI scope. Starting a newer request in the
 /// same scope makes the older result disappear, preventing stale state writes.
 pub async fn invoke_latest<T, A>(

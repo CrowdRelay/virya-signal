@@ -5,8 +5,11 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::{
     AppError, AppState,
-    models::{RequestedCityInput, RequestedCityResult},
+    models::{
+        FanSessionStatus, LauncherStatus, RequestedCityInput, RequestedCityResult, SessionStatus,
+    },
     validation::clean_optional,
+    vault,
 };
 
 #[tauri::command]
@@ -53,4 +56,26 @@ pub(crate) async fn request_city(
         .api
         .request_city("https://signal-api.virya.music/v1/", &input)
         .await
+}
+
+#[tauri::command]
+pub(crate) async fn launcher_status(
+    state: State<'_, AppState>,
+) -> Result<LauncherStatus, AppError> {
+    let operator_session = state.session.read().await;
+    let fan_session = state.fan_session.read().await;
+    Ok(LauncherStatus {
+        operator: SessionStatus {
+            configured: vault::exists(&state.app_data_dir),
+            unlocked: operator_session.is_some(),
+            session: operator_session
+                .as_ref()
+                .map(|profile| profile.as_ref().into()),
+        },
+        fan: FanSessionStatus {
+            configured: vault::fan_exists(&state.app_data_dir),
+            unlocked: fan_session.is_some(),
+            session: fan_session.as_ref().map(|profile| profile.as_ref().into()),
+        },
+    })
 }

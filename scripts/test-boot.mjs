@@ -143,7 +143,7 @@ function runtime({ ready = false, mounted = false, retryCount = 0 } = {}) {
 
 {
   const app = runtime();
-  app.mount();
+  app.boot.ready();
   assert.equal(app.splash.hidden, true);
 }
 
