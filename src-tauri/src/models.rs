@@ -188,10 +188,10 @@ fn value_as_u16(value: &Value) -> Result<u16, String> {
             .map_err(|_| format!("text code unit {number} exceeds the UTF-16 range"));
     }
 
-    if let Some(number) = value.as_i64() {
-        if (-128..=-1).contains(&number) {
-            return Ok((number as i8 as u8) as u16);
-        }
+    if let Some(number) = value.as_i64()
+        && (-128..=-1).contains(&number)
+    {
+        return Ok((number as i8 as u8) as u16);
     }
 
     Err(format!(
@@ -201,7 +201,7 @@ fn value_as_u16(value: &Value) -> Result<u16, String> {
 
 fn looks_like_utf16_le_bytes(values: &[u16]) -> bool {
     values.len() >= 2
-        && values.len() % 2 == 0
+        && values.len().is_multiple_of(2)
         && values
             .iter()
             .enumerate()
@@ -210,7 +210,7 @@ fn looks_like_utf16_le_bytes(values: &[u16]) -> bool {
 
 fn looks_like_utf16_be_bytes(values: &[u16]) -> bool {
     values.len() >= 2
-        && values.len() % 2 == 0
+        && values.len().is_multiple_of(2)
         && values
             .iter()
             .enumerate()
