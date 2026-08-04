@@ -2102,6 +2102,11 @@ fn Skeleton(#[prop(default = 3)] rows: usize) -> impl IntoView {
 
 #[component]
 fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
+    Effect::new(move |_| {
+        if error.get().is_some() {
+            set_timeout(move || error.set(None), std::time::Duration::from_secs(5));
+        }
+    });
     view! { <Show when=move || error.get().is_some()><button class="toast" on:click=move |_| error.set(None)>{move || error.get().value_or_else(Default::default)}</button></Show> }
 }
 
