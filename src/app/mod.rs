@@ -250,7 +250,12 @@ fn OperatorAccess(
     let scan_pairing = move |_| {
         spawn_local(async move {
             match bridge::scan_qr().await {
-                Ok(Some(value)) => pair(value),
+                Ok(Some(value)) => {
+                    pairing.set(value);
+                    if pin.get().chars().count() >= 6 {
+                        pair(pairing.get());
+                    }
+                }
                 Ok(None) => {}
                 Err(message) => error.set(Some(message)),
             }
@@ -303,12 +308,20 @@ fn OperatorAccess(
             <div class="access-card">
                 <Show when=move || status.get().configured fallback=move || view! {
                     <div class="pairing-flow">
-                        <button class="pairing-scan primary" on:click=scan_pairing disabled=move || busy.get()>
-                            <span class="pairing-qr">"▦"</span>
-                            <strong>{move || if busy.get() { "ŁĄCZĘ…" } else { "ZESKANUJ KOD QR" }}</strong>
-                            <small>Kod pokazany w panelu Virya</small>
-                        </button>
-                        <div class="pairing-divider"><span></span><small>ALBO</small><span></span></div>
+                        <Show when=move || pairing.get().trim().is_empty() fallback=move || view! {
+                            <div class="pairing-scanned">
+                                <span class="pairing-ok">"✓"</span>
+                                <strong>"Kod zeskanowany"</strong>
+                                <small>"Wpisz PIN poniżej i kliknij SPARUJ."</small>
+                            </div>
+                        }>
+                            <button class="pairing-scan primary" on:click=scan_pairing disabled=move || busy.get()>
+                                <span class="pairing-qr">"▦"</span>
+                                <strong>{move || if busy.get() { "ŁĄCZĘ…" } else { "ZESKANUJ KOD QR" }}</strong>
+                                <small>"Kod pokazany w panelu Virya"</small>
+                            </button>
+                        </Show>
+                        <div class="pairing-divider"><span></span><small>"ALBO"</small><span></span></div>
                         <label>"Kod parowania"<textarea rows="2" placeholder="virya-signal://pair?…" prop:value=move || pairing.get() on:input=move |e| pairing.set(event_target_value(&e))></textarea></label>
                         <label>"Lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e)) /></label>
                         <button class="primary" on:click=submit_pairing disabled=move || busy.get() || pairing.get().trim().is_empty()>"SPARUJ"</button>
@@ -1402,9 +1415,6 @@ fn FanAccess(
                         refresh_fan_status(status, error);
                     } else {
                         access_mode.set(FanAccessMode::Confirm);
-                        error.set(Some(
-                            "Sprawdź e-mail i wklej kod potwierdzający.".to_owned(),
-                        ));
                     }
                 }
                 Err(message) => error.set(Some(message)),
@@ -1447,9 +1457,14 @@ fn FanAccess(
         <section class="fan-access">
             <BackButton mode=mode />
             <header class="fan-access-hero">
-                <p class="eyebrow">VIRYA SIGNAL</p>
-                <h1>Koncerty, bilety<br/><em>i nagrody.</em></h1>
-                <p>Podaj e-mail i miasto. Potwierdź wiadomość, a reszta pojawi się w Twoim Sygnale.</p>
+                <p class="eyebrow">"VIRYA SIGNAL"</p>
+                <h1>"Koncerty, bilety"<br/><em>"i nagrody."</em></h1>
+                <p class="hero-subtitle">"Dołącz w 3 krokach:"</p>
+                <ol class="signal-steps" aria-label="Jak dołączyć">
+                    <li><span class="step-num">"1"</span>" Podaj e-mail i miasto"</li>
+                    <li><span class="step-num">"2"</span>" Potwierdź kod z wiadomości"</li>
+                    <li><span class="step-num">"3"</span>" Odkrywaj koncerty blisko Ciebie"</li>
+                </ol>
                 <div class="signal-purpose-grid" aria-label="Co daje Virya Signal">
                     <span><b aria-hidden="true">"⌁"</b>" koncerty blisko Ciebie"</span>
                     <span><b aria-hidden="true">"▣"</b>" bilety i QR w telefonie"</span>
@@ -1467,20 +1482,20 @@ fn FanAccess(
                         <label>"Imię / nazwa (opcjonalnie)"<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/></label>
                         <Show when=move || access_mode.get() == FanAccessMode::Signup fallback=move || view! {
                             <>
-                                <label>"Kod z e-maila"<textarea rows="3" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
+                                <p class="confirm-hint">"Sprawdź skrzynkę e-mail. Wklej poniżej kod, który wysłaliśmy."</p>
+                                <label>"Kod z e-maila"<textarea rows="3" placeholder="np. eyJhbGci..." prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
                                 <label>"Lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
                                 <button class="primary" disabled=move || busy.get() on:click=confirm>"POTWIERDŹ I WEJDŹ"</button>
                             </>
                         }>
                             <>
                                 <div class="custom-city-fields city-stable-entry">
-                                        <label>"Miejscowość"<input placeholder="np. Bielawa" prop:value=move || custom_city_name.get() on:input=move |e| custom_city_name.set(event_target_value(&e))/></label>
-                                        <label>"Województwo / region (opcjonalnie)"<input placeholder="dolnośląskie" prop:value=move || custom_region.get() on:input=move |e| custom_region.set(event_target_value(&e))/></label>
-                                        <p class="inline-note">Dodamy ją do mapy. Powiadomienia mogą działać jeszcze przed zatwierdzeniem.</p>
-                                    <p class="inline-note">Wpisz miejscowość ręcznie. Zapiszemy ją bezpiecznie i dopasujemy do mapy Sygnału.</p>
+                                    <label>"Miejscowość"<input placeholder="np. Bielawa" prop:value=move || custom_city_name.get() on:input=move |e| custom_city_name.set(event_target_value(&e))/></label>
+                                    <label>"Województwo / region (opcjonalnie)"<input placeholder="dolnośląskie" prop:value=move || custom_region.get() on:input=move |e| custom_region.set(event_target_value(&e))/></label>
+                                    <p class="inline-note">"Wpisz miejscowość ręcznie — dopasujemy ją do mapy Sygnału."</p>
                                 </div>
                                 <div class="nearby-pref">
-                                    <label class="check-label"><input type="checkbox" prop:checked=move || nearby_enabled.get() on:change=move |e| nearby_enabled.set(event_target_checked(&e))/><span>Powiadamiaj mnie o koncertach w pobliżu</span></label>
+                                    <label class="check-label"><input type="checkbox" prop:checked=move || nearby_enabled.get() on:change=move |e| nearby_enabled.set(event_target_checked(&e))/><span>"Powiadamiaj mnie o koncertach w pobliżu"</span></label>
                                     <Show when=move || nearby_enabled.get()>
                                         <div class="radius-picker">
                                             <button type="button" class:active=move || radius_km.get()==50 on:click=move |_| radius_km.set(50)>"50 km"</button>
@@ -1492,7 +1507,7 @@ fn FanAccess(
                                 </div>
                                 <label>"Kod polecający (opcjonalnie)"<input prop:value=move || referral.get() on:input=move |e| referral.set(event_target_value(&e))/></label>
                                 <label>"Lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
-                                <label class="check-label"><input type="checkbox" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/><span>Chcę otrzymywać informacje o koncertach, premierach i nagrodach Viryi.</span></label>
+                                <label class="check-label"><input type="checkbox" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/><span>"Chcę otrzymywać informacje o koncertach, premierach i nagrodach Viryi."</span></label>
                                 <button class="primary" disabled=move || busy.get() on:click=signup>"DOŁĄCZ DO SYGNAŁU"</button>
                             </>
                         </Show>
