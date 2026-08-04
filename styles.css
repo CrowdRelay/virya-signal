@@ -125,13 +125,17 @@ button:disabled { opacity: .48; cursor: default; }
 .bottom-nav button { border: 0; background: none; color: #777; display: grid; place-content: center; gap: 5px; padding: 8px 0; }
 .bottom-nav button.active { color: var(--yellow); }
 .bottom-nav span { font-size: 26px; line-height: 1; }
+.bottom-nav.primary-three span { font-size: 32px; }
+.bottom-nav.primary-three small { font-size: 11px; }
 .bottom-nav small { font-size: 10px; font-weight: 800; letter-spacing: .04em; }
 .overflow-backdrop { position: fixed; inset: 0; z-index: 50; background: #00000088; }
 .overflow-menu { position: fixed; z-index: 51; top: max(60px, calc(env(safe-area-inset-top) + 48px)); right: 14px; min-width: 180px; background: #161614; border: 1px solid #333; border-radius: 12px; box-shadow: 0 16px 48px #000a; padding: 6px; display: grid; gap: 2px; }
 .overflow-menu button { border: 0; background: transparent; color: #bbb; display: flex; align-items: center; gap: 10px; padding: 13px 16px; font-size: .88rem; font-weight: 600; border-radius: 8px; }
 .overflow-menu button:active, .overflow-menu button.active { background: #222; color: var(--yellow); }
 .overflow-menu button span { width: 22px; text-align: center; font-size: 1.1rem; }
-.menu-trigger { font-size: 20px !important; letter-spacing: 2px; }
+.menu-trigger { width: 44px; min-width: 44px; display: grid !important; place-content: center; gap: 5px; border-color: #5a5130 !important; background: #17150d !important; }
+.menu-trigger i { display: block; width: 21px; height: 2px; border-radius: 2px; background: var(--yellow); box-shadow: 0 0 10px #f3c51a33; }
+.menu-trigger[aria-expanded="true"] { background: #25200b !important; border-color: var(--yellow) !important; }
 .scanner-button { margin-top: 14px; width: 100%; min-height: 300px; border: 1px solid #473d18; background: radial-gradient(circle, #2c260d, #10100d 54%, #0a0a0a); color: #fff; display: grid; place-content: center; justify-items: center; gap: 14px; }
 .scanner-frame { width: 142px; height: 142px; border: 2px solid var(--yellow); box-shadow: inset 0 0 34px #f3c51a16, 0 0 40px #f3c51a10; }
 .scanner-button strong { color: var(--yellow); letter-spacing: .08em; }
@@ -718,3 +722,11 @@ html[data-virya-scanner-active] .app-shell {
   .confirmation-actions { grid-template-columns: 1fr; }
   .confirmation-action { min-height: 60px; }
 }
+
+.confirmation-actions.single { grid-template-columns: 1fr; }
+.recovery-link { margin-top: 4px; color: var(--yellow); text-align: center; }
+.recovery-panel { gap: 12px; }
+.recovery-heading { padding: 14px; border-left: 2px solid var(--yellow); background: #121108; }
+.recovery-heading h3 { margin: 5px 0; }
+.recovery-heading p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.event-actions .ticket-buy-button { border-color: var(--yellow); color: #090909; background: var(--yellow); }

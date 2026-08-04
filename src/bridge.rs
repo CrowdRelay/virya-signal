@@ -225,14 +225,6 @@ export async function viryaScanQr() {
   }
 }
 
-export async function viryaReadClipboard() {
-  const clipboard = window.navigator?.clipboard;
-  if (!clipboard?.readText) {
-    throw new Error('Odczyt schowka nie jest dostępny. Przytrzymaj pole i wybierz Wklej.');
-  }
-  const value = await clipboard.readText();
-  return String(value ?? '');
-}
 
 const VIRYA_FAILURE_STORAGE_KEY = 'virya:last-runtime-failure:v2';
 const VIRYA_FAILURE_HISTORY_KEY = 'virya:runtime-failure-history:v3';
@@ -430,9 +422,6 @@ extern "C" {
     #[wasm_bindgen(catch, js_name = viryaScanQr)]
     async fn scan_qr_js() -> Result<JsValue, JsValue>;
 
-    #[wasm_bindgen(catch, js_name = viryaReadClipboard)]
-    async fn read_clipboard_js() -> Result<JsValue, JsValue>;
-
     #[wasm_bindgen(js_name = viryaInstallRuntimeGuards)]
     fn install_runtime_guards_js();
 }
@@ -522,21 +511,6 @@ pub async fn scan_qr() -> Result<Option<String>, String> {
         Err("Skaner nie zwrócił kodu.".to_owned())
     } else {
         Ok(Some(value.to_owned()))
-    }
-}
-
-pub async fn read_clipboard() -> Result<String, String> {
-    let value = read_clipboard_js().await.map_err(js_error)?;
-    let value = value
-        .as_string()
-        .ok_or_else(|| "Schowek nie zwrócił tekstu.".to_owned())?;
-    let value = value.trim();
-    if value.is_empty() {
-        Err("Schowek jest pusty.".to_owned())
-    } else if value.len() > 8_192 {
-        Err("Zawartość schowka jest zbyt długa.".to_owned())
-    } else {
-        Ok(value.to_owned())
     }
 }
 

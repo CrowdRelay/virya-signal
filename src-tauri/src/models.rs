@@ -1,5 +1,40 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 use zeroize::Zeroize;
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum StringOrBytes {
+    String(String),
+    Bytes(Vec<u8>),
+}
+
+fn deserialize_string_or_bytes<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    match StringOrBytes::deserialize(deserializer)? {
+        StringOrBytes::String(value) => Ok(value),
+        StringOrBytes::Bytes(value) => String::from_utf8(value).map_err(D::Error::custom),
+    }
+}
+
+fn deserialize_optional_string_or_bytes<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::<StringOrBytes>::deserialize(deserializer)?.map_or(Ok(None), |value| {
+        deserialize_compat_string(value)
+            .map(Some)
+            .map_err(D::Error::custom)
+    })
+}
+
+fn deserialize_compat_string(value: StringOrBytes) -> Result<String, std::string::FromUtf8Error> {
+    match value {
+        StringOrBytes::String(value) => Ok(value),
+        StringOrBytes::Bytes(value) => String::from_utf8(value),
+    }
+}
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -45,7 +80,9 @@ pub struct SessionStatus {
 #[derive(Clone, Debug, Deserialize, Serialize, Zeroize)]
 #[zeroize(drop)]
 pub struct WalletCredential {
+    #[serde(deserialize_with = "deserialize_string_or_bytes")]
     pub order_id: String,
+    #[serde(deserialize_with = "deserialize_string_or_bytes")]
     pub checkout_token: String,
 }
 
@@ -101,13 +138,22 @@ pub struct WalletTicket {
 #[derive(Clone, Debug, Deserialize, Serialize, Zeroize)]
 #[zeroize(drop)]
 pub struct FanProfile {
+    #[serde(deserialize_with = "deserialize_string_or_bytes")]
     pub api_base_url: String,
-    #[serde(default = "new_area_wallet_id")]
+    #[serde(
+        default = "new_area_wallet_id",
+        deserialize_with = "deserialize_string_or_bytes"
+    )]
     pub area_wallet_id: String,
+    #[serde(deserialize_with = "deserialize_string_or_bytes")]
     pub email: String,
+    #[serde(default, deserialize_with = "deserialize_optional_string_or_bytes")]
     pub display_name: Option<String>,
+    #[serde(deserialize_with = "deserialize_string_or_bytes")]
     pub fan_session_token: String,
+    #[serde(default, deserialize_with = "deserialize_optional_string_or_bytes")]
     pub pass_session_token: Option<String>,
+    #[serde(default)]
     pub wallets: Vec<WalletCredential>,
 }
 
@@ -725,5 +771,33 @@ mod tests {
             "physical_rewards": []
         })));
         assert_eq!(referral.draw_entries[0].total_entries, 4);
+    }
+}
+
+#[cfg(test)]
+mod fan_profile_compat_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_byte_sequences_are_migrated_to_strings() {
+        let payload = serde_json::json!({
+            "api_base_url": b"https://signal-api.virya.music/v1/".to_vec(),
+            "email": b"fan@example.com".to_vec(),
+            "display_name": b"Fan".to_vec(),
+            "fan_session_token": b"session-token".to_vec(),
+            "pass_session_token": null,
+            "wallets": [{
+                "order_id": b"01234567-89ab-cdef-0123-456789abcdef".to_vec(),
+                "checkout_token": b"checkout-token".to_vec()
+            }]
+        });
+        let profile: FanProfile = match serde_json::from_value(payload) {
+            Ok(profile) => profile,
+            Err(error) => panic!("legacy profile migration failed: {error}"),
+        };
+        assert_eq!(profile.email, "fan@example.com");
+        assert_eq!(profile.fan_session_token, "session-token");
+        assert_eq!(profile.wallets[0].checkout_token, "checkout-token");
+        assert!(!profile.area_wallet_id.is_empty());
     }
 }

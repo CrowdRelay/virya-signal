@@ -408,13 +408,16 @@ fn OperatorApp(
                 <div on:dblclick=move |_| refresh_operator_parts(dashboard, loading, error) style="cursor:pointer"><p class="eyebrow">"VIRYA CONTROL"</p><strong>{move || status.get().session.map(|s| s.display_name).value_or_else(Default::default)}</strong></div>
                 <div class="topbar-actions">
                     <span class="role-pill">{move || role().label()}</span>
-                    <button class="menu-trigger" aria-label="Więcej opcji" on:click=move |_| menu_open.update(|v| *v = !*v)>"⋯"</button>
+                    <button class="menu-trigger" aria-label="Otwórz menu" aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|v| *v = !*v)><i></i><i></i><i></i></button>
                     <button aria-label="Zamknij i zablokuj panel" on:click=close>"×"</button>
                 </div>
             </header>
             <Show when=move || menu_open.get()>
                 <div class="overflow-backdrop" on:click=move |_| menu_open.set(false)></div>
                 <nav class="overflow-menu">
+                    <Show when=move || owner.get()>
+                        <button class:active=move || tab.get() == OperatorTab::Signal on:click=move |_| { tab.set(OperatorTab::Signal); menu_open.set(false); }><span>"◉"</span>"Sygnał"</button>
+                    </Show>
                     <button class:active=move || tab.get() == OperatorTab::Discounts on:click=move |_| { tab.set(OperatorTab::Discounts); menu_open.set(false); }><span>"%"</span>"Zniżki"</button>
                     <button class:active=move || tab.get() == OperatorTab::Campaigns on:click=move |_| { tab.set(OperatorTab::Campaigns); menu_open.set(false); }><span>"◫"</span>"Kody QR"</button>
                     <button class:active=move || tab.get() == OperatorTab::Settings on:click=move |_| { tab.set(OperatorTab::Settings); menu_open.set(false); }><span>"⚙"</span>"Ustawienia"</button>
@@ -431,11 +434,8 @@ fn OperatorApp(
                     OperatorTab::Settings => view! { <OperatorSettings status=status dashboard=dashboard loading=loading error=error /> }.into_any(),
                 }}
             </div>
-            <nav class="bottom-nav" class:four=move || owner.get() class:three=move || !owner.get()>
+            <nav class="bottom-nav three primary-three">
                 <NavButton tab=tab own=OperatorTab::Home icon="⌁" label="Start" />
-                <Show when=move || owner.get()>
-                    <NavButton tab=tab own=OperatorTab::Signal icon="◉" label="Sygnał" />
-                </Show>
                 <NavButton tab=tab own=OperatorTab::Scan icon="▣" label="Skan" />
                 <NavButton tab=tab own=OperatorTab::Tickets icon="▤" label="Bilety" />
             </nav>
@@ -1391,6 +1391,7 @@ fn FanAccess(
     let nearby_enabled = RwSignal::new(true);
     let radius_km = RwSignal::new(150_u16);
     let busy = RwSignal::new(false);
+    let recovery_open = RwSignal::new(false);
 
     let unlock = move |_| {
         let current_pin = pin.get();
@@ -1572,25 +1573,6 @@ fn FanAccess(
         });
     };
 
-    let paste_confirmation = move |_| {
-        if busy.get_untracked() {
-            return;
-        }
-        busy.set(true);
-        spawn_local(async move {
-            match bridge::read_clipboard().await {
-                Ok(value) => {
-                    token.set(value);
-                    error.set(Some(
-                        "Kod wklejony. Uzupełnij e-mail i PIN, potem potwierdź.".to_owned(),
-                    ));
-                }
-                Err(message) => error.set(Some(message)),
-            }
-            busy.set(false);
-        });
-    };
-
     view! {
         <section class="fan-access">
             <BackButton mode=mode />
@@ -1622,9 +1604,8 @@ fn FanAccess(
                             <>
                                 <p class="confirm-hint"><strong>"Najszybciej: zeskanuj QR z maila."</strong><br/>"Możesz też wkleić cały link albo 64-znakowy kod. Aplikacja sama wyciągnie właściwy token."</p>
                                 <label>"Link lub kod z e-maila"<textarea rows="3" autocomplete="one-time-code" spellcheck="false" autocapitalize="none" placeholder="Wklej link, kod albo użyj QR" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
-                                <div class="confirmation-actions">
-                                    <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>"SKANUJ QR"</strong><small>"aparat telefonu"</small></button>
-                                    <button type="button" class="confirmation-action" disabled=move || busy.get() on:click=paste_confirmation><span aria-hidden="true">"⌁"</span><strong>"WKLEJ"</strong><small>"ze schowka"</small></button>
+                                <div class="confirmation-actions single">
+                                    <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>"SKANUJ QR"</strong><small>"albo przytrzymaj pole wyżej i wybierz Wklej"</small></button>
                                 </div>
                                 <label>"Lokalny PIN"<input type="password" autocomplete="new-password" inputmode="numeric" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
                                 <p class="confirmation-note">"PIN szyfruje profil tylko na tym urządzeniu. Nie wysyłamy go do CrowdRelay."</p>
@@ -1660,11 +1641,29 @@ fn FanAccess(
                 </div>
             }>
                 <div class="access-card fan-card">
-                    <p class="lock-copy">Twój profil i bilety są zaszyfrowane na urządzeniu.</p>
-                    <div class="form-grid">
-                        <label>"PIN"<input type="password" autocomplete="current-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
-                        <button class="primary" disabled=move || busy.get() on:click=unlock>"OTWÓRZ MÓJ SYGNAŁ"</button>
-                    </div>
+                    <Show when=move || recovery_open.get() fallback=move || view! {
+                        <>
+                            <p class="lock-copy">Twój profil i bilety są zaszyfrowane na urządzeniu.</p>
+                            <div class="form-grid">
+                                <label>"PIN"<input type="password" autocomplete="current-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
+                                <button class="primary" disabled=move || busy.get() on:click=unlock>"OTWÓRZ MÓJ SYGNAŁ"</button>
+                                <button type="button" class="text-button recovery-link" on:click=move |_| recovery_open.set(true)>"NIE PAMIĘTAM PIN-U / ZALOGUJ PONOWNIE"</button>
+                            </div>
+                        </>
+                    }>
+                        <div class="form-grid recovery-panel">
+                            <div class="recovery-heading"><p class="eyebrow">"ODZYSKIWANIE DOSTĘPU"</p><h3>"Ustaw nowy PIN"</h3><p>"Podaj e-mail, wyślij świeży link, a potem zeskanuj QR lub wklej kod w pole."</p></div>
+                            <label>"E-mail"<input type="email" autocomplete="email" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label>
+                            <button type="button" class="ghost" disabled=move || busy.get() || email.get().trim().is_empty() on:click=request_access>"WYŚLIJ LINK LOGOWANIA"</button>
+                            <label>"Link lub kod z e-maila"<textarea rows="3" autocomplete="one-time-code" spellcheck="false" autocapitalize="none" placeholder="Wklej link lub kod" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
+                            <div class="confirmation-actions single">
+                                <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>"SKANUJ QR"</strong><small>"albo przytrzymaj pole i wybierz Wklej"</small></button>
+                            </div>
+                            <label>"Nowy lokalny PIN"<input type="password" autocomplete="new-password" inputmode="numeric" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
+                            <button class="primary" disabled=move || busy.get() || email.get().trim().is_empty() || token.get().trim().is_empty() || pin.get().chars().count() < 4 on:click=confirm>"POTWIERDŹ I USTAW NOWY PIN"</button>
+                            <button type="button" class="text-button" on:click=move |_| recovery_open.set(false)>"WRÓĆ DO LOGOWANIA PIN-EM"</button>
+                        </div>
+                    </Show>
                 </div>
             </Show>
         </section>
@@ -1686,6 +1685,7 @@ fn FanApp(
     let loading = RwSignal::new(FanLoadingState::all());
 
     let loaded = RwSignal::new(FanLoadedState::default());
+    let menu_open = RwSignal::new(false);
 
     Effect::new(move |_| {
         if !status.get().unlocked {
@@ -1780,13 +1780,27 @@ fn FanApp(
     };
 
     view! {
-        <section class="authenticated fan-authenticated"><header class="topbar fan-topbar"><div on:dblclick=move |_| { loaded.set(FanLoadedState::default()); refresh_fan_parts(dashboard, loading, error); refresh_wallets(wallets, Some(loading), error); refresh_fan_area(area, loading, error); } style="cursor:pointer"><p class="eyebrow">VIRYA SIGNAL</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| "Mój Sygnał".to_owned())}</strong></div><div class="topbar-actions"><span class="live-dot"></span><button aria-label="Zamknij i zablokuj Sygnał" on:click=close>"×"</button></div></header><div class="content">{move || match tab.get() {
-            FanTab::Signal => view! { <FanSignal dashboard=dashboard loading=loading /> }.into_any(),
-            FanTab::Events => view! { <FanEvents dashboard=dashboard public=public loading=loading error=error /> }.into_any(),
-            FanTab::Game => view! { <FanGame area=area loading=loading error=error /> }.into_any(),
-            FanTab::Wallet => view! { <FanWallet dashboard=dashboard wallets=wallets admission_qr=admission_qr loading=loading error=error /> }.into_any(),
-            FanTab::Profile => view! { <FanProfileScreen status=status dashboard=dashboard wallets=wallets area=area loading=loading error=error /> }.into_any(),
-        }}</div><nav class="bottom-nav five"><FanNavButton tab=tab own=FanTab::Signal icon="◉" label="Sygnał"/><FanNavButton tab=tab own=FanTab::Events icon="⌁" label="Koncerty"/><FanNavButton tab=tab own=FanTab::Game icon="◇" label="Gra"/><FanNavButton tab=tab own=FanTab::Wallet icon="▣" label="Bilety"/><FanNavButton tab=tab own=FanTab::Profile icon="◎" label="Profil"/></nav></section>
+        <section class="authenticated fan-authenticated">
+            <header class="topbar fan-topbar">
+                <div on:dblclick=move |_| { loaded.set(FanLoadedState::default()); refresh_fan_parts(dashboard, loading, error); refresh_wallets(wallets, Some(loading), error); refresh_fan_area(area, loading, error); } style="cursor:pointer"><p class="eyebrow">"VIRYA SIGNAL"</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| "Mój Sygnał".to_owned())}</strong></div>
+                <div class="topbar-actions"><span class="live-dot"></span><button class="menu-trigger" aria-label="Otwórz menu" aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|value| *value = !*value)><i></i><i></i><i></i></button><button aria-label="Zamknij i zablokuj Sygnał" on:click=close>"×"</button></div>
+            </header>
+            <Show when=move || menu_open.get()>
+                <div class="overflow-backdrop" on:click=move |_| menu_open.set(false)></div>
+                <nav class="overflow-menu">
+                    <button class:active=move || tab.get() == FanTab::Game on:click=move |_| { tab.set(FanTab::Game); menu_open.set(false); }><span>"◇"</span>"Gra AREA"</button>
+                    <button class:active=move || tab.get() == FanTab::Profile on:click=move |_| { tab.set(FanTab::Profile); menu_open.set(false); }><span>"◎"</span>"Profil"</button>
+                </nav>
+            </Show>
+            <div class="content">{move || match tab.get() {
+                FanTab::Signal => view! { <FanSignal dashboard=dashboard loading=loading /> }.into_any(),
+                FanTab::Events => view! { <FanEvents dashboard=dashboard public=public loading=loading error=error /> }.into_any(),
+                FanTab::Game => view! { <FanGame area=area loading=loading error=error /> }.into_any(),
+                FanTab::Wallet => view! { <FanWallet dashboard=dashboard wallets=wallets admission_qr=admission_qr loading=loading error=error /> }.into_any(),
+                FanTab::Profile => view! { <FanProfileScreen status=status dashboard=dashboard wallets=wallets area=area loading=loading error=error /> }.into_any(),
+            }}</div>
+            <nav class="bottom-nav three primary-three"><FanNavButton tab=tab own=FanTab::Signal icon="◉" label="Sygnał"/><FanNavButton tab=tab own=FanTab::Events icon="⌁" label="Koncerty"/><FanNavButton tab=tab own=FanTab::Wallet icon="▣" label="Bilety"/></nav>
+        </section>
     }
 }
 
@@ -1931,7 +1945,7 @@ fn FanEventCard(
                 {description.map(|text| view! { <p class="event-description">{text}</p> })}
                 <div class="event-actions">
                     <button class:active=move || interested.get() on:click=interest disabled=move || busy.get() || interested.get()>{move || if busy.get() { "ZAPISUJĘ…" } else if interested.get() { "✓ MAM TO" } else { "+ INTERESUJE MNIE" }}</button>
-                    {ticket.map(|url| view! { <ExternalLink url=url label="BILETY ↗" error=error /> })}
+                    {ticket.map(|url| view! { <ExternalLink url=url label="KUP BILET ↗" error=error /> })}
                 </div>
             </div>
         </article>
@@ -1955,7 +1969,7 @@ fn ExternalLink(
             }
         });
     };
-    view! { <button on:click=open>{label}</button> }
+    view! { <button class="ticket-buy-button" on:click=open>{label}</button> }
 }
 
 fn open_area_game(error: RwSignal<Option<String>>) {

@@ -119,6 +119,45 @@ pub fn load_fan(app_data_dir: &Path, pin: &str) -> Result<FanProfile, AppError> 
     )
 }
 
+/// Replaces an existing fan vault after a server-verified recovery flow.
+/// The previous encrypted files are kept as sibling backups until the new
+/// profile is committed, then removed. A failed write restores the old pair.
+pub fn replace_fan(app_data_dir: &Path, pin: &str, profile: &FanProfile) -> Result<(), AppError> {
+    let vault_path = fan_vault_path(app_data_dir);
+    let salt_path = fan_salt_path(app_data_dir);
+    let vault_backup = backup_path(&vault_path);
+    let salt_backup = backup_path(&salt_path);
+
+    remove_if_present(&vault_backup)?;
+    remove_if_present(&salt_backup)?;
+    move_if_present(&vault_path, &vault_backup)?;
+    if let Err(error) = move_if_present(&salt_path, &salt_backup) {
+        let _ = move_if_present(&vault_backup, &vault_path);
+        return Err(error);
+    }
+
+    match save_at(
+        &vault_path,
+        &salt_path,
+        FAN_CLIENT_PATH,
+        FAN_PROFILE_KEY,
+        pin,
+        profile,
+    ) {
+        Ok(()) => {
+            let _ = remove_if_present(&vault_backup);
+            let _ = remove_if_present(&salt_backup);
+            Ok(())
+        }
+        Err(error) => {
+            let _ = remove_pair(&vault_path, &salt_path);
+            let _ = move_if_present(&vault_backup, &vault_path);
+            let _ = move_if_present(&salt_backup, &salt_path);
+            Err(error)
+        }
+    }
+}
+
 pub fn remove_fan(app_data_dir: &Path) -> Result<(), AppError> {
     remove_pair(&fan_vault_path(app_data_dir), &fan_salt_path(app_data_dir))
 }
@@ -295,11 +334,25 @@ fn remove_if_present(path: &Path) -> Result<(), AppError> {
     }
 }
 
+fn move_if_present(from: &Path, to: &Path) -> Result<(), AppError> {
+    match std::fs::rename(from, to) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn backup_path(path: &Path) -> PathBuf {
+    let mut value = path.as_os_str().to_os_string();
+    value.push(".recovery-backup");
+    PathBuf::from(value)
+}
+
 fn ensure_pin(pin: &str) -> Result<(), AppError> {
-    if (6..=128).contains(&pin.chars().count()) {
+    if (4..=128).contains(&pin.chars().count()) {
         Ok(())
     } else {
-        Err(AppError::InvalidInput("PIN musi mieć 6–128 znaków".into()))
+        Err(AppError::InvalidInput("PIN musi mieć 4–128 znaków".into()))
     }
 }
 
