@@ -54,7 +54,7 @@ impl CrowdRelayClient {
             .pool_idle_timeout(Duration::from_secs(60))
             .pool_max_idle_per_host(4)
             .tcp_keepalive(Duration::from_secs(30))
-            .user_agent(concat!("crowdrelay-mobile/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("virya-signal/", env!("CARGO_PKG_VERSION")))
             .https_only(!cfg!(debug_assertions));
         #[cfg(target_os = "android")]
         {

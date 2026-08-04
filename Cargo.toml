@@ -1,5 +1,5 @@
 [package]
-name = "crowdrelay-mobile-ui"
+name = "virya-signal-ui"
 version = "0.4.2"
 edition = "2024"
 rust-version = "1.97"
@@ -42,6 +42,6 @@ panic = "abort"
 strip = "symbols"
 
 # WebAssembly is download/startup sensitive; the native shell remains opt=s.
-[profile.release.package.crowdrelay-mobile-ui]
+[profile.release.package.virya-signal-ui]
 opt-level = "z"
 codegen-units = 1

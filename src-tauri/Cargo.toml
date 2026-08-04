@@ -1,18 +1,18 @@
 [package]
-name = "crowdrelay-mobile"
+name = "virya-signal"
 version = "0.4.2"
-description = "Virya fan wallet and live operations client for CrowdRelay"
+description = "Virya Signal mobile fan wallet and live operations client"
 authors = ["Wojciech Bator"]
 edition = "2024"
 rust-version = "1.97"
 license = "Apache-2.0"
 
 [lib]
-name = "crowdrelay_mobile_lib"
+name = "virya_signal_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [[bin]]
-name = "crowdrelay-mobile"
+name = "virya-signal"
 path = "src/main.rs"
 
 [build-dependencies]

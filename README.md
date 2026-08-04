@@ -29,13 +29,13 @@ python3 scripts/static-check.py
 python3 scripts/test-principal-contract.py
 python3 -m unittest discover -s scripts -p 'test_*.py'
 node scripts/test-boot.mjs
-cargo check --locked -p crowdrelay-mobile-ui --target wasm32-unknown-unknown
-cargo clippy --locked -p crowdrelay-mobile-ui --target wasm32-unknown-unknown -- -D warnings
+cargo check --locked -p virya-signal-ui --target wasm32-unknown-unknown
+cargo clippy --locked -p virya-signal-ui --target wasm32-unknown-unknown -- -D warnings
 trunk build --release
 python3 scripts/check-web-dist.py dist
-cargo check --locked -p crowdrelay-mobile
-cargo test --locked -p crowdrelay-mobile
-cargo clippy --locked -p crowdrelay-mobile --all-targets -- -D warnings
+cargo check --locked -p virya-signal
+cargo test --locked -p virya-signal
+cargo clippy --locked -p virya-signal --all-targets -- -D warnings
 ```
 
 To apply reviewed compiler fixes and formatting in one pass, run
