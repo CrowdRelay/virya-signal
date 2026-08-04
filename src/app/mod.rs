@@ -199,8 +199,8 @@ fn OperatorAccess(
 
     let unlock = move |_| {
         let current_pin = pin.get();
-        if current_pin.chars().count() < 6 {
-            error.set(Some("PIN musi mieć co najmniej 6 znaków.".to_owned()));
+        if current_pin.chars().count() < 4 {
+            error.set(Some("PIN musi mieć co najmniej 4 znaki.".to_owned()));
             return;
         }
         busy.set(true);
@@ -252,7 +252,7 @@ fn OperatorAccess(
             match bridge::scan_qr().await {
                 Ok(Some(value)) => {
                     pairing.set(value);
-                    if pin.get().chars().count() >= 6 {
+                    if pin.get().chars().count() >= 4 {
                         pair(pairing.get());
                     }
                 }
@@ -782,7 +782,7 @@ fn Scanner(
             }
         });
     };
-    let manual_submit = move |_| redeem_code(manual.get());
+    let manual_submit = move |_| redeem_code(manual.get().trim().to_owned());
 
     let prepare = move |_| {
         let slug = event_slug.get();
@@ -923,8 +923,8 @@ fn Tickets(
     let issue = move |_| {
         let input = IssuePassInput {
             event_slug: event_slug.get(),
-            pool_slug: pool_slug.get(),
-            fan_email: fan_email.get(),
+            pool_slug: pool_slug.get().trim().to_owned(),
+            fan_email: fan_email.get().trim().to_owned(),
             claim_expires_hours: 72,
         };
         if input.event_slug.is_empty() || input.fan_email.trim().is_empty() {
@@ -943,8 +943,8 @@ fn Tickets(
     };
 
     let revoke = move |_| {
-        let reference = revoke_ref.get();
-        if reference.trim().is_empty() {
+        let reference = revoke_ref.get().trim().to_owned();
+        if reference.is_empty() {
             error.set(Some("Podaj public reference wejściówki.".to_owned()));
             return;
         }
@@ -987,9 +987,9 @@ fn Discounts(error: RwSignal<Option<String>>) -> impl IntoView {
     let result = RwSignal::new(None::<CouponEnvelope>);
     let busy = RwSignal::new(false);
     let redeem = move |_| {
-        let c = code.get();
-        let o = order.get();
-        if c.trim().is_empty() || o.trim().is_empty() {
+        let c = code.get().trim().to_owned();
+        let o = order.get().trim().to_owned();
+        if c.is_empty() || o.is_empty() {
             error.set(Some("Podaj kod i numer sprzedaży.".to_owned()));
             return;
         }
@@ -1057,12 +1057,12 @@ fn Campaigns(
         }
         let input = CreateQrCampaignInput {
             event_slug: event_slug.get(),
-            label: label.get(),
+            label: label.get().trim().to_owned(),
             valid_from: from,
             valid_until: until,
             max_checkins: max,
         };
-        if input.event_slug.is_empty() || input.label.trim().is_empty() {
+        if input.event_slug.is_empty() || input.label.is_empty() {
             error.set(Some("Wybierz koncert i nazwij kampanię.".to_owned()));
             return;
         }
@@ -1376,13 +1376,13 @@ fn FanAccess(
         }
         let current_pin = pin.get();
         let requested = RequestedCityInput {
-            name: custom_city_name.get(),
-            region: optional(custom_region.get()),
+            name: custom_city_name.get().trim().to_owned(),
+            region: optional(custom_region.get().trim().to_owned()),
             country_code: "PL".to_owned(),
         };
-        let input_email = email.get();
-        let input_name = optional(name.get());
-        let input_referral = optional(referral.get());
+        let input_email = email.get().trim().to_owned();
+        let input_name = optional(name.get().trim().to_owned());
+        let input_referral = optional(referral.get().trim().to_owned());
         let nearby = nearby_enabled.get();
         let radius = radius_km.get();
         busy.set(true);
@@ -1439,13 +1439,23 @@ fn FanAccess(
         });
     };
 
+    let extract_token = move |raw: String| -> String {
+        let trimmed = raw.trim();
+        if let Some(pos) = trimmed.find("token=") {
+            let after = &trimmed[pos + 6..];
+            after.split('&').next().unwrap_or(after).to_owned()
+        } else {
+            trimmed.to_owned()
+        }
+    };
+
     let confirm = move |_| {
         let current_pin = pin.get();
         let input = FanConfirmationInput {
             api_base_url: API_BASE.to_owned(),
-            email: email.get(),
-            display_name: optional(name.get()),
-            token: token.get(),
+            email: email.get().trim().to_owned(),
+            display_name: optional(name.get().trim().to_owned()),
+            token: extract_token(token.get()),
         };
         busy.set(true);
         spawn_local(async move {
@@ -1498,8 +1508,8 @@ fn FanAccess(
                         <label>"Imię / nazwa (opcjonalnie)"<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/></label>
                         <Show when=move || access_mode.get() == FanAccessMode::Signup fallback=move || view! {
                             <>
-                                <p class="confirm-hint">"Sprawdź skrzynkę e-mail. Wklej poniżej kod, który wysłaliśmy."</p>
-                                <label>"Kod z e-maila"<textarea rows="3" placeholder="np. eyJhbGci..." prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
+                                <p class="confirm-hint">"Sprawdź skrzynkę e-mail. Wklej poniżej link lub sam token z wiadomości."</p>
+                                <label>"Link lub token z e-maila"<textarea rows="3" placeholder="Wklej cały link lub sam token" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
                                 <label>"Lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
                                 <button class="primary" disabled=move || busy.get() on:click=confirm>"POTWIERDŹ I WEJDŹ"</button>
                             </>
@@ -1899,9 +1909,9 @@ fn FanWallet(
     let busy = RwSignal::new(false);
 
     let import = move |_| {
-        let order = order_id.get();
-        let token = checkout_token.get();
-        if order.trim().is_empty() || token.trim().is_empty() {
+        let order = order_id.get().trim().to_owned();
+        let token = checkout_token.get().trim().to_owned();
+        if order.is_empty() || token.is_empty() {
             error.set(Some(
                 "Podaj identyfikator zamówienia i prywatny token.".to_owned(),
             ));
@@ -1929,8 +1939,8 @@ fn FanWallet(
     };
 
     let claim = move |_| {
-        let token = claim_token.get();
-        if token.trim().is_empty() {
+        let token = claim_token.get().trim().to_owned();
+        if token.is_empty() {
             error.set(Some("Wklej token wejściówki.".to_owned()));
             return;
         }

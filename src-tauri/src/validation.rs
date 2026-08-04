@@ -124,11 +124,11 @@ pub(crate) fn validate_campaign(input: &mut CreateQrCampaignInput) -> Result<(),
 }
 
 pub(crate) fn validate_pin(pin: &str) -> Result<(), AppError> {
-    if (6..=128).contains(&pin.chars().count()) {
+    if (4..=128).contains(&pin.chars().count()) {
         Ok(())
     } else {
         Err(AppError::InvalidInput(
-            "PIN musi mieć co najmniej 6 znaków".into(),
+            "PIN musi mieć co najmniej 4 znaki".into(),
         ))
     }
 }
@@ -215,9 +215,10 @@ mod tests {
 
     #[test]
     fn pin_limits_use_character_count() {
+        assert!(validate_pin("1234").is_ok());
         assert!(validate_pin("123456").is_ok());
         assert!(validate_pin("ążźćńó").is_ok());
-        assert!(validate_pin("12345").is_err());
+        assert!(validate_pin("123").is_err());
         assert!(validate_pin(&"x".repeat(129)).is_err());
     }
 
