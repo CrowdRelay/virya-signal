@@ -173,6 +173,14 @@ pub(super) struct FanConfirmArgs<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(super) struct FanAccessArgs<'a> {
+    pub api_base_url: &'a str,
+    pub email: &'a str,
+    pub locale: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct ClaimArgs<'a> {
     pub claim_token: &'a str,
 }

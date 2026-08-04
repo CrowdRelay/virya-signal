@@ -137,6 +137,32 @@ pub(crate) async fn fan_confirm(
 }
 
 #[tauri::command]
+pub(crate) async fn fan_request_access(
+    state: State<'_, AppState>,
+    mut api_base_url: String,
+    mut email: String,
+    mut locale: String,
+) -> Result<serde_json::Value, AppError> {
+    api_base_url = api_base_url.trim().to_owned();
+    email = email.trim().to_ascii_lowercase();
+    locale = locale.trim().to_owned();
+    crate::validation::validate_api_base(&api_base_url)?;
+    if !crate::validation::valid_email(&email)
+        || locale.is_empty()
+        || locale.len() > 16
+        || !locale
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+    {
+        return Err(AppError::InvalidInput("Podaj poprawny e-mail".into()));
+    }
+    state
+        .api
+        .fan_request_access(&api_base_url, &email, &locale)
+        .await
+}
+
+#[tauri::command]
 pub(crate) async fn fan_area_wallet(
     state: State<'_, AppState>,
 ) -> Result<crate::models::AreaWallet, AppError> {

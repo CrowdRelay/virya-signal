@@ -164,6 +164,27 @@ impl super::CrowdRelayClient {
         ))
     }
 
+    pub async fn fan_request_access(
+        &self,
+        api_base_url: &str,
+        email: &str,
+        locale: &str,
+    ) -> Result<serde_json::Value, AppError> {
+        let body = serde_json::json!({
+            "email": email,
+            "locale": locale,
+        });
+        let response = self
+            .http
+            .post(endpoint(api_base_url, "fans/access")?)
+            .header(ACCEPT, "application/json")
+            .header("Idempotency-Key", Uuid::new_v4().to_string())
+            .json(&body)
+            .send()
+            .await?;
+        decode(response).await
+    }
+
     pub async fn fan_confirm(
         &self,
         input: &FanConfirmationInput,

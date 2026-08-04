@@ -1510,6 +1510,40 @@ fn FanAccess(
         submit_fan_confirmation(email, name, token, pin, busy, status, error);
     };
 
+    let request_access = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        let current_email = email.get_untracked().trim().to_owned();
+        if current_email.is_empty() {
+            error.set(Some("Podaj e-mail użyty w Virya Signal.".to_owned()));
+            return;
+        }
+        busy.set(true);
+        spawn_local(async move {
+            match bridge::invoke_unit(
+                "fan_request_access",
+                &FanAccessArgs {
+                    api_base_url: API_BASE,
+                    email: &current_email,
+                    locale: "pl",
+                },
+            )
+            .await
+            {
+                Ok(()) => {
+                    access_mode.set(FanAccessMode::Confirm);
+                    error.set(Some(
+                        "Jeśli ten e-mail jest zapisany w Virya Signal, wysłaliśmy świeży link logowania z QR. Po otwarciu ustaw nowy PIN dla tego urządzenia."
+                            .to_owned(),
+                    ));
+                }
+                Err(message) => error.set(Some(message)),
+            }
+            busy.set(false);
+        });
+    };
+
     let scan_confirmation = move |_| {
         if busy.get_untracked() {
             return;
@@ -1595,6 +1629,7 @@ fn FanAccess(
                                 <label>"Lokalny PIN"<input type="password" autocomplete="new-password" inputmode="numeric" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
                                 <p class="confirmation-note">"PIN szyfruje profil tylko na tym urządzeniu. Nie wysyłamy go do CrowdRelay."</p>
                                 <button class="primary" disabled=move || busy.get() || email.get().trim().is_empty() || token.get().trim().is_empty() || pin.get().chars().count() < 4 on:click=confirm>"POTWIERDŹ I WEJDŹ"</button>
+                                <button type="button" class="text-button" disabled=move || busy.get() || email.get().trim().is_empty() on:click=request_access>"MAM JUŻ KONTO — WYŚLIJ LINK LOGOWANIA"</button>
                                 <p class="confirmation-resend">"Nie ma wiadomości? Sprawdź spam. Po 15 minutach wróć do ZACZYNAM i wyślij kod ponownie."</p>
                             </>
                         }>
