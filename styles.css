@@ -228,6 +228,13 @@ button:disabled { opacity: .48; cursor: default; }
 .toast { position: fixed; z-index: 100; left: 16px; right: 16px; bottom: calc(82px + var(--safe-bottom)); max-width: 600px; margin: auto; border: 1px solid #8b7521; background: #211b08; color: #ffedaa; padding: 14px; text-align: left; box-shadow: 0 12px 44px #000; animation: toast-in .25s ease-out, toast-out .4s ease-in 4.6s forwards; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(12px); } }
 @keyframes toast-out { to { opacity: 0; transform: translateY(8px); } }
+.toast-success { border-color: #2d7a4a; background: #0e1f14; color: #a8f0c0; }
+.scan-result { animation: scan-flash .35s ease-out; }
+@keyframes scan-flash { 0% { opacity: 0; transform: scale(.96); } 50% { transform: scale(1.01); } 100% { opacity: 1; transform: scale(1); } }
+.empty-state { padding: 40px 20px; text-align: center; border: 1px dashed #333; border-radius: 12px; }
+.empty-state strong { display: block; margin-bottom: 8px; font-size: 1rem; }
+.empty-state p { margin: 0; color: var(--muted); font-size: .85rem; line-height: 1.5; }
+.empty-state.compact { padding: 24px 16px; }
 .skeleton-stack { display: grid; gap: 9px; }
 .skeleton-stack i { display: block; height: 82px; contain: strict; background: #1b1b19; animation: skeleton-pulse 1.1s ease-in-out infinite alternate; }
 @keyframes skeleton-pulse { to { opacity: .42; } }

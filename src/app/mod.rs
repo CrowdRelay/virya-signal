@@ -422,7 +422,7 @@ fn OperatorApp(
     view! {
         <section class="authenticated">
             <header class="topbar">
-                <div><p class="eyebrow">"VIRYA CONTROL"</p><strong>{move || status.get().session.map(|s| s.display_name).value_or_else(Default::default)}</strong></div>
+                <div on:dblclick=move |_| refresh_operator_parts(dashboard, loading, error) style="cursor:pointer"><p class="eyebrow">"VIRYA CONTROL"</p><strong>{move || status.get().session.map(|s| s.display_name).value_or_else(Default::default)}</strong></div>
                 <div class="topbar-actions">
                     <span class="role-pill">{move || role().label()}</span>
                     <button class="menu-trigger" aria-label="Więcej opcji" on:click=move |_| menu_open.update(|v| *v = !*v)>"⋯"</button>
@@ -495,7 +495,11 @@ fn OperatorHome(
                     })}
                     <div class="stats-grid"><Metric value=event_count.to_string() label="koncerty"/><Metric value=if qr_loading { "…".to_owned() } else { active.to_string() } label="aktywne QR"/><Metric value=if qr_loading { "…".to_owned() } else { checkins.to_string() } label="check-iny"/></div>
                     <div class="section-head"><h3>Nadchodzące</h3><span>{event_count}</span></div>
-                    <div class="card-list">{events.into_iter().map(|event| view! { <EventCard event=event /> }).collect_view()}</div>
+                    {if events.is_empty() {
+                        view! { <div class="empty-state"><strong>"Brak nadchodzących koncertów"</strong><p>"Kiedy pojawi się nowe wydarzenie, zobaczysz je tutaj."</p></div> }.into_any()
+                    } else {
+                        view! { <div class="card-list">{events.into_iter().map(|event| view! { <EventCard event=event /> }).collect_view()}</div> }.into_any()
+                    }}
                 }
             }.into_any())).value_or_else(|| view! { <Skeleton /> }.into_any())}
             </Show>
@@ -1647,7 +1651,7 @@ fn FanApp(
     };
 
     view! {
-        <section class="authenticated fan-authenticated"><header class="topbar fan-topbar"><div><p class="eyebrow">VIRYA SIGNAL</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| "Mój Sygnał".to_owned())}</strong></div><div class="topbar-actions"><span class="live-dot"></span><button aria-label="Zamknij i zablokuj Sygnał" on:click=close>"×"</button></div></header><div class="content">{move || match tab.get() {
+        <section class="authenticated fan-authenticated"><header class="topbar fan-topbar"><div on:dblclick=move |_| { loaded.set(FanLoadedState::default()); refresh_fan_parts(dashboard, loading, error); refresh_wallets(wallets, Some(loading), error); refresh_fan_area(area, loading, error); } style="cursor:pointer"><p class="eyebrow">VIRYA SIGNAL</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| "Mój Sygnał".to_owned())}</strong></div><div class="topbar-actions"><span class="live-dot"></span><button aria-label="Zamknij i zablokuj Sygnał" on:click=close>"×"</button></div></header><div class="content">{move || match tab.get() {
             FanTab::Signal => view! { <FanSignal dashboard=dashboard loading=loading /> }.into_any(),
             FanTab::Events => view! { <FanEvents dashboard=dashboard public=public loading=loading error=error /> }.into_any(),
             FanTab::Game => view! { <FanGame area=area loading=loading error=error /> }.into_any(),
@@ -1723,9 +1727,7 @@ fn FanEvents(
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">GDZIE GRAMY</p><h2>Koncerty</h2></header><Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }><div class="card-list fan-event-list">{move || fan_events(dashboard, public).into_iter().map(|event| view! {
-                    <FanEventCard event=event dashboard=dashboard loading=loading error=error />
-                }).collect_view()}</div></Show></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">GDZIE GRAMY</p><h2>Koncerty</h2></header><Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }>{move || { let events = fan_events(dashboard, public); if events.is_empty() { view! { <div class="empty-state"><strong>"Brak koncertów w kalendarzu"</strong><p>"Kiedy pojawi się nowy event, będzie tutaj."</p></div> }.into_any() } else { view! { <div class="card-list fan-event-list">{events.into_iter().map(|event| view! { <FanEventCard event=event dashboard=dashboard loading=loading error=error /> }).collect_view()}</div> }.into_any() }}}</Show></section>
     }
 }
 
@@ -2107,7 +2109,22 @@ fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
             set_timeout(move || error.set(None), std::time::Duration::from_secs(5));
         }
     });
-    view! { <Show when=move || error.get().is_some()><button class="toast" on:click=move |_| error.set(None)>{move || error.get().value_or_else(Default::default)}</button></Show> }
+    let is_success = move || {
+        error.with(|msg| {
+            msg.as_ref().is_some_and(|m| {
+                let lower = m.to_lowercase();
+                lower.contains("utworzon")
+                    || lower.contains("zapisan")
+                    || lower.contains("wysłaliśmy")
+                    || lower.contains("unieważnion")
+                    || lower.contains("zrealizowan")
+                    || lower.contains("gotowy")
+                    || lower.contains("zeskanowany")
+                    || lower.contains("ponownie")
+            })
+        })
+    };
+    view! { <Show when=move || error.get().is_some()><button class="toast" class:toast-success=is_success on:click=move |_| error.set(None)>{move || error.get().value_or_else(Default::default)}</button></Show> }
 }
 
 fn refresh_operator_parts(

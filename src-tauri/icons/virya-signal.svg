@@ -6,7 +6,7 @@
       <stop offset="1" stop-color="#e08a00"/>
     </linearGradient>
     <filter id="glow">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="10" result="blur"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur"/>
       <feMerge>
         <feMergeNode in="blur"/>
         <feMergeNode in="SourceGraphic"/>
@@ -15,10 +15,8 @@
   </defs>
   <rect width="1024" height="1024" fill="#0a0a0a"/>
   <g id="signal-bars" fill="url(#amber)" filter="url(#glow)">
-    <rect x="302" y="470" width="60" height="180" rx="30"/>
-    <rect x="392" y="390" width="60" height="260" rx="30"/>
-    <rect x="482" y="282" width="60" height="460" rx="30"/>
-    <rect x="572" y="350" width="60" height="310" rx="30"/>
-    <rect x="662" y="430" width="60" height="230" rx="30"/>
+    <rect x="370" y="430" width="56" height="190" rx="28"/>
+    <rect x="484" y="290" width="56" height="440" rx="28"/>
+    <rect x="598" y="370" width="56" height="280" rx="28"/>
   </g>
 </svg>
