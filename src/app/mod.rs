@@ -1325,6 +1325,68 @@ fn AccessLoader(mode: RwSignal<RootMode>, label: &'static str) -> impl IntoView 
     }
 }
 
+// VIRYA SIGNAL FAN CONFIRM UX V1
+fn submit_fan_confirmation(
+    email: RwSignal<String>,
+    name: RwSignal<String>,
+    token: RwSignal<String>,
+    pin: RwSignal<String>,
+    busy: RwSignal<bool>,
+    status: RwSignal<FanSessionStatus>,
+    error: RwSignal<Option<String>>,
+) {
+    if busy.get_untracked() {
+        return;
+    }
+    let input_email = email.get_untracked().trim().to_owned();
+    let current_token = token.get_untracked().trim().to_owned();
+    let current_pin = pin.get_untracked();
+    if input_email.is_empty() {
+        error.set(Some(
+            "Podaj e-mail użyty przy zapisie do Sygnału.".to_owned(),
+        ));
+        return;
+    }
+    if current_token.is_empty() {
+        error.set(Some(
+            "Wklej kod, cały link albo zeskanuj QR z wiadomości.".to_owned(),
+        ));
+        return;
+    }
+    if current_pin.chars().count() < 4 {
+        error.set(Some(
+            "Ustaw lokalny PIN mający co najmniej 4 znaki.".to_owned(),
+        ));
+        return;
+    }
+    let input = FanConfirmationInput {
+        api_base_url: API_BASE.to_owned(),
+        email: input_email,
+        display_name: optional(name.get_untracked().trim().to_owned()),
+        token: current_token,
+    };
+    busy.set(true);
+    spawn_local(async move {
+        match bridge::invoke::<FanAuthResult, _>(
+            "fan_confirm",
+            &FanConfirmArgs {
+                input: &input,
+                pin: &current_pin,
+            },
+        )
+        .await
+        {
+            Ok(_) => {
+                pin.set(String::new());
+                token.set(String::new());
+                refresh_fan_status(status, error);
+            }
+            Err(message) => error.set(Some(message)),
+        }
+        busy.set(false);
+    });
+}
+
 #[component]
 fn FanAccess(
     mode: RwSignal<RootMode>,
@@ -1431,6 +1493,9 @@ fn FanAccess(
                         refresh_fan_status(status, error);
                     } else {
                         access_mode.set(FanAccessMode::Confirm);
+                        error.set(Some(
+                            "Mail wysłany. Zeskanuj QR albo wklej kod z wiadomości.".to_owned(),
+                        ));
                     }
                 }
                 Err(message) => error.set(Some(message)),
@@ -1439,39 +1504,50 @@ fn FanAccess(
         });
     };
 
-    let extract_token = move |raw: String| -> String {
-        let trimmed = raw.trim();
-        if let Some(pos) = trimmed.find("token=") {
-            let after = &trimmed[pos + 6..];
-            after.split('&').next().unwrap_or(after).to_owned()
-        } else {
-            trimmed.to_owned()
-        }
+    let confirm = move |_| {
+        submit_fan_confirmation(email, name, token, pin, busy, status, error);
     };
 
-    let confirm = move |_| {
-        let current_pin = pin.get();
-        let input = FanConfirmationInput {
-            api_base_url: API_BASE.to_owned(),
-            email: email.get().trim().to_owned(),
-            display_name: optional(name.get().trim().to_owned()),
-            token: extract_token(token.get()),
-        };
+    let scan_confirmation = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<FanAuthResult, _>(
-                "fan_confirm",
-                &FanConfirmArgs {
-                    input: &input,
-                    pin: &current_pin,
-                },
-            )
-            .await
-            {
-                Ok(_) => {
-                    pin.set(String::new());
-                    token.set(String::new());
-                    refresh_fan_status(status, error);
+            match bridge::scan_qr().await {
+                Ok(Some(value)) => {
+                    token.set(value);
+                    busy.set(false);
+                    if !email.get_untracked().trim().is_empty()
+                        && pin.get_untracked().chars().count() >= 4
+                    {
+                        submit_fan_confirmation(email, name, token, pin, busy, status, error);
+                    } else {
+                        error.set(Some(
+                            "QR zeskanowany. Uzupełnij e-mail i lokalny PIN.".to_owned(),
+                        ));
+                    }
+                    return;
+                }
+                Ok(None) => {}
+                Err(message) => error.set(Some(message)),
+            }
+            busy.set(false);
+        });
+    };
+
+    let paste_confirmation = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        busy.set(true);
+        spawn_local(async move {
+            match bridge::read_clipboard().await {
+                Ok(value) => {
+                    token.set(value);
+                    error.set(Some(
+                        "Kod wklejony. Uzupełnij e-mail i PIN, potem potwierdź.".to_owned(),
+                    ));
                 }
                 Err(message) => error.set(Some(message)),
             }
@@ -1508,10 +1584,16 @@ fn FanAccess(
                         <label>"Imię / nazwa (opcjonalnie)"<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/></label>
                         <Show when=move || access_mode.get() == FanAccessMode::Signup fallback=move || view! {
                             <>
-                                <p class="confirm-hint">"Sprawdź skrzynkę e-mail. Wklej poniżej link lub sam token z wiadomości."</p>
-                                <label>"Link lub token z e-maila"<textarea rows="3" placeholder="Wklej cały link lub sam token" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
-                                <label>"Lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
-                                <button class="primary" disabled=move || busy.get() on:click=confirm>"POTWIERDŹ I WEJDŹ"</button>
+                                <p class="confirm-hint"><strong>"Najszybciej: zeskanuj QR z maila."</strong><br/>"Możesz też wkleić cały link albo 64-znakowy kod. Aplikacja sama wyciągnie właściwy token."</p>
+                                <label>"Link lub kod z e-maila"<textarea rows="3" autocomplete="one-time-code" spellcheck="false" autocapitalize="none" placeholder="Wklej link, kod albo użyj QR" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
+                                <div class="confirmation-actions">
+                                    <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>"SKANUJ QR"</strong><small>"aparat telefonu"</small></button>
+                                    <button type="button" class="confirmation-action" disabled=move || busy.get() on:click=paste_confirmation><span aria-hidden="true">"⌁"</span><strong>"WKLEJ"</strong><small>"ze schowka"</small></button>
+                                </div>
+                                <label>"Lokalny PIN"<input type="password" autocomplete="new-password" inputmode="numeric" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
+                                <p class="confirmation-note">"PIN szyfruje profil tylko na tym urządzeniu. Nie wysyłamy go do CrowdRelay."</p>
+                                <button class="primary" disabled=move || busy.get() || email.get().trim().is_empty() || token.get().trim().is_empty() || pin.get().chars().count() < 4 on:click=confirm>"POTWIERDŹ I WEJDŹ"</button>
+                                <p class="confirmation-resend">"Nie ma wiadomości? Sprawdź spam. Po 15 minutach wróć do ZACZYNAM i wyślij kod ponownie."</p>
                             </>
                         }>
                             <>

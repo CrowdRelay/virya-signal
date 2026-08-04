@@ -63,6 +63,38 @@ pub(crate) fn validate_fan_signup(input: &mut FanSignupInput, pin: &str) -> Resu
     Ok(())
 }
 
+fn normalized_fan_confirmation_token(value: &str) -> Option<String> {
+    fn exact_hex(value: &str) -> Option<String> {
+        let value = value.trim();
+        (value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit()))
+            .then(|| value.to_ascii_lowercase())
+    }
+
+    let value = value.trim();
+    if let Some(token) = exact_hex(value) {
+        return Some(token);
+    }
+    for prefix in ["token=", "#token="] {
+        if let Some(token) = value.strip_prefix(prefix).and_then(exact_hex) {
+            return Some(token);
+        }
+    }
+    let url = url::Url::parse(value).ok()?;
+    if let Some((_, token)) = url.query_pairs().find(|(name, _)| name == "token")
+        && let Some(token) = exact_hex(token.as_ref())
+    {
+        return Some(token);
+    }
+    if let Some(fragment) = url.fragment()
+        && let Some((_, token)) =
+            url::form_urlencoded::parse(fragment.as_bytes()).find(|(name, _)| name == "token")
+        && let Some(token) = exact_hex(token.as_ref())
+    {
+        return Some(token);
+    }
+    None
+}
+
 pub(crate) fn validate_fan_confirmation(
     input: &mut FanConfirmationInput,
     pin: &str,
@@ -70,11 +102,12 @@ pub(crate) fn validate_fan_confirmation(
     validate_pin(pin)?;
     input.api_base_url = input.api_base_url.trim().to_owned();
     input.email = input.email.trim().to_ascii_lowercase();
-    input.token = input.token.trim().to_owned();
+    input.token = normalized_fan_confirmation_token(&input.token).ok_or_else(|| {
+        AppError::InvalidInput("Wklej prawidłowy kod, link albo zeskanuj QR".into())
+    })?;
     input.display_name = clean_optional(input.display_name.take());
     validate_api_base(&input.api_base_url)?;
     if !valid_email(&input.email)
-        || !(24..=MAX_SECRET_BYTES).contains(&input.token.len())
         || input
             .display_name
             .as_ref()
@@ -220,6 +253,28 @@ mod tests {
         assert!(validate_pin("ążźćńó").is_ok());
         assert!(validate_pin("123").is_err());
         assert!(validate_pin(&"x".repeat(129)).is_err());
+    }
+
+    #[test]
+    fn confirmation_accepts_raw_token_and_urls() {
+        let token = "A".repeat(64);
+        assert_eq!(
+            normalized_fan_confirmation_token(&token),
+            Some("a".repeat(64))
+        );
+        assert_eq!(
+            normalized_fan_confirmation_token(&format!(
+                "https://virya.music/signal/confirm#token={token}"
+            )),
+            Some("a".repeat(64))
+        );
+        assert_eq!(
+            normalized_fan_confirmation_token(&format!(
+                "virya-signal://fan/confirm?source=mail&token={token}"
+            )),
+            Some("a".repeat(64))
+        );
+        assert_eq!(normalized_fan_confirmation_token("not-a-token"), None);
     }
 
     #[test]

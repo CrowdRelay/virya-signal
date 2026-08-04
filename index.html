@@ -9,31 +9,28 @@
     <style>
       #boot-splash{position:fixed;inset:0;z-index:2147483647;display:grid;place-content:center;justify-items:center;gap:9px;padding:24px;background:radial-gradient(circle at 50% 35%,#2b2409 0,#080808 38%);color:#f5f5ef;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;text-align:center;transition:opacity .18s ease}
       #boot-splash[aria-hidden="true"]{opacity:0;pointer-events:none}
-      .boot-signal{height:42px;display:flex;align-items:center;gap:6px}
-      .boot-signal i{display:block;width:5px;border-radius:3px;background:#f3c51a;box-shadow:0 0 22px #f3c51a55;animation:boot-pulse .72s ease-in-out infinite alternate}
-      .boot-signal i:nth-child(1){height:13px}.boot-signal i:nth-child(2){height:38px;animation-delay:.16s}.boot-signal i:nth-child(3){height:23px;animation-delay:.32s}
-      .boot-led{width:13px;height:13px;margin:2px 0 5px;border:2px solid #f8dc67;border-radius:50%;background:#f3c51a;box-shadow:0 0 10px #f3c51acc,0 0 28px #f3c51a88;animation:boot-led 1.05s steps(2,end) infinite}
+      .boot-signal{height:36px;display:flex;align-items:center;gap:5px}
+      .boot-signal i{display:block;width:4px;border-radius:2px;background:#f3c51a;box-shadow:0 0 10px #f3c51aaa,0 0 28px #f3c51a55;animation:boot-pulse .8s ease-in-out infinite alternate;transform-origin:center}
+      .boot-signal i:nth-child(1){height:10px}.boot-signal i:nth-child(2){height:28px;animation-delay:.18s}.boot-signal i:nth-child(3){height:17px;animation-delay:.36s}
       #boot-splash strong{margin-top:7px;font-size:clamp(42px,14vw,64px);line-height:.85;letter-spacing:-.075em}
       #boot-splash strong span{color:#f3c51a}
       #boot-status{margin:3px 0 0;color:#a9a89f;font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase}
       #boot-detail{max-width:320px;margin:2px 0 0;color:#d6d4c8;font-size:11px;line-height:1.45;overflow-wrap:anywhere}
       #boot-retry{margin-top:10px;border:1px solid #f3c51a;background:transparent;color:#f3c51a;padding:10px 14px;font:800 10px/1 ui-sans-serif,system-ui,-apple-system,sans-serif;letter-spacing:.16em;text-transform:uppercase}
       #boot-retry[hidden]{display:none}
-      @keyframes boot-pulse{to{opacity:.3;transform:scaleY(.52)}}
-      @keyframes boot-led{50%{opacity:.18;box-shadow:0 0 3px #f3c51a44}}
-      @media(prefers-reduced-motion:reduce){.boot-signal i,.boot-led{animation:none}}
+      @keyframes boot-pulse{to{opacity:.3;transform:scaleY(.55)}}
+      @media(prefers-reduced-motion:reduce){.boot-signal i{animation:none}}
     </style>
     <link data-trunk rel="css" href="styles.css" />
     <link data-trunk rel="copy-file" href="boot.js" />
     <!-- Must execute before Trunk's WASM module so the ready event cannot race the listener. -->
-    <script src="boot.js?v=0.4.2-startup-v6"></script>
+    <script src="boot.js?v=0.4.2-startup-v7"></script>
     <link data-trunk rel="rust" data-initializer="boot-initializer.mjs" data-wasm-opt="z" data-wasm-opt-params="--enable-bulk-memory --enable-bulk-memory-opt --enable-nontrapping-float-to-int" />
   </head>
   <body>
     <section id="boot-splash" role="status" aria-live="polite">
       <div class="boot-signal" aria-hidden="true"><i></i><i></i><i></i></div>
-      <div class="boot-led" aria-hidden="true"></div>
-      <strong>VIRYA <span>SIGNAL</span></strong>
+        <strong>VIRYA <span>SIGNAL</span></strong>
       <p id="boot-status">URUCHAMIAMY SYGNAŁ</p>
       <p id="boot-detail" hidden></p>
       <button id="boot-retry" type="button" hidden>PONÓW START</button>

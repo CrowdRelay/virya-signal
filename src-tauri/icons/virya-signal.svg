@@ -1,22 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="amber" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffc107"/>
-      <stop offset=".55" stop-color="#f5a623"/>
-      <stop offset="1" stop-color="#e08a00"/>
-    </linearGradient>
-    <filter id="glow">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
+    <filter id="signal-glow" x="-80%" y="-80%" width="260%" height="260%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="24" result="wide"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="near"/>
+      <feMerge><feMergeNode in="wide"/><feMergeNode in="near"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
-  <rect width="1024" height="1024" fill="#0a0a0a"/>
-  <g id="signal-bars" fill="url(#amber)" filter="url(#glow)">
-    <rect x="370" y="430" width="56" height="190" rx="28"/>
-    <rect x="484" y="290" width="56" height="440" rx="28"/>
-    <rect x="598" y="370" width="56" height="280" rx="28"/>
+  <rect width="1024" height="1024" fill="#080808"/>
+  <g fill="#f3c51a" filter="url(#signal-glow)">
+    <rect x="336" y="422" width="72" height="180" rx="36"/>
+    <rect x="476" y="260" width="72" height="504" rx="36"/>
+    <rect x="616" y="359" width="72" height="306" rx="36"/>
   </g>
 </svg>

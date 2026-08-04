@@ -1,4 +1,5 @@
 use reqwest::{Method, header::ACCEPT};
+use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::{
@@ -16,6 +17,11 @@ use super::{
         segment,
     },
 };
+
+#[derive(Deserialize)]
+struct FanConfirmationApiResponse {
+    fan_session_token: Option<String>,
+}
 
 impl super::CrowdRelayClient {
     pub async fn fan_events(&self, profile: &FanProfile) -> Result<Vec<PublicEvent>, AppError> {
@@ -157,17 +163,35 @@ impl super::CrowdRelayClient {
             .json(&serde_json::json!({"token": input.token.trim()}))
             .send()
             .await?;
-        let token =
-            response_cookie(response.headers(), FAN_COOKIE).ok_or_else(|| AppError::Remote {
-                status: response.status().as_u16(),
-                detail: "Backend nie zwrócił sesji fana".into(),
+        let cookie_token = response_cookie(response.headers(), FAN_COOKIE);
+        let body: FanConfirmationApiResponse = match decode(response).await {
+            Ok(body) => body,
+            Err(AppError::Conflict(_)) => {
+                return Err(AppError::Conflict(
+                    "Ten kod został już wykorzystany. Wróć do ZACZYNAM i poproś o nową wiadomość."
+                        .into(),
+                ));
+            }
+            Err(AppError::NotFound) => {
+                return Err(AppError::InvalidInput(
+                    "Kod jest nieprawidłowy albo wygasł. Poproś o nową wiadomość.".into(),
+                ));
+            }
+            Err(error) => return Err(error),
+        };
+        let session_token = body
+            .fan_session_token
+            .or(cookie_token)
+            .filter(|value| !value.is_empty() && value.len() <= MAX_TOKEN_BYTES)
+            .ok_or_else(|| AppError::Remote {
+                status: 200,
+                detail: "Backend potwierdził kod, ale nie zwrócił sesji fana".into(),
             })?;
-        let _: serde_json::Value = decode(response).await?;
         Ok((
             FanAuthResult {
                 session_created: true,
             },
-            token,
+            session_token,
         ))
     }
 }
