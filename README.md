@@ -4,12 +4,31 @@ Tauri 2 mobile client for Virya Signal and CrowdRelay live operations. The UI is
 written in Leptos/WASM; credentials, network access, wallet state and operator
 actions live in the native Rust shell.
 
-## 0.4.2 scope
+## Features
 
-- fan-side VIRYA AREA wallet and game progress without exposing drop coordinates;
-- owner-only CrowdRelay operations cockpit with audited retries;
-- partial-source degradation for operations data instead of an all-or-nothing screen;
-- Stronghold-backed stable AREA identity and 37-command IPC contract guards.
+### Fan area
+- email + PIN fan sign-up and unlock with Stronghold-backed session storage;
+- home dashboard with referral progress, active draws, coupons and physical rewards;
+- public event calendar with interest registration and external ticket links (`KUP BILET`);
+- ticket wallet import and offline QR rendering, plus admission pass QR for events;
+- merch catalog with availability, variants and direct checkout via the hosted store;
+- VIRYA AREA wallet and game progress.
+
+### Operator area
+- role-based operator login (owner/staff) with audited retries;
+- CrowdRelay operations cockpit: event QR campaigns, admission redemption, pass and coupon issuance;
+- staff/event QR overviews and admin pass management;
+- operations monitoring: outbox/delivery queues, dead items and signal summaries;
+- requested city tracking and staff dashboards.
+
+### Show mode
+- offline scan journal for check-ins, synchronised with CrowdRelay when connectivity returns.
+
+### Platform
+- Leptos/WASM presentation layer and Tauri 2 native Rust security boundary;
+- 37-command typed IPC contract with static guards;
+- bounded persistent caches, validated HTTPS endpoints, size limits and latest-wins refresh;
+- partial-source degradation so one upstream failure does not block the whole screen.
 
 ## Toolchain
 
