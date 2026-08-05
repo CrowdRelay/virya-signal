@@ -1,61 +1,36 @@
-# Architecture
+# Virya Signal architecture
 
-## Source of truth
+Virya Signal is a Tauri 2 application with a Leptos/WASM presentation layer and a native Rust security boundary.
 
-CrowdRelay owns products, SKU variants, inventory movements, reservations,
-physical reward allocations and fulfillment. The stock value is derived from
-an append-only ledger; active reservations are subtracted separately.
+## Boundaries
 
-`available = sum(inventory_ledger.delta) - active_reservations`
+- `src/`: reactive UI, bounded DTOs and typed command invocation;
+- `src-tauri/src/api.rs`: CrowdRelay HTTP adapter;
+- `src-tauri/src/vault.rs`: Stronghold-backed credential storage;
+- `src-tauri/src/lib.rs`: native command composition, session state and mobile lifecycle;
+- CrowdRelay: authoritative fan, ticket, admission, campaign and operations state.
 
-The ledger records receipts, initial counts, sales, refunds, manual adjustments,
-promotional issues, damage and staff issues. Every mutation is workspace-scoped
-and the externally retried operations use stable idempotency keys.
+The WebView never owns long-lived operator credentials or raw ticket QR capabilities. Native commands validate inputs and return the smallest response needed by the active screen.
 
-## Stripe order lifecycle
+## State ownership
 
-1. Virya validates the cart and expands bundles to physical SKU quantities.
-2. With the site write switch enabled, CrowdRelay creates an expiring order
-   reservation before Stripe Checkout is created.
-3. The checkout request identity is a fingerprint of the complete cart,
-   customer, parcel-locker, language and reward payload. An unchanged retry
-   reuses the same Stripe idempotency key.
-4. Ambiguous Stripe failures do not release stock immediately. The reservation
-   expires naturally, or the exact checkout retries safely.
-5. Signed Stripe payment events run the established mail and InPost checkpoints
-   first. Inventory commit is appended afterwards.
-6. CrowdRelay commit is idempotent. A paid event may also commit an expired or
-   released reservation when Stripe events arrived out of order; preserving a
-   paid order takes precedence over hiding a temporary negative correction.
+Operator, fan and show-mode mutations are serialized independently. Public content may use bounded persistent caches. Private sessions are loaded from Stronghold and sensitive in-memory values use zeroizing containers where practical.
 
-## Reward campaigns
+## Offline show mode
 
-A physical reward campaign reuses the existing weighted draw and existing
-`physical_reward.granted` outbox contract. A new allocation links one draw to a
-SKU, reserves `winner_count × units_per_winner`, and creates fulfillment rows
-only for actual selected winners. If fewer winners qualify, unused reservation
-quantity is released inside the draw transaction.
+A prepared show session keeps a bounded local scan journal and synchronizes against CrowdRelay when connectivity returns. PostgreSQL remains authoritative for final redemption and conflict classification.
 
-Campaign states remain the established draw states: draft, scheduled, running,
-completed and cancelled. Scheduling is separately gated. Cancellation is only
-allowed before running and releases the allocation.
+## Crash evidence path
 
-## Public site failure isolation
+```text
+UI action
+  -> persisted command name (arguments excluded)
+  -> bounded native invocation
+  -> WebView error/rejection overlay when catchable
+  -> native panic file written atomically when Rust panics
+  -> next-launch recovery reads report
+  -> WebView persists and displays report
+  -> native report acknowledged and deleted
+```
 
-Static product cards render immediately. Only the small availability indicator
-calls `/api/merch/inventory`, with bounded upstream and browser timeouts. A
-CrowdRelay outage produces an error/retry state rather than blocking or removing
-the page.
-
-## Mobile payment boundary
-
-Virya Signal reads the coarse public catalog and links products to the existing
-Virya store. Concert cards continue to use `PublicEvent.ticket_url` and open the
-system browser. Both tickets and merch therefore use hosted Stripe Checkout;
-the mobile app never embeds card collection or stores payment credentials.
-
-## n8n and mail boundary
-
-No workflow JSON was modified. The existing mail paths continue to consume the
-same events. The protected `physical_reward.granted` outbox block and the Stripe
-mail/shipment block are covered by exact SHA-256 source guards.
+A foreground heartbeat identifies an abnormal WebView/process termination even when no JavaScript or Rust stack can be captured.

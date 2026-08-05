@@ -1802,7 +1802,7 @@ fn FanApp(
                 </nav>
             </Show>
             <div class="content">{move || match tab.get() {
-                FanTab::Signal => view! { <FanSignal dashboard=dashboard loading=loading /> }.into_any(),
+                FanTab::Signal => view! { <FanSignal dashboard=dashboard loading=loading error=error /> }.into_any(),
                 FanTab::Events => view! { <FanEvents dashboard=dashboard public=public loading=loading error=error /> }.into_any(),
                 FanTab::Merch => view! { <FanMerch merch=merch loading=loading error=error /> }.into_any(),
                 FanTab::Game => view! { <FanGame area=area loading=loading error=error /> }.into_any(),
@@ -1828,6 +1828,7 @@ fn FanNavButton(
 fn FanSignal(
     dashboard: RwSignal<Option<FanDashboardData>>,
     loading: RwSignal<FanLoadingState>,
+    error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     view! {
         <section class="screen fan-screen">
@@ -1860,8 +1861,20 @@ fn FanSignal(
                 view! {
                     <div class="stats-grid"><Metric value=referral.pending_referrals.to_string() label="oczekujące"/><Metric value=entries_total.to_string() label="losy"/><Metric value=coupon_count.to_string() label="kupony"/></div>
                     <div class="section-head"><h3>Aktywne losowania</h3><span>{draw_count}</span></div>
-                    <div class="card-list">{draws.into_iter().map(|draw| view! {
-                        <article class="draw-card"><div><p class="eyebrow">{draw.prize_kind}</p><strong>{draw.name}</strong><span>{format!("Losowanie {}", human_time(&draw.draw_at))}</span></div><div class="entry-count"><b>{draw.total_entries}</b><small>LOSÓW</small></div></article>
+                    <div class="card-list">{draws.into_iter().map(|draw| {
+                        let proof_url = (!draw.slug.is_empty()).then(|| format!(
+                            "https://virya.music/pl/dowody/losowania/{}/?source=signal-app",
+                            draw.slug,
+                        ));
+                        view! {
+                            <article class="draw-card">
+                                <div><p class="eyebrow">{draw.prize_kind}</p><strong>{draw.name}</strong><span>{format!("Losowanie {}", human_time(&draw.draw_at))}</span></div>
+                                <div class="draw-actions">
+                                    <div class="entry-count"><b>{draw.total_entries}</b><small>LOSÓW</small></div>
+                                    {proof_url.map(|url| view! { <ExternalLink url=url label="DOWÓD ↗" error=error /> })}
+                                </div>
+                            </article>
+                        }
                     }).collect_view()}</div>
                     {coupons_view}
                     {rewards_view}

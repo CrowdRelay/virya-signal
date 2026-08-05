@@ -186,6 +186,8 @@ button:disabled { opacity: .48; cursor: default; }
 .draw-card, .reward-card, .fan-coupon { border: 1px solid var(--line); background: var(--surface); padding: 15px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .draw-card strong { display: block; margin: 5px 0; }
 .draw-card span, .reward-card p { color: var(--muted); font-size: 10px; margin: 0; }
+.draw-actions { display: grid; justify-items: end; gap: 8px; }
+.draw-actions .ticket-buy-button { min-height: 32px; padding: 7px 10px; font-size: 9px; }
 .entry-count { min-width: 58px; height: 58px; border: 1px solid var(--yellow); color: var(--yellow); display: grid; place-content: center; text-align: center; }
 .entry-count b { font-size: 22px; line-height: 1; }
 .entry-count small { font-size: 7px; }

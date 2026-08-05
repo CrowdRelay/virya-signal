@@ -289,6 +289,8 @@ pub struct ReferralProgress {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct WeightedDrawEntry {
+    #[serde(default)]
+    pub slug: String,
     pub name: String,
     pub prize_kind: String,
     pub draw_at: String,
