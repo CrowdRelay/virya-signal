@@ -65,6 +65,35 @@ pub struct PublicHomeData {
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
+pub struct MerchCatalog {
+    #[serde(default)]
+    pub products: Vec<MerchProduct>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct MerchProduct {
+    pub slug: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub image_url: Option<String>,
+    pub currency: String,
+    pub price_gross_minor: i64,
+    pub active: bool,
+    pub public: bool,
+    #[serde(default)]
+    pub variants: Vec<MerchVariant>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct MerchVariant {
+    pub sku: String,
+    pub label: String,
+    pub active: bool,
+    pub available: bool,
+    pub availability: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct DashboardData {
     pub events: Vec<PublicEvent>,
     pub qr: Option<ConcertQrOverview>,

@@ -17,7 +17,7 @@ use uuid::Uuid;
 
 use crate::{
     AppError,
-    models::{CitySignal, FanProfile, OperatorProfile, PublicEvent},
+    models::{CitySignal, FanProfile, MerchCatalog, OperatorProfile, PublicEvent},
 };
 
 use super::{
@@ -124,6 +124,17 @@ impl CrowdRelayClient {
         drop(c);
         self.persist_public_cache_in_background();
         Ok(events)
+    }
+
+    pub async fn public_merch_catalog(&self, api_base_url: &str) -> Result<MerchCatalog, AppError> {
+        let response = self
+            .public_response_base(
+                api_base_url,
+                "public/merch/catalog",
+                CacheValidators::default(),
+            )
+            .await?;
+        decode(response).await
     }
 
     pub async fn public_cities(&self, api_base_url: &str) -> Result<Vec<CitySignal>, AppError> {

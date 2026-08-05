@@ -14,8 +14,8 @@ use crate::{
     AppError, AppState, MAX_SECRET_BYTES,
     models::{
         AdmissionPass, FanAuthResult, FanConfirmationInput, FanEventInterest, FanProfile,
-        FanSessionStatus, FanSignupInput, PublicEvent, ReferralProgress, TicketWallet,
-        TicketWalletApi, WalletBatch, WalletCredential, WalletTicket,
+        FanSessionStatus, FanSignupInput, MerchCatalog, PublicEvent, ReferralProgress,
+        TicketWallet, TicketWalletApi, WalletBatch, WalletCredential, WalletTicket,
     },
     session::{fan_profile, persist_fan, run_blocking},
     validation::{bounded_secret, validate_fan_confirmation, validate_fan_signup, validate_pin},
@@ -174,6 +174,14 @@ pub(crate) async fn fan_area_wallet(
 pub(crate) async fn fan_events(state: State<'_, AppState>) -> Result<Vec<PublicEvent>, AppError> {
     let profile = fan_profile(&state).await?;
     state.api.fan_events(&profile).await
+}
+
+#[tauri::command]
+pub(crate) async fn fan_merch_catalog(
+    state: State<'_, AppState>,
+) -> Result<MerchCatalog, AppError> {
+    let profile = fan_profile(&state).await?;
+    state.api.public_merch_catalog(&profile.api_base_url).await
 }
 
 #[tauri::command]

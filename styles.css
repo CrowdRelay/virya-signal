@@ -199,6 +199,20 @@ button:disabled { opacity: .48; cursor: default; }
 .date-line { display: flex; justify-content: space-between; color: var(--yellow); font-size: 10px; font-weight: 900; }
 .fan-event-card h3 { margin: 10px 0 5px; text-transform: uppercase; font-size: 23px; }
 .fan-event-card p { margin: 0; color: var(--muted); }
+.fan-merch-list { gap: 12px; }
+.fan-merch-card { border: 1px solid var(--line); background: var(--surface); overflow: hidden; contain: layout paint; content-visibility: auto; contain-intrinsic-size: auto 420px; }
+.fan-merch-card > img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; display: block; background: #171715; }
+.fan-merch-body { display: grid; gap: 12px; padding: 15px; }
+.fan-merch-body p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.fan-merch-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.fan-merch-heading h3 { margin: 0 0 5px; text-transform: uppercase; font-size: 19px; line-height: 1.1; }
+.fan-merch-heading strong { color: var(--yellow); font-size: 14px; }
+.fan-merch-heading > span { flex: 0 0 auto; border: 1px solid #4b2b2b; color: #d99494; padding: 5px 7px; font-size: 8px; font-weight: 900; letter-spacing: .08em; }
+.fan-merch-heading > span.available { border-color: #66571d; color: var(--yellow); }
+.fan-merch-variants { display: flex; flex-wrap: wrap; gap: 6px; }
+.fan-merch-variants span { min-width: 34px; border: 1px solid #343431; color: #777; padding: 6px 8px; text-align: center; font-size: 9px; font-weight: 800; }
+.fan-merch-variants span.available { border-color: #6a5a21; color: #f2d65a; background: #f3c51a0d; }
+.fan-merch-card .ticket-buy-button { width: 100%; border-color: var(--yellow); background: var(--yellow); color: #090909; }
 .event-description { margin-top: 12px !important; line-height: 1.5; font-size: 12px; }
 .event-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 16px; }
 .event-actions button, .event-actions a { border: 1px solid #4d431b; background: transparent; color: var(--yellow); padding: 12px 8px; text-align: center; font-size: 10px; font-weight: 900; }

@@ -88,7 +88,7 @@ if missing:
     raise SystemExit(f'UI invokes unregistered commands: {sorted(missing)}')
 
 required_paths = [
-    'public/events?limit=50', 'staff/admission/redeem', 'staff/coupons/redeem',
+    'public/events?limit=50', 'public/merch/catalog', 'staff/admission/redeem', 'staff/coupons/redeem',
     'staff/event-qr/overview', 'admin/event-qr/overview',
     'admin/admission/passes', 'me/referral', 'me/events?limit=50',
     'public/ticket-orders/{order_id}/wallet',
@@ -96,6 +96,10 @@ required_paths = [
 for path in required_paths:
     if path not in api:
         raise SystemExit(f'missing API contract path: {path}')
+
+for contract in ('event.ticket_url', 'KUP BILET ↗', 'ExternalLink'):
+    if contract not in ui:
+        raise SystemExit(f'mobile ticket checkout contract is missing: {contract}')
 
 index = (root / 'index.html').read_text()
 boot = (root / 'boot.js').read_text()

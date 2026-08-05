@@ -16,7 +16,7 @@ use crate::{
         AdmissionPass, AdmissionQr, AdmissionRedemption, AreaWallet, CouponEnvelope,
         CreateQrCampaignInput, DashboardData, FanAuthResult, FanConfirmationInput,
         FanDashboardData, FanEventInterest, FanSessionStatus, FanSignupInput, IssuePassInput,
-        IssuedPass, OperatorOpsOverview, OperatorProfileInput, OperatorRole,
+        IssuedPass, MerchCatalog, OperatorOpsOverview, OperatorProfileInput, OperatorRole,
         OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem, OpsRetryResult, PublicEvent,
         PublicHomeData, QrCampaign, ReferralProgress, RequestedCityInput, RequestedCityResult,
         SessionStatus, ShowModeScanResult, ShowModeStatus, ShowModeSyncResult, TicketWallet,
@@ -1679,6 +1679,7 @@ fn FanApp(
 ) -> impl IntoView {
     let tab = RwSignal::new(FanTab::Signal);
     let dashboard = RwSignal::new(None::<FanDashboardData>);
+    let merch = RwSignal::new(None::<MerchCatalog>);
     let wallets = RwSignal::new(Vec::<TicketWallet>::new());
     let admission_qr = RwSignal::new(None::<AdmissionQr>);
     let area = RwSignal::new(None::<AreaWallet>);
@@ -1711,6 +1712,12 @@ fn FanApp(
                 if !state.interests {
                     loaded.update(|value| value.interests = true);
                     refresh_fan_interests(dashboard, loading, error);
+                }
+            }
+            FanTab::Merch => {
+                if !loaded.get_untracked().merch {
+                    loaded.update(|state| state.merch = true);
+                    refresh_fan_merch(merch, loading, error);
                 }
             }
             FanTab::Game => {
@@ -1767,6 +1774,7 @@ fn FanApp(
             match bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
                 Ok(value) => {
                     dashboard.set(None);
+                    merch.set(None);
                     wallets.set(Vec::new());
                     admission_qr.set(None);
                     area.set(None);
@@ -1782,12 +1790,13 @@ fn FanApp(
     view! {
         <section class="authenticated fan-authenticated">
             <header class="topbar fan-topbar">
-                <div on:dblclick=move |_| { loaded.set(FanLoadedState::default()); refresh_fan_parts(dashboard, loading, error); refresh_wallets(wallets, Some(loading), error); refresh_fan_area(area, loading, error); } style="cursor:pointer"><p class="eyebrow">"VIRYA SIGNAL"</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| "Mój Sygnał".to_owned())}</strong></div>
+                <div on:dblclick=move |_| { loaded.set(FanLoadedState::default()); refresh_fan_parts(dashboard, loading, error); refresh_fan_merch(merch, loading, error); refresh_wallets(wallets, Some(loading), error); refresh_fan_area(area, loading, error); } style="cursor:pointer"><p class="eyebrow">"VIRYA SIGNAL"</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| "Mój Sygnał".to_owned())}</strong></div>
                 <div class="topbar-actions"><span class="live-dot"></span><button class="menu-trigger" aria-label="Otwórz menu" aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|value| *value = !*value)><i></i><i></i><i></i></button><button aria-label="Zamknij i zablokuj Sygnał" on:click=close>"×"</button></div>
             </header>
             <Show when=move || menu_open.get()>
                 <div class="overflow-backdrop" on:click=move |_| menu_open.set(false)></div>
                 <nav class="overflow-menu">
+                    <button class:active=move || tab.get() == FanTab::Merch on:click=move |_| { tab.set(FanTab::Merch); menu_open.set(false); }><span>"▤"</span>"Merch"</button>
                     <button class:active=move || tab.get() == FanTab::Game on:click=move |_| { tab.set(FanTab::Game); menu_open.set(false); }><span>"◇"</span>"Gra AREA"</button>
                     <button class:active=move || tab.get() == FanTab::Profile on:click=move |_| { tab.set(FanTab::Profile); menu_open.set(false); }><span>"◎"</span>"Profil"</button>
                 </nav>
@@ -1795,6 +1804,7 @@ fn FanApp(
             <div class="content">{move || match tab.get() {
                 FanTab::Signal => view! { <FanSignal dashboard=dashboard loading=loading /> }.into_any(),
                 FanTab::Events => view! { <FanEvents dashboard=dashboard public=public loading=loading error=error /> }.into_any(),
+                FanTab::Merch => view! { <FanMerch merch=merch loading=loading error=error /> }.into_any(),
                 FanTab::Game => view! { <FanGame area=area loading=loading error=error /> }.into_any(),
                 FanTab::Wallet => view! { <FanWallet dashboard=dashboard wallets=wallets admission_qr=admission_qr loading=loading error=error /> }.into_any(),
                 FanTab::Profile => view! { <FanProfileScreen status=status dashboard=dashboard wallets=wallets area=area loading=loading error=error /> }.into_any(),
@@ -1857,6 +1867,109 @@ fn FanSignal(
                     {rewards_view}
                 }.into_any()
             }).value_or_else(|| view! { <Skeleton /> }.into_any())}
+            </Show>
+        </section>
+    }
+}
+
+#[component]
+fn FanMerch(
+    merch: RwSignal<Option<MerchCatalog>>,
+    loading: RwSignal<FanLoadingState>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    view! {
+        <section class="screen fan-screen merch-screen">
+            <header class="screen-title">
+                <p class="eyebrow">"VIRYA STORE"</p>
+                <h2>"Merch"</h2>
+                <p>"Stan magazynowy doczytuje się osobno. Płatność otworzy bezpieczny Stripe Checkout, a aplikacja nie przechowuje danych karty."</p>
+            </header>
+            <Show when=move || !loading.get().merch fallback=move || view! { <Skeleton rows=4 /> }>
+                {move || merch.get().map(|catalog| {
+                    let products = catalog.products.into_iter()
+                        .filter(|product| product.active && product.public)
+                        .collect::<Vec<_>>();
+                    if products.is_empty() {
+                        view! {
+                            <div class="empty-state">
+                                <strong>"Sklep jest chwilowo niedostępny"</strong>
+                                <p>"Pozostałe części Sygnału działają normalnie. Spróbuj ponownie za moment."</p>
+                                <button class="ghost" on:click=move |_| refresh_fan_merch(merch, loading, error)>"ODŚWIEŻ MERCH"</button>
+                            </div>
+                        }.into_any()
+                    } else {
+                        view! {
+                            <div class="card-list fan-merch-list">
+                                <ExternalLink url="https://virya.music/pl/merch/?source=signal-app".to_owned() label="OTWÓRZ PEŁNY SKLEP ↗" error=error />
+                                {products.into_iter().map(|product| {
+                                    let available_variants = product.variants.iter()
+                                        .filter(|variant| variant.active && variant.available)
+                                        .cloned()
+                                        .collect::<Vec<_>>();
+                                    let has_stock = !available_variants.is_empty();
+                                    let preorder = available_variants.iter()
+                                        .any(|variant| variant.availability == "preorder");
+                                    let low_stock = available_variants.iter()
+                                        .any(|variant| variant.availability == "low_stock");
+                                    let availability_label = if preorder {
+                                        "PRZEDSPRZEDAŻ"
+                                    } else if low_stock {
+                                        "OSTATNIE SZTUKI"
+                                    } else if has_stock {
+                                        "DOSTĘPNY"
+                                    } else {
+                                        "BRAK NA STANIE"
+                                    };
+                                    let first_sku = available_variants.first()
+                                        .map(|variant| variant.sku.clone())
+                                        .value_or_else(String::new);
+                                    let shop_url = format!(
+                                        "https://virya.music/pl/merch/?source=signal-app&product={}&sku={}",
+                                        product.slug,
+                                        first_sku,
+                                    );
+                                    let variants = product.variants.into_iter()
+                                        .filter(|variant| variant.active)
+                                        .collect::<Vec<_>>();
+                                    let variants_view = (!variants.is_empty()).then(|| view! {
+                                        <div class="fan-merch-variants">
+                                            {variants.into_iter().map(|variant| view! {
+                                                <span class:available=variant.available>{variant.label}</span>
+                                            }).collect_view()}
+                                        </div>
+                                    });
+                                    view! {
+                                        <article class="fan-merch-card">
+                                            {product.image_url.map(|url| view! {
+                                                <img src=url alt="" width="720" height="720" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+                                            })}
+                                            <div class="fan-merch-body">
+                                                <div class="fan-merch-heading">
+                                                    <div><h3>{product.name}</h3><strong>{money(product.price_gross_minor, &product.currency)}</strong></div>
+                                                    <span class:available=has_stock>{availability_label}</span>
+                                                </div>
+                                                {product.description.map(|description| view! { <p>{description}</p> })}
+                                                {variants_view}
+                                                <Show when=move || has_stock fallback=move || view! {
+                                                    <button class="ghost" on:click=move |_| refresh_fan_merch(merch, loading, error)>"SPRAWDŹ PONOWNIE"</button>
+                                                }>
+                                                    <ExternalLink url=shop_url.clone() label="KUP W SKLEPIE ↗" error=error />
+                                                </Show>
+                                            </div>
+                                        </article>
+                                    }
+                                }).collect_view()}
+                            </div>
+                        }.into_any()
+                    }
+                }).value_or_else(|| view! {
+                    <div class="empty-state">
+                        <strong>"Nie udało się pobrać stanu sklepu"</strong>
+                        <p>"Koncerty, bilety i profil pozostają dostępne."</p>
+                        <button class="ghost" on:click=move |_| refresh_fan_merch(merch, loading, error)>"SPRÓBUJ PONOWNIE"</button>
+                    </div>
+                }.into_any())}
             </Show>
         </section>
     }
@@ -2422,6 +2535,32 @@ fn refresh_fan_events(
             Err(message) => error.set(Some(message)),
         }
         loading.update(|state| state.events = false);
+    });
+}
+
+fn refresh_fan_merch(
+    merch: RwSignal<Option<MerchCatalog>>,
+    loading: RwSignal<FanLoadingState>,
+    error: RwSignal<Option<String>>,
+) {
+    loading.update(|state| state.merch = true);
+    spawn_local(async move {
+        match bridge::invoke_latest::<MerchCatalog, _>(
+            "fan_merch_catalog",
+            &EmptyArgs {},
+            15_000,
+            "fan:merch",
+        )
+        .await
+        {
+            Ok(Some(value)) => merch.set(Some(value)),
+            Ok(None) => return,
+            Err(message) => {
+                merch.set(None);
+                error.set(Some(message));
+            }
+        }
+        loading.update(|state| state.merch = false);
     });
 }
 

@@ -396,6 +396,43 @@ pub struct EventListResponse {
     pub events: Vec<PublicEvent>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct MerchCatalog {
+    #[serde(default)]
+    pub products: Vec<MerchProduct>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct MerchProduct {
+    #[serde(deserialize_with = "deserialize_string_or_default")]
+    pub slug: String,
+    #[serde(deserialize_with = "deserialize_string_or_default")]
+    pub name: String,
+    #[serde(default, deserialize_with = "deserialize_optional_string_or_bytes")]
+    pub description: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_string_or_bytes")]
+    pub image_url: Option<String>,
+    #[serde(deserialize_with = "deserialize_string_or_default")]
+    pub currency: String,
+    pub price_gross_minor: i64,
+    pub active: bool,
+    pub public: bool,
+    #[serde(default)]
+    pub variants: Vec<MerchVariant>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct MerchVariant {
+    #[serde(deserialize_with = "deserialize_string_or_default")]
+    pub sku: String,
+    #[serde(deserialize_with = "deserialize_string_or_default")]
+    pub label: String,
+    pub active: bool,
+    pub available: bool,
+    #[serde(deserialize_with = "deserialize_string_or_default")]
+    pub availability: String,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct CityListResponse {
     pub items: Vec<CitySignal>,
@@ -403,28 +440,44 @@ pub struct CityListResponse {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct CitySignal {
+    #[serde(deserialize_with = "deserialize_string_or_default")]
     pub slug: String,
+    #[serde(deserialize_with = "deserialize_string_or_default")]
     pub name: String,
+    #[serde(deserialize_with = "deserialize_string_or_default")]
     pub country_code: String,
     pub fan_count: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PublicEvent {
+    #[serde(deserialize_with = "deserialize_string_or_default")]
     pub slug: String,
+    #[serde(deserialize_with = "deserialize_string_or_default")]
     pub title: String,
+    #[serde(default, deserialize_with = "deserialize_optional_string_or_bytes")]
     pub description: Option<String>,
     pub city: Option<EventCity>,
+    #[serde(default, deserialize_with = "deserialize_optional_string_or_bytes")]
     pub venue: Option<String>,
+    #[serde(deserialize_with = "deserialize_string_or_default")]
     pub starts_at: String,
+    #[serde(default, deserialize_with = "deserialize_optional_string_or_bytes")]
     pub ticket_url: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_optional_string_or_bytes")]
     pub image_url: Option<String>,
-    #[serde(default, alias = "thumbnail_url", alias = "image_mobile_url")]
+    #[serde(
+        default,
+        alias = "thumbnail_url",
+        alias = "image_mobile_url",
+        deserialize_with = "deserialize_optional_string_or_bytes"
+    )]
     pub image_thumbnail_url: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct EventCity {
+    #[serde(deserialize_with = "deserialize_string_or_default")]
     pub name: String,
 }
 

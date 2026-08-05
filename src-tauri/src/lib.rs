@@ -19,9 +19,9 @@ use api::CrowdRelayClient;
 use commands::{
     fan::{
         fan_admission_pass, fan_admission_qr, fan_area_wallet, fan_claim_pass, fan_confirm,
-        fan_events, fan_forget, fan_import_wallet, fan_interests, fan_lock, fan_referral,
-        fan_register_interest, fan_request_access, fan_request_delivery, fan_signup, fan_status,
-        fan_unlock, fan_wallets, render_wallet_qr,
+        fan_events, fan_forget, fan_import_wallet, fan_interests, fan_lock, fan_merch_catalog,
+        fan_referral, fan_register_interest, fan_request_access, fan_request_delivery, fan_signup,
+        fan_status, fan_unlock, fan_wallets, render_wallet_qr,
     },
     misc::{launcher_status, open_external_url, request_city},
     operator::{
@@ -134,6 +134,7 @@ pub fn run() {
             fan_request_access,
             fan_confirm,
             fan_events,
+            fan_merch_catalog,
             fan_area_wallet,
             fan_referral,
             fan_interests,
