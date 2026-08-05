@@ -150,8 +150,7 @@ bash scripts/profile-android.sh music.virya.control artifacts/pixel8-profile 5
 The script performs a warm-up plus repeated cold starts and saves aggregated startup
 time, CPU, memory, frame statistics, package metadata and `[virya:boot]` /
 `[virya:ipc]` diagnostics under `artifacts/`.
-See `QUALITY.md` for budgets, architecture decisions and the release checklist.
 
 ## Engineering documentation
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/RELIABILITY.md`](docs/RELIABILITY.md) and [`QUALITY.md`](QUALITY.md).
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/RELIABILITY.md`](docs/RELIABILITY.md).
