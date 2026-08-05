@@ -15,8 +15,8 @@ use crate::{
     },
     session::{operator_profile, run_blocking},
     validation::{
-        validate_api_base, validate_campaign, validate_issue_pass, validate_operator_profile,
-        validate_pin,
+        validate_api_base, validate_campaign, validate_issue_pass, validate_new_operator_pin,
+        validate_operator_profile, validate_pin,
     },
     vault,
 };
@@ -39,20 +39,23 @@ pub(crate) async fn configure(
 ) -> Result<SessionStatus, AppError> {
     let _mutation = state.operator_mutation.lock().await;
     validate_operator_profile(&mut profile)?;
-    validate_pin(&pin)?;
+    validate_new_operator_pin(&pin)?;
     state.api.validate(&profile).await?;
     let app_data_dir = state.app_data_dir.clone();
     let stored_profile = profile.clone();
     let pin = Zeroizing::new(pin);
     let vault_pin = pin.clone();
-    run_blocking(move || vault::save(&app_data_dir, vault_pin.as_str(), &stored_profile)).await?;
+    let persisted_profile = run_blocking(move || {
+        vault::save_verified(&app_data_dir, vault_pin.as_str(), &stored_profile)
+    })
+    .await?;
     let password_dir = state.app_data_dir.clone();
     let password_pin = pin.clone();
     let vault_password =
         run_blocking(move || vault::operator_password(&password_dir, password_pin.as_str()))
             .await?;
     let _show_mutation = state.show_mode_mutation.lock().await;
-    *state.session.write().await = Some(Arc::new(profile));
+    *state.session.write().await = Some(Arc::new(persisted_profile));
     *state.operator_pin.write().await = Some(pin);
     *state.operator_vault_password.write().await = Some(vault_password);
     *state.show_mode_store.write().await = None;

@@ -43,7 +43,7 @@ pub enum OperatorRole {
     Staff,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize, Zeroize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Zeroize)]
 #[zeroize(drop)]
 pub struct OperatorProfile {
     pub display_name: String,

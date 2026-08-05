@@ -156,6 +156,19 @@ pub(crate) fn validate_campaign(input: &mut CreateQrCampaignInput) -> Result<(),
     Ok(())
 }
 
+/// New operator PINs are intentionally short, numeric and usable at the gate.
+/// `validate_pin` remains broader for unlocking profiles created by older builds.
+pub(crate) fn validate_new_operator_pin(pin: &str) -> Result<(), AppError> {
+    let length = pin.len();
+    if (4..=6).contains(&length) && pin.bytes().all(|byte| byte.is_ascii_digit()) {
+        Ok(())
+    } else {
+        Err(AppError::InvalidInput(
+            "PIN operatora musi mieć 4–6 cyfr".into(),
+        ))
+    }
+}
+
 pub(crate) fn validate_pin(pin: &str) -> Result<(), AppError> {
     if (4..=128).contains(&pin.chars().count()) {
         Ok(())
@@ -247,7 +260,17 @@ mod tests {
     }
 
     #[test]
-    fn pin_limits_use_character_count() {
+    fn new_operator_pin_accepts_four_to_six_ascii_digits() {
+        assert!(validate_new_operator_pin("1234").is_ok());
+        assert!(validate_new_operator_pin("123456").is_ok());
+        assert!(validate_new_operator_pin("123").is_err());
+        assert!(validate_new_operator_pin("1234567").is_err());
+        assert!(validate_new_operator_pin("12a4").is_err());
+        assert!(validate_new_operator_pin("１２３４").is_err());
+    }
+
+    #[test]
+    fn legacy_pin_limits_use_character_count() {
         assert!(validate_pin("1234").is_ok());
         assert!(validate_pin("123456").is_ok());
         assert!(validate_pin("ążźćńó").is_ok());

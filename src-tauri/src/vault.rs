@@ -30,15 +30,69 @@ pub fn exists(app_data_dir: &Path) -> bool {
     )
 }
 
-pub fn save(app_data_dir: &Path, pin: &str, profile: &OperatorProfile) -> Result<(), AppError> {
+/// Persists an operator profile transactionally and proves that the same PIN
+/// can reopen it before pairing is reported as complete. Existing data is
+/// restored if either the write or the verification fails.
+pub fn save_verified(
+    app_data_dir: &Path,
+    pin: &str,
+    profile: &OperatorProfile,
+) -> Result<OperatorProfile, AppError> {
+    let vault_path = operator_vault_path(app_data_dir);
+    let salt_path = operator_salt_path(app_data_dir);
+    let vault_backup = backup_path(&vault_path);
+    let salt_backup = backup_path(&salt_path);
+
+    remove_if_present(&vault_backup)?;
+    remove_if_present(&salt_backup)?;
+    move_if_present(&vault_path, &vault_backup)?;
+    if let Err(error) = move_if_present(&salt_path, &salt_backup) {
+        let _ = move_if_present(&vault_backup, &vault_path);
+        return Err(error);
+    }
+
+    let result = write_and_verify_operator(&vault_path, &salt_path, pin, profile);
+
+    match result {
+        Ok(persisted) => {
+            let _ = remove_if_present(&vault_backup);
+            let _ = remove_if_present(&salt_backup);
+            Ok(persisted)
+        }
+        Err(error) => {
+            let _ = remove_pair(&vault_path, &salt_path);
+            let _ = move_if_present(&vault_backup, &vault_path);
+            let _ = move_if_present(&salt_backup, &salt_path);
+            Err(error)
+        }
+    }
+}
+
+fn write_and_verify_operator(
+    vault_path: &Path,
+    salt_path: &Path,
+    pin: &str,
+    profile: &OperatorProfile,
+) -> Result<OperatorProfile, AppError> {
     save_at(
-        &operator_vault_path(app_data_dir),
-        &operator_salt_path(app_data_dir),
+        vault_path,
+        salt_path,
         OPERATOR_CLIENT_PATH,
         OPERATOR_PROFILE_KEY,
         pin,
         profile,
-    )
+    )?;
+    let persisted = load_at(
+        vault_path,
+        salt_path,
+        OPERATOR_CLIENT_PATH,
+        OPERATOR_PROFILE_KEY,
+        pin,
+    )?;
+    if &persisted != profile {
+        return Err(AppError::StrongholdClient);
+    }
+    Ok(persisted)
 }
 
 pub fn load(app_data_dir: &Path, pin: &str) -> Result<OperatorProfile, AppError> {
@@ -210,6 +264,9 @@ fn save_bytes_at(
     bytes: &[u8],
 ) -> Result<(), AppError> {
     ensure_pin(pin)?;
+    if let Some(parent) = vault_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
     let salt = load_or_create_salt(salt_path)?;
     let password = Zeroizing::new(password(pin, &salt)?);
     save_bytes_with_password_at(
@@ -259,6 +316,11 @@ fn save_bytes_with_password_at(
         .commit_with_keyprovider(&snapshot_path, &key_provider)
         .map_err(|_| AppError::StrongholdClient)?;
     set_private_permissions(vault_path)?;
+    OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(vault_path)?
+        .sync_all()?;
     Ok(())
 }
 
@@ -415,4 +477,53 @@ fn set_private_permissions(path: &Path) -> Result<(), AppError> {
     #[cfg(not(unix))]
     let _ = path;
     Ok(())
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod tests {
+    use super::*;
+    use crate::models::OperatorRole;
+
+    fn test_dir(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("virya-signal-{name}-{}", uuid::Uuid::new_v4()))
+    }
+
+    fn profile() -> OperatorProfile {
+        OperatorProfile {
+            display_name: "Bramka Virya".to_owned(),
+            api_base_url: "https://signal-api.virya.music/v1/".to_owned(),
+            role: OperatorRole::Staff,
+            bearer_token: "staff-device-token-0123456789abcdef".to_owned(),
+        }
+    }
+
+    #[test]
+    fn operator_pin_survives_a_fresh_vault_round_trip() {
+        let directory = test_dir("operator-round-trip");
+        let expected = profile();
+        let persisted = save_verified(&directory, "1234", &expected)
+            .expect("operator profile should persist and reopen");
+        assert_eq!(persisted, expected);
+        assert!(exists(&directory));
+        assert_eq!(
+            load(&directory, "1234").expect("same PIN should unlock"),
+            expected
+        );
+        assert!(matches!(
+            load(&directory, "4321"),
+            Err(AppError::InvalidPin)
+        ));
+        let _ = std::fs::remove_dir_all(directory);
+    }
+
+    #[test]
+    fn operator_save_creates_a_missing_app_data_directory() {
+        let directory = test_dir("missing-directory");
+        assert!(!directory.exists());
+        save_verified(&directory, "9876", &profile())
+            .expect("save should create the app data directory");
+        assert!(exists(&directory));
+        let _ = std::fs::remove_dir_all(directory);
+    }
 }

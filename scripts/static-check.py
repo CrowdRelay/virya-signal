@@ -101,6 +101,27 @@ for contract in ('event.ticket_url', 'KUP BILET ↗', 'ExternalLink'):
     if contract not in ui:
         raise SystemExit(f'mobile ticket checkout contract is missing: {contract}')
 
+for contract in (
+    'fn new_operator_pin_is_valid',
+    '(4..=6).contains(&pin.len())',
+    'Lokalny PIN (4–6 cyfr)',
+    'inputmode="numeric"',
+    'vault::save_verified',
+):
+    if contract not in ui and contract != 'vault::save_verified':
+        raise SystemExit(f'staff PIN regression contract is missing from UI: {contract}')
+operator_command = (root / 'src-tauri/src/commands/operator.rs').read_text()
+validation = (root / 'src-tauri/src/validation.rs').read_text()
+vault = (root / 'src-tauri/src/vault.rs').read_text()
+if 'vault::save_verified' not in operator_command:
+    raise SystemExit('staff pairing must verify the persisted vault before reporting success')
+if 'validate_new_operator_pin(&pin)?;' not in operator_command:
+    raise SystemExit('new staff PINs must use the 4–6 digit native validator')
+if 'operator_pin_survives_a_fresh_vault_round_trip' not in vault:
+    raise SystemExit('staff PIN persistence regression test is missing')
+if 'PIN operatora musi mieć 4–6 cyfr' not in validation:
+    raise SystemExit('native staff PIN validation contract is missing')
+
 index = (root / 'index.html').read_text()
 boot = (root / 'boot.js').read_text()
 boot_initializer = (root / 'boot-initializer.mjs').read_text()

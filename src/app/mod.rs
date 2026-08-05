@@ -165,6 +165,14 @@ fn OperatorPortal(
     }
 }
 
+fn new_operator_pin_is_valid(pin: &str) -> bool {
+    (4..=6).contains(&pin.len()) && pin.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+fn normalize_new_operator_pin(value: String) -> String {
+    value.chars().filter(char::is_ascii_digit).take(6).collect()
+}
+
 #[component]
 fn OperatorAccess(
     mode: RwSignal<RootMode>,
@@ -202,9 +210,9 @@ fn OperatorAccess(
 
     let pair = move |payload: String| {
         let current_pin = pin.get();
-        if current_pin.chars().count() < 6 || payload.trim().is_empty() {
+        if !new_operator_pin_is_valid(&current_pin) || payload.trim().is_empty() {
             error.set(Some(
-                "Podaj PIN i zeskanuj albo wklej kod parowania.".to_owned(),
+                "Podaj 4–6-cyfrowy PIN i zeskanuj albo wklej kod parowania.".to_owned(),
             ));
             return;
         }
@@ -235,7 +243,7 @@ fn OperatorAccess(
             match bridge::scan_qr().await {
                 Ok(Some(value)) => {
                     pairing.set(value);
-                    if pin.get().chars().count() >= 4 {
+                    if new_operator_pin_is_valid(&pin.get()) {
                         pair(pairing.get());
                     }
                 }
@@ -254,8 +262,10 @@ fn OperatorAccess(
             role: role.get(),
             bearer_token: token.get(),
         };
-        if current_pin.chars().count() < 6 || profile.bearer_token.trim().len() < 24 {
-            error.set(Some("Podaj PIN i poprawny token urządzenia.".to_owned()));
+        if !new_operator_pin_is_valid(&current_pin) || profile.bearer_token.trim().len() < 24 {
+            error.set(Some(
+                "Podaj 4–6-cyfrowy PIN i poprawny token urządzenia.".to_owned(),
+            ));
             return;
         }
         busy.set(true);
@@ -306,8 +316,8 @@ fn OperatorAccess(
                         </Show>
                         <div class="pairing-divider"><span></span><small>"ALBO"</small><span></span></div>
                         <label>"Kod parowania"<textarea rows="2" placeholder="virya-signal://pair?…" prop:value=move || pairing.get() on:input=move |e| pairing.set(event_target_value(&e))></textarea></label>
-                        <label>"Lokalny PIN"<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e)) /></label>
-                        <button class="primary" on:click=submit_pairing disabled=move || busy.get() || pairing.get().trim().is_empty()>"SPARUJ"</button>
+                        <label>"Lokalny PIN (4–6 cyfr)"<input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) /></label>
+                        <button class="primary" on:click=submit_pairing disabled=move || busy.get() || pairing.get().trim().is_empty() || !new_operator_pin_is_valid(&pin.get())>"SPARUJ"</button>
                         <button class="text-button" type="button" on:click=move |_| advanced.update(|v| *v = !*v)>
                             {move || if advanced.get() { "UKRYJ USTAWIENIA RĘCZNE" } else { "USTAWIENIA ZAAWANSOWANE" }}
                         </button>
@@ -320,15 +330,15 @@ fn OperatorAccess(
                                     <button class:active=move || role.get() == OperatorRole::Staff on:click=move |_| role.set(OperatorRole::Staff)>"STAFF"</button>
                                 </div>
                                 <label>"Token urządzenia"<textarea rows="3" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
-                                <button class="ghost" on:click=configure_manual disabled=move || busy.get()>"ZAPISZ RĘCZNIE"</button>
+                                <button class="ghost" on:click=configure_manual disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get())>"ZAPISZ RĘCZNIE"</button>
                             </div>
                         </Show>
                     </div>
                 }>
                     <div class="form-grid">
                         <p class="lock-copy">Profil operatora jest zaszyfrowany lokalnie.</p>
-                        <label>"PIN"<input type="password" autocomplete="current-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e)) /></label>
-                        <button class="primary" disabled=move || busy.get() on:click=unlock>"ODBLOKUJ"</button>
+                        <label>"PIN"<input type="password" autocomplete="current-password" inputmode="numeric" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e)) /></label>
+                        <button class="primary" disabled=move || busy.get() || pin.get().chars().count() < 4 on:click=unlock>"ODBLOKUJ"</button>
                     </div>
                 </Show>
             </div>
