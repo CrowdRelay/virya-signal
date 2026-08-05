@@ -2,6 +2,7 @@
 
 use tauri::{AppHandle, State};
 use tauri_plugin_opener::OpenerExt;
+use zeroize::Zeroizing;
 
 use crate::{
     AppError, AppState,
@@ -78,4 +79,30 @@ pub(crate) async fn launcher_status(
             session: fan_session.as_ref().map(|profile| profile.as_ref().into()),
         },
     })
+}
+
+#[tauri::command]
+pub(crate) async fn verify_staff_access(
+    state: State<'_, AppState>,
+    password: String,
+) -> Result<(), AppError> {
+    if password.is_empty() || password.len() > 256 {
+        return Err(AppError::InvalidInput(
+            "Podaj poprawne hasło staff.".to_owned(),
+        ));
+    }
+    let password = Zeroizing::new(password);
+    state.api.verify_staff_access(password.as_str()).await
+}
+
+#[tauri::command]
+pub(crate) async fn submit_anonymous_feedback(
+    state: State<'_, AppState>,
+    category: String,
+    message: String,
+) -> Result<(), AppError> {
+    state
+        .api
+        .submit_anonymous_feedback(&category, &message)
+        .await
 }

@@ -47,7 +47,7 @@ if tomllib is not None:
             raise SystemExit(f'invalid source TOML {path.relative_to(root)}: {error}') from error
 
 required = [
-    'src-tauri/src/lib.rs', 'src-tauri/src/api/mod.rs', 'src-tauri/src/vault.rs',
+    'src-tauri/src/lib.rs', 'src-tauri/src/api/mod.rs', 'src-tauri/src/api/ticketing.rs', 'src-tauri/src/vault.rs',
     'src/app/mod.rs', 'src/bridge.rs', 'src-tauri/capabilities/mobile.json',
     '.github/workflows/check.yml', '.github/workflows/mobile-smoke.yml',
     'rust-toolchain.toml', '.cargo/config.toml', 'scripts/collect-mobile-artifact.py', 'boot.js',
@@ -91,15 +91,48 @@ required_paths = [
     'public/events?limit=50', 'public/merch/catalog', 'staff/admission/redeem', 'staff/coupons/redeem',
     'staff/event-qr/overview', 'admin/event-qr/overview',
     'admin/admission/passes', 'me/referral', 'me/events?limit=50',
-    'public/ticket-orders/{order_id}/wallet',
+    'public/ticket-orders/{order_id}/wallet', 'public/events/{event_slug}/tickets',
 ]
+
 for path in required_paths:
     if path not in api:
         raise SystemExit(f'missing API contract path: {path}')
 
-for contract in ('event.ticket_url', 'KUP BILET ↗', 'ExternalLink'):
+for contract in (
+    'FanTicketCheckout',
+    'FanTicketSale',
+    'fan_ticket_sale',
+    'fan_start_ticket_checkout',
+    'PRZEJDŹ DO PŁATNOŚCI STRIPE',
+    'OTWÓRZ PŁATNOŚĆ PONOWNIE',
+    '<FanNavButton tab=tab own=FanTab::Merch icon="shop" label="Sklep"/>',
+    'KUP W SKLEPIE ↗',
+    'fan_merch_bundles',
+    'submit_anonymous_feedback',
+    'ANONIMOWY FEEDBACK',
+):
     if contract not in ui:
-        raise SystemExit(f'mobile ticket checkout contract is missing: {contract}')
+        raise SystemExit(f'fan commerce UX contract is missing: {contract}')
+
+ticketing = (root / 'src-tauri/src/api/ticketing.rs').read_text()
+native_fan = (root / 'src-tauri/src/commands/fan.rs').read_text()
+frontend_models = (root / 'src/models.rs').read_text()
+for contract in (
+    'https://virya.music/api/ticket-checkout',
+    '.header(ORIGIN, VIRYA_SITE_ORIGIN)',
+    'checkout.stripe.com',
+    'MAX_CHECKOUT_LINES',
+    'MAX_CHECKOUT_QUANTITY',
+    'public/events/{event_slug}/tickets',
+):
+    if contract not in ticketing:
+        raise SystemExit(f'native ticket checkout hardening contract is missing: {contract}')
+if 'checkout_token' in frontend_models:
+    raise SystemExit('checkout token must never be deserialized into the WASM model')
+if native_fan.find('persist_fan(&state, &profile).await?;') > native_fan.find('Ok(checkout)'):
+    raise SystemExit('ticket wallet credential must be persisted before checkout is returned to the WebView')
+if 'Zeroizing::new(response.checkout_token)' not in native_fan:
+    raise SystemExit('ticket checkout token must be zeroized while crossing the native command')
 
 for contract in (
     'fn new_operator_pin_is_valid',
@@ -179,6 +212,44 @@ if 'console_error_panic_hook::set_once();' not in main or '#[cfg(debug_assertion
     raise SystemExit('release startup panics must remain diagnosable')
 if 'futures::join!' in ui or 'fn Splash()' in ui:
     raise SystemExit('startup must render immediately instead of waiting behind a second splash')
+
+for contract in (
+    'RwSignal::new(RootMode::Fan)',
+    'RootMode::StaffGate',
+    'verify_staff_access',
+    'JESTEŚ W STAFFIE?',
+    '<NavGlyph icon=icon/>',
+    '<StatusFailure',
+    'status_failed=fan_status_failed',
+):
+    if contract not in ui:
+        raise SystemExit(f'fan-first or staff-gate UX contract is missing: {contract}')
+if ui.count('mode.set(RootMode::Team)') != 1 or 'Ok(()) => mode.set(RootMode::Team)' not in ui:
+    raise SystemExit('operator UI must be reachable only after successful staff-gate verification')
+
+native_client = (root / 'src-tauri/src/api/client.rs').read_text()
+native_misc = (root / 'src-tauri/src/commands/misc.rs').read_text()
+for contract in (
+    'https://virya.music/api/staff/qr/login',
+    '.header(ORIGIN, STAFF_GATE_ORIGIN)',
+    '.redirect(reqwest::redirect::Policy::none())',
+    'StatusCode::TOO_MANY_REQUESTS',
+):
+    if contract not in native_client:
+        raise SystemExit(f'server-verified staff gate contract is missing: {contract}')
+if 'Zeroizing::new(password)' not in native_misc:
+    raise SystemExit('staff password must be zeroized immediately in the native command')
+
+native_models = (root / 'src-tauri/src/models.rs').read_text()
+for contract in (
+    'fn normalize_compat_string',
+    'deserialize_string_or_bytes',
+    'referral_payload_accepts_legacy_byte_sequences_for_text_fields',
+    'legacy_byte_sequences_are_migrated_to_strings',
+    'accepts_node_buffer_objects',
+):
+    if contract not in native_models:
+        raise SystemExit(f'StringOrBytes compatibility regression contract is missing: {contract}')
 if 'serde_json::Value' in ui or 'serde_json::Value' in bridge:
     raise SystemExit('discarded IPC responses must not pull JSON values into the WASM UI')
 launcher_startup = 'bridge::launcher_status' in ui

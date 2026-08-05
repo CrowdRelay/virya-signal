@@ -19,11 +19,15 @@ use api::CrowdRelayClient;
 use commands::{
     fan::{
         fan_admission_pass, fan_admission_qr, fan_area_wallet, fan_claim_pass, fan_confirm,
-        fan_events, fan_forget, fan_import_wallet, fan_interests, fan_lock, fan_merch_catalog,
-        fan_referral, fan_register_interest, fan_request_access, fan_request_delivery, fan_signup,
-        fan_status, fan_unlock, fan_wallets, render_wallet_qr,
+        fan_events, fan_forget, fan_import_wallet, fan_interests, fan_lock, fan_merch_bundles,
+        fan_merch_catalog, fan_referral, fan_register_interest, fan_request_access,
+        fan_request_delivery, fan_signup, fan_start_ticket_checkout, fan_status, fan_ticket_sale,
+        fan_unlock, fan_wallets, render_wallet_qr,
     },
-    misc::{launcher_status, open_external_url, request_city},
+    misc::{
+        launcher_status, open_external_url, request_city, submit_anonymous_feedback,
+        verify_staff_access,
+    },
     operator::{
         configure, create_qr_campaign, forget_device, issue_pass, lock, operator_events,
         operator_ops_overview, operator_qr, operator_retry, operator_signal_overview,
@@ -101,6 +105,7 @@ pub fn run() {
             crash::acknowledge_native_crash,
             session_status,
             launcher_status,
+            verify_staff_access,
             configure,
             unlock,
             lock,
@@ -135,6 +140,9 @@ pub fn run() {
             fan_confirm,
             fan_events,
             fan_merch_catalog,
+            fan_merch_bundles,
+            fan_ticket_sale,
+            fan_start_ticket_checkout,
             fan_area_wallet,
             fan_referral,
             fan_interests,
@@ -146,6 +154,7 @@ pub fn run() {
             fan_wallets,
             render_wallet_qr,
             fan_request_delivery,
+            submit_anonymous_feedback,
         ])
         .run(tauri::generate_context!());
     if let Err(error) = runtime_result {

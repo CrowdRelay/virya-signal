@@ -5,5 +5,10 @@ mod http;
 mod operator;
 mod public;
 mod retry;
+mod site;
+mod ticketing;
 
 pub use client::CrowdRelayClient;
+
+pub(crate) use site::SignalMerchBundleCatalog;
+pub(crate) use ticketing::{TicketCheckoutInput, TicketCheckoutStart, TicketSaleOffer};

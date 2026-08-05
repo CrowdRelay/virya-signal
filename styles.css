@@ -47,6 +47,9 @@ a { color: inherit; text-decoration: none; }
 .mode-card > strong { grid-column: 2; color: var(--yellow); font-size: 11px; letter-spacing: .1em; }
 .launcher-foot { margin: 0; color: #555; text-align: center; font-size: 8px; letter-spacing: .18em; }
 .back-button { position: absolute; top: max(18px, env(safe-area-inset-top)); left: 18px; border: 0; background: none; color: #888; font-size: 10px; font-weight: 900; letter-spacing: .14em; }
+.staff-entry-button { position: fixed; z-index: 35; top: max(17px, env(safe-area-inset-top)); right: 16px; min-height: 42px; border: 1px solid #34342f; border-radius: 999px; background: #0c0c0bea; color: #8d8d84; padding: 11px 13px; display: inline-flex; align-items: center; gap: 7px; font-size: 8px; font-weight: 900; letter-spacing: .1em; box-shadow: 0 8px 26px #0007; }
+.staff-entry-button:active { color: var(--yellow); border-color: #66551a; background: #17140a; }
+.staff-entry-button span { color: var(--yellow); font-size: 14px; line-height: 1; }
 .access-screen, .fan-access { min-height: 100dvh; padding: max(76px, calc(env(safe-area-inset-top) + 58px)) 20px 38px; display: flex; flex-direction: column; justify-content: center; position: relative; }
 .hero, .fan-access-hero { width: 100%; max-width: 600px; margin: 0 auto 24px; }
 .hero h1, .fan-access-hero h1 { font-size: clamp(42px, 12vw, 70px); line-height: .9; text-transform: uppercase; margin: 9px 0 17px; letter-spacing: -.06em; }
@@ -76,12 +79,23 @@ input:focus, textarea:focus, select:focus { border-color: var(--yellow); box-sha
 .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: #080808; padding: 3px; }
 .segmented button { border: 0; background: transparent; color: #777; padding: 12px; font-weight: 900; }
 .segmented button.active { background: var(--yellow); color: #090909; }
-.primary { border: 0; border-radius: 8px; background: var(--yellow); color: #080808; min-height: 48px; padding: 12px 18px; font-weight: 950; letter-spacing: .08em; transition: opacity .15s, transform .1s; }
+.primary { border: 0; border-radius: 8px; background: var(--yellow); color: #080808; min-height: 50px; padding: 14px 18px; font-weight: 950; letter-spacing: .08em; transition: opacity .15s, transform .1s; }
 .primary:active:not(:disabled) { transform: scale(.97); }
 button:disabled { opacity: .48; cursor: default; }
 .lock-copy { margin: 0 0 5px; color: #aaa; line-height: 1.5; }
+.staff-gate-screen { background: radial-gradient(circle at 50% 8%, #282108 0, transparent 30%); }
+.staff-gate-hero { margin-bottom: 18px; }
+.staff-gate-card { display: grid; gap: 16px; border-color: #4c4118; }
+.staff-gate-card h2 { margin: 5px 0 8px; font-size: 24px; text-transform: uppercase; letter-spacing: -.035em; }
+.staff-gate-card p { margin: 0; color: #999; line-height: 1.55; }
+.staff-gate-lock { width: 58px; height: 58px; border: 1px solid #5d4e16; border-radius: 16px; background: #1b1707; color: var(--yellow); display: grid; place-content: center; font-size: 30px; box-shadow: inset 0 0 24px #f3c51a0b; }
+.staff-gate-note { color: #686860 !important; font-size: 10px; }
+.staff-gate-card .primary, .access-card .form-grid > .primary, .pairing-flow > .primary { min-height: 56px; padding-top: 16px; padding-bottom: 16px; border-radius: 10px; }
+.status-failure .access-card { display: grid; gap: 14px; border-color: #5b351f; background: linear-gradient(145deg, #1b100b, #111 68%); }
+.status-failure h2 { margin: 0; font-size: 24px; text-transform: uppercase; }
+.status-failure p:not(.eyebrow) { margin: 0; color: #aaa; line-height: 1.55; }
 .public-strip { width: 100%; max-width: 600px; margin: 24px auto 0; }
-.authenticated { min-height: 100dvh; padding-bottom: calc(85px + var(--safe-bottom)); }
+.authenticated { min-height: 100dvh; padding-bottom: calc(98px + var(--safe-bottom)); }
 .topbar { position: sticky; z-index: 20; top: 0; display: flex; align-items: center; justify-content: space-between; padding: max(16px, env(safe-area-inset-top)) 18px 14px; background: linear-gradient(#090909 75%, #09090900); }
 .topbar strong { display: block; margin-top: 4px; font-size: 15px; }
 .topbar-actions { display: flex; align-items: center; gap: 10px; }
@@ -117,17 +131,21 @@ button:disabled { opacity: .48; cursor: default; }
 .event-card h4 { font-size: 14px; }
 .event-card p, .order-card p { color: var(--muted); font-size: 11px; margin-top: 4px; }
 .chevron { color: var(--yellow); font-size: 28px; }
-.bottom-nav { position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; height: calc(76px + var(--safe-bottom)); padding-bottom: var(--safe-bottom); display: grid; background: #0c0c0c; border-top: 1px solid #272724; }
+.bottom-nav { position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; height: calc(88px + var(--safe-bottom)); padding: 5px 6px var(--safe-bottom); display: grid; gap: 3px; background: #0c0c0cf8; border-top: 1px solid #30302c; box-shadow: 0 -12px 34px #0009; }
 .bottom-nav.three { grid-template-columns: repeat(3, 1fr); }
 .bottom-nav.four { grid-template-columns: repeat(4, 1fr); }
 .bottom-nav.five { grid-template-columns: repeat(5, 1fr); }
 .bottom-nav.six { grid-template-columns: repeat(6, 1fr); }
-.bottom-nav button { border: 0; background: none; color: #777; display: grid; place-content: center; gap: 5px; padding: 8px 0; }
-.bottom-nav button.active { color: var(--yellow); }
-.bottom-nav span { font-size: 26px; line-height: 1; }
-.bottom-nav.primary-three span { font-size: 32px; }
-.bottom-nav.primary-three small { font-size: 11px; }
-.bottom-nav small { font-size: 10px; font-weight: 800; letter-spacing: .04em; }
+.bottom-nav button { min-width: 0; min-height: 70px; border: 0; border-radius: 12px; background: transparent; color: #8b8b83; display: grid; place-content: center; justify-items: center; gap: 5px; padding: 7px 4px; transition: color .15s, background .15s, transform .1s; }
+.bottom-nav button:active { transform: scale(.96); }
+.bottom-nav button.active { color: var(--yellow); background: linear-gradient(180deg, #f3c51a12, #f3c51a05); }
+.nav-icon { width: 31px; height: 31px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; overflow: visible; filter: drop-shadow(0 0 9px transparent); }
+.bottom-nav button.active .nav-icon { stroke-width: 2.2; filter: drop-shadow(0 0 9px #f3c51a38); }
+.bottom-nav.primary-three .nav-icon,
+.bottom-nav.primary-four .nav-icon { width: 35px; height: 35px; }
+.bottom-nav.primary-three small,
+.bottom-nav.primary-four small { font-size: 11px; }
+.bottom-nav small { font-size: 10px; font-weight: 850; letter-spacing: .045em; line-height: 1; }
 .overflow-backdrop { position: fixed; inset: 0; z-index: 50; background: #00000088; }
 .overflow-menu { position: fixed; z-index: 51; top: max(60px, calc(env(safe-area-inset-top) + 48px)); right: 14px; min-width: 180px; background: #161614; border: 1px solid #333; border-radius: 12px; box-shadow: 0 16px 48px #000a; padding: 6px; display: grid; gap: 2px; }
 .overflow-menu button { border: 0; background: transparent; color: #bbb; display: flex; align-items: center; gap: 10px; padding: 13px 16px; font-size: .88rem; font-weight: 600; border-radius: 8px; }
@@ -179,6 +197,17 @@ button:disabled { opacity: .48; cursor: default; }
 .settings-list article { display: flex; justify-content: space-between; gap: 12px; }
 .settings-list p { margin: 5px 0 0; color: var(--muted); font-size: 11px; word-break: break-all; }
 .security-note { margin-top: 18px; padding: 15px; border-left: 2px solid var(--yellow); color: var(--muted); font-size: 11px; line-height: 1.5; }
+.feedback-card { margin-top: 24px; border: 1px solid #4b411a; border-radius: 12px; background: linear-gradient(145deg, #181507, #111 66%); padding: 17px; display: grid; gap: 13px; box-shadow: 0 16px 46px #0005; }
+.feedback-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.feedback-heading p, .feedback-heading h3 { margin: 0; }
+.feedback-heading h3 { margin-top: 5px; font-size: 19px; text-transform: uppercase; line-height: 1.12; }
+.feedback-heading > span { color: var(--yellow); font-size: 30px; line-height: 1; }
+.feedback-card > p { margin: 0; color: #999; font-size: 11px; line-height: 1.55; }
+.feedback-card label { display: grid; gap: 7px; color: #aaa; font-size: 10px; font-weight: 800; letter-spacing: .055em; text-transform: uppercase; }
+.feedback-card textarea { min-height: 126px; line-height: 1.5; text-transform: none; }
+.feedback-submit-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; }
+.feedback-submit-row small { color: #777; font-size: 9px; white-space: nowrap; }
+.feedback-submit-row .primary { min-height: 54px; padding-top: 15px; padding-bottom: 15px; }
 .signal-dashboard-hero { min-height: 230px; padding: 24px; background: linear-gradient(145deg, #2c2406, #111 62%); border: 1px solid #594a10; display: flex; flex-direction: column; justify-content: end; }
 .signal-dashboard-hero h2 { margin: 12px 0 0; color: var(--yellow); font-size: 88px; line-height: .8; letter-spacing: -.08em; }
 .signal-dashboard-hero strong { margin-top: 8px; text-transform: uppercase; font-size: 13px; letter-spacing: .08em; }
@@ -201,20 +230,37 @@ button:disabled { opacity: .48; cursor: default; }
 .date-line { display: flex; justify-content: space-between; color: var(--yellow); font-size: 10px; font-weight: 900; }
 .fan-event-card h3 { margin: 10px 0 5px; text-transform: uppercase; font-size: 23px; }
 .fan-event-card p { margin: 0; color: var(--muted); }
-.fan-merch-list { gap: 12px; }
-.fan-merch-card { border: 1px solid var(--line); background: var(--surface); overflow: hidden; contain: layout paint; content-visibility: auto; contain-intrinsic-size: auto 420px; }
+.fan-merch-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 10px; }
+.merch-grid-action, .merch-grid-heading, .merch-grid-message { grid-column: 1 / -1; }
+.merch-grid-action .ticket-buy-button { width: 100%; min-height: 52px; border: 1px solid #65561c; border-radius: 9px; background: #191607; color: var(--yellow); padding: 14px 16px; font-size: 10px; font-weight: 900; letter-spacing: .07em; }
+.merch-grid-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin: 17px 0 1px; padding-bottom: 9px; border-bottom: 1px solid #312b17; }
+.merch-grid-heading p, .merch-grid-heading h3 { margin: 0; }
+.merch-grid-heading h3 { margin-top: 4px; font-size: 16px; text-transform: uppercase; }
+.merch-grid-heading > span { color: var(--yellow); font-size: 10px; font-weight: 900; letter-spacing: .08em; white-space: nowrap; }
+.merch-products-heading { margin-top: 22px; }
+.merch-grid-message { display: grid; gap: 10px; border: 1px solid var(--line); background: var(--surface); padding: 14px; }
+.merch-grid-message p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.merch-grid-message .ticket-buy-button { width: 100%; min-height: 48px; border: 1px solid #5d4f1c; border-radius: 8px; background: #171407; color: var(--yellow); padding: 13px 12px; font-size: 10px; font-weight: 900; }
+.fan-merch-card { position: relative; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); overflow: hidden; display: flex; flex-direction: column; contain: layout paint; content-visibility: auto; contain-intrinsic-size: auto 420px; }
+.fan-merch-bundle { border-color: #514719; background: linear-gradient(155deg, #171407, #111 54%); }
+.bundle-badge { position: absolute; z-index: 2; top: 8px; left: 8px; border: 1px solid #7b681c; border-radius: 999px; background: #0d0c08e8; color: var(--yellow); padding: 5px 7px; font-size: 7px; font-weight: 950; letter-spacing: .12em; box-shadow: 0 4px 16px #0008; }
 .fan-merch-card > img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; display: block; background: #171715; }
-.fan-merch-body { display: grid; gap: 12px; padding: 15px; }
-.fan-merch-body p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
-.fan-merch-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
-.fan-merch-heading h3 { margin: 0 0 5px; text-transform: uppercase; font-size: 19px; line-height: 1.1; }
-.fan-merch-heading strong { color: var(--yellow); font-size: 14px; }
-.fan-merch-heading > span { flex: 0 0 auto; border: 1px solid #4b2b2b; color: #d99494; padding: 5px 7px; font-size: 8px; font-weight: 900; letter-spacing: .08em; }
+.fan-merch-body { flex: 1; display: flex; flex-direction: column; gap: 9px; padding: 11px; }
+.fan-merch-body p { display: -webkit-box; margin: 0; overflow: hidden; color: var(--muted); font-size: 10px; line-height: 1.45; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.fan-merch-heading { display: grid; align-items: start; gap: 7px; }
+.fan-merch-heading h3 { margin: 0 0 5px; text-transform: uppercase; font-size: 14px; line-height: 1.15; overflow-wrap: anywhere; }
+.fan-merch-heading strong { color: var(--yellow); font-size: 13px; }
+.fan-merch-heading > span { justify-self: start; border: 1px solid #4b2b2b; border-radius: 999px; color: #d99494; padding: 4px 6px; font-size: 7px; font-weight: 900; letter-spacing: .06em; }
 .fan-merch-heading > span.available { border-color: #66571d; color: var(--yellow); }
-.fan-merch-variants { display: flex; flex-wrap: wrap; gap: 6px; }
-.fan-merch-variants span { min-width: 34px; border: 1px solid #343431; color: #777; padding: 6px 8px; text-align: center; font-size: 9px; font-weight: 800; }
+.fan-merch-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.fan-merch-price del { color: #777; font-size: 9px; }
+.fan-merch-includes { margin: 0; padding: 0 0 0 14px; color: #aaa; font-size: 9px; line-height: 1.45; }
+.fan-merch-includes li + li { margin-top: 2px; }
+.fan-merch-variants { display: flex; flex-wrap: wrap; gap: 4px; }
+.fan-merch-variants span { min-width: 27px; border: 1px solid #343431; border-radius: 5px; color: #777; padding: 5px 6px; text-align: center; font-size: 8px; font-weight: 800; }
 .fan-merch-variants span.available { border-color: #6a5a21; color: #f2d65a; background: #f3c51a0d; }
-.fan-merch-card .ticket-buy-button { width: 100%; border-color: var(--yellow); background: var(--yellow); color: #090909; }
+.fan-merch-card .ticket-buy-button { width: 100%; min-height: 52px; margin-top: auto; border: 1px solid var(--yellow); border-radius: 8px; background: var(--yellow); color: #090909; padding: 14px 8px; font-size: 9px; font-weight: 950; letter-spacing: .055em; line-height: 1.2; transition: transform .1s, filter .15s; }
+.fan-merch-card .ticket-buy-button:active:not(:disabled) { transform: scale(.965); filter: brightness(.9); }
 .event-description { margin-top: 12px !important; line-height: 1.5; font-size: 12px; }
 .event-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 16px; }
 .event-actions button, .event-actions a { border: 1px solid #4d431b; background: transparent; color: var(--yellow); padding: 12px 8px; text-align: center; font-size: 10px; font-weight: 900; }
@@ -294,8 +340,10 @@ button:disabled { opacity: .48; cursor: default; }
   .scanner-button { min-height: 380px; }
 }
 @media (max-width: 390px) {
-  .bottom-nav small { font-size: 7px; }
-  .bottom-nav span { font-size: 18px; }
+  .bottom-nav { padding-left: 3px; padding-right: 3px; }
+  .bottom-nav small { font-size: 10px; }
+  .bottom-nav.primary-three .nav-icon,
+  .bottom-nav.primary-four .nav-icon { width: 33px; height: 33px; }
   .ticket-card { grid-template-columns: 1fr; }
   .mini-qr { max-width: 160px; }
 }
@@ -746,3 +794,59 @@ html[data-virya-scanner-active] .app-shell {
 .recovery-heading h3 { margin: 5px 0; }
 .recovery-heading p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .event-actions .ticket-buy-button { border-color: var(--yellow); color: #090909; background: var(--yellow); }
+
+
+/* Fan commerce V1 — first-class ticket checkout and store navigation. */
+.fan-ticket-checkout-screen { display: grid; gap: 16px; padding-bottom: 44px; }
+.checkout-back { justify-self: start; min-height: 40px; border: 1px solid #39352a; border-radius: 999px; background: #11110f; color: #aaa99f; padding: 8px 13px; font-size: 9px; font-weight: 900; letter-spacing: .1em; }
+.checkout-back:active { color: var(--yellow); border-color: #6b5915; }
+.ticket-checkout-hero { border: 1px solid #514417; background: linear-gradient(145deg, #211b06, #10100e 68%); padding: 20px; overflow: hidden; position: relative; }
+.ticket-checkout-hero::after { content: "V"; position: absolute; z-index: 0; right: -5px; top: -56px; color: #f3c51a0a; font-size: 190px; font-weight: 1000; transform: rotate(8deg); }
+.ticket-checkout-hero > * { position: relative; z-index: 1; }
+.ticket-checkout-hero h2 { margin: 8px 0 7px; max-width: 88%; font-size: clamp(28px, 8vw, 42px); line-height: .98; letter-spacing: -.045em; text-transform: uppercase; }
+.ticket-checkout-hero > p:last-child { margin: 0; color: #aaa; line-height: 1.45; }
+.ticket-sale-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.ticket-sale-summary > div { min-width: 0; border: 1px solid var(--line); background: var(--surface); padding: 12px 8px; text-align: center; }
+.ticket-sale-summary strong { display: block; color: var(--yellow); font-size: 22px; line-height: 1; }
+.ticket-sale-summary span { display: block; margin-top: 6px; color: var(--muted); font-size: 8px; font-weight: 800; text-transform: uppercase; }
+.checkout-state-copy { margin: 0; color: #aaa; font-size: 12px; line-height: 1.55; }
+.ticket-type-list { display: grid; gap: 9px; }
+.ticket-type-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 15px; border: 1px solid #37342a; background: var(--surface); padding: 15px; content-visibility: auto; contain-intrinsic-size: auto 130px; }
+.ticket-type-card h3 { margin: 0 0 5px; font-size: 17px; line-height: 1.15; text-transform: uppercase; }
+.ticket-type-card p { margin: 0 0 9px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.ticket-type-card strong { display: block; color: var(--yellow); font-size: 15px; }
+.ticket-type-card small { display: block; margin-top: 5px; color: #777; font-size: 9px; }
+.ticket-stepper { display: grid; grid-template-columns: 42px 40px 42px; align-items: center; border: 1px solid #4b421e; background: #0b0b09; }
+.ticket-stepper button { width: 42px; height: 44px; border: 0; background: transparent; color: var(--yellow); font-size: 24px; line-height: 1; }
+.ticket-stepper button:active:not(:disabled) { background: #f3c51a12; }
+.ticket-stepper output { min-width: 40px; text-align: center; color: #fff; font-weight: 900; }
+.ticket-buyer-panel { display: grid; gap: 11px; border: 1px solid var(--line); background: #10100e; padding: 15px; }
+.ticket-buyer-panel label { display: grid; gap: 7px; color: #999; font-size: 10px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
+.ticket-buyer-panel p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.ticket-buyer-panel .ticket-buy-button { width: 100%; }
+.ticket-checkout-total { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border: 1px solid #5d4d16; background: linear-gradient(145deg, #1a1607, #0e0e0c); padding: 15px; box-shadow: 0 16px 44px #0007; }
+.ticket-checkout-total > div { min-width: 0; border-bottom: 1px solid #39331c; padding: 0 3px 11px; }
+.ticket-checkout-total > div:nth-child(2) { text-align: right; }
+.ticket-checkout-total span { display: block; color: var(--muted); font-size: 9px; text-transform: uppercase; }
+.ticket-checkout-total strong { display: block; margin-top: 5px; color: var(--yellow); font-size: 19px; }
+.ticket-checkout-total .primary,
+.ticket-checkout-total .checkout-retry,
+.ticket-checkout-total > small { grid-column: 1 / -1; }
+.ticket-checkout-total .checkout-retry { min-height: 44px; border: 1px solid var(--yellow); border-radius: 8px; background: transparent; color: var(--yellow); padding: 10px 14px; font-size: 10px; font-weight: 900; letter-spacing: .07em; }
+.ticket-checkout-total > small { color: #777; font-size: 9px; line-height: 1.45; text-align: center; }
+.merch-screen .screen-title > p:last-child { color: var(--muted); line-height: 1.5; }
+.merch-screen .empty-state .ghost { min-height: 50px; padding-top: 13px; padding-bottom: 13px; }
+.fan-merch-card .ghost { width: 100%; min-height: 48px; margin-top: auto; border: 1px solid #47443a; border-radius: 8px; background: transparent; color: #aaa; padding: 10px 14px; font-size: 10px; font-weight: 850; }
+@media (max-width: 420px) {
+  .ticket-type-card { grid-template-columns: 1fr; }
+  .ticket-stepper { justify-self: stretch; grid-template-columns: 1fr 48px 1fr; }
+  .ticket-stepper button { width: auto; }
+}
+
+@media (max-width: 360px) {
+  .fan-merch-list { gap: 7px; }
+  .fan-merch-body { padding: 9px; }
+  .fan-merch-heading h3 { font-size: 12px; }
+  .fan-merch-card .ticket-buy-button { min-height: 50px; padding-left: 5px; padding-right: 5px; font-size: 8px; }
+  .feedback-submit-row { grid-template-columns: 1fr; }
+}

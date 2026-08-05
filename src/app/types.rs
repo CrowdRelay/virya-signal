@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use crate::models::{
     CreateQrCampaignInput, FanConfirmationInput, FanSignupInput, IssuePassInput,
-    OperatorProfileInput, RequestedCityInput,
+    OperatorProfileInput, RequestedCityInput, TicketCheckoutInput,
 };
 
 pub(super) const API_BASE: &str = "https://signal-api.virya.music/v1/";
@@ -10,8 +10,8 @@ pub(super) const POLICY_VERSION: &str = "2026-07";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum RootMode {
-    Launcher,
     Fan,
+    StaffGate,
     Team,
 }
 
@@ -105,6 +105,12 @@ pub(super) struct PinArgs<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(super) struct StaffGateArgs<'a> {
+    pub password: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct ConfigureArgs<'a> {
     pub pin: &'a str,
     pub profile: &'a OperatorProfileInput,
@@ -114,6 +120,12 @@ pub(super) struct ConfigureArgs<'a> {
 #[serde(rename_all = "camelCase")]
 pub(super) struct EventArgs<'a> {
     pub event_slug: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct TicketCheckoutArgs<'a> {
+    pub input: &'a TicketCheckoutInput,
 }
 
 #[derive(Serialize)]
@@ -226,4 +238,11 @@ pub(super) struct RequestedCityArgs<'a> {
 #[serde(rename_all = "camelCase")]
 pub(super) struct UrlArgs<'a> {
     pub url: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AnonymousFeedbackArgs<'a> {
+    pub category: &'a str,
+    pub message: &'a str,
 }

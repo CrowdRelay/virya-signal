@@ -1,0 +1,285 @@
+use std::time::Duration;
+
+use reqwest::header::{ACCEPT, ORIGIN};
+use serde::{Deserialize, Serialize};
+use url::Url;
+use uuid::Uuid;
+
+use crate::AppError;
+
+use super::{client::CrowdRelayClient, http::decode};
+
+const MERCH_INVENTORY_URL: &str = "https://virya.music/api/merch/inventory";
+const SIGNAL_FEEDBACK_URL: &str = "https://virya.music/api/signal-feedback";
+const VIRYA_SITE_ORIGIN: &str = "https://virya.music";
+const SITE_READ_TIMEOUT: Duration = Duration::from_secs(8);
+const FEEDBACK_TIMEOUT: Duration = Duration::from_secs(15);
+const MAX_BUNDLES: usize = 8;
+const MAX_VARIANTS: usize = 8;
+const MAX_INCLUDES: usize = 8;
+const MAX_MESSAGE_CHARS: usize = 2_000;
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct SignalMerchBundleCatalog {
+    #[serde(default)]
+    pub bundles: Vec<SignalMerchBundle>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct SignalMerchBundle {
+    pub slug: String,
+    pub name: String,
+    pub description: Option<String>,
+    #[serde(default)]
+    pub includes: Vec<String>,
+    pub image_url: Option<String>,
+    pub secondary_image_url: Option<String>,
+    pub product_url: String,
+    pub currency: String,
+    pub price_gross_minor: i64,
+    pub original_price_gross_minor: i64,
+    pub available: bool,
+    pub availability: String,
+    #[serde(default)]
+    pub variants: Vec<SignalMerchBundleVariant>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct SignalMerchBundleVariant {
+    pub label: String,
+    pub available: bool,
+    pub availability: String,
+}
+
+#[derive(Serialize)]
+struct SignalFeedbackRequest<'a> {
+    submission_id: String,
+    category: &'a str,
+    message: &'a str,
+    website: &'static str,
+}
+
+#[derive(Deserialize)]
+struct SignalFeedbackResponse {
+    ok: bool,
+}
+
+fn bounded(value: &str, label: &str, max: usize) -> Result<String, AppError> {
+    let value = value.trim();
+    if value.is_empty() || value.chars().count() > max || value.chars().any(char::is_control) {
+        return Err(AppError::InvalidInput(format!("Nieprawidłowy {label}")));
+    }
+    Ok(value.to_owned())
+}
+
+fn bounded_multiline(value: &str, label: &str, max: usize) -> Result<String, AppError> {
+    let value = value.trim();
+    if value.chars().count() < 8
+        || value.chars().count() > max
+        || value.chars().any(|character| {
+            character == '\0' || (character.is_control() && character != '\n' && character != '\t')
+        })
+    {
+        return Err(AppError::InvalidInput(format!("Nieprawidłowy {label}")));
+    }
+    Ok(value.to_owned())
+}
+
+fn valid_slug(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_')
+        })
+}
+
+fn valid_availability(value: &str) -> bool {
+    matches!(value, "available" | "low_stock" | "sold_out")
+}
+
+fn validated_site_url(value: &str, label: &str) -> Result<String, AppError> {
+    let parsed = Url::parse(value.trim())?;
+    if parsed.scheme() != "https"
+        || !matches!(parsed.host_str(), Some("virya.music" | "www.virya.music"))
+        || parsed.username() != ""
+        || parsed.password().is_some()
+        || parsed.fragment().is_some()
+    {
+        return Err(AppError::InvalidInput(format!("Nieprawidłowy {label}")));
+    }
+    Ok(parsed.to_string())
+}
+
+fn validated_store_url(value: &str) -> Result<String, AppError> {
+    let value = validated_site_url(value, "adres sklepu")?;
+    let parsed = Url::parse(&value)?;
+    if !matches!(parsed.path(), "/pl/merch" | "/pl/merch/") {
+        return Err(AppError::InvalidInput("Nieprawidłowy adres sklepu".into()));
+    }
+    Ok(value)
+}
+
+impl SignalMerchBundleCatalog {
+    fn validate(mut self) -> Result<Self, AppError> {
+        if self.bundles.len() > MAX_BUNDLES {
+            return Err(AppError::InvalidInput(
+                "Katalog zestawów jest zbyt duży".into(),
+            ));
+        }
+        let mut seen = std::collections::HashSet::new();
+        for bundle in &mut self.bundles {
+            bundle.slug = bundle.slug.trim().to_owned();
+            if !valid_slug(&bundle.slug) || !seen.insert(bundle.slug.clone()) {
+                return Err(AppError::InvalidInput("Nieprawidłowy zestaw merchu".into()));
+            }
+            bundle.name = bounded(&bundle.name, "nazwa zestawu", 120)?;
+            bundle.description = bundle
+                .description
+                .take()
+                .map(|value| bounded_multiline(&value, "opis zestawu", 600))
+                .transpose()?;
+            if bundle.includes.len() > MAX_INCLUDES || bundle.variants.len() > MAX_VARIANTS {
+                return Err(AppError::InvalidInput(
+                    "Zestaw merchu ma zbyt wiele pozycji".into(),
+                ));
+            }
+            for include in &mut bundle.includes {
+                *include = bounded(include, "element zestawu", 120)?;
+            }
+            bundle.image_url = bundle
+                .image_url
+                .take()
+                .map(|url| validated_site_url(&url, "adres grafiki"))
+                .transpose()?;
+            bundle.secondary_image_url = bundle
+                .secondary_image_url
+                .take()
+                .map(|url| validated_site_url(&url, "adres grafiki"))
+                .transpose()?;
+            bundle.product_url = validated_store_url(&bundle.product_url)?;
+            bundle.currency = bundle.currency.trim().to_ascii_uppercase();
+            if bundle.currency != "PLN"
+                || !(0..=1_000_000).contains(&bundle.price_gross_minor)
+                || !(0..=1_000_000).contains(&bundle.original_price_gross_minor)
+                || bundle.price_gross_minor > bundle.original_price_gross_minor
+                || !valid_availability(&bundle.availability)
+                || bundle.available == (bundle.availability == "sold_out")
+            {
+                return Err(AppError::InvalidInput(
+                    "Nieprawidłowa oferta zestawu".into(),
+                ));
+            }
+            let mut seen_variants = std::collections::HashSet::new();
+            for variant in &mut bundle.variants {
+                variant.label = bounded(&variant.label, "wariant zestawu", 24)?;
+                if !seen_variants.insert(variant.label.clone())
+                    || !valid_availability(&variant.availability)
+                    || variant.available == (variant.availability == "sold_out")
+                {
+                    return Err(AppError::InvalidInput(
+                        "Nieprawidłowy wariant zestawu".into(),
+                    ));
+                }
+            }
+        }
+        Ok(self)
+    }
+}
+
+impl CrowdRelayClient {
+    pub async fn public_merch_bundles(&self) -> Result<SignalMerchBundleCatalog, AppError> {
+        let response = self
+            .site_http
+            .get(Url::parse(MERCH_INVENTORY_URL)?)
+            .header(ACCEPT, "application/json")
+            .header(ORIGIN, VIRYA_SITE_ORIGIN)
+            .timeout(SITE_READ_TIMEOUT)
+            .send()
+            .await?;
+        let catalog: SignalMerchBundleCatalog = decode(response).await?;
+        catalog.validate()
+    }
+
+    pub async fn submit_anonymous_feedback(
+        &self,
+        category: &str,
+        message: &str,
+    ) -> Result<(), AppError> {
+        let category = category.trim();
+        if !matches!(category, "idea" | "bug" | "concert" | "merch" | "other") {
+            return Err(AppError::InvalidInput("Wybierz kategorię feedbacku".into()));
+        }
+        let message = bounded_multiline(message, "treść feedbacku", MAX_MESSAGE_CHARS)?;
+        let response = self
+            .site_http
+            .post(Url::parse(SIGNAL_FEEDBACK_URL)?)
+            .header(ACCEPT, "application/json")
+            .header(ORIGIN, VIRYA_SITE_ORIGIN)
+            .json(&SignalFeedbackRequest {
+                submission_id: Uuid::new_v4().to_string(),
+                category,
+                message: &message,
+                website: "",
+            })
+            .timeout(FEEDBACK_TIMEOUT)
+            .send()
+            .await?;
+        let result: SignalFeedbackResponse = decode(response).await?;
+        if result.ok {
+            Ok(())
+        } else {
+            Err(AppError::Remote {
+                status: 502,
+                detail: "Nie udało się przekazać feedbacku".into(),
+            })
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn valid_catalog() -> SignalMerchBundleCatalog {
+        SignalMerchBundleCatalog {
+            bundles: vec![SignalMerchBundle {
+                slug: "bundle-stage-pack".into(),
+                name: "Pakiet Sceniczny".into(),
+                description: Some("Koszulka i album w jednym zestawie.".into()),
+                includes: vec!["Koszulka".into(), "Album".into()],
+                image_url: Some("https://virya.music/images/merch/echoes.webp".into()),
+                secondary_image_url: None,
+                product_url: "https://virya.music/pl/merch/?product=bundle-stage-pack".into(),
+                currency: "PLN".into(),
+                price_gross_minor: 7_000,
+                original_price_gross_minor: 10_000,
+                available: true,
+                availability: "available".into(),
+                variants: vec![SignalMerchBundleVariant {
+                    label: "L".into(),
+                    available: true,
+                    availability: "available".into(),
+                }],
+            }],
+        }
+    }
+
+    #[test]
+    fn accepts_bounded_same_origin_bundle_catalog() {
+        assert!(valid_catalog().validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_external_bundle_destination() {
+        let mut catalog = valid_catalog();
+        catalog.bundles[0].product_url = "https://example.com/store".into();
+        assert!(catalog.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_inconsistent_availability() {
+        let mut catalog = valid_catalog();
+        catalog.bundles[0].availability = "sold_out".into();
+        assert!(catalog.validate().is_err());
+    }
+}

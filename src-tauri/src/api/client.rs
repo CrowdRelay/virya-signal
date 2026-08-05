@@ -8,8 +8,8 @@ use std::{
 };
 
 use reqwest::{
-    Client, Method, Response,
-    header::{ACCEPT, COOKIE, IF_MODIFIED_SINCE, IF_NONE_MATCH},
+    Client, Method, Response, StatusCode,
+    header::{ACCEPT, COOKIE, IF_MODIFIED_SINCE, IF_NONE_MATCH, ORIGIN},
 };
 use serde::{Serialize, de::DeserializeOwned};
 use tokio::sync::{Mutex, RwLock};
@@ -32,10 +32,35 @@ use super::{
 pub(super) const FAN_COOKIE: &str = "crowdrelay_fan";
 pub(super) const PASS_COOKIE: &str = "crowdrelay_pass_session";
 pub(super) const WALLET_REQUEST_TIMEOUT: Duration = Duration::from_secs(12);
+const STAFF_GATE_URL: &str = "https://virya.music/api/staff/qr/login";
+const STAFF_GATE_ORIGIN: &str = "https://virya.music";
+
+#[derive(Serialize)]
+struct StaffGateRequest<'a> {
+    password: &'a str,
+}
+
+fn http_builder() -> reqwest::ClientBuilder {
+    #[allow(unused_mut)]
+    let mut builder = Client::builder()
+        .timeout(Duration::from_secs(15))
+        .connect_timeout(Duration::from_secs(5))
+        .pool_idle_timeout(Duration::from_secs(60))
+        .pool_max_idle_per_host(4)
+        .tcp_keepalive(Duration::from_secs(30))
+        .user_agent(concat!("virya-signal/", env!("CARGO_PKG_VERSION")))
+        .https_only(!cfg!(debug_assertions));
+    #[cfg(target_os = "android")]
+    {
+        builder = builder.use_preconfigured_tls(android_tls_config());
+    }
+    builder
+}
 
 #[derive(Clone)]
 pub struct CrowdRelayClient {
     pub(super) http: Client,
+    pub(super) site_http: Client,
     pub(super) public_cache: Arc<RwLock<PublicCache>>,
     events_fetch: Arc<Mutex<()>>,
     cities_fetch: Arc<Mutex<()>>,
@@ -47,20 +72,11 @@ pub struct CrowdRelayClient {
 impl CrowdRelayClient {
     pub fn new(cache_file: PathBuf) -> Result<Self, AppError> {
         let _ = rustls::crypto::ring::default_provider().install_default();
-        #[allow(unused_mut)]
-        let mut builder = Client::builder()
-            .timeout(Duration::from_secs(15))
-            .connect_timeout(Duration::from_secs(5))
-            .pool_idle_timeout(Duration::from_secs(60))
-            .pool_max_idle_per_host(4)
-            .tcp_keepalive(Duration::from_secs(30))
-            .user_agent(concat!("virya-signal/", env!("CARGO_PKG_VERSION")))
-            .https_only(!cfg!(debug_assertions));
-        #[cfg(target_os = "android")]
-        {
-            builder = builder.use_preconfigured_tls(android_tls_config());
-        }
-        let http = builder.build()?;
+        let http = http_builder().build()?;
+        let site_http = http_builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .pool_max_idle_per_host(1)
+            .build()?;
         let public_cache = match cache::load_public_cache(&cache_file) {
             Ok(cache) => cache,
             Err(error) => {
@@ -70,6 +86,7 @@ impl CrowdRelayClient {
         };
         Ok(Self {
             http,
+            site_http,
             public_cache: Arc::new(RwLock::new(public_cache)),
             events_fetch: Arc::new(Mutex::new(())),
             cities_fetch: Arc::new(Mutex::new(())),
@@ -135,6 +152,20 @@ impl CrowdRelayClient {
             )
             .await?;
         decode(response).await
+    }
+
+    pub async fn verify_staff_access(&self, password: &str) -> Result<(), AppError> {
+        let response = self
+            .site_http
+            .post(STAFF_GATE_URL)
+            .header(ACCEPT, "application/json")
+            .header(ORIGIN, STAFF_GATE_ORIGIN)
+            .json(&StaffGateRequest { password })
+            .timeout(Duration::from_secs(12))
+            .send()
+            .await?;
+
+        staff_gate_status(response.status())
     }
 
     pub async fn public_cities(&self, api_base_url: &str) -> Result<Vec<CitySignal>, AppError> {
@@ -396,6 +427,39 @@ impl CrowdRelayClient {
             request = request.header(IF_MODIFIED_SINCE, last_modified);
         }
         Ok(request.send().await?)
+    }
+}
+
+fn staff_gate_status(status: StatusCode) -> Result<(), AppError> {
+    match status {
+        StatusCode::OK => Ok(()),
+        StatusCode::UNAUTHORIZED => Err(AppError::InvalidInput(
+            "Nieprawidłowe hasło staff.".to_owned(),
+        )),
+        StatusCode::TOO_MANY_REQUESTS => Err(AppError::InvalidInput(
+            "Za dużo prób logowania. Spróbuj ponownie za kilkanaście minut.".to_owned(),
+        )),
+        StatusCode::SERVICE_UNAVAILABLE => Err(AppError::Remote {
+            status: status.as_u16(),
+            detail: "Weryfikacja staff jest chwilowo niedostępna".to_owned(),
+        }),
+        _ => Err(AppError::Remote {
+            status: status.as_u16(),
+            detail: "Nie udało się zweryfikować dostępu staff".to_owned(),
+        }),
+    }
+}
+
+#[cfg(test)]
+mod staff_gate_tests {
+    use super::*;
+
+    #[test]
+    fn accepts_only_success_status() {
+        assert!(staff_gate_status(StatusCode::OK).is_ok());
+        assert!(staff_gate_status(StatusCode::UNAUTHORIZED).is_err());
+        assert!(staff_gate_status(StatusCode::TOO_MANY_REQUESTS).is_err());
+        assert!(staff_gate_status(StatusCode::SERVICE_UNAVAILABLE).is_err());
     }
 }
 

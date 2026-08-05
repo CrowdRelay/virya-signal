@@ -12,6 +12,7 @@ use zeroize::Zeroizing;
 
 use crate::{
     AppError, AppState, MAX_SECRET_BYTES,
+    api::{SignalMerchBundleCatalog, TicketCheckoutInput, TicketCheckoutStart, TicketSaleOffer},
     models::{
         AdmissionPass, FanAuthResult, FanConfirmationInput, FanEventInterest, FanProfile,
         FanSessionStatus, FanSignupInput, MerchCatalog, PublicEvent, ReferralProgress,
@@ -182,6 +183,59 @@ pub(crate) async fn fan_merch_catalog(
 ) -> Result<MerchCatalog, AppError> {
     let profile = fan_profile(&state).await?;
     state.api.public_merch_catalog(&profile.api_base_url).await
+}
+
+#[tauri::command]
+pub(crate) async fn fan_merch_bundles(
+    state: State<'_, AppState>,
+) -> Result<SignalMerchBundleCatalog, AppError> {
+    state.api.public_merch_bundles().await
+}
+
+#[tauri::command]
+pub(crate) async fn fan_ticket_sale(
+    state: State<'_, AppState>,
+    event_slug: String,
+) -> Result<Option<TicketSaleOffer>, AppError> {
+    let profile = fan_profile(&state).await?;
+    match state
+        .api
+        .public_ticket_sale(&profile.api_base_url, &event_slug)
+        .await
+    {
+        Ok(value) => Ok(Some(value)),
+        Err(AppError::NotFound) => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+#[tauri::command]
+pub(crate) async fn fan_start_ticket_checkout(
+    state: State<'_, AppState>,
+    mut input: TicketCheckoutInput,
+) -> Result<TicketCheckoutStart, AppError> {
+    input.normalize()?;
+    let _mutation = state.fan_mutation.lock().await;
+    let mut profile = fan_profile(&state).await?.as_ref().clone();
+    if profile.wallets.len() >= MAX_WALLETS {
+        return Err(AppError::InvalidInput(format!(
+            "Portfel może zawierać maksymalnie {MAX_WALLETS} zamówienia"
+        )));
+    }
+
+    let response = state.api.start_ticket_checkout(&profile, &input).await?;
+    let checkout = TicketCheckoutStart::from_site(&response)?;
+    let checkout_token = Zeroizing::new(response.checkout_token);
+    profile
+        .wallets
+        .retain(|wallet| wallet.order_id != checkout.order_id);
+    profile.wallets.push(WalletCredential {
+        order_id: checkout.order_id.clone(),
+        checkout_token: checkout_token.to_string(),
+    });
+    persist_fan(&state, &profile).await?;
+    *state.fan_session.write().await = Some(Arc::new(profile));
+    Ok(checkout)
 }
 
 #[tauri::command]

@@ -9,7 +9,50 @@ actions live in the native Rust shell.
 - fan-side VIRYA AREA wallet and game progress without exposing drop coordinates;
 - owner-only CrowdRelay operations cockpit with audited retries;
 - partial-source degradation for operations data instead of an all-or-nothing screen;
-- Stronghold-backed stable AREA identity and 37-command IPC contract guards.
+- Stronghold-backed stable AREA identity and typed IPC contract guards;
+- fan-first ticket checkout with multi-tier selection, Stripe handoff and automatic wallet persistence;
+- first-class fan merch tab backed by authoritative CrowdRelay inventory and the existing Virya store;
+- exact web-store bundles, a two-column mobile catalog and anonymous in-app feedback for fan and owner views.
+
+
+## Fan commerce
+
+The fan area exposes **Koncerty**, **Sklep** and **Bilety** as first-class tabs.
+Every concert card opens a typed ticket flow. For Virya-owned sales the native
+shell fetches the current offer from CrowdRelay, validates its bounds, creates
+the existing Virya Stripe Checkout session and stores the order credential in
+the encrypted fan profile before the browser handoff. The WebView receives only
+the Stripe URL, public order ID/reference and expiry — the automatic checkout
+response never contains the checkout token. The pre-existing manual wallet-recovery
+form still accepts a token explicitly pasted by the user and passes it directly to
+the native import command.
+External organizer sales fall back to the event's ticket link or Virya event page.
+
+Merch remains a thin mobile storefront over the authoritative CrowdRelay catalog.
+The app renders two product cards per row and reads bundle names, contents, prices,
+discounts and live availability from the same canonical definitions used by the web
+store. Product and bundle cards open the existing Virya cart, so inventory, shipping,
+Stripe, e-mail and accounting stay in one system rather than being duplicated in the
+APK. Catalog and bundle reads remain lazy and run only after the Store tab is opened.
+
+## Anonymous feedback
+
+Fan and owner/operator settings expose the same feedback form. The WebView passes only
+a bounded category and message to a native Tauri command. The native client creates a
+random submission ID and posts to the fixed first-party endpoint
+`https://virya.music/api/signal-feedback`; it never reads or attaches profile, session,
+e-mail or operator identifiers. The endpoint validates the app origin, uses the existing
+mail delivery ledger for idempotency and a keyed, durable network rate limiter (dedicated
+`SIGNAL_FEEDBACK_RATE_SECRET` or the existing `AREA_AUTH_SECRET` fallback). It fails closed
+when the rate limiter, mailer or lease store is unavailable. Standard hosting/network logs may still contain ordinary connection metadata,
+so the UI does not promise network-level anonymity.
+
+Operational prerequisites:
+
+- `ticket_sales_enabled=true` and a configured Stripe secret on `virya.music`;
+- the CrowdRelay event sale must be published/open with active ticket types;
+- merch inventory must pass stocktake and be marked ready, otherwise the public
+  catalog intentionally remains fail-closed with HTTP 503.
 
 ## Toolchain
 
@@ -113,6 +156,12 @@ remains `music.virya.control` so upgrades stay compatible.
 - Rustls uses the compact Ring crypto provider instead of AWS-LC on mobile;
 - mutation commands are serialized to prevent lost state updates;
 - external URLs and API base URLs are validated before native use;
+- bundle responses are bounded, reject duplicate variants and accept only exact first-party store/image URLs;
+- anonymous feedback carries only category, message and a random idempotency ID, never profile/session fields;
+- ticket offers are response-bounded and checked for UUIDs, dates, counters,
+  duplicate slugs and non-negative prices before the UI renders them;
+- Stripe handoff accepts only exact `https://checkout.stripe.com` URLs and
+  checkout tokens are validated and persisted natively before leaving the app;
 - response, token and user-input sizes are bounded;
 - production API and external links require HTTPS;
 - closing or explicitly locking a profile clears sensitive in-memory UI state.
@@ -134,4 +183,4 @@ time, CPU, memory, frame statistics, package metadata and `[virya:boot]` /
 
 ## Engineering documentation
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/RELIABILITY.md`](docs/RELIABILITY.md) and [`QUALITY.md`](QUALITY.md).
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/RELIABILITY.md`](docs/RELIABILITY.md).

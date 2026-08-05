@@ -15,18 +15,19 @@ use crate::{
     models::{
         AdmissionPass, AdmissionQr, AdmissionRedemption, AreaWallet, CouponEnvelope,
         CreateQrCampaignInput, DashboardData, FanAuthResult, FanConfirmationInput,
-        FanDashboardData, FanEventInterest, FanSessionStatus, FanSignupInput, IssuePassInput,
-        IssuedPass, MerchCatalog, OperatorOpsOverview, OperatorProfileInput, OperatorRole,
-        OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem, OpsRetryResult, PublicEvent,
-        PublicHomeData, QrCampaign, ReferralProgress, RequestedCityInput, RequestedCityResult,
-        SessionStatus, ShowModeScanResult, ShowModeStatus, ShowModeSyncResult, TicketWallet,
-        TicketingOverview, WalletBatch, WalletTicket,
+        FanDashboardData, FanEventInterest, FanMerchBundleCatalog, FanSessionStatus,
+        FanSignupInput, IssuePassInput, IssuedPass, MerchCatalog, OperatorOpsOverview,
+        OperatorProfileInput, OperatorRole, OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem,
+        OpsRetryResult, PublicEvent, PublicHomeData, QrCampaign, ReferralProgress,
+        RequestedCityInput, RequestedCityResult, SessionStatus, ShowModeScanResult, ShowModeStatus,
+        ShowModeSyncResult, TicketCheckoutInput, TicketCheckoutItemInput, TicketCheckoutStart,
+        TicketSaleOffer, TicketWallet, TicketingOverview, WalletBatch, WalletTicket,
     },
 };
 
 #[component]
 pub fn App() -> impl IntoView {
-    let mode = RwSignal::new(RootMode::Launcher);
+    let mode = RwSignal::new(RootMode::Fan);
     let operator_status = RwSignal::new(SessionStatus::default());
     let fan_status = RwSignal::new(FanSessionStatus::default());
     let operator_status_loading = RwSignal::new(true);
@@ -64,23 +65,28 @@ pub fn App() -> impl IntoView {
     view! {
         <main class="app-shell">
             {move || match mode.get() {
-                RootMode::Launcher => view! {
-                    <Launcher
+                RootMode::Fan => view! {
+                    <FanPortal
                         mode=mode
-                        fan_status=fan_status
-                        operator_status=operator_status
-                        fan_status_loading=fan_status_loading
-                        operator_status_loading=operator_status_loading
-                        fan_status_failed=fan_status_failed
-                        operator_status_failed=operator_status_failed
+                        status=fan_status
+                        status_loading=fan_status_loading
+                        status_failed=fan_status_failed
                         status_refresh=status_refresh
+                        error=error
                     />
                 }.into_any(),
-                RootMode::Fan => view! {
-                    <FanPortal mode=mode status=fan_status status_loading=fan_status_loading error=error />
+                RootMode::StaffGate => view! {
+                    <StaffGate mode=mode error=error />
                 }.into_any(),
                 RootMode::Team => view! {
-                    <OperatorPortal mode=mode status=operator_status status_loading=operator_status_loading error=error />
+                    <OperatorPortal
+                        mode=mode
+                        status=operator_status
+                        status_loading=operator_status_loading
+                        status_failed=operator_status_failed
+                        status_refresh=status_refresh
+                        error=error
+                    />
                 }.into_any(),
             }}
             <Toast error=error />
@@ -89,59 +95,98 @@ pub fn App() -> impl IntoView {
 }
 
 #[component]
-fn Launcher(
-    mode: RwSignal<RootMode>,
-    fan_status: RwSignal<FanSessionStatus>,
-    operator_status: RwSignal<SessionStatus>,
-    fan_status_loading: RwSignal<bool>,
-    operator_status_loading: RwSignal<bool>,
-    fan_status_failed: RwSignal<bool>,
-    operator_status_failed: RwSignal<bool>,
-    status_refresh: RwSignal<u32>,
-) -> impl IntoView {
-    let open_fan = move |_| {
-        if fan_status_failed.get_untracked() {
-            status_refresh.update(|value| *value = value.wrapping_add(1));
-        } else {
-            mode.set(RootMode::Fan);
-        }
-    };
-    let open_team = move |_| {
-        if operator_status_failed.get_untracked() {
-            status_refresh.update(|value| *value = value.wrapping_add(1));
-        } else {
-            mode.set(RootMode::Team);
-        }
-    };
+fn BackButton(mode: RwSignal<RootMode>) -> impl IntoView {
+    view! { <button class="back-button" on:click=move |_| mode.set(RootMode::Fan)>"← SYGNAŁ"</button> }
+}
 
+#[component]
+fn StaffEntryButton(mode: RwSignal<RootMode>) -> impl IntoView {
     view! {
-        <section class="launcher">
-            <header class="launcher-brand">
-                <div class="signal-mark signal-logo" role="img" aria-label="Logo Virya Signal"><span></span><span></span><span></span></div>
-                <p class="eyebrow">VIRYA SIGNAL</p>
-                <h1>Sygnał w kieszeni.<br/><em>Kontrola na scenie.</em></h1>
-                <p>Koncerty, bilety, nagrody i wejście dla fanów. Sprzedaż, skanowanie i obsługa wydarzeń dla zespołu.</p>
-            </header>
-            <div class="mode-grid">
-                <button class="mode-card fan-mode" on:click=open_fan>
-                    <span class="mode-index">01</span>
-                    <div><p class="eyebrow">DLA FANÓW</p><h2>Virya Signal</h2><p>Koncerty, polecenia, nagrody, bilety i QR na wejście.</p></div>
-                    <strong>{move || if fan_status_loading.get() { "SPRAWDZAM PROFIL…" } else if fan_status_failed.get() { "PONÓW ODCZYT PROFILU" } else if fan_status.get().configured { "OTWÓRZ MÓJ SYGNAŁ" } else { "DOŁĄCZ DO SYGNAŁU" }}</strong>
-                </button>
-                <button class="mode-card team-mode" on:click=open_team>
-                    <span class="mode-index">02</span>
-                    <div><p class="eyebrow">DLA ZESPOŁU</p><h2>Virya Control</h2><p>Bramka, bilety, kupony, wejściówki i kampanie koncertowe.</p></div>
-                    <strong>{move || if operator_status_loading.get() { "SPRAWDZAM SEJF…" } else if operator_status_failed.get() { "PONÓW ODCZYT SEJFU" } else if operator_status.get().configured { "OTWÓRZ PANEL" } else { "SPARUJ URZĄDZENIE" }}</strong>
-                </button>
-            </div>
-            <p class="launcher-foot">CROWDRELAY POWERED / RUST NATIVE CORE</p>
-        </section>
+        <button
+            type="button"
+            class="staff-entry-button"
+            on:click=move |_| mode.set(RootMode::StaffGate)
+        >
+            <span aria-hidden="true">"⌁"</span>
+            "JESTEŚ W STAFFIE?"
+        </button>
     }
 }
 
 #[component]
-fn BackButton(mode: RwSignal<RootMode>) -> impl IntoView {
-    view! { <button class="back-button" on:click=move |_| mode.set(RootMode::Launcher)>"← VIRYA"</button> }
+fn StaffGate(mode: RwSignal<RootMode>, error: RwSignal<Option<String>>) -> impl IntoView {
+    let password = RwSignal::new(String::new());
+    let busy = RwSignal::new(false);
+
+    let submit = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        let current_password = password.get_untracked();
+        if current_password.is_empty() {
+            error.set(Some("Podaj hasło staff używane w panelu Virya.".to_owned()));
+            return;
+        }
+        busy.set(true);
+        spawn_local(async move {
+            let result = bridge::invoke_unit(
+                "verify_staff_access",
+                &StaffGateArgs {
+                    password: &current_password,
+                },
+            )
+            .await;
+            password.set(String::new());
+            busy.set(false);
+            match result {
+                Ok(()) => mode.set(RootMode::Team),
+                Err(message) => error.set(Some(message)),
+            }
+        });
+    };
+
+    view! {
+        <section class="access-screen staff-gate-screen">
+            <button
+                class="back-button"
+                disabled=move || busy.get()
+                on:click=move |_| mode.set(RootMode::Fan)
+            >
+                "← SYGNAŁ"
+            </button>
+            <header class="hero compact staff-gate-hero">
+                <p class="eyebrow">"VIRYA / STAFF"</p>
+                <h1>"Strefa "<em>"zespołu."</em></h1>
+                <p>"Dostęp do bramki, sprzedaży i obsługi koncertu jest oddzielony od konta fana."</p>
+            </header>
+            <div class="access-card staff-gate-card">
+                <div class="staff-gate-lock" aria-hidden="true">"⌁"</div>
+                <div>
+                    <p class="eyebrow">"WERYFIKACJA STAFF"</p>
+                    <h2>"Hasło panelu Virya"</h2>
+                    <p>"Użyj tego samego hasła co w QR, bramce i Control Center. Po weryfikacji aplikacja pokaże lokalny PIN lub parowanie urządzenia."</p>
+                </div>
+                <label>
+                    "Hasło staff"
+                    <input
+                        type="password"
+                        autocomplete="current-password"
+                        maxlength="256"
+                        prop:value=move || password.get()
+                        on:input=move |event| password.set(event_target_value(&event))
+                    />
+                </label>
+                <button
+                    class="primary"
+                    disabled=move || busy.get() || password.get().is_empty()
+                    on:click=submit
+                >
+                    {move || if busy.get() { "SPRAWDZAM…" } else { "OTWÓRZ STREFĘ STAFF" }}
+                </button>
+                <p class="staff-gate-note">"Hasło jest sprawdzane po stronie virya.music, nie jest zapisywane w aplikacji."</p>
+            </div>
+        </section>
+    }
 }
 
 #[component]
@@ -149,14 +194,18 @@ fn OperatorPortal(
     mode: RwSignal<RootMode>,
     status: RwSignal<SessionStatus>,
     status_loading: RwSignal<bool>,
+    status_failed: RwSignal<bool>,
+    status_refresh: RwSignal<u32>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let dashboard = RwSignal::new(None::<DashboardData>);
     let tab = RwSignal::new(OperatorTab::Home);
 
     view! {
-        {move || if status_loading.get() {
-            view! { <AccessLoader mode=mode label="SPRAWDZAM BEZPIECZNY SEJF" /> }.into_any()
+        {move || if status_failed.get() {
+            view! { <StatusFailure mode=mode status_refresh=status_refresh label="NIE UDAŁO SIĘ ODCZYTAĆ SEJFU STAFF" show_back=true /> }.into_any()
+        } else if status_loading.get() {
+            view! { <AccessLoader mode=mode label="SPRAWDZAM BEZPIECZNY SEJF" show_back=true /> }.into_any()
         } else if status.get().unlocked {
             view! { <OperatorApp mode=mode status=status dashboard=dashboard tab=tab error=error /> }.into_any()
         } else {
@@ -405,7 +454,7 @@ fn OperatorApp(
                     signal_loading.set(false);
                     signal_requested.set(false);
                     status.set(value);
-                    mode.set(RootMode::Launcher);
+                    mode.set(RootMode::Fan);
                 }
                 Err(message) => error.set(Some(message)),
             }
@@ -445,9 +494,9 @@ fn OperatorApp(
                 }}
             </div>
             <nav class="bottom-nav three primary-three">
-                <NavButton tab=tab own=OperatorTab::Home icon="⌁" label="Start" />
-                <NavButton tab=tab own=OperatorTab::Scan icon="▣" label="Skan" />
-                <NavButton tab=tab own=OperatorTab::Tickets icon="▤" label="Bilety" />
+                <NavButton tab=tab own=OperatorTab::Home icon="home" label="Start" />
+                <NavButton tab=tab own=OperatorTab::Scan icon="scan" label="Skan" />
+                <NavButton tab=tab own=OperatorTab::Tickets icon="ticket" label="Bilety" />
             </nav>
         </section>
     }
@@ -458,7 +507,52 @@ fn NavButton<T>(tab: RwSignal<T>, own: T, icon: &'static str, label: &'static st
 where
     T: Copy + PartialEq + Send + Sync + 'static,
 {
-    view! { <button class:active=move || tab.get() == own on:click=move |_| tab.set(own)><span>{icon}</span><small>{label}</small></button> }
+    view! { <button class:active=move || tab.get() == own on:click=move |_| tab.set(own)><NavGlyph icon=icon/><small>{label}</small></button> }
+}
+
+#[component]
+fn NavGlyph(icon: &'static str) -> impl IntoView {
+    match icon {
+        "signal" => view! {
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M6 15V9M12 19V5M18 16V8"/>
+            </svg>
+        }
+        .into_any(),
+        "events" => view! {
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <rect x="3" y="5" width="18" height="16" rx="2"/>
+                <path d="M8 3v4M16 3v4M3 10h18M8 14h3M13 14h3M8 17h3"/>
+            </svg>
+        }
+        .into_any(),
+        "scan" => view! {
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M8 4H4v4M16 4h4v4M20 16v4h-4M8 20H4v-4M7 12h10"/>
+            </svg>
+        }
+        .into_any(),
+        "shop" => view! {
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M5 8h14l-1 12H6L5 8Z"/>
+                <path d="M9 9V6a3 3 0 0 1 6 0v3"/>
+            </svg>
+        }
+        .into_any(),
+        "ticket" => view! {
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4V6Z"/>
+                <path d="M9 9v6"/>
+            </svg>
+        }
+        .into_any(),
+        _ => view! {
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M4 13 12 5l8 8M7 11v9h10v-9"/>
+            </svg>
+        }
+        .into_any(),
+    }
 }
 
 #[component]
@@ -1175,7 +1269,19 @@ fn OperatorSettings(
         })
     };
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">DEVICE</p><h2>Ustawienia</h2></header><div class="settings-list"><article><div><strong>Połączenie</strong><p>{move || status.get().session.map(|s| s.api_base_url).value_or_else(Default::default)}</p></div><span class:online=move || !loading.get().events && !loading.get().qr>{move || if loading.get().events || loading.get().qr { "ŁĄCZĘ" } else { "ONLINE" }}</span></article><article><div><strong>Uprawnienia</strong><p>{move || status.get().session.map(|s| s.role.label().to_owned()).value_or_else(Default::default)}</p></div></article><button on:click=refresh disabled=move || loading.get().events || loading.get().qr>"Odśwież wszystkie dane"</button><button on:click=lock>"Zablokuj panel"</button><button class="danger ghost" on:click=forget>"Usuń profil operatora"</button></div><Show when=move || owner.get()><OpsPanel overview=ops loading=ops_loading error=error /></Show><p class="security-note">Token operatora przechowuje zaszyfrowany sejf Stronghold. Warstwa WebView nigdy go nie odczytuje.</p></section>
+        <section class="screen">
+            <header class="screen-title"><p class="eyebrow">"DEVICE"</p><h2>"Ustawienia"</h2></header>
+            <div class="settings-list">
+                <article><div><strong>"Połączenie"</strong><p>{move || status.get().session.map(|s| s.api_base_url).value_or_else(Default::default)}</p></div><span class:online=move || !loading.get().events && !loading.get().qr>{move || if loading.get().events || loading.get().qr { "ŁĄCZĘ" } else { "ONLINE" }}</span></article>
+                <article><div><strong>"Uprawnienia"</strong><p>{move || status.get().session.map(|s| s.role.label().to_owned()).value_or_else(Default::default)}</p></div></article>
+                <button on:click=refresh disabled=move || loading.get().events || loading.get().qr>"Odśwież wszystkie dane"</button>
+                <button on:click=lock>"Zablokuj panel"</button>
+                <button class="danger ghost" on:click=forget>"Usuń profil operatora"</button>
+            </div>
+            <Show when=move || owner.get()><OpsPanel overview=ops loading=ops_loading error=error /></Show>
+            <AnonymousFeedback error=error />
+            <p class="security-note">"Token operatora przechowuje zaszyfrowany sejf Stronghold. Warstwa WebView nigdy go nie odczytuje."</p>
+        </section>
     }
 }
 
@@ -1288,6 +1394,8 @@ fn FanPortal(
     mode: RwSignal<RootMode>,
     status: RwSignal<FanSessionStatus>,
     status_loading: RwSignal<bool>,
+    status_failed: RwSignal<bool>,
+    status_refresh: RwSignal<u32>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     // Entering the fan zone must be a local-only transition. City data is
@@ -1295,21 +1403,55 @@ fn FanPortal(
     let public = RwSignal::new(Some(PublicHomeData::default()));
 
     view! {
-        {move || if status_loading.get() {
-            view! { <AccessLoader mode=mode label="SPRAWDZAM TWÓJ SYGNAŁ" /> }.into_any()
+        <Show when=move || !status.get().unlocked>
+            <StaffEntryButton mode=mode />
+        </Show>
+        {move || if status_failed.get() {
+            view! { <StatusFailure mode=mode status_refresh=status_refresh label="NIE UDAŁO SIĘ ODCZYTAĆ PROFILU FANA" show_back=false /> }.into_any()
+        } else if status_loading.get() {
+            view! { <AccessLoader mode=mode label="SPRAWDZAM TWÓJ SYGNAŁ" show_back=false /> }.into_any()
         } else if status.get().unlocked {
             view! { <FanApp mode=mode status=status public=public error=error /> }.into_any()
         } else {
-            view! { <FanAccess mode=mode status=status error=error /> }.into_any()
+            view! { <FanAccess status=status error=error /> }.into_any()
         }}
     }
 }
 
 #[component]
-fn AccessLoader(mode: RwSignal<RootMode>, label: &'static str) -> impl IntoView {
+fn StatusFailure(
+    mode: RwSignal<RootMode>,
+    status_refresh: RwSignal<u32>,
+    label: &'static str,
+    show_back: bool,
+) -> impl IntoView {
+    view! {
+        <section class="access-screen status-failure">
+            <Show when=move || show_back>
+                <BackButton mode=mode />
+            </Show>
+            <div class="access-card">
+                <p class="eyebrow">{label}</p>
+                <h2>"Profil pozostaje nietknięty."</h2>
+                <p>"Aplikacja nie przejdzie do rejestracji ani parowania, dopóki nie potwierdzi stanu zaszyfrowanego sejfu na urządzeniu."</p>
+                <button
+                    class="primary"
+                    on:click=move |_| status_refresh.update(|value| *value = value.wrapping_add(1))
+                >
+                    "SPRÓBUJ PONOWNIE"
+                </button>
+            </div>
+        </section>
+    }
+}
+
+#[component]
+fn AccessLoader(mode: RwSignal<RootMode>, label: &'static str, show_back: bool) -> impl IntoView {
     view! {
         <section class="access-screen status-loader">
-            <BackButton mode=mode />
+            <Show when=move || show_back>
+                <BackButton mode=mode />
+            </Show>
             <div class="access-card">
                 <p class="eyebrow">{label}</p>
                 <Skeleton rows=2 />
@@ -1381,11 +1523,7 @@ fn submit_fan_confirmation(
 }
 
 #[component]
-fn FanAccess(
-    mode: RwSignal<RootMode>,
-    status: RwSignal<FanSessionStatus>,
-    error: RwSignal<Option<String>>,
-) -> impl IntoView {
+fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>) -> impl IntoView {
     let access_mode = RwSignal::new(FanAccessMode::Signup);
     let email = RwSignal::new(String::new());
     let name = RwSignal::new(String::new());
@@ -1585,7 +1723,6 @@ fn FanAccess(
 
     view! {
         <section class="fan-access">
-            <BackButton mode=mode />
             <header class="fan-access-hero">
                 <p class="eyebrow">"VIRYA SIGNAL"</p>
                 <h1>"Koncerty, bilety"<br/><em>"i nagrody."</em></h1>
@@ -1690,7 +1827,9 @@ fn FanApp(
     let tab = RwSignal::new(FanTab::Signal);
     let dashboard = RwSignal::new(None::<FanDashboardData>);
     let merch = RwSignal::new(None::<MerchCatalog>);
+    let merch_bundles = RwSignal::new(None::<FanMerchBundleCatalog>);
     let wallets = RwSignal::new(Vec::<TicketWallet>::new());
+    let checkout_event = RwSignal::new(None::<PublicEvent>);
     let admission_qr = RwSignal::new(None::<AdmissionQr>);
     let area = RwSignal::new(None::<AreaWallet>);
     let loading = RwSignal::new(FanLoadingState::all());
@@ -1728,6 +1867,7 @@ fn FanApp(
                 if !loaded.get_untracked().merch {
                     loaded.update(|state| state.merch = true);
                     refresh_fan_merch(merch, loading, error);
+                    refresh_fan_merch_bundles(merch_bundles);
                 }
             }
             FanTab::Game => {
@@ -1776,6 +1916,11 @@ fn FanApp(
             }
         }
     });
+    Effect::new(move |_| {
+        if tab.get() != FanTab::Events && checkout_event.get_untracked().is_some() {
+            checkout_event.set(None);
+        }
+    });
     on_cleanup(move || bridge::invalidate_latest("fan:"));
 
     let close = move |_| {
@@ -1785,12 +1930,14 @@ fn FanApp(
                 Ok(value) => {
                     dashboard.set(None);
                     merch.set(None);
+                    merch_bundles.set(None);
                     wallets.set(Vec::new());
+                    checkout_event.set(None);
                     admission_qr.set(None);
                     area.set(None);
                     loading.set(FanLoadingState::all());
                     status.set(value);
-                    mode.set(RootMode::Launcher);
+                    mode.set(RootMode::Fan);
                 }
                 Err(message) => error.set(Some(message)),
             }
@@ -1800,26 +1947,38 @@ fn FanApp(
     view! {
         <section class="authenticated fan-authenticated">
             <header class="topbar fan-topbar">
-                <div on:dblclick=move |_| { loaded.set(FanLoadedState::default()); refresh_fan_parts(dashboard, loading, error); refresh_fan_merch(merch, loading, error); refresh_wallets(wallets, Some(loading), error); refresh_fan_area(area, loading, error); } style="cursor:pointer"><p class="eyebrow">"VIRYA SIGNAL"</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| "Mój Sygnał".to_owned())}</strong></div>
+                <div on:dblclick=move |_| { loaded.set(FanLoadedState::default()); refresh_fan_parts(dashboard, loading, error); refresh_fan_merch(merch, loading, error); refresh_fan_merch_bundles(merch_bundles); refresh_wallets(wallets, Some(loading), error); refresh_fan_area(area, loading, error); } style="cursor:pointer"><p class="eyebrow">"VIRYA SIGNAL"</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| "Mój Sygnał".to_owned())}</strong></div>
                 <div class="topbar-actions"><span class="live-dot"></span><button class="menu-trigger" aria-label="Otwórz menu" aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|value| *value = !*value)><i></i><i></i><i></i></button><button aria-label="Zamknij i zablokuj Sygnał" on:click=close>"×"</button></div>
             </header>
             <Show when=move || menu_open.get()>
                 <div class="overflow-backdrop" on:click=move |_| menu_open.set(false)></div>
                 <nav class="overflow-menu">
-                    <button class:active=move || tab.get() == FanTab::Merch on:click=move |_| { tab.set(FanTab::Merch); menu_open.set(false); }><span>"▤"</span>"Merch"</button>
                     <button class:active=move || tab.get() == FanTab::Game on:click=move |_| { tab.set(FanTab::Game); menu_open.set(false); }><span>"◇"</span>"Gra AREA"</button>
                     <button class:active=move || tab.get() == FanTab::Profile on:click=move |_| { tab.set(FanTab::Profile); menu_open.set(false); }><span>"◎"</span>"Profil"</button>
+                    <button on:click=move |_| { menu_open.set(false); mode.set(RootMode::StaffGate); }><span>"⌁"</span>"Strefa staff"</button>
                 </nav>
             </Show>
             <div class="content">{move || match tab.get() {
                 FanTab::Signal => view! { <FanSignal dashboard=dashboard loading=loading error=error /> }.into_any(),
-                FanTab::Events => view! { <FanEvents dashboard=dashboard public=public loading=loading error=error /> }.into_any(),
-                FanTab::Merch => view! { <FanMerch merch=merch loading=loading error=error /> }.into_any(),
+                FanTab::Events => checkout_event.get().map(|event| view! {
+                    <FanTicketCheckout
+                        event=event
+                        status=status
+                        tab=tab
+                        checkout_event=checkout_event
+                        wallets=wallets
+                        loading=loading
+                        error=error
+                    />
+                }.into_any()).value_or_else(|| view! {
+                    <FanEvents dashboard=dashboard public=public checkout_event=checkout_event loading=loading error=error />
+                }.into_any()),
+                FanTab::Merch => view! { <FanMerch merch=merch bundles=merch_bundles loading=loading error=error /> }.into_any(),
                 FanTab::Game => view! { <FanGame area=area loading=loading error=error /> }.into_any(),
                 FanTab::Wallet => view! { <FanWallet dashboard=dashboard wallets=wallets admission_qr=admission_qr loading=loading error=error /> }.into_any(),
                 FanTab::Profile => view! { <FanProfileScreen status=status dashboard=dashboard wallets=wallets area=area loading=loading error=error /> }.into_any(),
             }}</div>
-            <nav class="bottom-nav three primary-three"><FanNavButton tab=tab own=FanTab::Signal icon="◉" label="Sygnał"/><FanNavButton tab=tab own=FanTab::Events icon="⌁" label="Koncerty"/><FanNavButton tab=tab own=FanTab::Wallet icon="▣" label="Bilety"/></nav>
+            <nav class="bottom-nav four primary-four"><FanNavButton tab=tab own=FanTab::Signal icon="signal" label="Sygnał"/><FanNavButton tab=tab own=FanTab::Events icon="events" label="Koncerty"/><FanNavButton tab=tab own=FanTab::Merch icon="shop" label="Sklep"/><FanNavButton tab=tab own=FanTab::Wallet icon="ticket" label="Bilety"/></nav>
         </section>
     }
 }
@@ -1831,7 +1990,7 @@ fn FanNavButton(
     icon: &'static str,
     label: &'static str,
 ) -> impl IntoView {
-    view! { <button class:active=move || tab.get() == own on:click=move |_| tab.set(own)><span>{icon}</span><small>{label}</small></button> }
+    view! { <button class:active=move || tab.get() == own on:click=move |_| tab.set(own)><NavGlyph icon=icon/><small>{label}</small></button> }
 }
 
 #[component]
@@ -1898,6 +2057,7 @@ fn FanSignal(
 #[component]
 fn FanMerch(
     merch: RwSignal<Option<MerchCatalog>>,
+    bundles: RwSignal<Option<FanMerchBundleCatalog>>,
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
@@ -1906,7 +2066,7 @@ fn FanMerch(
             <header class="screen-title">
                 <p class="eyebrow">"VIRYA STORE"</p>
                 <h2>"Merch"</h2>
-                <p>"Stan magazynowy doczytuje się osobno. Płatność otworzy bezpieczny Stripe Checkout, a aplikacja nie przechowuje danych karty."</p>
+                <p>"Produkty i zestawy korzystają z tego samego stanu magazynowego co sklep online. Płatność otworzy bezpieczny Stripe Checkout, a aplikacja nie przechowuje danych karty."</p>
             </header>
             <Show when=move || !loading.get().merch fallback=move || view! { <Skeleton rows=4 /> }>
                 {move || merch.get().map(|catalog| {
@@ -1918,13 +2078,97 @@ fn FanMerch(
                             <div class="empty-state">
                                 <strong>"Sklep jest chwilowo niedostępny"</strong>
                                 <p>"Pozostałe części Sygnału działają normalnie. Spróbuj ponownie za moment."</p>
-                                <button class="ghost" on:click=move |_| refresh_fan_merch(merch, loading, error)>"ODŚWIEŻ MERCH"</button>
+                                <button class="ghost" on:click=move |_| {
+                                    refresh_fan_merch(merch, loading, error);
+                                    refresh_fan_merch_bundles(bundles);
+                                }>"ODŚWIEŻ MERCH"</button>
                             </div>
                         }.into_any()
                     } else {
+                        let bundle_catalog = bundles.get();
                         view! {
-                            <div class="card-list fan-merch-list">
-                                <ExternalLink url="https://virya.music/pl/merch/?source=signal-app".to_owned() label="OTWÓRZ PEŁNY SKLEP ↗" error=error />
+                            <div class="fan-merch-list">
+                                <div class="merch-grid-action">
+                                    <ExternalLink url="https://virya.music/pl/merch/?source=signal-app".to_owned() label="OTWÓRZ PEŁNY SKLEP ↗" error=error />
+                                </div>
+                                <div class="merch-grid-heading">
+                                    <div><p class="eyebrow">"ZESTAWY"</p><h3>"Bundle ze sklepu online"</h3></div>
+                                    <span>"DO −30%"</span>
+                                </div>
+                                {bundle_catalog.map(|catalog| {
+                                    if catalog.bundles.is_empty() {
+                                        view! {
+                                            <div class="merch-grid-message">
+                                                <p>"Zestawy są teraz niedostępne w live inventory."</p>
+                                                <ExternalLink url="https://virya.music/pl/merch/?source=signal-app&product=bundle-stage-pack".to_owned() label="ZOBACZ ZESTAWY ↗" error=error />
+                                            </div>
+                                        }.into_any()
+                                    } else {
+                                        catalog.bundles.into_iter().map(|bundle| {
+                                            let availability_label = match bundle.availability.as_str() {
+                                                "low_stock" => "OSTATNIE SZTUKI",
+                                                "available" => "DOSTĘPNY",
+                                                _ => "BRAK NA STANIE",
+                                            };
+                                            let available = bundle.available;
+                                            let product_url = bundle.product_url.clone();
+                                            let bundle_name = bundle.name;
+                                            let image_alt = format!("{} — zestaw merchu Virya", bundle_name);
+                                            let original_price = (bundle.original_price_gross_minor > bundle.price_gross_minor)
+                                                .then(|| money(bundle.original_price_gross_minor, &bundle.currency));
+                                            let includes = bundle.includes;
+                                            let includes_view = (!includes.is_empty()).then(|| view! {
+                                                <ul class="fan-merch-includes">
+                                                    {includes.into_iter().map(|item| view! { <li>{item}</li> }).collect_view()}
+                                                </ul>
+                                            });
+                                            let variants = bundle.variants;
+                                            let variants_view = (!variants.is_empty()).then(|| view! {
+                                                <div class="fan-merch-variants">
+                                                    {variants.into_iter().map(|variant| view! {
+                                                        <span class:available=variant.available>{variant.label}</span>
+                                                    }).collect_view()}
+                                                </div>
+                                            });
+                                            view! {
+                                                <article class="fan-merch-card fan-merch-bundle">
+                                                    <div class="bundle-badge">"BUNDLE"</div>
+                                                    {bundle.image_url.map(|url| view! {
+                                                        <img src=url alt=image_alt width="720" height="720" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+                                                    })}
+                                                    <div class="fan-merch-body">
+                                                        <div class="fan-merch-heading">
+                                                            <div>
+                                                                <h3>{bundle_name}</h3>
+                                                                <div class="fan-merch-price">
+                                                                    <strong>{money(bundle.price_gross_minor, &bundle.currency)}</strong>
+                                                                    {original_price.map(|price| view! { <del>{price}</del> })}
+                                                                </div>
+                                                            </div>
+                                                            <span class:available=available>{availability_label}</span>
+                                                        </div>
+                                                        {bundle.description.map(|description| view! { <p>{description}</p> })}
+                                                        {includes_view}
+                                                        {variants_view}
+                                                        <Show when=move || available fallback=move || view! {
+                                                            <button class="ghost" on:click=move |_| refresh_fan_merch_bundles(bundles)>"SPRAWDŹ PONOWNIE"</button>
+                                                        }>
+                                                            <ExternalLink url=product_url.clone() label="KUP W SKLEPIE ↗" error=error />
+                                                        </Show>
+                                                    </div>
+                                                </article>
+                                            }
+                                        }).collect_view().into_any()
+                                    }
+                                }).value_or_else(|| view! {
+                                    <div class="merch-grid-message">
+                                        <p>"Zestawy doczytują się niezależnie od produktów."</p>
+                                        <ExternalLink url="https://virya.music/pl/merch/?source=signal-app&product=bundle-stage-pack".to_owned() label="ZOBACZ ZESTAWY ↗" error=error />
+                                    </div>
+                                }.into_any())}
+                                <div class="merch-grid-heading merch-products-heading">
+                                    <div><p class="eyebrow">"POJEDYNCZE PRODUKTY"</p><h3>"Wybierz swój merch"</h3></div>
+                                </div>
                                 {products.into_iter().map(|product| {
                                     let available_variants = product.variants.iter()
                                         .filter(|variant| variant.active && variant.available)
@@ -1944,14 +2188,12 @@ fn FanMerch(
                                     } else {
                                         "BRAK NA STANIE"
                                     };
-                                    let first_sku = available_variants.first()
-                                        .map(|variant| variant.sku.clone())
-                                        .value_or_else(String::new);
                                     let shop_url = format!(
-                                        "https://virya.music/pl/merch/?source=signal-app&product={}&sku={}",
+                                        "https://virya.music/pl/merch/?source=signal-app&product={}",
                                         product.slug,
-                                        first_sku,
                                     );
+                                    let product_name = product.name;
+                                    let image_alt = format!("{} — merch Virya", product_name);
                                     let variants = product.variants.into_iter()
                                         .filter(|variant| variant.active)
                                         .collect::<Vec<_>>();
@@ -1965,11 +2207,11 @@ fn FanMerch(
                                     view! {
                                         <article class="fan-merch-card">
                                             {product.image_url.map(|url| view! {
-                                                <img src=url alt="" width="720" height="720" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+                                                <img src=url alt=image_alt width="720" height="720" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
                                             })}
                                             <div class="fan-merch-body">
                                                 <div class="fan-merch-heading">
-                                                    <div><h3>{product.name}</h3><strong>{money(product.price_gross_minor, &product.currency)}</strong></div>
+                                                    <div><h3>{product_name}</h3><strong>{money(product.price_gross_minor, &product.currency)}</strong></div>
                                                     <span class:available=has_stock>{availability_label}</span>
                                                 </div>
                                                 {product.description.map(|description| view! { <p>{description}</p> })}
@@ -1990,7 +2232,10 @@ fn FanMerch(
                     <div class="empty-state">
                         <strong>"Nie udało się pobrać stanu sklepu"</strong>
                         <p>"Koncerty, bilety i profil pozostają dostępne."</p>
-                        <button class="ghost" on:click=move |_| refresh_fan_merch(merch, loading, error)>"SPRÓBUJ PONOWNIE"</button>
+                        <button class="ghost" on:click=move |_| {
+                            refresh_fan_merch(merch, loading, error);
+                            refresh_fan_merch_bundles(bundles);
+                        }>"SPRÓBUJ PONOWNIE"</button>
                     </div>
                 }.into_any())}
             </Show>
@@ -2002,21 +2247,25 @@ fn FanMerch(
 fn FanEvents(
     dashboard: RwSignal<Option<FanDashboardData>>,
     public: RwSignal<Option<PublicHomeData>>,
+    checkout_event: RwSignal<Option<PublicEvent>>,
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">GDZIE GRAMY</p><h2>Koncerty</h2></header><Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }>{move || { let events = fan_events(dashboard, public); if events.is_empty() { view! { <div class="empty-state"><strong>"Brak koncertów w kalendarzu"</strong><p>"Kiedy pojawi się nowy event, będzie tutaj."</p></div> }.into_any() } else { view! { <div class="card-list fan-event-list">{events.into_iter().map(|event| view! { <FanEventCard event=event dashboard=dashboard loading=loading error=error /> }).collect_view()}</div> }.into_any() }}}</Show></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">GDZIE GRAMY</p><h2>Koncerty</h2></header><Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }>{move || { let events = fan_events(dashboard, public); if events.is_empty() { view! { <div class="empty-state"><strong>"Brak koncertów w kalendarzu"</strong><p>"Kiedy pojawi się nowy event, będzie tutaj."</p></div> }.into_any() } else { view! { <div class="card-list fan-event-list">{events.into_iter().map(|event| view! { <FanEventCard event=event checkout_event=checkout_event dashboard=dashboard loading=loading error=error /> }).collect_view()}</div> }.into_any() }}}</Show></section>
     }
 }
 
 #[component]
 fn FanEventCard(
     event: PublicEvent,
+    checkout_event: RwSignal<Option<PublicEvent>>,
     dashboard: RwSignal<Option<FanDashboardData>>,
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
+    let checkout = event.clone();
+    let buy = move |_| checkout_event.set(Some(checkout.clone()));
     let event_slug = event.slug.clone();
     let interested = Signal::derive(move || {
         dashboard.with(|state| {
@@ -2058,15 +2307,15 @@ fn FanEventCard(
     let event_time = human_time(&event.starts_at);
     let location = event_location(&event);
     let image = event.image_thumbnail_url.or(event.image_url);
-    let ticket = event.ticket_url;
     let description = event.description;
     let title = event.title;
+    let image_alt = format!("{} — koncert Virya", title);
     view! {
         <article class="fan-event-card">
             {image.map(|url| view! {
                 <img
                     src=url
-                    alt=""
+                    alt=image_alt
                     width="720"
                     height="405"
                     loading="lazy"
@@ -2081,11 +2330,416 @@ fn FanEventCard(
                 {description.map(|text| view! { <p class="event-description">{text}</p> })}
                 <div class="event-actions">
                     <button class:active=move || interested.get() on:click=interest disabled=move || busy.get() || interested.get()>{move || if busy.get() { "ZAPISUJĘ…" } else if interested.get() { "✓ MAM TO" } else { "+ INTERESUJE MNIE" }}</button>
-                    {ticket.map(|url| view! { <ExternalLink url=url label="KUP BILET ↗" error=error /> })}
+                    <button class="ticket-buy-button" on:click=buy>"KUP BILET"</button>
                 </div>
             </div>
         </article>
     }
+}
+
+#[component]
+fn FanTicketCheckout(
+    event: PublicEvent,
+    status: RwSignal<FanSessionStatus>,
+    tab: RwSignal<FanTab>,
+    checkout_event: RwSignal<Option<PublicEvent>>,
+    wallets: RwSignal<Vec<TicketWallet>>,
+    loading: RwSignal<FanLoadingState>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let sale = RwSignal::new(None::<TicketSaleOffer>);
+    let sale_loading = RwSignal::new(true);
+    let sale_failed = RwSignal::new(false);
+    let sale_refresh = RwSignal::new(0_u32);
+    let load_slug = event.slug.clone();
+
+    Effect::new(move |_| {
+        sale_refresh.get();
+        sale_loading.set(true);
+        let event_slug = load_slug.clone();
+        spawn_local(async move {
+            match bridge::invoke_latest::<Option<TicketSaleOffer>, _>(
+                "fan_ticket_sale",
+                &EventArgs {
+                    event_slug: &event_slug,
+                },
+                15_000,
+                "fan:ticket-sale",
+            )
+            .await
+            {
+                Ok(Some(Some(value))) => {
+                    sale.set(Some(value));
+                    sale_failed.set(false);
+                }
+                Ok(Some(None)) => {
+                    sale.set(None);
+                    sale_failed.set(false);
+                }
+                Ok(None) => return,
+                Err(message) => {
+                    sale.set(None);
+                    sale_failed.set(true);
+                    error.set(Some(message));
+                }
+            }
+            sale_loading.set(false);
+        });
+    });
+    on_cleanup(move || bridge::invalidate_latest("fan:ticket-sale"));
+
+    let back = move |_| checkout_event.set(None);
+    let event_title = event.title.clone();
+    let event_meta = event_time_location(&event.starts_at, event.venue.as_deref());
+    let event_slug = event.slug.clone();
+    let fallback_url = event
+        .ticket_url
+        .clone()
+        .value_or_else(|| format!("https://virya.music/pl/live/{}/#tickets", event.slug));
+    let full_form_url = format!("https://virya.music/pl/live/{}/#tickets", event.slug);
+
+    view! {
+        <section class="screen fan-ticket-checkout-screen">
+            <button class="checkout-back" on:click=back>"← WRÓĆ DO KONCERTÓW"</button>
+            <header class="ticket-checkout-hero">
+                <p class="eyebrow">"VIRYA // BILETY"</p>
+                <h2>{event_title}</h2>
+                <p>{event_meta}</p>
+            </header>
+            {
+                let render_sale = move || {
+                    let event_slug = event_slug.clone();
+                    let fallback_url = fallback_url.clone();
+                    let full_form_url = full_form_url.clone();
+                    match sale.get() {
+                        Some(offer) => view! {
+                            <FanTicketSale
+                                offer=offer
+                                event_slug=event_slug
+                                fallback_url=fallback_url
+                                full_form_url=full_form_url
+                                status=status
+                                tab=tab
+                                checkout_event=checkout_event
+                                wallets=wallets
+                                loading=loading
+                                sale_refresh=sale_refresh
+                                error=error
+                            />
+                        }
+                        .into_any(),
+                        None => view! {
+                            <div class="empty-state">
+                                <strong>{if sale_failed.get() { "Nie udało się sprawdzić sprzedaży" } else { "Brak własnej puli Virya" }}</strong>
+                                <p>"Możesz przejść do strony koncertu lub sprzedaży prowadzonej przez organizatora."</p>
+                                <ExternalLink url=fallback_url label="SPRAWDŹ BILETY ↗" error=error />
+                            </div>
+                        }
+                        .into_any(),
+                    }
+                };
+                view! {
+                    <Show when=move || !sale_loading.get() fallback=move || view! { <Skeleton rows=4 /> }>
+                        {render_sale.clone()}
+                    </Show>
+                }
+            }
+        </section>
+    }
+}
+
+#[component]
+fn FanTicketSale(
+    offer: TicketSaleOffer,
+    event_slug: String,
+    fallback_url: String,
+    full_form_url: String,
+    status: RwSignal<FanSessionStatus>,
+    tab: RwSignal<FanTab>,
+    checkout_event: RwSignal<Option<PublicEvent>>,
+    wallets: RwSignal<Vec<TicketWallet>>,
+    loading: RwSignal<FanLoadingState>,
+    sale_refresh: RwSignal<u32>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let ticket_types = offer
+        .ticket_types
+        .iter()
+        .filter(|ticket_type| ticket_type.active)
+        .cloned()
+        .collect::<Vec<_>>();
+    let max_per_order = offer.max_per_order.max(0) as u32;
+    let has_available_type = ticket_types
+        .iter()
+        .any(|ticket_type| ticket_type.available > 0);
+    let is_open = offer.active
+        && offer.sales_state == "open"
+        && offer.available > 0
+        && max_per_order > 0
+        && has_available_type;
+    let state_copy = match offer.sales_state.as_str() {
+        "upcoming" => "Sprzedaż rozpocznie się wkrótce.",
+        "closed" => "Sprzedaż online została zakończona.",
+        "sold_out" => "Ta pula biletów jest wyprzedana.",
+        "inactive" => "Sprzedaż jest chwilowo wyłączona.",
+        "event_unavailable" => "Ten koncert nie jest obecnie dostępny w sprzedaży.",
+        _ if !is_open => "Bilety nie są teraz dostępne.",
+        _ => "Wybierz bilety. Miejsca zostaną zarezerwowane na czas płatności.",
+    };
+    let sale_available = offer.available.max(0);
+    let sale_reserved = offer.reserved.max(0);
+    let sale_sold = offer.sold.max(0);
+
+    if !is_open {
+        return view! {
+            <div class="ticket-sale-summary">
+                <div><strong>{sale_available}</strong><span>"dostępne"</span></div>
+                <div><strong>{sale_reserved}</strong><span>"w płatności"</span></div>
+                <div><strong>{sale_sold}</strong><span>"sprzedane"</span></div>
+            </div>
+            <p class="checkout-state-copy">{state_copy}</p>
+            <div class="empty-state compact">
+                <strong>"Sprawdź stronę koncertu"</strong>
+                <p>"Jeżeli organizator prowadzi osobną sprzedaż, znajdziesz ją pod tym przyciskiem."</p>
+                <ExternalLink url=fallback_url label="SPRAWDŹ BILETY ↗" error=error />
+            </div>
+        }
+        .into_any();
+    }
+
+    let quantities = RwSignal::new(
+        ticket_types
+            .iter()
+            .map(|ticket_type| TicketCheckoutItemInput {
+                ticket_type_slug: ticket_type.slug.clone(),
+                quantity: 0,
+            })
+            .collect::<Vec<_>>(),
+    );
+    let buyer_name = RwSignal::new(
+        status
+            .get_untracked()
+            .session
+            .and_then(|profile| profile.display_name)
+            .unwrap_or_default(),
+    );
+    let busy = RwSignal::new(false);
+    let pending_checkout = RwSignal::new(None::<TicketCheckoutStart>);
+    let selected_count = Signal::derive(move || checkout_count(quantities));
+    let gross_offer = offer.clone();
+    let selected_gross = Signal::derive(move || checkout_gross(&gross_offer, quantities));
+    let purchase_slug = event_slug.clone();
+
+    let purchase = move |_| {
+        if busy.get_untracked() || pending_checkout.get_untracked().is_some() {
+            return;
+        }
+        let items = quantities
+            .get_untracked()
+            .into_iter()
+            .filter(|item| item.quantity > 0)
+            .collect::<Vec<_>>();
+        if items.is_empty() {
+            error.set(Some("Wybierz co najmniej jeden bilet.".to_owned()));
+            return;
+        }
+        let name = buyer_name.get_untracked().trim().to_owned();
+        let input = TicketCheckoutInput {
+            event_slug: purchase_slug.clone(),
+            buyer_name: (!name.is_empty()).then_some(name),
+            items,
+        };
+        busy.set(true);
+        spawn_local(async move {
+            match bridge::invoke_timeout::<TicketCheckoutStart, _>(
+                "fan_start_ticket_checkout",
+                &TicketCheckoutArgs { input: &input },
+                35_000,
+            )
+            .await
+            {
+                Ok(checkout) => {
+                    pending_checkout.set(Some(checkout.clone()));
+                    refresh_wallets(wallets, Some(loading), error);
+                    let checkout_url = checkout.url.clone();
+                    match bridge::invoke_unit("open_external_url", &UrlArgs { url: &checkout_url })
+                        .await
+                    {
+                        Ok(_) => {
+                            checkout_event.set(None);
+                            tab.set(FanTab::Wallet);
+                            error.set(Some(format!(
+                                "Zamówienie {} zapisane. Dokończ bezpieczną płatność Stripe.",
+                                checkout.order_reference
+                            )));
+                        }
+                        Err(message) => {
+                            error.set(Some(format!(
+                                "{message} Zamówienie {} jest zapisane — użyj przycisku ponownego otwarcia płatności.",
+                                checkout.order_reference
+                            )));
+                        }
+                    }
+                }
+                Err(message) => {
+                    error.set(Some(message));
+                    sale_refresh.update(|value| *value = value.wrapping_add(1));
+                }
+            }
+            busy.set(false);
+        });
+    };
+
+    let retry_payment = move |_| {
+        let Some(checkout) = pending_checkout.get_untracked() else {
+            return;
+        };
+        let checkout_url = checkout.url.clone();
+        spawn_local(async move {
+            match bridge::invoke_unit("open_external_url", &UrlArgs { url: &checkout_url }).await {
+                Ok(_) => {
+                    checkout_event.set(None);
+                    tab.set(FanTab::Wallet);
+                    error.set(Some(format!(
+                        "Otworzono płatność dla zamówienia {}.",
+                        checkout.order_reference
+                    )));
+                }
+                Err(message) => error.set(Some(message)),
+            }
+        });
+    };
+
+    let currency_for_total = offer.currency.clone();
+    view! {
+        <div class="ticket-sale-summary">
+            <div><strong>{sale_available}</strong><span>"dostępne"</span></div>
+            <div><strong>{sale_reserved}</strong><span>"w płatności"</span></div>
+            <div><strong>{sale_sold}</strong><span>"sprzedane"</span></div>
+        </div>
+        <p class="checkout-state-copy">{state_copy}</p>
+        <div class="ticket-type-list">
+            {ticket_types.into_iter().map(|ticket_type| {
+                let quantity_slug = ticket_type.slug.clone();
+                let decrement_slug = ticket_type.slug.clone();
+                let increment_slug = ticket_type.slug.clone();
+                let available = ticket_type.available.max(0) as u32;
+                let currency = offer.currency.clone();
+                let quantity = Signal::derive(move || checkout_quantity(quantities, &quantity_slug));
+                let decrement = move |_| {
+                    let current = checkout_quantity(quantities, &decrement_slug);
+                    set_checkout_quantity(
+                        quantities,
+                        &decrement_slug,
+                        current.saturating_sub(1),
+                        available,
+                        max_per_order,
+                    );
+                };
+                let increment = move |_| {
+                    let current = checkout_quantity(quantities, &increment_slug);
+                    set_checkout_quantity(
+                        quantities,
+                        &increment_slug,
+                        current.saturating_add(1),
+                        available,
+                        max_per_order,
+                    );
+                };
+                view! {
+                    <article class="ticket-type-card">
+                        <div>
+                            <h3>{ticket_type.name}</h3>
+                            {ticket_type.description.map(|description| view! { <p>{description}</p> })}
+                            <strong>{money(ticket_type.price_gross_minor, &currency)}</strong>
+                            <small>{format!("Dostępne: {}", ticket_type.available.max(0))}</small>
+                        </div>
+                        <div class="ticket-stepper" aria-label="Liczba biletów">
+                            <button aria-label="Zmniejsz liczbę biletów" on:click=decrement disabled=move || quantity.get() == 0>"−"</button>
+                            <output>{move || quantity.get()}</output>
+                            <button aria-label="Zwiększ liczbę biletów" on:click=increment disabled=move || quantity.get() >= available || selected_count.get() >= max_per_order>"+"</button>
+                        </div>
+                    </article>
+                }
+            }).collect_view()}
+        </div>
+        <div class="ticket-buyer-panel">
+            <label>"Imię i nazwisko na zamówieniu (opcjonalnie)"<input autocomplete="name" maxlength="160" prop:value=move || buyer_name.get() on:input=move |event| buyer_name.set(event_target_value(&event))/></label>
+            <p>{move || status.get().session.map(|profile| format!("Bilety i potwierdzenie trafią na {}", profile.email)).value_or_else(|| "Bilety trafią na e-mail konta fana.".to_owned())}</p>
+            <ExternalLink url=full_form_url label="FAKTURA / PEŁNY FORMULARZ ↗" error=error />
+        </div>
+        <footer class="ticket-checkout-total">
+            <div><span>"Wybrane bilety"</span><strong>{move || selected_count.get()}</strong></div>
+            <div><span>"Razem brutto"</span><strong>{move || money(selected_gross.get(), &currency_for_total)}</strong></div>
+            <button class="primary" on:click=purchase disabled=move || busy.get() || selected_count.get() == 0 || pending_checkout.get().is_some()>{move || if busy.get() { "REZERWUJĘ…" } else if pending_checkout.get().is_some() { "ZAMÓWIENIE ZAPISANE" } else { "PRZEJDŹ DO PŁATNOŚCI STRIPE" }}</button>
+            <Show when=move || pending_checkout.get().is_some()>
+                <button class="ghost checkout-retry" on:click=retry_payment>"OTWÓRZ PŁATNOŚĆ PONOWNIE ↗"</button>
+            </Show>
+            <small>"Dane karty nie trafiają do Virya Signal. Płatność otworzy się w bezpiecznym Stripe Checkout."</small>
+        </footer>
+    }
+    .into_any()
+}
+
+fn checkout_quantity(
+    quantities: RwSignal<Vec<TicketCheckoutItemInput>>,
+    ticket_type_slug: &str,
+) -> u32 {
+    quantities.with(|items| {
+        items
+            .iter()
+            .find(|item| item.ticket_type_slug == ticket_type_slug)
+            .map(|item| item.quantity)
+            .unwrap_or_default()
+    })
+}
+
+fn checkout_count(quantities: RwSignal<Vec<TicketCheckoutItemInput>>) -> u32 {
+    quantities.with(|items| items.iter().map(|item| item.quantity).sum())
+}
+
+fn checkout_gross(
+    sale: &TicketSaleOffer,
+    quantities: RwSignal<Vec<TicketCheckoutItemInput>>,
+) -> i64 {
+    quantities.with(|items| {
+        items
+            .iter()
+            .filter_map(|item| {
+                sale.ticket_types
+                    .iter()
+                    .find(|ticket_type| ticket_type.slug == item.ticket_type_slug)
+                    .map(|ticket_type| {
+                        ticket_type
+                            .price_gross_minor
+                            .saturating_mul(i64::from(item.quantity))
+                    })
+            })
+            .fold(0_i64, i64::saturating_add)
+    })
+}
+
+fn set_checkout_quantity(
+    quantities: RwSignal<Vec<TicketCheckoutItemInput>>,
+    ticket_type_slug: &str,
+    requested: u32,
+    available: u32,
+    max_per_order: u32,
+) {
+    quantities.update(|items| {
+        let other = items
+            .iter()
+            .filter(|item| item.ticket_type_slug != ticket_type_slug)
+            .map(|item| item.quantity)
+            .sum::<u32>();
+        let allowed = available.min(max_per_order.saturating_sub(other));
+        if let Some(item) = items
+            .iter_mut()
+            .find(|item| item.ticket_type_slug == ticket_type_slug)
+        {
+            item.quantity = requested.min(allowed);
+        }
+    });
 }
 
 #[component]
@@ -2105,7 +2759,7 @@ fn ExternalLink(
             }
         });
     };
-    view! { <button class="ticket-buy-button" on:click=open>{label}</button> }
+    view! { <button type="button" class="ticket-buy-button" on:click=open>{label}</button> }
 }
 
 fn open_area_game(error: RwSignal<Option<String>>) {
@@ -2186,6 +2840,8 @@ fn FanWallet(
             ));
             return;
         }
+        // The recovery token must not remain rendered in the WebView while IPC runs.
+        checkout_token.set(String::new());
         busy.set(true);
         spawn_local(async move {
             match bridge::invoke::<TicketWallet, _>(
@@ -2249,7 +2905,7 @@ fn FanWallet(
         <Show when=move || dashboard.with(|state| state.as_ref().is_none_or(|d| d.admission_pass.is_none()))><div class="claim-box"><p class="eyebrow">WYGRAŁEŚ WEJŚCIÓWKĘ?</p><h3>Przypisz ją do telefonu</h3><textarea rows="3" placeholder="Token z wiadomości" prop:value=move || claim_token.get() on:input=move |e| claim_token.set(event_target_value(&e))></textarea><button class="primary" on:click=claim disabled=move || busy.get()>"ODBIERZ WEJŚCIÓWKĘ"</button></div></Show></Show>
         <div class="section-head"><h3>Portfel biletów</h3><span>{move || wallets.get().len()}</span></div><Show when=move || !loading.get().wallets fallback=move || view! { <Skeleton rows=2 /> }><div class="wallet-stack">{move || wallets.get().into_iter().map(|wallet| view! {
             <WalletCard wallet=wallet error=error />
-        }).collect_view()}</div></Show><details class="import-box"><summary>"Dodaj istniejące zamówienie"</summary><div class="form-grid"><label>"Order ID"<input placeholder="UUID zamówienia" prop:value=move || order_id.get() on:input=move |e| order_id.set(event_target_value(&e))/></label><label>"Prywatny checkout token"<textarea rows="3" prop:value=move || checkout_token.get() on:input=move |e| checkout_token.set(event_target_value(&e))></textarea></label><button class="primary" on:click=import disabled=move || busy.get()>"DODAJ DO PORTFELA"</button></div></details></section>
+        }).collect_view()}</div></Show><details class="import-box"><summary>"Dodaj istniejące zamówienie"</summary><div class="form-grid"><label>"Order ID"<input placeholder="UUID zamówienia" prop:value=move || order_id.get() on:input=move |e| order_id.set(event_target_value(&e))/></label><label>"Prywatny checkout token"<textarea rows="3" autocomplete="off" autocapitalize="none" spellcheck="false" prop:value=move || checkout_token.get() on:input=move |e| checkout_token.set(event_target_value(&e))></textarea></label><button class="primary" on:click=import disabled=move || busy.get()>"DODAJ DO PORTFELA"</button></div></details></section>
     }
 }
 
@@ -2372,7 +3028,99 @@ fn FanProfileScreen(
         })
     };
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">MÓJ PROFIL</p><h2>Ustawienia Sygnału</h2></header>{move || status.get().session.map(|profile| view! { <div class="profile-card"><div class="avatar">V</div><div><strong>{profile.display_name.value_or_else(|| "Fan Viryi".to_owned())}</strong><p>{profile.email}</p></div></div><div class="stats-grid"><Metric value=profile.wallet_count.to_string() label="zamówienia"/><Metric value=if profile.has_admission_pass { "1".to_owned() } else { "0".to_owned() } label="wejściówki"/><Metric value=dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned()) label="polecenia"/></div> })}<div class="settings-list"><button on:click=refresh disabled=move || { let state = loading.get(); state.events || state.referral || state.interests || state.admission_pass || state.wallets }>{move || { let state = loading.get(); if state.events || state.referral || state.interests || state.admission_pass || state.wallets { "Odświeżam…" } else { "Odśwież dane" } }}</button><button on:click=lock>"Zablokuj aplikację"</button><button class="danger ghost" on:click=forget>"Usuń profil i bilety z urządzenia"</button></div><p class="security-note">Sesja fana, wejściówka oraz prywatne tokeny portfela są przechowywane w osobnym, zaszyfrowanym sejfie Stronghold.</p></section>
+        <section class="screen">
+            <header class="screen-title"><p class="eyebrow">"MÓJ PROFIL"</p><h2>"Ustawienia Sygnału"</h2></header>
+            {move || status.get().session.map(|profile| view! {
+                <div class="profile-card"><div class="avatar">"V"</div><div><strong>{profile.display_name.value_or_else(|| "Fan Viryi".to_owned())}</strong><p>{profile.email}</p></div></div>
+                <div class="stats-grid"><Metric value=profile.wallet_count.to_string() label="zamówienia"/><Metric value=if profile.has_admission_pass { "1".to_owned() } else { "0".to_owned() } label="wejściówki"/><Metric value=dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned()) label="polecenia"/></div>
+            })}
+            <div class="settings-list">
+                <button on:click=refresh disabled=move || { let state = loading.get(); state.events || state.referral || state.interests || state.admission_pass || state.wallets }>{move || { let state = loading.get(); if state.events || state.referral || state.interests || state.admission_pass || state.wallets { "Odświeżam…" } else { "Odśwież dane" } }}</button>
+                <button on:click=lock>"Zablokuj aplikację"</button>
+                <button class="danger ghost" on:click=forget>"Usuń profil i bilety z urządzenia"</button>
+            </div>
+            <AnonymousFeedback error=error />
+            <p class="security-note">"Sesja fana, wejściówka oraz prywatne tokeny portfela są przechowywane w osobnym, zaszyfrowanym sejfie Stronghold."</p>
+        </section>
+    }
+}
+
+#[component]
+fn AnonymousFeedback(error: RwSignal<Option<String>>) -> impl IntoView {
+    let category = RwSignal::new("idea".to_owned());
+    let message = RwSignal::new(String::new());
+    let busy = RwSignal::new(false);
+
+    let submit = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        let current_category = category.get_untracked();
+        let current_message = message.get_untracked().trim().to_owned();
+        let length = current_message.chars().count();
+        if !(8..=2_000).contains(&length) {
+            error.set(Some(
+                "Feedback powinien mieć od 8 do 2000 znaków.".to_owned(),
+            ));
+            return;
+        }
+        busy.set(true);
+        spawn_local(async move {
+            match bridge::invoke_unit(
+                "submit_anonymous_feedback",
+                &AnonymousFeedbackArgs {
+                    category: &current_category,
+                    message: &current_message,
+                },
+            )
+            .await
+            {
+                Ok(()) => {
+                    message.set(String::new());
+                    error.set(Some(
+                        "Feedback został wysłany anonimowo. Dzięki!".to_owned(),
+                    ));
+                }
+                Err(message) => error.set(Some(message)),
+            }
+            busy.set(false);
+        });
+    };
+
+    view! {
+        <section class="feedback-card">
+            <div class="feedback-heading">
+                <div><p class="eyebrow">"ANONIMOWY FEEDBACK"</p><h3>"Powiedz nam, co poprawić"</h3></div>
+                <span aria-hidden="true">"◌"</span>
+            </div>
+            <p>"Aplikacja wysyła tylko kategorię i treść — bez e-maila, nazwy, tokenu sesji i identyfikatora profilu. Hosting może zachować standardowe logi techniczne połączenia."</p>
+            <label class="select-label">
+                "Kategoria"
+                <select prop:value=move || category.get() on:change=move |event| category.set(event_target_value(&event))>
+                    <option value="idea">"Pomysł"</option>
+                    <option value="bug">"Błąd"</option>
+                    <option value="concert">"Koncerty i bilety"</option>
+                    <option value="merch">"Merch"</option>
+                    <option value="other">"Inne"</option>
+                </select>
+            </label>
+            <label>
+                "Treść"
+                <textarea
+                    rows="6"
+                    maxlength="2000"
+                    placeholder="Napisz wprost, co działa źle albo czego brakuje…"
+                    prop:value=move || message.get()
+                    on:input=move |event| message.set(event_target_value(&event))
+                ></textarea>
+            </label>
+            <div class="feedback-submit-row">
+                <small>{move || format!("{} / 2000", message.get().chars().count())}</small>
+                <button type="button" class="primary" disabled=move || busy.get() || message.get().trim().chars().count() < 8 on:click=submit>
+                    {move || if busy.get() { "WYSYŁAM…" } else { "WYŚLIJ ANONIMOWO" }}
+                </button>
+            </div>
+        </section>
     }
 }
 
@@ -2400,6 +3148,7 @@ fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
                     || lower.contains("gotowy")
                     || lower.contains("zeskanowany")
                     || lower.contains("ponownie")
+                    || lower.contains("feedback został wysłany")
             })
         })
     };
@@ -2584,6 +3333,23 @@ fn refresh_fan_merch(
             }
         }
         loading.update(|state| state.merch = false);
+    });
+}
+
+fn refresh_fan_merch_bundles(bundles: RwSignal<Option<FanMerchBundleCatalog>>) {
+    spawn_local(async move {
+        match bridge::invoke_latest::<FanMerchBundleCatalog, _>(
+            "fan_merch_bundles",
+            &EmptyArgs {},
+            12_000,
+            "fan:merch-bundles",
+        )
+        .await
+        {
+            Ok(Some(value)) => bundles.set(Some(value)),
+            Ok(None) => {}
+            Err(_) => bundles.set(None),
+        }
     });
 }
 

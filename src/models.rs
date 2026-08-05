@@ -70,6 +70,41 @@ pub struct MerchCatalog {
     pub products: Vec<MerchProduct>,
 }
 
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct FanMerchBundleCatalog {
+    #[serde(default)]
+    pub bundles: Vec<FanMerchBundle>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct FanMerchBundle {
+    #[allow(dead_code)]
+    pub slug: String,
+    pub name: String,
+    pub description: Option<String>,
+    #[serde(default)]
+    pub includes: Vec<String>,
+    pub image_url: Option<String>,
+    #[allow(dead_code)]
+    pub secondary_image_url: Option<String>,
+    pub product_url: String,
+    pub currency: String,
+    pub price_gross_minor: i64,
+    pub original_price_gross_minor: i64,
+    pub available: bool,
+    pub availability: String,
+    #[serde(default)]
+    pub variants: Vec<FanMerchBundleVariant>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct FanMerchBundleVariant {
+    pub label: String,
+    pub available: bool,
+    #[allow(dead_code)]
+    pub availability: String,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct MerchProduct {
     pub slug: String,
@@ -86,11 +121,93 @@ pub struct MerchProduct {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct MerchVariant {
+    #[allow(dead_code)]
     pub sku: String,
     pub label: String,
     pub active: bool,
     pub available: bool,
     pub availability: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct TicketTypeOffer {
+    #[allow(dead_code)]
+    pub id: String,
+    pub slug: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub price_gross_minor: i64,
+    #[allow(dead_code)]
+    pub capacity: Option<i32>,
+    #[allow(dead_code)]
+    pub sold: i32,
+    #[allow(dead_code)]
+    pub reserved: i32,
+    pub available: i32,
+    #[allow(dead_code)]
+    pub sort_order: i32,
+    pub active: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct TicketSaleOffer {
+    #[allow(dead_code)]
+    pub event_id: String,
+    #[allow(dead_code)]
+    pub event_slug: String,
+    #[allow(dead_code)]
+    pub event_title: String,
+    #[allow(dead_code)]
+    pub event_status: String,
+    #[allow(dead_code)]
+    pub venue: Option<String>,
+    #[allow(dead_code)]
+    pub timezone: String,
+    #[allow(dead_code)]
+    pub starts_at: String,
+    pub currency: String,
+    #[allow(dead_code)]
+    pub vat_rate_basis_points: i32,
+    #[allow(dead_code)]
+    pub capacity: i32,
+    pub sold: i32,
+    pub reserved: i32,
+    pub available: i32,
+    pub max_per_order: i32,
+    #[allow(dead_code)]
+    pub sales_open_at: String,
+    #[allow(dead_code)]
+    pub sales_close_at: String,
+    pub active: bool,
+    pub sales_state: String,
+    #[serde(default)]
+    pub ticket_types: Vec<TicketTypeOffer>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TicketCheckoutItemInput {
+    pub ticket_type_slug: String,
+    pub quantity: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TicketCheckoutInput {
+    pub event_slug: String,
+    pub buyer_name: Option<String>,
+    pub items: Vec<TicketCheckoutItemInput>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TicketCheckoutStart {
+    pub url: String,
+    #[allow(dead_code)]
+    pub order_id: String,
+    pub order_reference: String,
+    #[allow(dead_code)]
+    pub expires_at: String,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
