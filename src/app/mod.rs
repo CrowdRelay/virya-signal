@@ -365,7 +365,11 @@ fn OperatorAccess(
                         </Show>
                         <div class="pairing-divider"><span></span><small>"ALBO"</small><span></span></div>
                         <label>"Kod parowania"<textarea rows="2" placeholder="virya-signal://pair?…" prop:value=move || pairing.get() on:input=move |e| pairing.set(event_target_value(&e))></textarea></label>
-                        <label>"Lokalny PIN (4–6 cyfr)"<input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) /></label>
+                        <label class="pin-field">
+                            <span class="pin-field-label">"Utwórz PIN do odblokowania"</span>
+                            <small id="operator-new-pin-help">"Wpisz 4–6 cyfr, np. 2580. To PIN tylko do Virya Signal — nie kod QR ani PIN telefonu."</small>
+                            <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="np. 2580" aria-describedby="operator-new-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) />
+                        </label>
                         <button class="primary" on:click=submit_pairing disabled=move || busy.get() || pairing.get().trim().is_empty() || !new_operator_pin_is_valid(&pin.get())>"SPARUJ"</button>
                         <button class="text-button" type="button" on:click=move |_| advanced.update(|v| *v = !*v)>
                             {move || if advanced.get() { "UKRYJ USTAWIENIA RĘCZNE" } else { "USTAWIENIA ZAAWANSOWANE" }}
@@ -386,7 +390,11 @@ fn OperatorAccess(
                 }>
                     <div class="form-grid">
                         <p class="lock-copy">Profil operatora jest zaszyfrowany lokalnie.</p>
-                        <label>"PIN"<input type="password" autocomplete="current-password" inputmode="numeric" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e)) /></label>
+                        <label class="pin-field">
+                            <span class="pin-field-label">"PIN do odblokowania aplikacji"</span>
+                            <small id="operator-unlock-pin-help">"Wpisz PIN ustawiony podczas parowania tego urządzenia."</small>
+                            <input type="password" autocomplete="current-password" inputmode="numeric" placeholder="Twój PIN" aria-describedby="operator-unlock-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e)) />
+                        </label>
                         <button class="primary" disabled=move || busy.get() || pin.get().chars().count() < 4 on:click=unlock>"ODBLOKUJ"</button>
                     </div>
                 </Show>
@@ -474,9 +482,6 @@ fn OperatorApp(
             <Show when=move || menu_open.get()>
                 <div class="overflow-backdrop" on:click=move |_| menu_open.set(false)></div>
                 <nav class="overflow-menu">
-                    <Show when=move || owner.get()>
-                        <button class:active=move || tab.get() == OperatorTab::Signal on:click=move |_| { tab.set(OperatorTab::Signal); menu_open.set(false); }><span>"◉"</span>"Sygnał"</button>
-                    </Show>
                     <button class:active=move || tab.get() == OperatorTab::Discounts on:click=move |_| { tab.set(OperatorTab::Discounts); menu_open.set(false); }><span>"%"</span>"Zniżki"</button>
                     <button class:active=move || tab.get() == OperatorTab::Campaigns on:click=move |_| { tab.set(OperatorTab::Campaigns); menu_open.set(false); }><span>"◫"</span>"Kody QR"</button>
                     <button class:active=move || tab.get() == OperatorTab::Settings on:click=move |_| { tab.set(OperatorTab::Settings); menu_open.set(false); }><span>"⚙"</span>"Ustawienia"</button>
@@ -493,8 +498,9 @@ fn OperatorApp(
                     OperatorTab::Settings => view! { <OperatorSettings status=status dashboard=dashboard loading=loading error=error /> }.into_any(),
                 }}
             </div>
-            <nav class="bottom-nav three primary-three">
+            <nav class="bottom-nav four primary-four">
                 <NavButton tab=tab own=OperatorTab::Home icon="home" label="Start" />
+                <NavButton tab=tab own=OperatorTab::Signal icon="signal" label="Sygnał" />
                 <NavButton tab=tab own=OperatorTab::Scan icon="scan" label="Skan" />
                 <NavButton tab=tab own=OperatorTab::Tickets icon="ticket" label="Bilety" />
             </nav>

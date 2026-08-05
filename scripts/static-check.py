@@ -137,7 +137,8 @@ if 'Zeroizing::new(response.checkout_token)' not in native_fan:
 for contract in (
     'fn new_operator_pin_is_valid',
     '(4..=6).contains(&pin.len())',
-    'Lokalny PIN (4–6 cyfr)',
+    'Utwórz PIN do odblokowania',
+    'PIN tylko do Virya Signal',
     'inputmode="numeric"',
     'vault::save_verified',
 ):
@@ -154,6 +155,26 @@ if 'operator_pin_survives_a_fresh_vault_round_trip' not in vault:
     raise SystemExit('staff PIN persistence regression test is missing')
 if 'PIN operatora musi mieć 4–6 cyfr' not in validation:
     raise SystemExit('native staff PIN validation contract is missing')
+
+operator_nav = ui[ui.find('<nav class="overflow-menu">'):ui.find('<div class="content">')]
+if 'OperatorTab::Signal' in operator_nav:
+    raise SystemExit('staff Signal must live in the bottom navigation, not the overflow menu')
+for contract in (
+    '<nav class="bottom-nav four primary-four">',
+    '<NavButton tab=tab own=OperatorTab::Signal icon="signal" label="Sygnał" />',
+):
+    if contract not in ui:
+        raise SystemExit(f'staff four-tab navigation contract is missing: {contract}')
+css = (root / 'styles.css').read_text()
+for contract in (
+    '--control-radius: 10px',
+    '.ghost { min-height: 48px;',
+    '.advanced-config > .ghost { width: 100%; min-height: 54px;',
+    'align-items: stretch',
+    'height: 100%',
+):
+    if contract not in css:
+        raise SystemExit(f'mobile UX consistency contract is missing: {contract}')
 
 index = (root / 'index.html').read_text()
 boot = (root / 'boot.js').read_text()
