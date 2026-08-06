@@ -387,13 +387,13 @@ impl CrowdRelayClient {
     }
 
     pub(super) fn persist_public_cache_in_background(&self) {
-        if self.cache_persisting.swap(true, Ordering::SeqCst) {
+        if self.cache_persisting.swap(true, Ordering::AcqRel) {
             return;
         }
         let client = self.clone();
         tokio::spawn(async move {
             client.persist_public_cache().await;
-            client.cache_persisting.store(false, Ordering::SeqCst);
+            client.cache_persisting.store(false, Ordering::Release);
         });
     }
 

@@ -164,6 +164,16 @@ async fn persist_show_store(state: &State<'_, AppState>) -> Result<(), AppError>
 }
 
 fn normalize_show_store(store: &mut ShowModeStore) {
+    let now = unix_now_secs();
+    store.sessions.retain(|_, session| {
+        let active = parse_snapshot_timestamp(&session.snapshot.expires_at)
+            .is_ok_and(|expires_at| expires_at >= now);
+        let has_unsynced_scans = session
+            .scans
+            .iter()
+            .any(|scan| scan.state != ShowModeScanState::Synced);
+        active || has_unsynced_scans
+    });
     for session in store.sessions.values_mut() {
         session
             .snapshot
@@ -613,5 +623,47 @@ mod tests {
         );
         let status = show_mode_status_for("virya-live", &store);
         assert_eq!((status.pending, status.synced, status.conflicts), (1, 0, 1));
+    }
+
+    #[test]
+    fn show_store_normalization_prunes_only_expired_fully_synced_sessions() {
+        let mut expired_clean = sample_show_snapshot();
+        expired_clean.expires_at = "2020-01-01T00:00:00Z".into();
+        let mut expired_pending = expired_clean.clone();
+        expired_pending.snapshot_id = "snapshot-pending".into();
+        let mut store = ShowModeStore::default();
+        store.sessions.insert(
+            "expired-clean".into(),
+            ShowModeSession {
+                snapshot: expired_clean,
+                scans: vec![ShowModeQueuedScan {
+                    scan_id: "clean".into(),
+                    public_reference: "VRY-TICKET-1".into(),
+                    holder_name: None,
+                    holder_email_masked: "—".into(),
+                    scanned_at_unix_secs: 1,
+                    state: ShowModeScanState::Synced,
+                    result_status: Some("redeemed".into()),
+                }],
+            },
+        );
+        store.sessions.insert(
+            "expired-pending".into(),
+            ShowModeSession {
+                snapshot: expired_pending,
+                scans: vec![ShowModeQueuedScan {
+                    scan_id: "pending".into(),
+                    public_reference: "VRY-TICKET-1".into(),
+                    holder_name: None,
+                    holder_email_masked: "—".into(),
+                    scanned_at_unix_secs: 1,
+                    state: ShowModeScanState::Pending,
+                    result_status: None,
+                }],
+            },
+        );
+        normalize_show_store(&mut store);
+        assert!(!store.sessions.contains_key("expired-clean"));
+        assert!(store.sessions.contains_key("expired-pending"));
     }
 }

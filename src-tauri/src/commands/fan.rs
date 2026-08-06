@@ -25,6 +25,7 @@ use crate::{
 };
 
 const MAX_WALLETS: usize = 24;
+const WALLET_FETCH_CONCURRENCY: usize = 8;
 
 #[tauri::command]
 pub(crate) async fn fan_status(state: State<'_, AppState>) -> Result<FanSessionStatus, AppError> {
@@ -421,7 +422,10 @@ pub(crate) async fn fan_wallets(state: State<'_, AppState>) -> Result<WalletBatc
             Ok(value)
         }
     });
-    let results = stream::iter(requests).buffered(8).collect::<Vec<_>>().await;
+    let results = stream::iter(requests)
+        .buffered(WALLET_FETCH_CONCURRENCY)
+        .collect::<Vec<_>>()
+        .await;
     let request_count = results.len();
     let mut wallets = Vec::with_capacity(request_count);
     let mut wallet_tokens = Vec::with_capacity(request_count);

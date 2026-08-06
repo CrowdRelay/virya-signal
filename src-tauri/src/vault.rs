@@ -6,7 +6,6 @@ use std::{
 
 use argon2::Argon2;
 use iota_stronghold::{KeyProvider, SnapshotPath, Stronghold};
-use rand::Rng;
 use serde::{Serialize, de::DeserializeOwned};
 use zeroize::Zeroizing;
 
@@ -425,7 +424,7 @@ fn load_or_create_salt(path: &Path) -> Result<[u8; SALT_BYTES], AppError> {
         return read_salt(path);
     }
     let mut salt = [0_u8; SALT_BYTES];
-    rand::rng().fill_bytes(&mut salt);
+    getrandom::fill(&mut salt).map_err(|_| AppError::StrongholdClient)?;
     match create_private_file(path, &salt) {
         Ok(()) => Ok(salt),
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => read_salt(path),

@@ -420,7 +420,7 @@ if tomllib is not None:
     ui_manifest = tomllib.loads(ui_manifest_text)
 else:
     required_native_fragments = [
-        'rust-version = "1.97"', 'rand = "0.10"', 'iota_stronghold = "2.1.0"',
+        'rust-version = "1.97"', 'getrandom = "0.4"', 'iota_stronghold = "2.1.0"',
         'features = ["v4"]', 'features = ["gzip", "json", "rustls-no-provider"]',
         'futures-util = { version = "0.3", default-features = false, features = ["alloc"] }',
     ]
@@ -434,7 +434,7 @@ else:
     native_manifest = {
         'package': {'rust-version': '1.97'},
         'dependencies': {
-            'rand': '0.10', 'iota_stronghold': '2.1.0',
+            'getrandom': '0.4', 'iota_stronghold': '2.1.0',
             'uuid': {'features': ['v4']},
             'reqwest': {'features': ['gzip', 'json', 'rustls-no-provider']},
             'futures-util': {'default-features': False, 'features': ['alloc']},
@@ -452,15 +452,15 @@ if any(key.startswith('profile') for key in native_manifest):
 dev_profile = ui_manifest.get('profile', {}).get('dev', {})
 if dev_profile.get('strip') != 'symbols' or dev_profile.get('panic') != 'abort':
     raise SystemExit('mobile debug builds must omit native symbols and unwinding')
-if native_manifest.get('dependencies', {}).get('rand') != '0.10':
-    raise SystemExit('native shell must use the validated rand 0.10 API')
+native_dependencies = native_manifest.get('dependencies', {})
+if native_dependencies.get('getrandom') != '0.4' or 'rand' in native_dependencies:
+    raise SystemExit('native shell must use the OS RNG directly without the rand facade')
 ui_dependencies = ui_manifest.get('dependencies', {})
 if 'futures' in ui_dependencies or 'serde_json' in ui_dependencies:
     raise SystemExit('unused direct WASM dependencies futures/serde_json must stay removed')
 ui_models = (root / 'src/models.rs').read_text()
 if len(re.findall(r'#\[derive\([^\]]*(?:Deserialize, Serialize|Serialize, Deserialize)', ui_models)) != 1:
     raise SystemExit('WASM models must derive only the serde direction used over IPC')
-native_dependencies = native_manifest.get('dependencies', {})
 if native_dependencies.get('uuid', {}).get('features') != ['v4']:
     raise SystemExit('native UUID support must not compile unused serde integration')
 reqwest = native_dependencies.get('reqwest', {})
@@ -472,14 +472,16 @@ futures_util = native_dependencies.get('futures-util', {})
 if futures_util.get('default-features') is not False or futures_util.get('features') != ['alloc']:
     raise SystemExit('native stream utilities must not enable the futures executor')
 vault = (root / 'src-tauri/src/vault.rs').read_text()
-if 'use rand::Rng;' not in vault or 'use rand::RngCore;' in vault:
-    raise SystemExit('vault must import rand 0.10 trait rand::Rng')
+if 'getrandom::fill(&mut salt)' not in vault or 'rand::' in vault:
+    raise SystemExit('vault salt must come directly from the operating-system RNG')
 native_src = '\\n'.join(
     path.read_text(encoding='utf-8')
     for path in sorted((root / 'src-tauri/src').rglob('*.rs'))
 )
-if not re.search(r'buffered\(8\)\s*\.collect::<Vec<_>>\(\)', native_src):
-    raise SystemExit('wallet loading must isolate individual backend failures')
+if 'const WALLET_FETCH_CONCURRENCY: usize = 8;' not in native_src or not re.search(
+    r'buffered\(WALLET_FETCH_CONCURRENCY\)\s*\.collect::<Vec<_>>\(\)', native_src
+):
+    raise SystemExit('wallet loading must stay bounded to preserve the wallet IPC latency budget')
 if 'WALLET_REQUEST_TIMEOUT: Duration = Duration::from_secs(12)' not in api:
     raise SystemExit('wallet requests must fit inside the IPC deadline')
 if 'invoke_latest::<WalletBatch' not in ui or '35_000' not in ui:
