@@ -1,4 +1,4 @@
-use reqwest::header::{ACCEPT, CONTENT_TYPE, ORIGIN};
+use reqwest::header::{ACCEPT, CONTENT_TYPE, COOKIE};
 use uuid::Uuid;
 
 use crate::{
@@ -10,17 +10,12 @@ use crate::{
 };
 
 use super::{
-    client::WALLET_REQUEST_TIMEOUT,
+    client::{FAN_COOKIE, WALLET_REQUEST_TIMEOUT},
     http::{
         MAX_TOKEN_BYTES, bounded_required, decode, decode_with_error_mapper, endpoint, segment,
         uuid_segment,
     },
 };
-
-const AREA_SITE_ORIGIN: &str = "https://virya.music";
-const AREA_WALLET_URL: &str = "https://virya.music/api/area/wallet";
-const AREA_CHALLENGE_URL: &str = "https://virya.music/api/area/challenge";
-const AREA_CLAIM_URL: &str = "https://virya.music/api/area/claim";
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -36,6 +31,15 @@ struct AreaClaimRequest<'a> {
     samples: &'a [AreaPositionSample],
 }
 
+fn fan_cookie(profile: &FanProfile) -> Result<String, AppError> {
+    let token = profile.fan_session_token.trim();
+    if token.len() != 64 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(AppError::Unauthorized);
+    }
+    let normalized = token.to_ascii_lowercase();
+    Ok(format!("{FAN_COOKIE}={normalized}"))
+}
+
 fn area_error_detail(body: &serde_json::Value) -> Option<String> {
     let key = match body.get("code")?.as_str()? {
         "INVALID_REQUEST" => "native_area_claim_invalid",
@@ -46,6 +50,8 @@ fn area_error_detail(body: &serde_json::Value) -> Option<String> {
         "LOW_ACCURACY" => "native_area_low_accuracy",
         "OUTSIDE_ZONE" => "native_area_outside_zone",
         "DROP_FULL" => "native_area_drop_full",
+        "CLAIM_CONFLICT" => "native_area_claim_conflict",
+        "AUTH_REQUIRED" => "native_fan_login_required",
         "TEMPORARY" => "native_area_temporary",
         _ => return None,
     };
@@ -54,16 +60,12 @@ fn area_error_detail(body: &serde_json::Value) -> Option<String> {
 
 impl super::CrowdRelayClient {
     pub async fn fan_area_wallet(&self, profile: &FanProfile) -> Result<AreaWallet, AppError> {
-        let wallet_id = uuid::Uuid::parse_str(profile.area_wallet_id.trim()).map_err(|_| {
-            AppError::InvalidInput(crate::i18n::tr("native_area_wallet_id_invalid").into())
-        })?;
+        let cookie = fan_cookie(profile)?;
         let response = self
             .http
-            .get(url::Url::parse(AREA_WALLET_URL)?)
+            .get(endpoint(&profile.api_base_url, "me/area")?)
             .header(ACCEPT, "application/json")
-            .header(ORIGIN, AREA_SITE_ORIGIN)
-            .bearer_auth(profile.fan_session_token.trim())
-            .header("x-virya-area-wallet", wallet_id.to_string())
+            .header(COOKIE, cookie)
             .timeout(WALLET_REQUEST_TIMEOUT)
             .send()
             .await?;
@@ -75,19 +77,15 @@ impl super::CrowdRelayClient {
         profile: &FanProfile,
         drop_id: &str,
     ) -> Result<AreaChallenge, AppError> {
-        let wallet_id = uuid::Uuid::parse_str(profile.area_wallet_id.trim()).map_err(|_| {
-            AppError::InvalidInput(crate::i18n::tr("native_area_wallet_id_invalid").into())
-        })?;
         let drop_id = segment(drop_id)?;
+        let cookie = fan_cookie(profile)?;
         let response = self
             .http
-            .post(url::Url::parse(AREA_CHALLENGE_URL)?)
+            .post(endpoint(&profile.api_base_url, "me/area/challenge")?)
             .header(ACCEPT, "application/json")
             .header(CONTENT_TYPE, "application/json")
-            .header(ORIGIN, AREA_SITE_ORIGIN)
+            .header(COOKIE, cookie)
             .header("Idempotency-Key", Uuid::new_v4().to_string())
-            .bearer_auth(profile.fan_session_token.trim())
-            .header("x-virya-area-wallet", wallet_id.to_string())
             .json(&AreaChallengeRequest { drop_id: &drop_id })
             .timeout(WALLET_REQUEST_TIMEOUT)
             .send()
@@ -102,19 +100,15 @@ impl super::CrowdRelayClient {
         challenge: &str,
         samples: &[AreaPositionSample],
     ) -> Result<AreaClaimResult, AppError> {
-        let wallet_id = uuid::Uuid::parse_str(profile.area_wallet_id.trim()).map_err(|_| {
-            AppError::InvalidInput(crate::i18n::tr("native_area_wallet_id_invalid").into())
-        })?;
         let drop_id = segment(drop_id)?;
+        let cookie = fan_cookie(profile)?;
         let response = self
             .http
-            .post(url::Url::parse(AREA_CLAIM_URL)?)
+            .post(endpoint(&profile.api_base_url, "me/area/claim")?)
             .header(ACCEPT, "application/json")
             .header(CONTENT_TYPE, "application/json")
-            .header(ORIGIN, AREA_SITE_ORIGIN)
+            .header(COOKIE, cookie)
             .header("Idempotency-Key", Uuid::new_v4().to_string())
-            .bearer_auth(profile.fan_session_token.trim())
-            .header("x-virya-area-wallet", wallet_id.to_string())
             .json(&AreaClaimRequest {
                 drop_id: &drop_id,
                 challenge,

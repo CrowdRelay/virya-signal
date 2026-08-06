@@ -466,6 +466,8 @@ pub struct AreaWallet {
     #[serde(default)]
     pub live_drops: Vec<AreaLiveDrop>,
     #[serde(default)]
+    pub drops: Vec<AreaDrop>,
+    #[serde(default)]
     #[allow(dead_code)]
     pub migration_required: bool,
 }
@@ -498,6 +500,9 @@ pub struct AreaClaim {
     pub edition: String,
     #[allow(dead_code)]
     pub claimed_at: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub distance_meters: u32,
     #[allow(dead_code)]
     pub edition_number: Option<u32>,
 }
@@ -515,6 +520,37 @@ pub struct AreaVoucher {
     pub expires_at: u64,
     #[allow(dead_code)]
     pub free_product_label: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaDrop {
+    pub id: String,
+    pub number: String,
+    pub city: String,
+    pub region: String,
+    #[allow(dead_code)]
+    pub signal_city_slug: String,
+    pub map_x: i16,
+    pub map_y: i16,
+    pub approximate_lat: f64,
+    pub approximate_lng: f64,
+    #[serde(default)]
+    pub clue: AreaDropClue,
+    #[serde(default)]
+    pub active: bool,
+    #[serde(default)]
+    pub full: bool,
+    #[serde(default)]
+    pub claimed: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct AreaDropClue {
+    #[serde(default)]
+    pub en: String,
+    #[serde(default)]
+    pub pl: String,
 }
 
 #[derive(Clone, Debug, Deserialize)]

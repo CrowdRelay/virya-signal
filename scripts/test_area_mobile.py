@@ -27,25 +27,29 @@ class MobileAreaContracts(unittest.TestCase):
         self.assertIn("viryaCollectLocationSamples", bridge)
         self.assertIn("samples.len() < 3", commands)
         self.assertIn("samples.len() > 8", commands)
-        self.assertIn('const AREA_CHALLENGE_URL: &str = "https://virya.music/api/area/challenge"', api)
-        self.assertIn('const AREA_CLAIM_URL: &str = "https://virya.music/api/area/claim"', api)
-        self.assertIn('.bearer_auth(profile.fan_session_token.trim())', api)
-        self.assertIn('.header("x-virya-area-wallet", wallet_id.to_string())', api)
+        self.assertIn('endpoint(&profile.api_base_url, "me/area/challenge")', api)
+        self.assertIn('endpoint(&profile.api_base_url, "me/area/claim")', api)
+        self.assertIn('fn fan_cookie(profile: &FanProfile)', api)
+        self.assertIn('token.len() != 64', api)
+        self.assertIn('byte.is_ascii_hexdigit()', api)
+        self.assertIn('let normalized = token.to_ascii_lowercase();', api)
+        self.assertIn('format!("{FAN_COOKIE}={normalized}")', api)
+        self.assertIn('.header(COOKIE, cookie)', api)
+        self.assertNotIn('virya.music/api/area', api)
 
     def test_app_uses_only_coarse_public_city_coordinates(self):
         source = (ROOT / "src/app/area.rs").read_text()
-        coordinates = re.findall(r"approximate_(?:lat|lng):\s*(-?\d+(?:\.(\d+))?)", source)
-        self.assertGreater(len(coordinates), 0)
-        for _, decimals in coordinates:
-            self.assertLessEqual(len(decimals or ""), 1)
+        self.assertIn("wallet.drops", source)
+        self.assertNotRegex(source, r'id:\s*"(?:wro|poz|gdn|waw|ktw|krk)-\d{3}"')
         self.assertNotIn("radius_meters", source)
         self.assertIn("area_location_privacy", source)
         self.assertIn("fan_area_challenge", source)
         self.assertIn("fan_area_claim", source)
+        self.assertLess(source.index("if active.is_empty()"), source.index("bridge::current_position().await"))
 
     def test_area_ui_keeps_inactive_cities_visible(self):
         source = (ROOT / "src/app/area.rs").read_text()
-        self.assertIn("AREA_DROPS.to_vec()", source)
+        self.assertIn("each=move || map_drops.clone()", source)
         self.assertIn("class:is-live", source)
         self.assertIn("inactive_area_point", source)
         self.assertNotIn("hidden=move || !live", source)
@@ -74,6 +78,7 @@ class MobileAreaContracts(unittest.TestCase):
             "LOW_ACCURACY",
             "OUTSIDE_ZONE",
             "DROP_FULL",
+            "CLAIM_CONFLICT",
             "TEMPORARY",
         ]:
             self.assertIn(f'"{code}"', public_api)

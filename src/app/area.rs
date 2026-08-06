@@ -3,8 +3,8 @@ use wasm_bindgen_futures::spawn_local;
 
 use crate::{
     bridge,
-    i18n::{self, tr},
-    models::{AreaChallenge, AreaClaimResult, AreaPositionSample, AreaWallet},
+    i18n::{self, Language, tr},
+    models::{AreaChallenge, AreaClaimResult, AreaDrop, AreaPositionSample, AreaWallet},
     util::OptionValueOrElseExt,
 };
 
@@ -12,19 +12,6 @@ use super::{
     AreaClaimArgs, AreaDropArgs, FanLoadingState, Skeleton, UrlArgs, open_area_game,
     refresh_fan_area,
 };
-
-#[derive(Clone, Copy)]
-struct AreaDrop {
-    id: &'static str,
-    number: &'static str,
-    city_key: &'static str,
-    region_key: &'static str,
-    clue_key: &'static str,
-    map_x: u8,
-    map_y: u8,
-    approximate_lat: f64,
-    approximate_lng: f64,
-}
 
 #[derive(Clone, Debug)]
 struct NearestPoint {
@@ -34,153 +21,38 @@ struct NearestPoint {
     bearing_degrees: f64,
 }
 
-const AREA_DROPS: [AreaDrop; 12] = [
-    AreaDrop {
-        id: "wro-001",
-        number: "001",
-        city_key: "area_city_wroclaw",
-        region_key: "area_region_lower_silesia",
-        clue_key: "area_clue_wroclaw",
-        map_x: 34,
-        map_y: 70,
-        approximate_lat: 51.1,
-        approximate_lng: 17.0,
-    },
-    AreaDrop {
-        id: "poz-002",
-        number: "002",
-        city_key: "area_city_poznan",
-        region_key: "area_region_greater_poland",
-        clue_key: "area_clue_poznan",
-        map_x: 29,
-        map_y: 45,
-        approximate_lat: 52.4,
-        approximate_lng: 16.9,
-    },
-    AreaDrop {
-        id: "gdn-003",
-        number: "003",
-        city_key: "area_city_gdansk",
-        region_key: "area_region_pomerania",
-        clue_key: "area_clue_gdansk",
-        map_x: 49,
-        map_y: 17,
-        approximate_lat: 54.4,
-        approximate_lng: 18.6,
-    },
-    AreaDrop {
-        id: "waw-004",
-        number: "004",
-        city_key: "area_city_warsaw",
-        region_key: "area_region_masovia",
-        clue_key: "area_clue_warsaw",
-        map_x: 68,
-        map_y: 48,
-        approximate_lat: 52.2,
-        approximate_lng: 21.0,
-    },
-    AreaDrop {
-        id: "ktw-005",
-        number: "005",
-        city_key: "area_city_katowice",
-        region_key: "area_region_silesia",
-        clue_key: "area_clue_katowice",
-        map_x: 53,
-        map_y: 79,
-        approximate_lat: 50.3,
-        approximate_lng: 19.0,
-    },
-    AreaDrop {
-        id: "krk-006",
-        number: "006",
-        city_key: "area_city_krakow",
-        region_key: "area_region_lesser_poland",
-        clue_key: "area_clue_krakow",
-        map_x: 65,
-        map_y: 86,
-        approximate_lat: 50.1,
-        approximate_lng: 19.9,
-    },
-    AreaDrop {
-        id: "ldz-007",
-        number: "007",
-        city_key: "area_city_lodz",
-        region_key: "area_region_lodz",
-        clue_key: "area_clue_lodz",
-        map_x: 53,
-        map_y: 56,
-        approximate_lat: 51.8,
-        approximate_lng: 19.5,
-    },
-    AreaDrop {
-        id: "szc-008",
-        number: "008",
-        city_key: "area_city_szczecin",
-        region_key: "area_region_west_pomerania",
-        clue_key: "area_clue_szczecin",
-        map_x: 14,
-        map_y: 29,
-        approximate_lat: 53.4,
-        approximate_lng: 14.6,
-    },
-    AreaDrop {
-        id: "lub-009",
-        number: "009",
-        city_key: "area_city_lublin",
-        region_key: "area_region_lublin",
-        clue_key: "area_clue_lublin",
-        map_x: 82,
-        map_y: 63,
-        approximate_lat: 51.2,
-        approximate_lng: 22.6,
-    },
-    AreaDrop {
-        id: "rze-010",
-        number: "010",
-        city_key: "area_city_rzeszow",
-        region_key: "area_region_subcarpathia",
-        clue_key: "area_clue_rzeszow",
-        map_x: 82,
-        map_y: 87,
-        approximate_lat: 50.0,
-        approximate_lng: 22.0,
-    },
-    AreaDrop {
-        id: "bia-011",
-        number: "011",
-        city_key: "area_city_bialystok",
-        region_key: "area_region_podlasie",
-        clue_key: "area_clue_bialystok",
-        map_x: 85,
-        map_y: 35,
-        approximate_lat: 53.1,
-        approximate_lng: 23.2,
-    },
-    AreaDrop {
-        id: "tor-012",
-        number: "012",
-        city_key: "area_city_torun",
-        region_key: "area_region_kuyavia_pomerania",
-        clue_key: "area_clue_torun",
-        map_x: 47,
-        map_y: 37,
-        approximate_lat: 53.0,
-        approximate_lng: 18.6,
-    },
-];
-
-fn find_drop(id: &str) -> Option<AreaDrop> {
-    AREA_DROPS.iter().copied().find(|drop| drop.id == id)
+fn find_drop(area: RwSignal<Option<AreaWallet>>, id: &str) -> Option<AreaDrop> {
+    area.get()
+        .and_then(|wallet| wallet.drops.into_iter().find(|drop| drop.id.as_str() == id))
 }
 
 fn live(area: RwSignal<Option<AreaWallet>>, id: &str) -> bool {
-    area.get()
-        .is_some_and(|wallet| wallet.live_drops.iter().any(|drop| drop.id == id))
+    area.get().is_some_and(|wallet| {
+        wallet
+            .drops
+            .iter()
+            .find(|drop| drop.id.as_str() == id)
+            .is_some_and(|drop| drop.active && !drop.full)
+            || wallet.live_drops.iter().any(|drop| drop.id == id)
+    })
 }
 
 fn claimed(area: RwSignal<Option<AreaWallet>>, id: &str) -> bool {
-    area.get()
-        .is_some_and(|wallet| wallet.claims.iter().any(|claim| claim.drop_id == id))
+    area.get().is_some_and(|wallet| {
+        wallet.claims.iter().any(|claim| claim.drop_id == id)
+            || wallet
+                .drops
+                .iter()
+                .find(|drop| drop.id.as_str() == id)
+                .is_some_and(|drop| drop.claimed)
+    })
+}
+
+fn clue(drop: &AreaDrop) -> String {
+    match i18n::current() {
+        Language::Pl => drop.clue.pl.clone(),
+        Language::En => drop.clue.en.clone(),
+    }
 }
 
 fn distance_meters(lat1: f64, lng1: f64, lat2: f64, lng2: f64) -> f64 {
@@ -231,7 +103,7 @@ fn distance_label(value: f64) -> String {
     }
 }
 
-fn open_route(drop: AreaDrop, error: RwSignal<Option<String>>) {
+fn open_route(drop: &AreaDrop, error: RwSignal<Option<String>>) {
     let url = format!(
         "https://www.google.com/maps/dir/?api=1&destination={:.4},{:.4}",
         drop.approximate_lat, drop.approximate_lng
@@ -258,16 +130,22 @@ pub(super) fn AreaGameScreen(
 
     Effect::new(move |_| {
         let wallet = area.get();
-        let selected_is_valid = selected
-            .get_untracked()
-            .is_some_and(|id| AREA_DROPS.iter().any(|drop| drop.id == id));
+        let selected_is_valid = selected.get_untracked().is_some_and(|id| {
+            wallet
+                .as_ref()
+                .is_some_and(|wallet| wallet.drops.iter().any(|drop| drop.id.as_str() == id))
+        });
         if selected_is_valid {
             return;
         }
-        let initial = wallet
-            .as_ref()
-            .and_then(|wallet| wallet.live_drops.first().map(|drop| drop.id.clone()))
-            .or_else(|| AREA_DROPS.first().map(|drop| drop.id.to_owned()));
+        let initial = wallet.as_ref().and_then(|wallet| {
+            wallet
+                .drops
+                .iter()
+                .find(|drop| drop.active && !drop.full)
+                .or_else(|| wallet.drops.first())
+                .map(|drop| drop.id.clone())
+        });
         selected.set(initial);
     });
 
@@ -276,15 +154,27 @@ pub(super) fn AreaGameScreen(
         if locating.get_untracked() {
             return;
         }
+        let active = area
+            .get_untracked()
+            .map(|wallet| {
+                wallet
+                    .drops
+                    .into_iter()
+                    .filter(|drop| drop.active && !drop.full)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
+        if active.is_empty() {
+            error.set(Some(tr("no_active_area_points_now").to_owned()));
+            return;
+        }
+
         locating.set(true);
         spawn_local(async move {
             match bridge::current_position().await {
                 Ok(position) => {
-                    let active = AREA_DROPS
-                        .iter()
-                        .copied()
-                        .filter(|drop| live(area, drop.id));
                     let closest = active
+                        .into_iter()
                         .map(|drop| {
                             let distance = distance_meters(
                                 position.lat,
@@ -296,9 +186,9 @@ pub(super) fn AreaGameScreen(
                         })
                         .min_by(|left, right| left.1.total_cmp(&right.1));
                     if let Some((drop, distance_meters)) = closest {
-                        selected.set(Some(drop.id.to_owned()));
+                        selected.set(Some(drop.id.clone()));
                         nearest.set(Some(NearestPoint {
-                            drop_id: drop.id.to_owned(),
+                            drop_id: drop.id,
                             distance_meters,
                             accuracy_meters: position.accuracy,
                             bearing_degrees: bearing_degrees(
@@ -308,8 +198,6 @@ pub(super) fn AreaGameScreen(
                                 drop.approximate_lng,
                             ),
                         }));
-                    } else {
-                        error.set(Some(tr("no_active_area_points_now").to_owned()));
                     }
                 }
                 Err(message) => error.set(Some(message)),
@@ -379,9 +267,10 @@ pub(super) fn AreaGameScreen(
                     let claimed_count = wallet.claims.len() as u32;
                     let total = wallet.collection_size.max(1);
                     let percent = (claimed_count.saturating_mul(100) / total).min(100);
-                    let live_count = wallet.live_drops.len();
+                    let live_count = wallet.drops.iter().filter(|drop| drop.active && !drop.full).count();
                     let collection_size = wallet.collection_size;
                     let reward_credits = wallet.reward_credits;
+                    let map_drops = wallet.drops.clone();
                     view! {
                         <div class="area-hero-card compact">
                             <div><p class="eyebrow">{tr("collection_progress")}</p><h3>{format!("{claimed_count} / {collection_size}")}</h3></div>
@@ -393,41 +282,58 @@ pub(super) fn AreaGameScreen(
                         <div class="area-native-map" aria-label=tr("area_game_tab")>
                             <div class="area-map-grid" aria-hidden="true"></div>
                             <For
-                                each=move || AREA_DROPS.to_vec()
-                                key=|drop| drop.id
+                                each=move || map_drops.clone()
+                                key=|drop| drop.id.clone()
                                 children=move |drop| {
-                                    let id = drop.id;
+                                    let id = drop.id.clone();
+                                    let live_id = id.clone();
+                                    let claimed_id = id.clone();
+                                    let selected_id = id.clone();
+                                    let pressed_id = id.clone();
+                                    let click_id = id;
+                                    let aria = format!("{} {}", drop.number, drop.city);
+                                    let style = format!("left:{}%;top:{}%", drop.map_x, drop.map_y);
+                                    let number = drop.number;
                                     view! {
                                         <button
                                             type="button"
                                             class="area-native-marker"
-                                            class:is-live=move || live(area, id)
-                                            class:is-claimed=move || claimed(area, id)
-                                            class:is-selected=move || selected.get().as_deref() == Some(id)
-                                            style=format!("left:{}%;top:{}%", drop.map_x, drop.map_y)
-                                            aria-label=move || format!("{} {}", drop.number, tr(drop.city_key))
-                                            aria-pressed=move || selected.get().as_deref() == Some(id)
-                                            on:click=move |_| selected.set(Some(id.to_owned()))
+                                            class:is-live=move || live(area, &live_id)
+                                            class:is-claimed=move || claimed(area, &claimed_id)
+                                            class:is-selected=move || selected.get().as_deref() == Some(selected_id.as_str())
+                                            style=style
+                                            aria-label=aria
+                                            aria-pressed=move || selected.get().as_deref() == Some(pressed_id.as_str())
+                                            on:click=move |_| selected.set(Some(click_id.clone()))
                                         >
-                                            <span aria-hidden="true">"⌖"</span><small>{drop.number}</small>
+                                            <span aria-hidden="true">"⌖"</span><small>{number}</small>
                                         </button>
                                     }
                                 }
                             />
                         </div>
 
-                        {move || selected.get().and_then(|id| find_drop(&id)).map(|drop| {
-                            let is_live = live(area, drop.id);
-                            let is_claimed = claimed(area, drop.id);
+                        {move || selected.get().and_then(|id| find_drop(area, &id)).map(|drop| {
+                            let drop_id = drop.id.clone();
+                            let is_live = live(area, &drop_id);
+                            let is_claimed = claimed(area, &drop_id);
                             let status = if is_claimed { tr("claimed_area_point") } else if is_live { tr("active_area_point") } else { tr("inactive_area_point") };
-                            let nearest_copy = nearest.get().filter(|value| value.drop_id == drop.id);
+                            let nearest_copy = nearest.get().filter(|value| value.drop_id == drop_id);
+                            let city = drop.city.clone();
+                            let region = drop.region.clone();
+                            let number = drop.number.clone();
+                            let drop_clue = clue(&drop);
+                            let city_for_distance = city.clone();
+                            let route_drop = drop.clone();
+                            let route_id = drop_id.clone();
+                            let claim_id = drop_id;
                             view! {
                                 <article class="area-target-card" class:is-live=is_live>
-                                    <div class="area-target-heading"><span>{drop.number}</span><div><p class="eyebrow">{status}</p><h3>{tr(drop.city_key)}</h3><small>{tr(drop.region_key)}</small></div></div>
-                                    <p>{tr(drop.clue_key)}</p>
+                                    <div class="area-target-heading"><span>{number}</span><div><p class="eyebrow">{status}</p><h3>{city}</h3><small>{region}</small></div></div>
+                                    <p>{drop_clue}</p>
                                     {nearest_copy.map(|point| view! {
                                         <div class="area-distance">
-                                            <strong>{i18n::format("you_are_about_distance_from_city", &[distance_label(point.distance_meters), tr(drop.city_key).to_owned()])}</strong>
+                                            <strong>{i18n::format("you_are_about_distance_from_city", &[distance_label(point.distance_meters), city_for_distance.clone()])}</strong>
                                             <span>{direction_label(point.bearing_degrees)}</span>
                                             <small>{i18n::format("location_accuracy_value", &[format!("{:.0}", point.accuracy_meters)])}</small>
                                         </div>
@@ -436,15 +342,15 @@ pub(super) fn AreaGameScreen(
                                         <button
                                             type="button"
                                             class="ghost"
-                                            disabled=move || !live(area, drop.id)
-                                            on:click=move |_| open_route(drop, error)
+                                            disabled=move || !live(area, &route_id)
+                                            on:click=move |_| open_route(&route_drop, error)
                                         >
                                             {tr("open_route_start")}
                                         </button>
                                         <button
                                             type="button"
                                             class="primary"
-                                            disabled=move || !live(area, drop.id) || claiming.get()
+                                            disabled=move || !live(area, &claim_id) || claiming.get()
                                             on:click=verify
                                         >
                                             {move || if claiming.get() { tr("verifying_location") } else { tr("verify_location_and_win") }}
@@ -503,7 +409,7 @@ pub(super) fn AreaGameScreen(
                             <button type="button" class="ghost" on:click=move |_| open_area_game(error)>{tr("open_full_area_game")}</button>
                         </div>
                         <p class="security-note">{tr("area_location_privacy")}</p>
-                        {wallet.live_drops.is_empty().then(|| view! {
+                        {wallet.drops.iter().all(|drop| !drop.active || drop.full).then(|| view! {
                             <p class="inline-note">{tr("no_active_area_points_now")}</p>
                         })}
                     }.into_any()

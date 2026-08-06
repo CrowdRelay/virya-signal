@@ -755,6 +755,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         }
         "native_area_outside_zone" => "Jesteś poza aktywną strefą punktu AREA.",
         "native_area_drop_full" => "Limit odbiorów tego punktu został już osiągnięty.",
+        "native_area_claim_conflict" => "Ta próba została już przetworzona. Odśwież postęp AREA.",
         "native_area_temporary" => {
             "Weryfikacja AREA jest chwilowo niedostępna. Spróbuj ponownie za moment."
         }

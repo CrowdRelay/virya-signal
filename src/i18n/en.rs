@@ -751,6 +751,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "native_area_low_accuracy" => "Location accuracy is too low. Move outdoors and try again.",
         "native_area_outside_zone" => "You are outside the active AREA point zone.",
         "native_area_drop_full" => "This AREA point has reached its claim limit.",
+        "native_area_claim_conflict" => "The claim was already processed. Refresh AREA progress.",
         "native_area_temporary" => {
             "AREA verification is temporarily unavailable. Try again in a moment."
         }
