@@ -269,7 +269,16 @@ function viryaNormalizePosition(position) {
   const lat = Number(coords?.latitude);
   const lng = Number(coords?.longitude);
   const accuracy = Number(coords?.accuracy);
-  const capturedAt = Math.round(Number(position?.timestamp) || Date.now());
+  const now = Date.now();
+  const rawTimestamp = Number(position?.timestamp);
+  const epochTimestamp = Number.isFinite(rawTimestamp)
+    ? (rawTimestamp < 10_000_000_000 ? rawTimestamp * 1000 : rawTimestamp)
+    : now;
+  // Android providers may return seconds, milliseconds, a monotonic value or
+  // a stale cached timestamp. The AREA protocol needs fresh epoch millis.
+  const capturedAt = Math.round(
+    Math.abs(epochTimestamp - now) <= 5 * 60_000 ? epochTimestamp : now,
+  );
   if (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
       !Number.isFinite(lng) || lng < -180 || lng > 180 ||
       !Number.isFinite(accuracy) || accuracy < 0 || accuracy > 10000) {
