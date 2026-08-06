@@ -152,9 +152,9 @@ impl TicketSaleOffer {
             || OffsetDateTime::parse(self.sales_open_at.trim(), &Rfc3339).is_err()
             || OffsetDateTime::parse(self.sales_close_at.trim(), &Rfc3339).is_err()
         {
-            return Err(invalid_remote(
-                "Serwer zwrócił nieprawidłową ofertę biletową",
-            ));
+            return Err(invalid_remote(crate::i18n::tr(
+                "native_ticket_offer_invalid",
+            )));
         }
 
         let mut slugs = HashSet::with_capacity(self.ticket_types.len());
@@ -172,7 +172,9 @@ impl TicketSaleOffer {
                 || ticket_type.reserved < 0
                 || ticket_type.available < 0
             {
-                return Err(invalid_remote("Serwer zwrócił nieprawidłową pulę biletów"));
+                return Err(invalid_remote(crate::i18n::tr(
+                    "native_ticket_pool_invalid",
+                )));
             }
         }
         Ok(self)
@@ -184,7 +186,7 @@ impl TicketCheckoutInput {
         self.event_slug = segment(&self.event_slug)?;
         if self.event_slug.len() > 128 {
             return Err(AppError::InvalidInput(
-                "Nieprawidłowy identyfikator koncertu".into(),
+                crate::i18n::tr("native_event_id_invalid").into(),
             ));
         }
         self.buyer_name = clean_optional(self.buyer_name.take());
@@ -194,11 +196,13 @@ impl TicketCheckoutInput {
             .is_some_and(|name| name.chars().count() > 160 || name.chars().any(char::is_control))
         {
             return Err(AppError::InvalidInput(
-                "Imię i nazwisko jest zbyt długie".into(),
+                crate::i18n::tr("native_buyer_name_too_long").into(),
             ));
         }
         if self.items.is_empty() || self.items.len() > MAX_CHECKOUT_LINES {
-            return Err(AppError::InvalidInput("Wybierz bilety".into()));
+            return Err(AppError::InvalidInput(
+                crate::i18n::tr("native_choose_tickets").into(),
+            ));
         }
 
         let mut seen = HashSet::with_capacity(self.items.len());
@@ -210,11 +214,15 @@ impl TicketCheckoutInput {
                 || item.quantity > MAX_CHECKOUT_QUANTITY
                 || !seen.insert(item.ticket_type_slug.clone())
             {
-                return Err(AppError::InvalidInput("Nieprawidłowy wybór biletów".into()));
+                return Err(AppError::InvalidInput(
+                    crate::i18n::tr("native_ticket_selection_invalid").into(),
+                ));
             }
             total = total.saturating_add(item.quantity);
             if total > MAX_CHECKOUT_QUANTITY {
-                return Err(AppError::InvalidInput("Wybrano zbyt wiele biletów".into()));
+                return Err(AppError::InvalidInput(
+                    crate::i18n::tr("native_too_many_tickets").into(),
+                ));
             }
         }
         Ok(())
@@ -229,16 +237,16 @@ impl TicketCheckoutStart {
             || url.username() != ""
             || url.password().is_some()
         {
-            return Err(invalid_remote(
-                "Serwer zwrócił nieprawidłowy adres płatności",
-            ));
+            return Err(invalid_remote(crate::i18n::tr(
+                "native_payment_url_invalid",
+            )));
         }
         let order_id = Uuid::parse_str(value.order_id.trim())
             .map(|id| id.to_string())
-            .map_err(|_| invalid_remote("Serwer zwrócił nieprawidłowe zamówienie"))?;
+            .map_err(|_| invalid_remote(crate::i18n::tr("native_order_invalid")))?;
         let checkout_token = bounded_required(
             value.checkout_token.as_str(),
-            "token zamówienia",
+            crate::i18n::tr("native_order_token_label"),
             MAX_TOKEN_BYTES,
         )?;
         if checkout_token.len() != 64
@@ -247,7 +255,7 @@ impl TicketCheckoutStart {
             || value.expires_at.len() > 80
             || OffsetDateTime::parse(value.expires_at.trim(), &Rfc3339).is_err()
         {
-            return Err(invalid_remote("Serwer zwrócił niepełne dane zamówienia"));
+            return Err(invalid_remote(crate::i18n::tr("native_order_incomplete")));
         }
         Ok(Self {
             url: url.to_string(),
@@ -293,7 +301,7 @@ impl CrowdRelayClient {
                 event_slug: input.event_slug.as_str(),
                 buyer_email: profile.email.trim(),
                 buyer_name: input.buyer_name.as_deref(),
-                lang: "pl",
+                lang: crate::i18n::current().code(),
                 checkout_request_id: Uuid::new_v4().to_string(),
                 invoice_requested: false,
                 items: &input.items,

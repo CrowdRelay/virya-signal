@@ -82,9 +82,13 @@ impl super::CrowdRelayClient {
         code: &str,
         order_reference: &str,
     ) -> Result<serde_json::Value, AppError> {
-        let code = super::http::bounded_required(code, "kod kuponu", 128)?;
-        let order_reference =
-            super::http::bounded_required(order_reference, "numer sprzedaży", 200)?;
+        let code =
+            super::http::bounded_required(code, crate::i18n::tr("native_coupon_code_label"), 128)?;
+        let order_reference = super::http::bounded_required(
+            order_reference,
+            crate::i18n::tr("native_sale_number_label"),
+            200,
+        )?;
         let body = serde_json::json!({"code": code.to_ascii_uppercase(), "order_reference": order_reference});
         self.auth_json(profile, Method::POST, "staff/coupons/redeem", Some(&body))
             .await
@@ -266,7 +270,11 @@ impl super::CrowdRelayClient {
         require_owner(profile)?;
         let target_kind = match target_kind {
             "outbox" | "deliveries" => target_kind,
-            _ => return Err(AppError::InvalidInput("Nieprawidłowy typ kolejki".into())),
+            _ => {
+                return Err(AppError::InvalidInput(
+                    crate::i18n::tr("native_queue_type_invalid").into(),
+                ));
+            }
         };
         let target_id = uuid_segment(target_id)?;
         self.auth_json::<OpsRetryResult, ()>(

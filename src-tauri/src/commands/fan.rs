@@ -155,7 +155,9 @@ pub(crate) async fn fan_request_access(
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
     {
-        return Err(AppError::InvalidInput("Podaj poprawny e-mail".into()));
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_enter_valid_email").into(),
+        ));
     }
     state
         .api
@@ -218,8 +220,9 @@ pub(crate) async fn fan_start_ticket_checkout(
     let _mutation = state.fan_mutation.lock().await;
     let mut profile = fan_profile(&state).await?.as_ref().clone();
     if profile.wallets.len() >= MAX_WALLETS {
-        return Err(AppError::InvalidInput(format!(
-            "Portfel może zawierać maksymalnie {MAX_WALLETS} zamówienia"
+        return Err(AppError::InvalidInput(crate::i18n::replace(
+            "native_wallet_limit",
+            &[("max", MAX_WALLETS.to_string())],
         )));
     }
 
@@ -285,7 +288,7 @@ pub(crate) async fn fan_claim_pass(
     claim_token: String,
 ) -> Result<AdmissionPass, AppError> {
     let _mutation = state.fan_mutation.lock().await;
-    let claim_token = bounded_secret(claim_token, "token wejściówki")?;
+    let claim_token = bounded_secret(claim_token, crate::i18n::tr("native_admission_token_label"))?;
     let mut profile = fan_profile(&state).await?.as_ref().clone();
     let (pass, pass_session_token) = state.api.claim_pass(&profile, claim_token.as_str()).await?;
     profile.pass_session_token = Some(pass_session_token);
@@ -317,16 +320,18 @@ pub(crate) async fn fan_import_wallet(
     let _mutation = state.fan_mutation.lock().await;
     let order_id = uuid::Uuid::parse_str(order_id.trim())
         .map(|value| value.to_string())
-        .map_err(|_| AppError::InvalidInput("Nieprawidłowy identyfikator zamówienia".into()))?;
-    let checkout_token = bounded_secret(checkout_token, "token zamówienia")?;
+        .map_err(|_| AppError::InvalidInput(crate::i18n::tr("native_invalid_order_id").into()))?;
+    let checkout_token =
+        bounded_secret(checkout_token, crate::i18n::tr("native_order_token_label"))?;
     let mut profile = fan_profile(&state).await?.as_ref().clone();
     let already_imported = profile
         .wallets
         .iter()
         .any(|wallet| wallet.order_id == order_id);
     if !already_imported && profile.wallets.len() >= MAX_WALLETS {
-        return Err(AppError::InvalidInput(format!(
-            "Portfel może zawierać maksymalnie {MAX_WALLETS} zamówienia"
+        return Err(AppError::InvalidInput(crate::i18n::replace(
+            "native_wallet_limit",
+            &[("max", MAX_WALLETS.to_string())],
         )));
     }
     let wallet = state
@@ -335,7 +340,7 @@ pub(crate) async fn fan_import_wallet(
         .await?;
     if wallet.order.order_id != order_id {
         return Err(AppError::InvalidInput(
-            "Backend zwrócił portfel innego zamówienia".into(),
+            crate::i18n::tr("native_wrong_order_wallet").into(),
         ));
     }
     let (wallet, wallet_tokens) = prepare_wallet(wallet);
@@ -368,7 +373,7 @@ pub(crate) async fn fan_wallets(state: State<'_, AppState>) -> Result<WalletBatc
                 .await?;
             if value.order.order_id != wallet.order_id {
                 return Err(AppError::InvalidInput(
-                    "Backend zwrócił portfel innego zamówienia".into(),
+                    crate::i18n::tr("native_wrong_order_wallet").into(),
                 ));
             }
             Ok(value)
@@ -418,11 +423,11 @@ pub(crate) async fn render_wallet_qr(
 ) -> Result<String, AppError> {
     let order_id = uuid::Uuid::parse_str(order_id.trim())
         .map(|value| value.to_string())
-        .map_err(|_| AppError::InvalidInput("Nieprawidłowy identyfikator zamówienia".into()))?;
+        .map_err(|_| AppError::InvalidInput(crate::i18n::tr("native_invalid_order_id").into()))?;
     let public_reference = public_reference.trim();
     if public_reference.is_empty() || public_reference.len() > 200 {
         return Err(AppError::InvalidInput(
-            "Nieprawidłowa referencja biletu".into(),
+            crate::i18n::tr("native_ticket_reference_invalid").into(),
         ));
     }
     let token = state
@@ -476,13 +481,15 @@ pub(crate) async fn fan_request_delivery(
 ) -> Result<serde_json::Value, AppError> {
     let order_id = uuid::Uuid::parse_str(order_id.trim())
         .map(|value| value.to_string())
-        .map_err(|_| AppError::InvalidInput("Nieprawidłowy identyfikator zamówienia".into()))?;
+        .map_err(|_| AppError::InvalidInput(crate::i18n::tr("native_invalid_order_id").into()))?;
     let profile = fan_profile(&state).await?;
     let wallet = profile
         .wallets
         .iter()
         .find(|wallet| wallet.order_id == order_id)
-        .ok_or_else(|| AppError::InvalidInput("Nie znaleziono biletu na urządzeniu".into()))?;
+        .ok_or_else(|| {
+            AppError::InvalidInput(crate::i18n::tr("native_ticket_not_on_device").into())
+        })?;
     state
         .api
         .request_ticket_delivery(
@@ -497,7 +504,7 @@ fn attach_single_qr(value: &mut serde_json::Value) -> Result<(), AppError> {
     let token = value
         .get("token")
         .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| AppError::InvalidInput("Brak tokenu QR w odpowiedzi backendu".into()))?;
+        .ok_or_else(|| AppError::InvalidInput(crate::i18n::tr("native_qr_token_missing").into()))?;
     let svg = render_qr(token)?;
     value["qr_svg"] = serde_json::Value::String(svg);
     Ok(())
@@ -505,10 +512,13 @@ fn attach_single_qr(value: &mut serde_json::Value) -> Result<(), AppError> {
 
 fn render_qr(token: &str) -> Result<String, AppError> {
     if token.is_empty() || token.len() > MAX_SECRET_BYTES {
-        return Err(AppError::InvalidInput("Nieprawidłowy token QR".into()));
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_qr_token_invalid").into(),
+        ));
     }
-    let code = QrCode::new(token.as_bytes())
-        .map_err(|_| AppError::InvalidInput("Nie udało się wygenerować kodu QR".into()))?;
+    let code = QrCode::new(token.as_bytes()).map_err(|_| {
+        AppError::InvalidInput(crate::i18n::tr("native_qr_generation_failed").into())
+    })?;
     let rendered = code
         .render::<svg::Color>()
         .min_dimensions(320, 320)
@@ -518,13 +528,13 @@ fn render_qr(token: &str) -> Result<String, AppError> {
 
     // qrcode's SVG renderer prepends an XML declaration. The webview contract
     // expects a standalone <svg> fragment suitable for direct DOM insertion.
-    let start = rendered
-        .find("<svg")
-        .ok_or_else(|| AppError::InvalidInput("Nie udało się wygenerować kodu QR".into()))?;
+    let start = rendered.find("<svg").ok_or_else(|| {
+        AppError::InvalidInput(crate::i18n::tr("native_qr_generation_failed").into())
+    })?;
     let svg = rendered[start..].trim();
     if !svg.ends_with("</svg>") {
         return Err(AppError::InvalidInput(
-            "Nie udało się wygenerować kodu QR".into(),
+            crate::i18n::tr("native_qr_generation_failed").into(),
         ));
     }
     Ok(svg.to_owned())

@@ -414,7 +414,9 @@ fn ensure_pin(pin: &str) -> Result<(), AppError> {
     if (4..=128).contains(&pin.chars().count()) {
         Ok(())
     } else {
-        Err(AppError::InvalidInput("PIN musi mieć 4–128 znaków".into()))
+        Err(AppError::InvalidInput(
+            crate::i18n::tr("native_pin_4_128").into(),
+        ))
     }
 }
 
@@ -434,13 +436,13 @@ fn load_or_create_salt(path: &Path) -> Result<[u8; SALT_BYTES], AppError> {
 fn read_salt(path: &Path) -> Result<[u8; SALT_BYTES], AppError> {
     if std::fs::metadata(path)?.len() != SALT_BYTES as u64 {
         return Err(AppError::InvalidInput(
-            "Uszkodzony profil urządzenia".into(),
+            crate::i18n::tr("native_damaged_device_profile").into(),
         ));
     }
     let bytes = std::fs::read(path)?;
-    bytes
-        .try_into()
-        .map_err(|_| AppError::InvalidInput("Uszkodzony profil urządzenia".into()))
+    bytes.try_into().map_err(|_| {
+        AppError::InvalidInput(crate::i18n::tr("native_damaged_device_profile").into())
+    })
 }
 
 fn password(pin: &str, salt: &[u8; SALT_BYTES]) -> Result<Vec<u8>, AppError> {

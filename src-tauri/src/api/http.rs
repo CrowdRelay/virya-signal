@@ -17,7 +17,7 @@ pub(super) async fn decode<T: DeserializeOwned>(mut response: Response) -> Resul
     if content_length.is_some_and(|length| length > MAX_RESPONSE_BYTES) {
         return Err(AppError::Remote {
             status: status.as_u16(),
-            detail: "Odpowiedź CrowdRelay jest zbyt duża".into(),
+            detail: crate::i18n::tr("native_response_too_large").into(),
         });
     }
     let initial_capacity = content_length.value_or(0).min(MAX_RESPONSE_BYTES) as usize;
@@ -26,7 +26,7 @@ pub(super) async fn decode<T: DeserializeOwned>(mut response: Response) -> Resul
         if bytes.len().saturating_add(chunk.len()) > MAX_RESPONSE_BYTES as usize {
             return Err(AppError::Remote {
                 status: status.as_u16(),
-                detail: "Odpowiedź CrowdRelay jest zbyt duża".into(),
+                detail: crate::i18n::tr("native_response_too_large").into(),
             });
         }
         bytes.extend_from_slice(&chunk);
@@ -81,7 +81,7 @@ fn remote_detail(body: &serde_json::Value) -> String {
             }
         }
     }
-    "CrowdRelay odrzucił operację".into()
+    crate::i18n::tr("native_operation_rejected").into()
 }
 
 pub(super) fn endpoint(base: &str, path: &str) -> Result<Url, AppError> {
@@ -90,7 +90,7 @@ pub(super) fn endpoint(base: &str, path: &str) -> Result<Url, AppError> {
         base.scheme() == "https" || (cfg!(debug_assertions) && base.scheme() == "http");
     if !allowed_scheme {
         return Err(AppError::InvalidInput(
-            "Produkcyjny API URL musi używać HTTPS".into(),
+            crate::i18n::tr("native_production_api_https").into(),
         ));
     }
     if base.host_str().is_none()
@@ -100,7 +100,7 @@ pub(super) fn endpoint(base: &str, path: &str) -> Result<Url, AppError> {
         || base.fragment().is_some()
     {
         return Err(AppError::InvalidInput(
-            "Nieprawidłowy bazowy URL API".into(),
+            crate::i18n::tr("native_invalid_api_base_url").into(),
         ));
     }
     if !base.path().ends_with('/') {
@@ -117,7 +117,9 @@ pub(super) fn segment(value: &str) -> Result<String, AppError> {
             .chars()
             .all(|character| character.is_ascii_alphanumeric() || matches!(character, '-' | '_'))
     {
-        return Err(AppError::InvalidInput("Nieprawidłowy identyfikator".into()));
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_invalid_identifier").into(),
+        ));
     }
     Ok(value.to_owned())
 }
@@ -125,25 +127,35 @@ pub(super) fn segment(value: &str) -> Result<String, AppError> {
 pub(super) fn uuid_segment(value: &str) -> Result<String, AppError> {
     Uuid::parse_str(value.trim())
         .map(|value| value.to_string())
-        .map_err(|_| AppError::InvalidInput("Nieprawidłowy identyfikator zamówienia".into()))
+        .map_err(|_| AppError::InvalidInput(crate::i18n::tr("native_invalid_order_id").into()))
 }
 
 pub(super) fn normalize_scanned_code(value: &str) -> Result<String, AppError> {
     let trimmed = value.trim();
     if trimmed.is_empty() || trimmed.len() > MAX_TOKEN_BYTES {
-        return Err(AppError::InvalidInput("Nieprawidłowy kod QR".into()));
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_invalid_qr_code").into(),
+        ));
     }
     if let Ok(url) = Url::parse(trimmed) {
         if let Some((_, token)) = url.query_pairs().find(|(name, _)| name == "token") {
-            return bounded_required(token.as_ref(), "token QR", MAX_TOKEN_BYTES)
-                .map(ToOwned::to_owned);
+            return bounded_required(
+                token.as_ref(),
+                crate::i18n::tr("native_qr_token_label"),
+                MAX_TOKEN_BYTES,
+            )
+            .map(ToOwned::to_owned);
         }
         if let Some(fragment) = url.fragment()
             && let Some((_, token)) =
                 url::form_urlencoded::parse(fragment.as_bytes()).find(|(name, _)| name == "token")
         {
-            return bounded_required(token.as_ref(), "token QR", MAX_TOKEN_BYTES)
-                .map(ToOwned::to_owned);
+            return bounded_required(
+                token.as_ref(),
+                crate::i18n::tr("native_qr_token_label"),
+                MAX_TOKEN_BYTES,
+            )
+            .map(ToOwned::to_owned);
         }
     }
     Ok(trimmed.to_owned())
@@ -169,7 +181,10 @@ pub(super) fn bounded_required<'a>(
 ) -> Result<&'a str, AppError> {
     let value = value.trim();
     if value.is_empty() || value.len() > max {
-        Err(AppError::InvalidInput(format!("Nieprawidłowy {label}")))
+        Err(AppError::InvalidInput(crate::i18n::replace(
+            "native_invalid_label",
+            &[("label", label.to_owned())],
+        )))
     } else {
         Ok(value)
     }

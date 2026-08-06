@@ -22,19 +22,21 @@
       @media(prefers-reduced-motion:reduce){.boot-signal i{animation:none}}
     </style>
     <link data-trunk rel="css" href="styles.css" />
+    <link data-trunk rel="copy-file" href="boot-i18n.js" />
     <link data-trunk rel="copy-file" href="boot.js" />
     <!-- Must execute before Trunk's WASM module so the ready event cannot race the listener. -->
-    <script src="boot.js?v=0.4.2-startup-v7"></script>
+    <script src="boot-i18n.js?v=0.4.2-i18n-v1"></script>
+    <script src="boot.js?v=0.4.2-startup-v8"></script>
     <link data-trunk rel="rust" data-initializer="boot-initializer.mjs" data-wasm-opt="z" data-wasm-opt-params="--enable-bulk-memory --enable-bulk-memory-opt --enable-nontrapping-float-to-int" />
   </head>
   <body>
     <section id="boot-splash" role="status" aria-live="polite">
       <div class="boot-signal" aria-hidden="true"><i></i><i></i><i></i></div>
         <strong>VIRYA <span>SIGNAL</span></strong>
-      <p id="boot-status">URUCHAMIAMY SYGNAŁ</p>
+      <p id="boot-status"></p>
       <p id="boot-detail" hidden></p>
-      <button id="boot-retry" type="button" hidden>PONÓW START</button>
+      <button id="boot-retry" type="button" hidden></button>
     </section>
-    <noscript>Virya Signal wymaga JavaScript/WASM.</noscript>
+    <noscript>Virya Signal requires JavaScript/WASM.</noscript>
   </body>
 </html>

@@ -2,6 +2,7 @@
 
 mod app;
 mod bridge;
+mod i18n;
 mod models;
 mod util;
 
@@ -69,6 +70,7 @@ fn virya_app_mounted() {
 
 fn main() {
     console_error_panic_hook::set_once();
+    i18n::initialize();
     bridge::install_runtime_guards();
     virya_boot_phase("wasm-entered");
     mount_to_body(|| view! { <App /> });

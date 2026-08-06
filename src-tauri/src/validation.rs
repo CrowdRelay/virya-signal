@@ -19,12 +19,12 @@ pub(crate) fn validate_operator_profile(profile: &mut OperatorProfile) -> Result
     profile.bearer_token = profile.bearer_token.trim().to_owned();
     if profile.display_name.is_empty() || profile.display_name.chars().count() > 80 {
         return Err(AppError::InvalidInput(
-            "Nieprawidłowa nazwa urządzenia".into(),
+            crate::i18n::tr("native_invalid_device_name").into(),
         ));
     }
     if profile.bearer_token.len() < 24 || profile.bearer_token.len() > 512 {
         return Err(AppError::InvalidInput(
-            "Nieprawidłowy token urządzenia".into(),
+            crate::i18n::tr("native_invalid_device_token").into(),
         ));
     }
     validate_api_base(&profile.api_base_url)
@@ -57,7 +57,7 @@ pub(crate) fn validate_fan_signup(input: &mut FanSignupInput, pin: &str) -> Resu
             .is_some_and(|value| value.len() > 128)
     {
         return Err(AppError::InvalidInput(
-            "Uzupełnij poprawnie dane fana".into(),
+            crate::i18n::tr("native_complete_fan_data").into(),
         ));
     }
     Ok(())
@@ -102,9 +102,8 @@ pub(crate) fn validate_fan_confirmation(
     validate_pin(pin)?;
     input.api_base_url = input.api_base_url.trim().to_owned();
     input.email = input.email.trim().to_ascii_lowercase();
-    input.token = normalized_fan_confirmation_token(&input.token).ok_or_else(|| {
-        AppError::InvalidInput("Wklej prawidłowy kod, link albo zeskanuj QR".into())
-    })?;
+    input.token = normalized_fan_confirmation_token(&input.token)
+        .ok_or_else(|| AppError::InvalidInput(crate::i18n::tr("native_paste_valid_code").into()))?;
     input.display_name = clean_optional(input.display_name.take());
     validate_api_base(&input.api_base_url)?;
     if !valid_email(&input.email)
@@ -114,7 +113,7 @@ pub(crate) fn validate_fan_confirmation(
             .is_some_and(|value| value.chars().count() > 100)
     {
         return Err(AppError::InvalidInput(
-            "Nieprawidłowy e-mail lub token".into(),
+            crate::i18n::tr("native_invalid_email_or_token").into(),
         ));
     }
     Ok(())
@@ -130,7 +129,7 @@ pub(crate) fn validate_issue_pass(input: &mut IssuePassInput) -> Result<(), AppE
         || !(1..=720).contains(&input.claim_expires_hours)
     {
         return Err(AppError::InvalidInput(
-            "Nieprawidłowe dane wejściówki".into(),
+            crate::i18n::tr("native_invalid_pass_data").into(),
         ));
     }
     Ok(())
@@ -150,7 +149,7 @@ pub(crate) fn validate_campaign(input: &mut CreateQrCampaignInput) -> Result<(),
         || input.max_checkins == Some(0)
     {
         return Err(AppError::InvalidInput(
-            "Nieprawidłowe dane kampanii QR".into(),
+            crate::i18n::tr("native_invalid_qr_campaign_data").into(),
         ));
     }
     Ok(())
@@ -164,7 +163,7 @@ pub(crate) fn validate_new_operator_pin(pin: &str) -> Result<(), AppError> {
         Ok(())
     } else {
         Err(AppError::InvalidInput(
-            "PIN operatora musi mieć 4–6 cyfr".into(),
+            crate::i18n::tr("native_operator_pin_4_6").into(),
         ))
     }
 }
@@ -174,7 +173,7 @@ pub(crate) fn validate_pin(pin: &str) -> Result<(), AppError> {
         Ok(())
     } else {
         Err(AppError::InvalidInput(
-            "PIN musi mieć co najmniej 4 znaki".into(),
+            crate::i18n::tr("native_pin_min_4").into(),
         ))
     }
 }
@@ -184,7 +183,9 @@ pub(crate) fn validate_api_base(value: &str) -> Result<(), AppError> {
     let allowed_scheme =
         parsed.scheme() == "https" || (cfg!(debug_assertions) && parsed.scheme() == "http");
     if !allowed_scheme {
-        return Err(AppError::InvalidInput("API musi używać HTTPS".into()));
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_api_must_use_https").into(),
+        ));
     }
     if parsed.host_str().is_none()
         || parsed.username() != ""
@@ -193,7 +194,7 @@ pub(crate) fn validate_api_base(value: &str) -> Result<(), AppError> {
         || parsed.fragment().is_some()
     {
         return Err(AppError::InvalidInput(
-            "Nieprawidłowy bazowy URL API".into(),
+            crate::i18n::tr("native_invalid_api_base_url").into(),
         ));
     }
     Ok(())
@@ -232,7 +233,10 @@ pub(crate) fn valid_slug(value: &str) -> bool {
 pub(crate) fn bounded_secret(value: String, label: &str) -> Result<Zeroizing<String>, AppError> {
     let value = Zeroizing::new(value.trim().to_owned());
     if value.is_empty() || value.len() > MAX_SECRET_BYTES {
-        Err(AppError::InvalidInput(format!("Nieprawidłowy {label}")))
+        Err(AppError::InvalidInput(crate::i18n::replace(
+            "native_invalid_label",
+            &[("label", label.to_owned())],
+        )))
     } else {
         Ok(value)
     }

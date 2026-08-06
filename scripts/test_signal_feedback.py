@@ -10,7 +10,7 @@ class SignalFeedbackContracts(unittest.TestCase):
         ui = (ROOT / "src/app/mod.rs").read_text()
         native = (ROOT / "src-tauri/src/api/site.rs").read_text()
         commands = (ROOT / "src-tauri/src/commands/misc.rs").read_text()
-        self.assertIn("ANONIMOWY FEEDBACK", ui)
+        self.assertIn('anonimowy_feedback', ui)
         self.assertIn("submit_anonymous_feedback", ui)
         self.assertIn("SignalFeedbackRequest", native)
         self.assertIn("submission_id: Uuid::new_v4()", native)

@@ -4,6 +4,8 @@ import json
 import os
 import re
 
+from i18n_catalog import load_catalog_pair
+
 try:
     if os.environ.get('VIRYA_FORCE_TOML_FALLBACK'):
         raise ModuleNotFoundError
@@ -50,8 +52,8 @@ required = [
     'src-tauri/src/lib.rs', 'src-tauri/src/api/mod.rs', 'src-tauri/src/api/ticketing.rs', 'src-tauri/src/vault.rs',
     'src/app/mod.rs', 'src/bridge.rs', 'src-tauri/capabilities/mobile.json',
     '.github/workflows/check.yml', '.github/workflows/mobile-smoke.yml',
-    'rust-toolchain.toml', '.cargo/config.toml', 'scripts/collect-mobile-artifact.py', 'boot.js',
-    'boot-initializer.mjs',
+    'rust-toolchain.toml', '.cargo/config.toml', 'scripts/collect-mobile-artifact.py', 'boot.js', 'boot-i18n.js',
+    'boot-initializer.mjs', 'scripts/generate-boot-i18n.py',
     'scripts/test-boot.mjs', 'scripts/check-web-dist.py',
     'scripts/configure-android-signing.py',
     'scripts/analyze-android-package.py',
@@ -73,6 +75,57 @@ api = '\n'.join(
     for path in sorted((root / 'src-tauri/src/api').rglob('*.rs'))
 )
 bridge = (root / 'src/bridge.rs').read_text()
+boot = (root / 'boot.js').read_text()
+index = (root / 'index.html').read_text()
+pl_catalog, en_catalog = load_catalog_pair(root)
+i18n_keys = set(pl_catalog)
+i18n_source_paths = [
+    *source_files('*.rs'),
+    root / 'boot.js',
+]
+i18n_sources = '\n'.join(
+    path.read_text(encoding='utf-8')
+    for path in i18n_source_paths
+    if 'src/i18n/pl.rs' not in path.as_posix()
+    and 'src/i18n/en.rs' not in path.as_posix()
+)
+used_i18n_keys = set(re.findall(r'(?<![A-Za-z0-9_])tr\("([^"]+)"\)', i18n_sources))
+used_i18n_keys.update(re.findall(r'i18n::(?:format|replace)\("([^"]+)"', i18n_sources))
+used_i18n_keys.update(re.findall(r'text\("([^"]+)"', boot))
+missing_i18n_keys = used_i18n_keys - i18n_keys
+if missing_i18n_keys:
+    raise SystemExit(f'code references missing i18n keys: {sorted(missing_i18n_keys)}')
+placeholder = re.compile(r'\{([A-Za-z0-9_]+)\}')
+for key in i18n_keys:
+    if set(placeholder.findall(pl_catalog[key])) != set(placeholder.findall(en_catalog[key])):
+        raise SystemExit(f'i18n placeholder mismatch for {key}')
+for required_i18n_file in (
+    'src/i18n/mod.rs', 'src/i18n/pl.rs', 'src/i18n/en.rs',
+    'src-tauri/src/i18n/mod.rs', 'scripts/i18n_catalog.py',
+):
+    if not (root / required_i18n_file).is_file():
+        raise SystemExit(f'missing {required_i18n_file}')
+if 'virya:language:v1' not in (root / 'src/i18n/mod.rs').read_text():
+    raise SystemExit('language preference must be persisted locally')
+if '<LanguageSwitch />' not in ui or ui.count('<LanguageSwitch />') < 2:
+    raise SystemExit('language switch must be available in fan and staff settings')
+if 'locale: i18n::current().code()' not in ui and 'locale: i18n::current().code().to_owned()' not in ui:
+    raise SystemExit('fan API locale must follow the selected language')
+if re.search(r'[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]', ui):
+    raise SystemExit('Polish UI copy must live in the i18n catalog, not src/app/mod.rs')
+if re.search(r'[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]', bridge + boot + index):
+    raise SystemExit('runtime WebView and boot copy must live in the i18n catalogs')
+for native_path in sorted((root / 'src-tauri/src').rglob('*.rs')):
+    runtime_native = native_path.read_text(encoding='utf-8').split('#[cfg(test)]', 1)[0]
+    if re.search(r'[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]', runtime_native):
+        raise SystemExit(
+            f'Polish native runtime copy must live in i18n: {native_path.relative_to(root)}'
+        )
+native_i18n = (root / 'src-tauri/src/i18n/mod.rs').read_text()
+if '../../../src/i18n/pl.rs' not in native_i18n or '../../../src/i18n/en.rs' not in native_i18n:
+    raise SystemExit('native and WASM must compile the same PL/EN catalogs')
+if 'locale: i18n::current().code()' not in bridge or 'i18n::set_language(&locale)' not in (root / 'src-tauri/src/commands/misc.rs').read_text():
+    raise SystemExit('selected locale must cross the first launcher IPC into native code')
 invoked = set(re.findall(
     r'bridge::invoke(?:_timeout|_latest)?(?:::<.*?>)?\(\s*"([a-z_]+)"', ui, re.S
 ))
@@ -103,13 +156,13 @@ for contract in (
     'FanTicketSale',
     'fan_ticket_sale',
     'fan_start_ticket_checkout',
-    'PRZEJDŹ DO PŁATNOŚCI STRIPE',
-    'OTWÓRZ PŁATNOŚĆ PONOWNIE',
-    '<FanNavButton tab=tab own=FanTab::Merch icon="shop" label="Sklep"/>',
-    'KUP W SKLEPIE ↗',
+    'przejdz_do_patnosci_stripe',
+    'otworz_patnosc_ponownie',
+    '<FanNavButton tab=tab own=FanTab::Merch icon="shop" label=tr("sklep")/>',
+    'kup_w_sklepie',
     'fan_merch_bundles',
     'submit_anonymous_feedback',
-    'ANONIMOWY FEEDBACK',
+    'anonimowy_feedback',
 ):
     if contract not in ui:
         raise SystemExit(f'fan commerce UX contract is missing: {contract}')
@@ -137,8 +190,8 @@ if 'Zeroizing::new(response.checkout_token)' not in native_fan:
 for contract in (
     'fn new_operator_pin_is_valid',
     '(4..=6).contains(&pin.len())',
-    'Utwórz PIN do odblokowania',
-    'PIN tylko do Virya Signal',
+    'utworz_pin_do_odblokowania',
+    'wpisz_46_cyfr_np_2580_to_pin_tylko',
     'inputmode="numeric"',
     'vault::save_verified',
 ):
@@ -153,7 +206,7 @@ if 'validate_new_operator_pin(&pin)?;' not in operator_command:
     raise SystemExit('new staff PINs must use the 4–6 digit native validator')
 if 'operator_pin_survives_a_fresh_vault_round_trip' not in vault:
     raise SystemExit('staff PIN persistence regression test is missing')
-if 'PIN operatora musi mieć 4–6 cyfr' not in validation:
+if 'native_operator_pin_4_6' not in validation:
     raise SystemExit('native staff PIN validation contract is missing')
 
 operator_nav = ui[ui.find('<nav class="overflow-menu">'):ui.find('<div class="content">')]
@@ -161,7 +214,7 @@ if 'OperatorTab::Signal' in operator_nav:
     raise SystemExit('staff Signal must live in the bottom navigation, not the overflow menu')
 for contract in (
     '<nav class="bottom-nav four primary-four">',
-    '<NavButton tab=tab own=OperatorTab::Signal icon="signal" label="Sygnał" />',
+    '<NavButton tab=tab own=OperatorTab::Signal icon="signal" label=tr("sygna_2") />',
 ):
     if contract not in ui:
         raise SystemExit(f'staff four-tab navigation contract is missing: {contract}')
@@ -186,7 +239,10 @@ if 'class="boot-signal"' not in index or '@keyframes boot-pulse' not in index:
     raise SystemExit('Virya Signal splash LED is missing or not animated')
 if '<script src="boot.js" defer>' in index:
     raise SystemExit('boot listener must execute before the deferred WASM module')
-boot_tag = '<script src="boot.js?v=0.4.2-startup-v7"></script>'
+boot_i18n_tag = '<script src="boot-i18n.js?v=0.4.2-i18n-v1"></script>'
+boot_tag = '<script src="boot.js?v=0.4.2-startup-v8"></script>'
+if boot_i18n_tag not in index or index.find(boot_i18n_tag) > index.find(boot_tag):
+    raise SystemExit('boot translations must load before the boot listener')
 if boot_tag not in index or index.find(boot_tag) > index.find('data-trunk rel="rust"'):
     raise SystemExit('boot listener must be declared before the WASM entrypoint')
 for contract in ['window.__VIRYA_BOOT__', 'data-virya-ready', '.app-shell .launcher', 'unhandledrejection', 'retry-blocked']:
@@ -238,7 +294,7 @@ for contract in (
     'RwSignal::new(RootMode::Fan)',
     'RootMode::StaffGate',
     'verify_staff_access',
-    'JESTEŚ W STAFFIE?',
+    'jestes_w_staffie',
     '<NavGlyph icon=icon/>',
     '<StatusFailure',
     'status_failed=fan_status_failed',

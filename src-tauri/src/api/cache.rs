@@ -133,7 +133,7 @@ pub(super) fn load_public_cache(path: &Path) -> Result<PublicCache, AppError> {
     let metadata = std::fs::metadata(path)?;
     if metadata.len() > MAX_DISK_CACHE_BYTES {
         return Err(AppError::InvalidInput(
-            "Lokalny cache danych publicznych jest zbyt duży".into(),
+            crate::i18n::tr("native_public_cache_too_large").into(),
         ));
     }
     let disk: DiskPublicCache = serde_json::from_slice(&std::fs::read(path)?)?;

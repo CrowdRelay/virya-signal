@@ -2,10 +2,11 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import vm from "node:vm";
 
+const i18nSource = fs.readFileSync(new URL("../boot-i18n.js", import.meta.url), "utf8");
 const source = fs.readFileSync(new URL("../boot.js", import.meta.url), "utf8");
 const initializer = fs.readFileSync(new URL("../boot-initializer.mjs", import.meta.url), "utf8");
 
-function runtime({ ready = false, mounted = false, retryCount = 0 } = {}) {
+function runtime({ ready = false, mounted = false, retryCount = 0, language = "pl" } = {}) {
   let now = 0;
   let nextTimer = 1;
   let observerCallback;
@@ -13,6 +14,7 @@ function runtime({ ready = false, mounted = false, retryCount = 0 } = {}) {
   const timers = new Map();
   const windowListeners = new Map();
   const storage = new Map(retryCount ? [["virya-signal-boot-retry-v1", String(retryCount)]] : []);
+  const localStorage = new Map([["virya:language:v1", language]]);
   const attributes = new Map(ready ? [["data-virya-ready", "true"]] : []);
   const splash = {
     hidden: false,
@@ -24,7 +26,7 @@ function runtime({ ready = false, mounted = false, retryCount = 0 } = {}) {
       this.removed = true;
     },
   };
-  const status = { textContent: "URUCHAMIAMY SYGNAŁ" };
+  const status = { textContent: "" };
   const detail = { textContent: "", hidden: true };
   const retry = {
     hidden: true,
@@ -56,6 +58,11 @@ function runtime({ ready = false, mounted = false, retryCount = 0 } = {}) {
   const window = {
     console: { info() {} },
     location: { reload() { reloads += 1; } },
+    localStorage: {
+      getItem: (key) => localStorage.get(key) ?? null,
+      setItem: (key, value) => localStorage.set(key, value),
+      removeItem: (key) => localStorage.delete(key),
+    },
     sessionStorage: {
       getItem: (key) => storage.get(key) ?? null,
       setItem: (key, value) => storage.set(key, value),
@@ -93,7 +100,9 @@ function runtime({ ready = false, mounted = false, retryCount = 0 } = {}) {
     }
   }
 
-  vm.runInNewContext(source, { window, document, MutationObserver, Object, String, Number });
+  const context = { window, document, MutationObserver, Object, String, Number };
+  vm.runInNewContext(i18nSource, context);
+  vm.runInNewContext(source, context);
 
   return {
     boot: window.__VIRYA_BOOT__,
@@ -173,6 +182,15 @@ function runtime({ ready = false, mounted = false, retryCount = 0 } = {}) {
   app.retry.listener();
   assert.equal(app.reloads(), 0, "retry guard must stop an endless reload loop");
   assert.equal(app.status.textContent, "PONOWNY START NIE POMÓGŁ");
+}
+
+{
+  const app = runtime({ language: "en" });
+  app.boot.phase("wasm-loading");
+  app.advance(8_000);
+  assert.equal(app.status.textContent, "ALMOST READY — FINISHING STARTUP");
+  app.boot.fail(new Error("WebAssembly module failed"));
+  assert.equal(app.status.textContent, "APP STARTUP STOPPED");
 }
 
 for (const contract of ["onStart", "onProgress", "onSuccess", "onFailure", "onComplete"]) {

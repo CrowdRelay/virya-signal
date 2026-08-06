@@ -117,7 +117,7 @@ impl CrowdRelayClient {
         if response.status() == reqwest::StatusCode::NOT_MODIFIED {
             let events = stale.ok_or_else(|| AppError::Remote {
                 status: reqwest::StatusCode::NOT_MODIFIED.as_u16(),
-                detail: "Backend potwierdził nieistniejący cache koncertów".into(),
+                detail: crate::i18n::tr("native_missing_events_cache").into(),
             })?;
             self.touch_cache(&ck, true).await;
             self.persist_public_cache_in_background();
@@ -189,7 +189,7 @@ impl CrowdRelayClient {
         if response.status() == reqwest::StatusCode::NOT_MODIFIED {
             let cities = stale.ok_or_else(|| AppError::Remote {
                 status: reqwest::StatusCode::NOT_MODIFIED.as_u16(),
-                detail: "Backend potwierdził nieistniejący cache miast".into(),
+                detail: crate::i18n::tr("native_missing_cities_cache").into(),
             })?;
             self.touch_cache(&ck, false).await;
             self.persist_public_cache_in_background();
@@ -434,18 +434,18 @@ fn staff_gate_status(status: StatusCode) -> Result<(), AppError> {
     match status {
         StatusCode::OK => Ok(()),
         StatusCode::UNAUTHORIZED => Err(AppError::InvalidInput(
-            "Nieprawidłowe hasło staff.".to_owned(),
+            crate::i18n::tr("native_invalid_staff_password").to_owned(),
         )),
         StatusCode::TOO_MANY_REQUESTS => Err(AppError::InvalidInput(
-            "Za dużo prób logowania. Spróbuj ponownie za kilkanaście minut.".to_owned(),
+            crate::i18n::tr("native_staff_rate_limited").to_owned(),
         )),
         StatusCode::SERVICE_UNAVAILABLE => Err(AppError::Remote {
             status: status.as_u16(),
-            detail: "Weryfikacja staff jest chwilowo niedostępna".to_owned(),
+            detail: crate::i18n::tr("native_staff_verification_unavailable").to_owned(),
         }),
         _ => Err(AppError::Remote {
             status: status.as_u16(),
-            detail: "Nie udało się zweryfikować dostępu staff".to_owned(),
+            detail: crate::i18n::tr("native_staff_verification_failed").to_owned(),
         }),
     }
 }

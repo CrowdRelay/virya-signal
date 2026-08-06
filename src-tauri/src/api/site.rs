@@ -67,7 +67,10 @@ struct SignalFeedbackResponse {
 fn bounded(value: &str, label: &str, max: usize) -> Result<String, AppError> {
     let value = value.trim();
     if value.is_empty() || value.chars().count() > max || value.chars().any(char::is_control) {
-        return Err(AppError::InvalidInput(format!("Nieprawidłowy {label}")));
+        return Err(AppError::InvalidInput(crate::i18n::replace(
+            "native_invalid_label",
+            &[("label", label.to_owned())],
+        )));
     }
     Ok(value.to_owned())
 }
@@ -80,7 +83,10 @@ fn bounded_multiline(value: &str, label: &str, max: usize) -> Result<String, App
             character == '\0' || (character.is_control() && character != '\n' && character != '\t')
         })
     {
-        return Err(AppError::InvalidInput(format!("Nieprawidłowy {label}")));
+        return Err(AppError::InvalidInput(crate::i18n::replace(
+            "native_invalid_label",
+            &[("label", label.to_owned())],
+        )));
     }
     Ok(value.to_owned())
 }
@@ -105,16 +111,21 @@ fn validated_site_url(value: &str, label: &str) -> Result<String, AppError> {
         || parsed.password().is_some()
         || parsed.fragment().is_some()
     {
-        return Err(AppError::InvalidInput(format!("Nieprawidłowy {label}")));
+        return Err(AppError::InvalidInput(crate::i18n::replace(
+            "native_invalid_label",
+            &[("label", label.to_owned())],
+        )));
     }
     Ok(parsed.to_string())
 }
 
 fn validated_store_url(value: &str) -> Result<String, AppError> {
-    let value = validated_site_url(value, "adres sklepu")?;
+    let value = validated_site_url(value, crate::i18n::tr("native_store_url_label"))?;
     let parsed = Url::parse(&value)?;
     if !matches!(parsed.path(), "/pl/merch" | "/pl/merch/") {
-        return Err(AppError::InvalidInput("Nieprawidłowy adres sklepu".into()));
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_invalid_store_url").into(),
+        ));
     }
     Ok(value)
 }
@@ -123,38 +134,50 @@ impl SignalMerchBundleCatalog {
     fn validate(mut self) -> Result<Self, AppError> {
         if self.bundles.len() > MAX_BUNDLES {
             return Err(AppError::InvalidInput(
-                "Katalog zestawów jest zbyt duży".into(),
+                crate::i18n::tr("native_bundle_catalog_too_large").into(),
             ));
         }
         let mut seen = std::collections::HashSet::new();
         for bundle in &mut self.bundles {
             bundle.slug = bundle.slug.trim().to_owned();
             if !valid_slug(&bundle.slug) || !seen.insert(bundle.slug.clone()) {
-                return Err(AppError::InvalidInput("Nieprawidłowy zestaw merchu".into()));
+                return Err(AppError::InvalidInput(
+                    crate::i18n::tr("native_invalid_merch_bundle").into(),
+                ));
             }
-            bundle.name = bounded(&bundle.name, "nazwa zestawu", 120)?;
+            bundle.name = bounded(
+                &bundle.name,
+                crate::i18n::tr("native_bundle_name_label"),
+                120,
+            )?;
             bundle.description = bundle
                 .description
                 .take()
-                .map(|value| bounded_multiline(&value, "opis zestawu", 600))
+                .map(|value| {
+                    bounded_multiline(
+                        &value,
+                        crate::i18n::tr("native_bundle_description_label"),
+                        600,
+                    )
+                })
                 .transpose()?;
             if bundle.includes.len() > MAX_INCLUDES || bundle.variants.len() > MAX_VARIANTS {
                 return Err(AppError::InvalidInput(
-                    "Zestaw merchu ma zbyt wiele pozycji".into(),
+                    crate::i18n::tr("native_bundle_too_many_items").into(),
                 ));
             }
             for include in &mut bundle.includes {
-                *include = bounded(include, "element zestawu", 120)?;
+                *include = bounded(include, crate::i18n::tr("native_bundle_item_label"), 120)?;
             }
             bundle.image_url = bundle
                 .image_url
                 .take()
-                .map(|url| validated_site_url(&url, "adres grafiki"))
+                .map(|url| validated_site_url(&url, crate::i18n::tr("native_image_url_label")))
                 .transpose()?;
             bundle.secondary_image_url = bundle
                 .secondary_image_url
                 .take()
-                .map(|url| validated_site_url(&url, "adres grafiki"))
+                .map(|url| validated_site_url(&url, crate::i18n::tr("native_image_url_label")))
                 .transpose()?;
             bundle.product_url = validated_store_url(&bundle.product_url)?;
             bundle.currency = bundle.currency.trim().to_ascii_uppercase();
@@ -166,18 +189,22 @@ impl SignalMerchBundleCatalog {
                 || bundle.available == (bundle.availability == "sold_out")
             {
                 return Err(AppError::InvalidInput(
-                    "Nieprawidłowa oferta zestawu".into(),
+                    crate::i18n::tr("native_invalid_bundle_offer").into(),
                 ));
             }
             let mut seen_variants = std::collections::HashSet::new();
             for variant in &mut bundle.variants {
-                variant.label = bounded(&variant.label, "wariant zestawu", 24)?;
+                variant.label = bounded(
+                    &variant.label,
+                    crate::i18n::tr("native_bundle_variant_label"),
+                    24,
+                )?;
                 if !seen_variants.insert(variant.label.clone())
                     || !valid_availability(&variant.availability)
                     || variant.available == (variant.availability == "sold_out")
                 {
                     return Err(AppError::InvalidInput(
-                        "Nieprawidłowy wariant zestawu".into(),
+                        crate::i18n::tr("native_invalid_bundle_variant").into(),
                     ));
                 }
             }
@@ -207,9 +234,15 @@ impl CrowdRelayClient {
     ) -> Result<(), AppError> {
         let category = category.trim();
         if !matches!(category, "idea" | "bug" | "concert" | "merch" | "other") {
-            return Err(AppError::InvalidInput("Wybierz kategorię feedbacku".into()));
+            return Err(AppError::InvalidInput(
+                crate::i18n::tr("native_choose_feedback_category").into(),
+            ));
         }
-        let message = bounded_multiline(message, "treść feedbacku", MAX_MESSAGE_CHARS)?;
+        let message = bounded_multiline(
+            message,
+            crate::i18n::tr("native_feedback_content_label"),
+            MAX_MESSAGE_CHARS,
+        )?;
         let response = self
             .site_http
             .post(Url::parse(SIGNAL_FEEDBACK_URL)?)
@@ -230,7 +263,7 @@ impl CrowdRelayClient {
         } else {
             Err(AppError::Remote {
                 status: 502,
-                detail: "Nie udało się przekazać feedbacku".into(),
+                detail: crate::i18n::tr("native_feedback_failed").into(),
             })
         }
     }

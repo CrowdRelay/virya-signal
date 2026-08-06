@@ -31,12 +31,12 @@ class TicketCommerceContracts(unittest.TestCase):
 
     def test_ticket_and_merch_are_first_class_fan_actions(self):
         ui = (ROOT / "src/app/mod.rs").read_text()
-        self.assertIn('own=FanTab::Merch icon="shop" label="Sklep"', ui)
-        self.assertIn('class="ticket-buy-button" on:click=buy>"KUP BILET"', ui)
+        self.assertIn('own=FanTab::Merch icon="shop" label=tr("sklep")', ui)
+        self.assertIn('class="ticket-buy-button" on:click=buy>{tr("kup_bilet")}', ui)
         self.assertIn("FanTicketSale", ui)
-        self.assertIn("KUP W SKLEPIE ↗", ui)
+        self.assertIn('kup_w_sklepie', ui)
         self.assertIn("fan_merch_bundles", ui)
-        self.assertIn("Bundle ze sklepu online", ui)
+        self.assertIn("bundle_ze_sklepu_online", ui)
 
     def test_ticket_quantity_controls_use_boolean_signals_not_raw_or_chains(self):
         ui = (ROOT / "src/app/mod.rs").read_text()

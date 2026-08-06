@@ -12,8 +12,34 @@ actions live in the native Rust shell.
 - Stronghold-backed stable AREA identity and typed IPC contract guards;
 - fan-first ticket checkout with multi-tier selection, Stripe handoff and automatic wallet persistence;
 - first-class fan merch tab backed by authoritative CrowdRelay inventory and the existing Virya store;
-- exact web-store bundles, a two-column mobile catalog and anonymous in-app feedback for fan and owner views.
+- exact web-store bundles, a two-column mobile catalog and anonymous in-app feedback for fan and owner views;
+- compile-time PL/EN catalogs with a persistent language switch shared by the WASM UI and native Tauri errors.
 
+## Internationalization
+
+Polish is the default language and English can be selected in both fan and staff
+settings. The selection is stored under `virya:language:v1`; changing it reloads only
+the interface, while encrypted profiles, sessions, wallets and cached data remain
+untouched. The selected locale crosses the first launcher IPC, so native validation,
+network errors, offline scanning and the WebView use the same language.
+
+Translations have no runtime JSON parser or hash map. Both the Leptos/WASM crate and
+the native Tauri crate compile the same static catalogs:
+
+- `src/i18n/pl.rs`
+- `src/i18n/en.rs`
+
+Add the same key to those two files and reference it with `tr("key")`; use
+`i18n::format`/native `i18n::replace` only for bounded dynamic placeholders. The
+pre-WASM splash is generated from the same catalogs with:
+
+```bash
+python3 scripts/generate-boot-i18n.py
+```
+
+`static-check.py` and `test_i18n.py` reject missing keys, duplicate keys, mismatched
+PL/EN placeholders, stale boot output and Polish runtime copy left outside the
+catalogs.
 
 ## Fan commerce
 

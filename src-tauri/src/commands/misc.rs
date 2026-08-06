@@ -5,7 +5,7 @@ use tauri_plugin_opener::OpenerExt;
 use zeroize::Zeroizing;
 
 use crate::{
-    AppError, AppState,
+    AppError, AppState, i18n,
     models::{
         FanSessionStatus, LauncherStatus, RequestedCityInput, RequestedCityResult, SessionStatus,
     },
@@ -17,7 +17,9 @@ use crate::{
 pub(crate) fn open_external_url(app: AppHandle, url: String) -> Result<(), AppError> {
     let url = url.trim();
     if url.len() > 2048 {
-        return Err(AppError::InvalidInput("Link jest zbyt długi".into()));
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_link_too_long").into(),
+        ));
     }
     let parsed = url::Url::parse(url)?;
     if parsed.scheme() != "https"
@@ -26,12 +28,17 @@ pub(crate) fn open_external_url(app: AppHandle, url: String) -> Result<(), AppEr
         || parsed.password().is_some()
     {
         return Err(AppError::InvalidInput(
-            "Można otwierać wyłącznie bezpieczne linki HTTPS".into(),
+            crate::i18n::tr("native_https_links_only").into(),
         ));
     }
     app.opener()
         .open_url(parsed.as_str(), None::<&str>)
-        .map_err(|error| AppError::InvalidInput(format!("Nie udało się otworzyć linku: {error}")))
+        .map_err(|error| {
+            AppError::InvalidInput(crate::i18n::replace(
+                "native_open_link_failed",
+                &[("error", error.to_string())],
+            ))
+        })
 }
 
 #[tauri::command]
@@ -51,7 +58,9 @@ pub(crate) async fn request_city(
             .bytes()
             .all(|byte| byte.is_ascii_uppercase())
     {
-        return Err(AppError::InvalidInput("Nieprawidłowa nazwa miasta".into()));
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_city_name_invalid").into(),
+        ));
     }
     state
         .api
@@ -62,7 +71,9 @@ pub(crate) async fn request_city(
 #[tauri::command]
 pub(crate) async fn launcher_status(
     state: State<'_, AppState>,
+    locale: String,
 ) -> Result<LauncherStatus, AppError> {
+    i18n::set_language(&locale);
     let operator_session = state.session.read().await;
     let fan_session = state.fan_session.read().await;
     Ok(LauncherStatus {
@@ -88,7 +99,7 @@ pub(crate) async fn verify_staff_access(
 ) -> Result<(), AppError> {
     if password.is_empty() || password.len() > 256 {
         return Err(AppError::InvalidInput(
-            "Podaj poprawne hasło staff.".to_owned(),
+            crate::i18n::tr("native_enter_valid_staff_password").to_owned(),
         ));
     }
     let password = Zeroizing::new(password);

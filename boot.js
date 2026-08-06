@@ -2,6 +2,20 @@
   "use strict";
 
   const READY_ATTRIBUTE = "data-virya-ready";
+  const LANGUAGE_STORAGE_KEY = "virya:language:v1";
+  let language = "pl";
+  try {
+    language = window.localStorage?.getItem(LANGUAGE_STORAGE_KEY) === "en" ? "en" : "pl";
+  } catch (_) {}
+  document.documentElement.lang = language;
+  const texts = window.__VIRYA_BOOT_I18N__?.[language] || window.__VIRYA_BOOT_I18N__?.pl || {};
+  const text = (key, values = {}) => {
+    let value = String(texts[key] || key);
+    for (const [name, replacement] of Object.entries(values)) {
+      value = value.replaceAll(`{${name}}`, String(replacement));
+    }
+    return value;
+  };
   const SLOW_BOOT_MS = 8_000;
   const RECOVERY_MS = 30_000;
   const RETRY_KEY = "virya-signal-boot-retry-v1";
@@ -35,7 +49,7 @@
   ) {
     window.__VIRYA_BOOT_DIAGNOSTIC__ = Object.freeze({
       kind: "unexpected-foreground-termination",
-      message: `Poprzednie uruchomienie zniknęło podczas etapu ${String(previousSession.phase || "unknown").slice(0, 80)}.`,
+      message: text("boot_previous_terminated", { phase: String(previousSession.phase || "unknown").slice(0, 80) }),
       previousHeartbeatAt: previousSession.heartbeatAt,
     });
   }
@@ -96,9 +110,9 @@
     trace(name);
     const statusElement = status();
     if (!statusElement) return;
-    if (name === "wasm-loading") statusElement.textContent = "ŁADUJĘ SILNIK APLIKACJI";
-    if (name === "wasm-entered") statusElement.textContent = "URUCHAMIAM INTERFEJS";
-    if (name === "wasm-initialized") statusElement.textContent = "KOŃCZĘ START";
+    if (name === "wasm-loading") statusElement.textContent = text("boot_phase_wasm_loading");
+    if (name === "wasm-entered") statusElement.textContent = text("boot_phase_wasm_entered");
+    if (name === "wasm-initialized") statusElement.textContent = text("boot_phase_wasm_initialized");
   };
 
   const finish = () => {
@@ -126,10 +140,10 @@
       finish();
       return;
     }
-    lastFailure = normalizeError(error) || "Nieznany błąd uruchamiania";
+    lastFailure = normalizeError(error) || text("boot_unknown_error");
     const statusElement = status();
     const retryElement = retry();
-    if (statusElement) statusElement.textContent = "START APLIKACJI ZATRZYMANY";
+    if (statusElement) statusElement.textContent = text("boot_start_stopped");
     setDetail(lastFailure);
     if (retryElement) retryElement.hidden = false;
     trace("failure", lastFailure);
@@ -141,19 +155,19 @@
       return;
     }
     const messages = {
-      "script-ready": "MODUŁ APLIKACJI NIE ZOSTAŁ URUCHOMIONY",
-      "dom-ready": "MODUŁ APLIKACJI NIE ZOSTAŁ URUCHOMIONY",
-      "wasm-loading": "NIE UDAŁO SIĘ ZAŁADOWAĆ SILNIKA APLIKACJI",
-      "wasm-initialized": "SILNIK NIE URUCHOMIŁ INTERFEJSU",
-      "wasm-entered": "INTERFEJS NIE ZAKOŃCZYŁ STARTU",
+      "script-ready": text("boot_module_not_started"),
+      "dom-ready": text("boot_module_not_started"),
+      "wasm-loading": text("boot_engine_load_failed"),
+      "wasm-initialized": text("boot_engine_no_interface"),
+      "wasm-entered": text("boot_interface_incomplete"),
     };
     const statusElement = status();
     const retryElement = retry();
     if (statusElement) {
-      statusElement.textContent = messages[lastPhase] || "START NIE ZAKOŃCZYŁ SIĘ";
+      statusElement.textContent = messages[lastPhase] || text("boot_start_incomplete");
     }
     if (!lastFailure) {
-      setDetail(`Etap: ${lastPhase}. Ponowienie wykona jeden czysty restart WebView.`);
+      setDetail(text("boot_stage_retry_detail", { phase: lastPhase }));
     }
     if (retryElement) retryElement.hidden = false;
     trace("recovery-offered", lastPhase);
@@ -166,10 +180,10 @@
     } catch (_) {}
     if (attempts >= 1) {
       const statusElement = status();
-      if (statusElement) statusElement.textContent = "PONOWNY START NIE POMÓGŁ";
+      if (statusElement) statusElement.textContent = text("boot_retry_failed");
       setDetail(
         lastFailure ||
-          `Etap: ${lastPhase}. Zapisz ten komunikat; aplikacja nie będzie już wpadać w pętlę restartów.`,
+          text("boot_retry_blocked_detail", { phase: lastPhase }),
       );
       trace("retry-blocked", lastPhase);
       return;
@@ -183,13 +197,17 @@
 
   const watchApp = () => {
     if (settled) return;
+    const statusElement = status();
+    const retryElement = retry();
+    if (statusElement && !statusElement.textContent) statusElement.textContent = text("boot_initial_status");
+    if (retryElement) retryElement.textContent = text("boot_retry_button");
     phase("dom-ready");
     reconcile();
     if (settled) return;
 
     slowTimer = window.setTimeout(() => {
       if (!settled && status()) {
-        status().textContent = "JESZCZE CHWILA — KOŃCZĘ START";
+        status().textContent = text("boot_almost_ready");
         trace("slow", lastPhase);
       }
     }, SLOW_BOOT_MS);

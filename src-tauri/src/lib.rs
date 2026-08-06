@@ -5,6 +5,7 @@ mod api;
 mod commands;
 mod crash;
 mod error;
+mod i18n;
 mod models;
 mod session;
 mod util;

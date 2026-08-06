@@ -34,10 +34,12 @@ fn unix_now_secs() -> u64 {
 
 fn parse_snapshot_timestamp(value: &str) -> Result<u64, AppError> {
     let timestamp = OffsetDateTime::parse(value, &Rfc3339)
-        .map_err(|_| AppError::InvalidInput("Snapshot ma nieprawidłowy czas".into()))?
+        .map_err(|_| {
+            AppError::InvalidInput(crate::i18n::tr("native_snapshot_time_invalid").into())
+        })?
         .unix_timestamp();
     u64::try_from(timestamp)
-        .map_err(|_| AppError::InvalidInput("Snapshot ma nieprawidłowy czas".into()))
+        .map_err(|_| AppError::InvalidInput(crate::i18n::tr("native_snapshot_time_invalid").into()))
 }
 
 fn hash_field(hasher: &mut Sha256, value: &str) {
@@ -78,23 +80,27 @@ fn parse_t1_reference(token: &str) -> Result<String, AppError> {
     let mut parts = token.trim().split('.');
     if parts.next() != Some("t1") {
         return Err(AppError::InvalidInput(
-            "Tryb offline obsługuje wyłącznie trwałe bilety t1".into(),
+            crate::i18n::tr("native_offline_t1_only").into(),
         ));
     }
-    let payload = parts
-        .next()
-        .ok_or_else(|| AppError::InvalidInput("Nieprawidłowy bilet QR".into()))?;
-    let signature = parts
-        .next()
-        .ok_or_else(|| AppError::InvalidInput("Nieprawidłowy bilet QR".into()))?;
+    let payload = parts.next().ok_or_else(|| {
+        AppError::InvalidInput(crate::i18n::tr("native_ticket_qr_invalid").into())
+    })?;
+    let signature = parts.next().ok_or_else(|| {
+        AppError::InvalidInput(crate::i18n::tr("native_ticket_qr_invalid").into())
+    })?;
     if parts.next().is_some() || signature.len() != 64 {
-        return Err(AppError::InvalidInput("Nieprawidłowy bilet QR".into()));
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_ticket_qr_invalid").into(),
+        ));
     }
     let bytes = URL_SAFE_NO_PAD
         .decode(payload)
-        .map_err(|_| AppError::InvalidInput("Nieprawidłowy bilet QR".into()))?;
+        .map_err(|_| AppError::InvalidInput(crate::i18n::tr("native_ticket_qr_invalid").into()))?;
     if bytes.len() > 512 {
-        return Err(AppError::InvalidInput("Nieprawidłowy bilet QR".into()));
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_ticket_qr_invalid").into(),
+        ));
     }
     #[derive(serde::Deserialize)]
     struct TicketReferenceClaims {
@@ -109,7 +115,9 @@ fn parse_t1_reference(token: &str) -> Result<String, AppError> {
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
     {
-        return Err(AppError::InvalidInput("Nieprawidłowy bilet QR".into()));
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_ticket_qr_invalid").into(),
+        ));
     }
     Ok(reference)
 }
@@ -208,12 +216,14 @@ pub(crate) async fn show_mode_prepare(
     let profile = operator_profile(&state).await?;
     let event_slug = event_slug.trim();
     if event_slug.is_empty() || event_slug.len() > 128 {
-        return Err(AppError::InvalidInput("Nieprawidłowy koncert".into()));
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_event_invalid").into(),
+        ));
     }
     let mut snapshot = state.api.show_mode_snapshot(&profile, event_slug).await?;
     if snapshot.schema_version != 1 || snapshot.event.slug != event_slug {
         return Err(AppError::InvalidInput(
-            "CrowdRelay zwrócił niezgodny snapshot koncertu".into(),
+            crate::i18n::tr("native_snapshot_event_mismatch").into(),
         ));
     }
     let generated_at = parse_snapshot_timestamp(&snapshot.generated_at)?;
@@ -224,12 +234,12 @@ pub(crate) async fn show_mode_prepare(
         || expires_at.saturating_sub(generated_at) > 72 * 60 * 60
     {
         return Err(AppError::InvalidInput(
-            "Snapshot koncertu jest nieważny albo wygasł".into(),
+            crate::i18n::tr("native_snapshot_expired").into(),
         ));
     }
     if snapshot.passes.len() > 10_000 {
         return Err(AppError::InvalidInput(
-            "Snapshot przekracza bezpieczny limit 10 000 wejść".into(),
+            crate::i18n::tr("native_snapshot_too_large").into(),
         ));
     }
     snapshot
@@ -240,7 +250,7 @@ pub(crate) async fn show_mode_prepare(
         || !snapshot.checksum_sha256.eq_ignore_ascii_case(&checksum)
     {
         return Err(AppError::InvalidInput(
-            "Snapshot koncertu nie przeszedł kontroli integralności".into(),
+            crate::i18n::tr("native_snapshot_integrity_failed").into(),
         ));
     }
     ensure_show_store_loaded(&state).await?;
@@ -288,7 +298,9 @@ pub(crate) async fn show_mode_scan(
     let event_slug = event_slug.trim();
     let token = code.trim();
     if token.len() > 4_096 {
-        return Err(AppError::InvalidInput("Kod QR jest zbyt długi".into()));
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_qr_too_long").into(),
+        ));
     }
     let reference = parse_t1_reference(token)?;
     let token_hash = hex::encode(Sha256::digest(token.as_bytes()));
@@ -296,13 +308,12 @@ pub(crate) async fn show_mode_scan(
     let result = {
         let mut cached = state.show_mode_store.write().await;
         let store = cached.as_mut().ok_or(AppError::Locked)?;
-        let session = store
-            .sessions
-            .get_mut(event_slug)
-            .ok_or_else(|| AppError::Conflict("Najpierw przygotuj koncert offline".into()))?;
+        let session = store.sessions.get_mut(event_slug).ok_or_else(|| {
+            AppError::Conflict(crate::i18n::tr("native_prepare_offline_event_first").into())
+        })?;
         if !snapshot_is_active(&session.snapshot) {
             return Err(AppError::Conflict(
-                "Snapshot koncertu wygasł. Połącz się z siecią i pobierz nowy".into(),
+                crate::i18n::tr("native_snapshot_refresh_required").into(),
             ));
         }
         let pass_index = session
@@ -310,12 +321,12 @@ pub(crate) async fn show_mode_scan(
             .passes
             .binary_search_by(|pass| pass.public_reference.as_str().cmp(reference.as_str()))
             .map_err(|_| {
-                AppError::Conflict("Bilet nie występuje w podpisanym snapshotcie".into())
+                AppError::Conflict(crate::i18n::tr("native_ticket_not_in_snapshot").into())
             })?;
         let pass = &session.snapshot.passes[pass_index];
         if !pass.offline_eligible || pass.qr_sha256.as_deref() != Some(token_hash.as_str()) {
             return Err(AppError::Conflict(
-                "Bilet nie występuje w podpisanym snapshotcie".into(),
+                crate::i18n::tr("native_ticket_not_in_snapshot").into(),
             ));
         }
         match session
@@ -336,7 +347,7 @@ pub(crate) async fn show_mode_scan(
             Err(insert_at) => {
                 if session.scans.len() >= 10_000 {
                     return Err(AppError::Conflict(
-                        "Lokalna kolejka skanów jest pełna".into(),
+                        crate::i18n::tr("native_scan_queue_full").into(),
                     ));
                 }
                 let queued = ShowModeQueuedScan {
@@ -377,10 +388,9 @@ pub(crate) async fn show_mode_sync(
     let pending = {
         let cached = state.show_mode_store.read().await;
         let store = cached.as_ref().ok_or(AppError::Locked)?;
-        let session = store
-            .sessions
-            .get(&event_slug)
-            .ok_or_else(|| AppError::Conflict("Brak przygotowanego koncertu".into()))?;
+        let session = store.sessions.get(&event_slug).ok_or_else(|| {
+            AppError::Conflict(crate::i18n::tr("native_no_prepared_event").into())
+        })?;
         session
             .scans
             .iter()
@@ -414,10 +424,9 @@ pub(crate) async fn show_mode_sync(
     {
         let mut cached = state.show_mode_store.write().await;
         let store = cached.as_mut().ok_or(AppError::Locked)?;
-        let session = store
-            .sessions
-            .get_mut(&event_slug)
-            .ok_or_else(|| AppError::Conflict("Brak przygotowanego koncertu".into()))?;
+        let session = store.sessions.get_mut(&event_slug).ok_or_else(|| {
+            AppError::Conflict(crate::i18n::tr("native_no_prepared_event").into())
+        })?;
         for (index, outcome) in outcomes {
             let Some(scan) = session.scans.get_mut(index) else {
                 unexpected.get_or_insert(AppError::BackgroundTask);

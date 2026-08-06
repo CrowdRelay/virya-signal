@@ -17,7 +17,7 @@ const AREA_WALLET_URL: &str = "https://virya.music/api/area/wallet";
 impl super::CrowdRelayClient {
     pub async fn fan_area_wallet(&self, profile: &FanProfile) -> Result<AreaWallet, AppError> {
         let wallet_id = uuid::Uuid::parse_str(profile.area_wallet_id.trim()).map_err(|_| {
-            AppError::InvalidInput("Nieprawidłowy identyfikator portfela AREA".into())
+            AppError::InvalidInput(crate::i18n::tr("native_area_wallet_id_invalid").into())
         })?;
         let response = self
             .http
@@ -56,7 +56,11 @@ impl super::CrowdRelayClient {
         checkout_token: &str,
     ) -> Result<TicketWalletApi, AppError> {
         let order_id = uuid_segment(order_id)?;
-        let checkout_token = bounded_required(checkout_token, "token zamówienia", MAX_TOKEN_BYTES)?;
+        let checkout_token = bounded_required(
+            checkout_token,
+            crate::i18n::tr("native_order_token_label"),
+            MAX_TOKEN_BYTES,
+        )?;
         let response = self
             .http
             .get(endpoint(
@@ -78,7 +82,11 @@ impl super::CrowdRelayClient {
         checkout_token: &str,
     ) -> Result<serde_json::Value, AppError> {
         let order_id = uuid_segment(order_id)?;
-        let checkout_token = bounded_required(checkout_token, "token zamówienia", MAX_TOKEN_BYTES)?;
+        let checkout_token = bounded_required(
+            checkout_token,
+            crate::i18n::tr("native_order_token_label"),
+            MAX_TOKEN_BYTES,
+        )?;
         let response = self
             .http
             .post(endpoint(

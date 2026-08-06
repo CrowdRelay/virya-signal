@@ -90,7 +90,11 @@ impl super::CrowdRelayClient {
         profile: &FanProfile,
         claim_token: &str,
     ) -> Result<(AdmissionPass, String), AppError> {
-        let claim_token = bounded_required(claim_token, "token wejściówki", MAX_TOKEN_BYTES)?;
+        let claim_token = bounded_required(
+            claim_token,
+            crate::i18n::tr("native_admission_token_label"),
+            MAX_TOKEN_BYTES,
+        )?;
         let response = self
             .http
             .post(endpoint(&profile.api_base_url, "passes/claim")?)
@@ -102,17 +106,16 @@ impl super::CrowdRelayClient {
         let session_token = response_cookie(response.headers(), super::client::PASS_COOKIE)
             .ok_or_else(|| AppError::Remote {
                 status: response.status().as_u16(),
-                detail: "Backend nie zwrócił sesji wejściówki".into(),
+                detail: crate::i18n::tr("native_admission_session_missing").into(),
             })?;
         let body = decode(response).await?;
         Ok((body, session_token))
     }
 
     pub async fn admission_qr(&self, profile: &FanProfile) -> Result<serde_json::Value, AppError> {
-        let token = profile
-            .pass_session_token
-            .as_deref()
-            .ok_or_else(|| AppError::InvalidInput("Najpierw odbierz wejściówkę".into()))?;
+        let token = profile.pass_session_token.as_deref().ok_or_else(|| {
+            AppError::InvalidInput(crate::i18n::tr("native_claim_pass_first").into())
+        })?;
         self.pass_json::<serde_json::Value, ()>(
             &profile.api_base_url,
             token,
@@ -202,13 +205,12 @@ impl super::CrowdRelayClient {
             Ok(body) => body,
             Err(AppError::Conflict(_)) => {
                 return Err(AppError::Conflict(
-                    "Ten kod został już wykorzystany. Wróć do ZACZYNAM i poproś o nową wiadomość."
-                        .into(),
+                    crate::i18n::tr("native_code_already_used").into(),
                 ));
             }
             Err(AppError::NotFound) => {
                 return Err(AppError::InvalidInput(
-                    "Kod jest nieprawidłowy albo wygasł. Poproś o nową wiadomość.".into(),
+                    crate::i18n::tr("native_code_invalid_or_expired").into(),
                 ));
             }
             Err(error) => return Err(error),
@@ -219,7 +221,7 @@ impl super::CrowdRelayClient {
             .filter(|value| !value.is_empty() && value.len() <= MAX_TOKEN_BYTES)
             .ok_or_else(|| AppError::Remote {
                 status: 200,
-                detail: "Backend potwierdził kod, ale nie zwrócił sesji fana".into(),
+                detail: crate::i18n::tr("native_fan_session_missing").into(),
             })?;
         Ok((
             FanAuthResult {

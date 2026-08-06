@@ -864,3 +864,9 @@ html[data-virya-scanner-active] .app-shell {
   .fan-merch-card .ticket-buy-button { min-height: 50px; padding-left: 5px; padding-right: 5px; font-size: 8px; }
   .feedback-submit-row { grid-template-columns: 1fr; }
 }
+
+.language-setting { display: grid; gap: 12px; align-items: center; }
+.language-setting p { margin: 4px 0 0; color: var(--muted); font-size: .82rem; line-height: 1.45; }
+.language-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; }
+.language-switch button { min-height: 46px; border-radius: var(--control-radius); border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-weight: 800; letter-spacing: .08em; }
+.language-switch button.active { border-color: var(--yellow); background: #f3c51a18; color: var(--yellow); }

@@ -24,7 +24,7 @@ pub(crate) async fn configure_from_pairing(
         .map_or(0, |value| value.as_secs());
     if pairing.version != 1 || pairing.expires_at < now || pairing.expires_at > now + 1800 {
         return Err(AppError::InvalidInput(
-            "Kod parowania wygasł albo jest nieprawidłowy".into(),
+            crate::i18n::tr("native_pairing_code_expired").into(),
         ));
     }
     configure(
@@ -43,25 +43,31 @@ pub(crate) async fn configure_from_pairing(
 fn parse_pairing_payload(raw: &str) -> Result<StaffPairingPayload, AppError> {
     let raw = raw.trim();
     if raw.is_empty() || raw.len() > 8192 {
-        return Err(AppError::InvalidInput("Nieprawidłowy kod parowania".into()));
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_pairing_code_invalid").into(),
+        ));
     }
     if raw.starts_with('{') {
         return serde_json::from_str(raw).map_err(AppError::from);
     }
     let url = url::Url::parse(raw)?;
     if url.scheme() != "virya-signal" || url.host_str() != Some("pair") {
-        return Err(AppError::InvalidInput("Nieprawidłowy kod parowania".into()));
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_pairing_code_invalid").into(),
+        ));
     }
     let encoded = url
         .query_pairs()
         .find_map(|(key, value)| (key == "payload").then_some(value.into_owned()))
-        .ok_or_else(|| AppError::InvalidInput("Kod parowania nie zawiera danych".into()))?;
+        .ok_or_else(|| {
+            AppError::InvalidInput(crate::i18n::tr("native_pairing_code_empty").into())
+        })?;
     let mut padded = encoded;
     while padded.len() % 4 != 0 {
         padded.push('=');
     }
-    let bytes = URL_SAFE
-        .decode(padded)
-        .map_err(|_| AppError::InvalidInput("Nieprawidłowy kod parowania".into()))?;
+    let bytes = URL_SAFE.decode(padded).map_err(|_| {
+        AppError::InvalidInput(crate::i18n::tr("native_pairing_code_invalid").into())
+    })?;
     serde_json::from_slice(&bytes).map_err(AppError::from)
 }

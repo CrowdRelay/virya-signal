@@ -1,4 +1,4 @@
-use crate::util::OptionValueOrElseExt;
+use crate::{i18n, util::OptionValueOrElseExt};
 use serde::{Serialize, de::DeserializeOwned};
 use wasm_bindgen::prelude::*;
 
@@ -6,6 +6,18 @@ use wasm_bindgen::prelude::*;
 const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
 const latestInvocations = new Map();
 let invocationSequence = 0;
+
+let viryaTexts = {
+  nativeBridgeUnavailable: 'The native app bridge is unavailable.',
+  operationTimeout: 'Operation {command} timed out.',
+  cameraModuleUnavailable: 'The camera permission module is unavailable in this app version.',
+  cameraDenied: 'Camera access is denied. Enable Camera for Virya Signal in the app settings.',
+  scannerLabel: 'QR code scanner', scannerTitle: 'SCAN QR CODE', scannerHint: 'Place the code inside the frame', scannerCancel: '← CANCEL SCANNING', scannerClosing: 'CLOSING…', scannerUnavailable: 'The scanner is available only in the iOS/Android app.',
+  unknownError: 'Unknown application error', reportType: 'Type', reportTime: 'Time', reportOperation: 'Operation', reportPath: 'Path', reportError: 'Error',
+  diagnostics: 'VIRYA SIGNAL / DIAGNOSTICS', previousFailure: 'The previous launch ended with an error', currentFailure: 'The app caught an error', reportHelp: 'We do not hide failures. Copy the report and send it with a note about what you tapped.', copyReport: 'COPY REPORT', restart: 'RESTART APP', close: 'CLOSE', reportCopied: 'Report copied.', copyManually: 'Press and hold the report text and copy it manually.', interrupted: 'The previous launch interrupted operation {command}.', uncleanShutdown: 'The previous launch ended without a clean shutdown.'
+};
+export function viryaSetRuntimeTranslations(value) { if (value && typeof value === 'object') viryaTexts = { ...viryaTexts, ...value }; }
+const viryaTemplate = (text, name, value) => String(text).replace(`{${name}}`, String(value));
 
 const VIRYA_OPERATION_STORAGE_KEY = 'virya:last-operation:v3';
 
@@ -58,7 +70,7 @@ export async function viryaInvoke(command, args, timeoutMs) {
   while (!(core = window.__TAURI__?.core) && Date.now() < deadline) {
     await sleep(25);
   }
-  if (!core?.invoke) throw new Error('Natywny most aplikacji nie jest dostępny.');
+  if (!core?.invoke) throw new Error(viryaTexts.nativeBridgeUnavailable);
 
   const remaining = Math.max(1, deadline - Date.now());
   let timer;
@@ -67,7 +79,7 @@ export async function viryaInvoke(command, args, timeoutMs) {
       core.invoke(command, args),
       new Promise((_, reject) => {
         timer = setTimeout(
-          () => reject(new Error(`Operacja ${command} przekroczyła limit czasu.`)),
+          () => reject(new Error(viryaTemplate(viryaTexts.operationTimeout, 'command', command))),
           remaining,
         );
       }),
@@ -119,7 +131,7 @@ function viryaPermissionState(value) {
 
 async function viryaEnsureCameraPermission(scanner) {
   if (!scanner?.checkPermissions || !scanner?.requestPermissions) {
-    throw new Error('Moduł uprawnień aparatu nie jest dostępny w tej wersji aplikacji.');
+    throw new Error(viryaTexts.cameraModuleUnavailable);
   }
 
   let state = viryaPermissionState(await scanner.checkPermissions());
@@ -128,7 +140,7 @@ async function viryaEnsureCameraPermission(scanner) {
   }
   if (state !== 'granted') {
     throw new Error(
-      'Brak dostępu do aparatu. Włącz Aparat dla Virya Signal w ustawieniach aplikacji.',
+      viryaTexts.cameraDenied,
     );
   }
 }
@@ -152,14 +164,14 @@ function viryaMountScannerOverlay(scanner) {
   overlay.id = 'virya-scanner-overlay';
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-label', 'Skaner kodu QR');
+  overlay.setAttribute('aria-label', viryaTexts.scannerLabel);
   overlay.innerHTML = `
     <div class="virya-scanner-copy">
-      <strong>SKANUJ KOD QR</strong>
-      <span>Umieść kod wewnątrz ramki</span>
+      <strong>${viryaTexts.scannerTitle}</strong>
+      <span>${viryaTexts.scannerHint}</span>
     </div>
     <div class="virya-scanner-frame" aria-hidden="true"></div>
-    <button id="virya-scanner-cancel" type="button">← ANULUJ SKANOWANIE</button>
+    <button id="virya-scanner-cancel" type="button">${viryaTexts.scannerCancel}</button>
   `;
 
   let wasCancelled = false;
@@ -170,7 +182,7 @@ function viryaMountScannerOverlay(scanner) {
     if (wasCancelled) return;
     wasCancelled = true;
     cancel.disabled = true;
-    cancel.textContent = 'ZAMYKAM…';
+    cancel.textContent = viryaTexts.scannerClosing;
 
     resolveCancel?.(VIRYA_SCAN_CANCELLED);
 
@@ -199,7 +211,7 @@ function viryaMountScannerOverlay(scanner) {
 export async function viryaScanQr() {
   const scanner = window.__TAURI__?.barcodeScanner;
   if (!scanner?.scan || !scanner?.cancel) {
-    throw new Error('Skaner jest dostępny tylko w aplikacji iOS/Android.');
+    throw new Error(viryaTexts.scannerUnavailable);
   }
 
   await viryaEnsureCameraPermission(scanner);
@@ -233,7 +245,7 @@ const MAX_RUNTIME_FAILURES = 8;
 function viryaRuntimeMessage(error) {
   if (typeof error === 'string') return error;
   if (typeof error?.message === 'string') return error.message;
-  try { return JSON.stringify(error); } catch { return 'Nieznany błąd aplikacji'; }
+  try { return JSON.stringify(error); } catch { return viryaTexts.unknownError; }
 }
 
 function viryaRuntimeStack(error) {
@@ -271,11 +283,11 @@ function viryaClearRuntimeFailure() {
 
 function viryaFailureText(report) {
   const lines = [
-    `Rodzaj: ${report.kind}`,
-    `Czas: ${report.occurredAt}`,
-    report.operation ? `Operacja: ${report.operation}` : '',
-    report.path ? `Ścieżka: ${report.path}` : '',
-    `Błąd: ${report.message}`,
+    `${viryaTexts.reportType}: ${report.kind}`,
+    `${viryaTexts.reportTime}: ${report.occurredAt}`,
+    report.operation ? `${viryaTexts.reportOperation}: ${report.operation}` : '',
+    report.path ? `${viryaTexts.reportPath}: ${report.path}` : '',
+    `${viryaTexts.reportError}: ${report.message}`,
     report.stack ? `\nStack:\n${report.stack}` : '',
   ];
   return lines.filter(Boolean).join('\n');
@@ -294,14 +306,14 @@ function viryaShowRuntimeFailure(report, previous = false) {
   node.setAttribute('aria-modal', 'true');
   node.innerHTML = `
     <div class="virya-runtime-failure-card">
-      <p class="eyebrow">VIRYA SIGNAL / DIAGNOSTYKA</p>
-      <h2>${previous ? 'Poprzednie uruchomienie zakończyło się błędem' : 'Aplikacja zatrzymała błąd'}</h2>
-      <p>Nie ukrywamy awarii. Skopiuj raport i wyślij go razem z informacją, co było kliknięte.</p>
+      <p class="eyebrow">${viryaTexts.diagnostics}</p>
+      <h2>${previous ? viryaTexts.previousFailure : viryaTexts.currentFailure}</h2>
+      <p>${viryaTexts.reportHelp}</p>
       <pre></pre>
       <div class="virya-runtime-failure-actions">
-        <button type="button" data-action="copy">KOPIUJ RAPORT</button>
-        <button type="button" data-action="reload">URUCHOM PONOWNIE</button>
-        <button type="button" data-action="close" class="ghost">ZAMKNIJ</button>
+        <button type="button" data-action="copy">${viryaTexts.copyReport}</button>
+        <button type="button" data-action="reload">${viryaTexts.restart}</button>
+        <button type="button" data-action="close" class="ghost">${viryaTexts.close}</button>
       </div>
       <small class="copy-status"></small>
     </div>`;
@@ -312,9 +324,9 @@ function viryaShowRuntimeFailure(report, previous = false) {
     const status = node.querySelector('.copy-status');
     try {
       await window.navigator?.clipboard?.writeText(text);
-      if (status) status.textContent = 'Raport skopiowany.';
+      if (status) status.textContent = viryaTexts.reportCopied;
     } catch {
-      if (status) status.textContent = 'Przytrzymaj tekst raportu i skopiuj ręcznie.';
+      if (status) status.textContent = viryaTexts.copyManually;
     }
   });
   node.querySelector('[data-action="reload"]')?.addEventListener('click', () => {
@@ -353,7 +365,7 @@ function viryaRecoverInterruptedOperation(report) {
   if (!operation || typeof operation.command !== 'string') return;
   report(
     'interrupted-native-operation',
-    `Poprzednie uruchomienie przerwało operację ${operation.command}.`,
+    viryaTemplate(viryaTexts.interrupted, 'command', operation.command),
   );
   viryaStorageRemove(VIRYA_OPERATION_STORAGE_KEY);
 }
@@ -363,7 +375,7 @@ function viryaRecoverBootDiagnostic(report) {
   if (!diagnostic) return;
   report(
     String(diagnostic.kind || 'unexpected-foreground-termination'),
-    String(diagnostic.message || 'Poprzednie uruchomienie zakończyło się bez czystego zamknięcia.'),
+    String(diagnostic.message || viryaTexts.uncleanShutdown),
   );
   window.__VIRYA_BOOT_DIAGNOSTIC__ = undefined;
 }
@@ -424,6 +436,41 @@ extern "C" {
 
     #[wasm_bindgen(js_name = viryaInstallRuntimeGuards)]
     fn install_runtime_guards_js();
+
+    #[wasm_bindgen(js_name = viryaSetRuntimeTranslations)]
+    fn set_runtime_translations_js(value: JsValue);
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeTranslations {
+    native_bridge_unavailable: &'static str,
+    operation_timeout: &'static str,
+    camera_module_unavailable: &'static str,
+    camera_denied: &'static str,
+    scanner_label: &'static str,
+    scanner_title: &'static str,
+    scanner_hint: &'static str,
+    scanner_cancel: &'static str,
+    scanner_closing: &'static str,
+    scanner_unavailable: &'static str,
+    unknown_error: &'static str,
+    report_type: &'static str,
+    report_time: &'static str,
+    report_operation: &'static str,
+    report_path: &'static str,
+    report_error: &'static str,
+    diagnostics: &'static str,
+    previous_failure: &'static str,
+    current_failure: &'static str,
+    report_help: &'static str,
+    copy_report: &'static str,
+    restart: &'static str,
+    close: &'static str,
+    report_copied: &'static str,
+    copy_manually: &'static str,
+    interrupted: &'static str,
+    unclean_shutdown: &'static str,
 }
 
 const DEFAULT_IPC_TIMEOUT_MS: u32 = 30_000;
@@ -453,7 +500,19 @@ where
 /// Fetches the launcher-time status for both operator and fan sessions in a
 /// single native round-trip, cutting startup IPC latency roughly in half.
 pub async fn launcher_status() -> Result<crate::models::LauncherStatus, String> {
-    invoke_timeout::<crate::models::LauncherStatus, _>("launcher_status", &(), 10_000).await
+    #[derive(Serialize)]
+    struct LauncherStatusArgs {
+        locale: &'static str,
+    }
+
+    invoke_timeout::<crate::models::LauncherStatus, _>(
+        "launcher_status",
+        &LauncherStatusArgs {
+            locale: i18n::current().code(),
+        },
+        10_000,
+    )
+    .await
 }
 
 /// Runs a read request in a named UI scope. Starting a newer request in the
@@ -502,28 +561,60 @@ pub async fn scan_qr() -> Result<Option<String>, String> {
     let value = scan_qr_js().await.map_err(js_error)?;
     let value = value
         .as_string()
-        .ok_or_else(|| "Skaner nie zwrócił kodu.".to_owned())?;
+        .ok_or_else(|| i18n::tr("skaner_nie_zwroci_kodu").to_owned())?;
     if value == CANCELLED {
         return Ok(None);
     }
     let value = value.trim();
     if value.is_empty() {
-        Err("Skaner nie zwrócił kodu.".to_owned())
+        Err(i18n::tr("skaner_nie_zwroci_kodu").to_owned())
     } else {
         Ok(Some(value.to_owned()))
     }
 }
 
 pub fn install_runtime_guards() {
+    let translations = RuntimeTranslations {
+        native_bridge_unavailable: i18n::tr("natywny_most_aplikacji_nie_jest_dostepny"),
+        operation_timeout: i18n::tr("operacja_command_przekroczya_limit_czasu"),
+        camera_module_unavailable: i18n::tr("modu_uprawnien_aparatu_nie_jest_dostepny_w_tej"),
+        camera_denied: i18n::tr("brak_dostepu_do_aparatu_wacz_aparat_dla_virya"),
+        scanner_label: i18n::tr("skaner_kodu_qr"),
+        scanner_title: i18n::tr("skanuj_kod_qr"),
+        scanner_hint: i18n::tr("umiesc_kod_wewnatrz_ramki"),
+        scanner_cancel: i18n::tr("anuluj_skanowanie"),
+        scanner_closing: i18n::tr("zamykam"),
+        scanner_unavailable: i18n::tr("skaner_jest_dostepny_tylko_w_aplikacji_ios_android"),
+        unknown_error: i18n::tr("nieznany_bad_aplikacji"),
+        report_type: i18n::tr("rodzaj"),
+        report_time: i18n::tr("czas"),
+        report_operation: i18n::tr("operacja"),
+        report_path: i18n::tr("sciezka"),
+        report_error: i18n::tr("bad"),
+        diagnostics: i18n::tr("virya_signal_diagnostyka"),
+        previous_failure: i18n::tr("poprzednie_uruchomienie_zakonczyo_sie_bedem"),
+        current_failure: i18n::tr("aplikacja_zatrzymaa_bad"),
+        report_help: i18n::tr("nie_ukrywamy_awarii_skopiuj_raport_i_wyslij_go"),
+        copy_report: i18n::tr("kopiuj_raport"),
+        restart: i18n::tr("uruchom_ponownie"),
+        close: i18n::tr("zamknij"),
+        report_copied: i18n::tr("raport_skopiowany"),
+        copy_manually: i18n::tr("przytrzymaj_tekst_raportu_i_skopiuj_recznie"),
+        interrupted: i18n::tr("poprzednie_uruchomienie_przerwao_operacje_command"),
+        unclean_shutdown: i18n::tr("poprzednie_uruchomienie_zakonczyo_sie_bez_czystego_zamkniecia"),
+    };
+    if let Ok(value) = serde_wasm_bindgen::to_value(&translations) {
+        set_runtime_translations_js(value);
+    }
     install_runtime_guards_js();
 }
 
 fn decode_error(error: serde_wasm_bindgen::Error) -> String {
     let raw = error.to_string();
     if raw.len() > 200 {
-        "Odpowiedź serwera ma nieoczekiwany format.".to_owned()
+        i18n::tr("odpowiedz_serwera_ma_nieoczekiwany_format").to_owned()
     } else {
-        format!("Błąd odczytu odpowiedzi: {raw}")
+        i18n::format("bad_odczytu_odpowiedzi_raw", &[raw])
     }
 }
 
@@ -540,5 +631,5 @@ fn js_error(value: JsValue) -> String {
                 .ok()
                 .and_then(|v| v.as_string())
         })
-        .value_or_else(|| "Nieznany błąd aplikacji".to_owned())
+        .value_or_else(|| i18n::tr("nieznany_bad_aplikacji").to_owned())
 }
