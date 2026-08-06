@@ -5,6 +5,7 @@ import os
 import re
 
 from i18n_catalog import load_catalog_pair
+from source_tree import read_app_source
 
 try:
     if os.environ.get('VIRYA_FORCE_TOML_FALLBACK'):
@@ -49,8 +50,8 @@ if tomllib is not None:
             raise SystemExit(f'invalid source TOML {path.relative_to(root)}: {error}') from error
 
 required = [
-    'src-tauri/src/lib.rs', 'src-tauri/src/api/mod.rs', 'src-tauri/src/api/ticketing.rs', 'src-tauri/src/vault.rs',
-    'src/app/mod.rs', 'src/app/area.rs', 'src/bridge.rs', 'src-tauri/capabilities/mobile.json',
+    'src-tauri/src/lib.rs', 'src-tauri/src/api.rs', 'src-tauri/src/api/ticketing.rs', 'src-tauri/src/vault.rs',
+    'src/app.rs', 'src/app/area.rs', 'src/bridge.rs', 'src-tauri/capabilities/mobile.json',
     '.github/workflows/check.yml', '.github/workflows/mobile-smoke.yml',
     'rust-toolchain.toml', '.cargo/config.toml', 'scripts/collect-mobile-artifact.py', 'boot.js', 'boot-i18n.js',
     'boot-initializer.mjs', 'scripts/generate-boot-i18n.py',
@@ -68,8 +69,8 @@ for item in required:
     if not (root / item).is_file():
         raise SystemExit(f'missing {item}')
 
-ui_main = (root / 'src/app/mod.rs').read_text()
-ui = ui_main + '\n' + (root / 'src/app/area.rs').read_text()
+ui_main = read_app_source(root)
+ui = ui_main
 native = (root / 'src-tauri/src/lib.rs').read_text()
 api = '\n'.join(
     path.read_text(encoding='utf-8')
@@ -106,19 +107,19 @@ for key in i18n_keys:
     if set(placeholder.findall(pl_catalog[key])) != set(placeholder.findall(en_catalog[key])):
         raise SystemExit(f'i18n placeholder mismatch for {key}')
 for required_i18n_file in (
-    'src/i18n/mod.rs', 'src/i18n/pl.rs', 'src/i18n/en.rs',
-    'src-tauri/src/i18n/mod.rs', 'scripts/i18n_catalog.py',
+    'src/i18n.rs', 'src/i18n/pl.rs', 'src/i18n/en.rs',
+    'src-tauri/src/i18n.rs', 'scripts/i18n_catalog.py',
 ):
     if not (root / required_i18n_file).is_file():
         raise SystemExit(f'missing {required_i18n_file}')
-if 'virya:language:v1' not in (root / 'src/i18n/mod.rs').read_text():
+if 'virya:language:v1' not in (root / 'src/i18n.rs').read_text():
     raise SystemExit('language preference must be persisted locally')
 if '<LanguageSwitch />' not in ui_main or ui_main.count('<LanguageSwitch />') < 2:
     raise SystemExit('language switch must be available in fan and staff settings')
 if 'locale: i18n::current().code()' not in ui_main and 'locale: i18n::current().code().to_owned()' not in ui_main:
     raise SystemExit('fan API locale must follow the selected language')
 if re.search(r'[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]', ui):
-    raise SystemExit('Polish UI copy must live in the i18n catalog, not src/app/mod.rs')
+    raise SystemExit('Polish UI copy must live in the i18n catalog, not src/app.rs')
 if re.search(r'[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]', bridge + boot + index):
     raise SystemExit('runtime WebView and boot copy must live in the i18n catalogs')
 for native_path in sorted((root / 'src-tauri/src').rglob('*.rs')):
@@ -127,8 +128,8 @@ for native_path in sorted((root / 'src-tauri/src').rglob('*.rs')):
         raise SystemExit(
             f'Polish native runtime copy must live in i18n: {native_path.relative_to(root)}'
         )
-native_i18n = (root / 'src-tauri/src/i18n/mod.rs').read_text()
-if '../../../src/i18n/pl.rs' not in native_i18n or '../../../src/i18n/en.rs' not in native_i18n:
+native_i18n = (root / 'src-tauri/src/i18n.rs').read_text()
+if '../../src/i18n/pl.rs' not in native_i18n or '../../src/i18n/en.rs' not in native_i18n:
     raise SystemExit('native and WASM must compile the same PL/EN catalogs')
 if 'locale: i18n::current().code()' not in bridge or 'i18n::set_language(&locale)' not in (root / 'src-tauri/src/commands/misc.rs').read_text():
     raise SystemExit('selected locale must cross the first launcher IPC into native code')

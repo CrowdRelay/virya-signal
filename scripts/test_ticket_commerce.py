@@ -2,6 +2,8 @@ import hashlib
 import unittest
 from pathlib import Path
 
+from source_tree import read_app_source
+
 
 ROOT = Path(__file__).resolve().parents[1]
 PROTECTED_COMPAT_PREFIX_SHA256 = "aab72bd3b0d6389069f2723f663d0b2995b52f4458681c202f401cb8da115830"
@@ -34,7 +36,7 @@ class TicketCommerceContracts(unittest.TestCase):
         self.assertIn("Zeroizing::new(response.checkout_token)", function)
 
     def test_ticket_and_merch_are_first_class_fan_actions(self):
-        ui = (ROOT / "src/app/mod.rs").read_text()
+        ui = read_app_source(ROOT)
         self.assertIn('own=FanTab::Merch icon="shop" label=tr("store_tab")', ui)
         self.assertIn('TicketPoolAvailability::Available', ui)
         self.assertIn('class="ticket-buy-button"', ui)
@@ -45,7 +47,7 @@ class TicketCommerceContracts(unittest.TestCase):
         self.assertIn("bundles_from_the_online_store", ui)
 
     def test_ticket_quantity_controls_use_boolean_signals_not_raw_or_chains(self):
-        ui = (ROOT / "src/app/mod.rs").read_text()
+        ui = read_app_source(ROOT)
         self.assertIn("let increment_disabled = Signal::derive", ui)
         self.assertIn("disabled=move || increment_disabled.get()", ui)
         self.assertIn("disabled=move || decrement_disabled.get()", ui)

@@ -3,6 +3,8 @@ import subprocess
 import unittest
 from pathlib import Path
 
+from source_tree import read_app_source
+
 from i18n_catalog import load_catalog_pair
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -34,9 +36,9 @@ class I18nContracts(unittest.TestCase):
             )
 
     def test_native_core_reuses_the_same_static_catalogs(self):
-        source = (ROOT / "src-tauri/src/i18n/mod.rs").read_text()
-        self.assertIn('../../../src/i18n/pl.rs', source)
-        self.assertIn('../../../src/i18n/en.rs', source)
+        source = (ROOT / "src-tauri/src/i18n.rs").read_text()
+        self.assertIn('../../src/i18n/pl.rs', source)
+        self.assertIn('../../src/i18n/en.rs', source)
         self.assertIn('AtomicU8', source)
         self.assertNotIn('HashMap', source)
 
@@ -57,18 +59,18 @@ class I18nContracts(unittest.TestCase):
         subprocess.run(["node", "--check", "boot-i18n.js"], check=True, cwd=ROOT)
 
     def test_runtime_copy_is_not_hardcoded_in_polish(self):
-        for relative in ("src/app/mod.rs", "src/app/area.rs", "src/bridge.rs", "boot.js", "index.html"):
+        for relative in ("src/app.rs", "src/app/area.rs", "src/bridge.rs", "boot.js", "index.html"):
             self.assertIsNone(DIACRITICS.search((ROOT / relative).read_text()), relative)
         for path in sorted((ROOT / "src-tauri/src").rglob("*.rs")):
             runtime = path.read_text().split("#[cfg(test)]", 1)[0]
             self.assertIsNone(DIACRITICS.search(runtime), path.relative_to(ROOT))
 
     def test_language_switch_is_present_for_fan_and_staff(self):
-        ui = (ROOT / "src/app/mod.rs").read_text()
+        ui = read_app_source(ROOT)
         self.assertGreaterEqual(ui.count("<LanguageSwitch />"), 2)
         self.assertIn("Language::Pl", ui)
         self.assertIn("Language::En", ui)
-        self.assertIn("virya:language:v1", (ROOT / "src/i18n/mod.rs").read_text())
+        self.assertIn("virya:language:v1", (ROOT / "src/i18n.rs").read_text())
 
     def test_catalog_identifiers_are_english_ascii_snake_case(self):
         for key in self.en:

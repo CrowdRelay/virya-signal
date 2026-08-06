@@ -1,6 +1,8 @@
 import pathlib
 import unittest
 
+from source_tree import read_app_source
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
@@ -13,7 +15,7 @@ class RekorLinkTests(unittest.TestCase):
         self.assertIn('default, deserialize_with = "deserialize_string_or_bytes"', native)
 
     def test_fan_draw_card_opens_public_proof(self):
-        app = (ROOT / "src/app/mod.rs").read_text()
+        app = read_app_source(ROOT)
         self.assertIn("/pl/dowody/losowania/{}/?source=signal-app", app)
         self.assertIn('label=tr("proof")', app)
         self.assertIn("open_external_url", app)

@@ -1,13 +1,15 @@
 import unittest
 from pathlib import Path
 
+from source_tree import read_app_source
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class SignalFeedbackContracts(unittest.TestCase):
     def test_ui_exposes_feedback_without_profile_fields(self):
-        ui = (ROOT / "src/app/mod.rs").read_text()
+        ui = read_app_source(ROOT)
         native = (ROOT / "src-tauri/src/api/site.rs").read_text()
         commands = (ROOT / "src-tauri/src/commands/misc.rs").read_text()
         self.assertIn('anonymous_feedback', ui)
@@ -20,7 +22,7 @@ class SignalFeedbackContracts(unittest.TestCase):
 
     def test_bundle_catalog_is_same_origin_and_bounded(self):
         native = (ROOT / "src-tauri/src/api/site.rs").read_text()
-        ui = (ROOT / "src/app/mod.rs").read_text()
+        ui = read_app_source(ROOT)
         self.assertIn("https://virya.music/api/merch/inventory", native)
         self.assertIn('Some("virya.music" | "www.virya.music")', native)
         self.assertIn("MAX_BUNDLES", native)

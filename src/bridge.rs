@@ -118,12 +118,18 @@ export async function viryaInvokeLatest(command, args, timeoutMs, scope) {
   } catch (error) {
     if (latestInvocations.get(scope) !== token) return undefined;
     throw error;
+  } finally {
+    // Scopes are short-lived request identities, not a cache. Removing the
+    // winning token prevents long sessions from retaining every visited view.
+    if (latestInvocations.get(scope) === token) latestInvocations.delete(scope);
   }
 }
 
 export function viryaInvalidateLatest(prefix) {
   for (const scope of latestInvocations.keys()) {
-    if (scope.startsWith(prefix)) latestInvocations.set(scope, ++invocationSequence);
+    // Deletion is enough to make every outstanding token stale and also keeps
+    // the registry bounded after logout, account switch and tab changes.
+    if (scope.startsWith(prefix)) latestInvocations.delete(scope);
   }
 }
 
@@ -287,9 +293,7 @@ function viryaNormalizePosition(position) {
   return { lat, lng, accuracy, capturedAt };
 }
 
-export async function viryaCurrentPosition() {
-  const core = await viryaWaitForNativeCore();
-  await viryaEnsureLocationPermission(core);
+async function viryaReadCurrentPosition(core) {
   try {
     const position = await core.invoke('plugin:geolocation|get_current_position', {
       options: { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
@@ -301,14 +305,24 @@ export async function viryaCurrentPosition() {
   }
 }
 
+export async function viryaCurrentPosition() {
+  const core = await viryaWaitForNativeCore();
+  await viryaEnsureLocationPermission(core);
+  return viryaReadCurrentPosition(core);
+}
+
 export async function viryaCollectLocationSamples(minSamples, maxSamples, minDurationMs) {
   const minimum = Math.max(3, Math.min(Number(minSamples) || 3, 8));
   const maximum = Math.max(minimum, Math.min(Number(maxSamples) || 8, 8));
   const duration = Math.max(3000, Math.min(Number(minDurationMs) || 6000, 20000));
+  const core = await viryaWaitForNativeCore();
+  // A claim samples one location session. Checking permissions once avoids up
+  // to fourteen redundant native IPC calls while collecting eight samples.
+  await viryaEnsureLocationPermission(core);
   const startedAt = Date.now();
   const samples = [];
   while (samples.length < maximum) {
-    samples.push(await viryaCurrentPosition());
+    samples.push(await viryaReadCurrentPosition(core));
     const elapsed = Date.now() - startedAt;
     if (samples.length >= minimum && elapsed >= duration) break;
     await sleep(Math.min(1500, Math.max(700, duration - elapsed)));

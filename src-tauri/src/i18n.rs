@@ -2,9 +2,9 @@ use std::sync::atomic::{AtomicU8, Ordering};
 
 // Both the WASM UI and the native Tauri core compile the same static catalogs.
 // This keeps translations in one PL/EN pair without runtime JSON or hash maps.
-#[path = "../../../src/i18n/en.rs"]
+#[path = "../../src/i18n/en.rs"]
 mod en;
-#[path = "../../../src/i18n/pl.rs"]
+#[path = "../../src/i18n/pl.rs"]
 mod pl;
 
 static LANGUAGE: AtomicU8 = AtomicU8::new(0);

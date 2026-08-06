@@ -25,6 +25,11 @@ class MobileAreaContracts(unittest.TestCase):
         api = (ROOT / "src-tauri/src/api/public.rs").read_text()
         self.assertIn("plugin:geolocation|get_current_position", bridge)
         self.assertIn("viryaCollectLocationSamples", bridge)
+        collection = bridge.split("export async function viryaCollectLocationSamples", 1)[1]
+        collection = collection.split("const VIRYA_FAILURE_STORAGE_KEY", 1)[0]
+        self.assertIn("await viryaEnsureLocationPermission(core)", collection)
+        self.assertIn("await viryaReadCurrentPosition(core)", collection)
+        self.assertNotIn("await viryaCurrentPosition()", collection)
         self.assertIn("samples.len() < 3", commands)
         self.assertIn("samples.len() > 8", commands)
         self.assertIn('endpoint(&profile.api_base_url, "me/area/challenge")', api)

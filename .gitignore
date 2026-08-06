@@ -15,3 +15,11 @@ AuthKey_*.p8
 keystore.properties
 .env
 .env.*
+
+# Editor/recovery files must never enter source packages.
+*.bak
+*.orig
+*.rej
+*.tmp
+*~
+.recovery-backup
