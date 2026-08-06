@@ -9,6 +9,13 @@ _ENTRY = re.compile(r'^\s*"([^"]+)"\s*=>\s*"([^"]*)",\s*$', re.MULTILINE)
 
 def parse_rust_catalog(path: Path) -> dict[str, str]:
     source = path.read_text(encoding="utf-8")
+    # Normalize multi-line string values to the single-line form the regex expects.
+    source = re.sub(
+        r'"([^"]+)"\s*=>\s*\{\s*"([^"]*)"\s*,?\s*\}\s*,?',
+        r'"\1" => "\2",\n',
+        source,
+        flags=re.DOTALL,
+    )
     entries = _ENTRY.findall(source)
     keys = [key for key, _ in entries]
     if len(keys) != len(set(keys)):
