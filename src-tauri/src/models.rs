@@ -656,6 +656,47 @@ pub struct AreaVoucher {
 pub struct AreaLiveDrop {
     pub id: String,
 }
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaChallenge {
+    pub challenge: String,
+    pub issued_at: u64,
+    pub expires_at: u64,
+    pub min_samples: u32,
+    pub max_samples: u32,
+    pub min_duration_ms: u32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaPositionSample {
+    pub lat: f64,
+    pub lng: f64,
+    pub accuracy: f64,
+    pub captured_at: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaClaimResult {
+    pub ok: bool,
+    pub already_claimed: bool,
+    pub collectible: Option<AreaCollectible>,
+    pub reward_credits_awarded: u32,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaCollectible {
+    pub drop_id: String,
+    pub number: String,
+    pub city: String,
+    pub line: String,
+    pub track: String,
+    pub edition: String,
+    #[allow(dead_code)]
+    pub riddle: String,
+}
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct QueueSummary {

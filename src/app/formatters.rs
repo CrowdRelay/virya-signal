@@ -59,14 +59,14 @@ pub(super) fn event_location(event: &crate::models::PublicEvent) -> String {
         .venue
         .clone()
         .or_else(|| event.city.as_ref().map(|city| city.name.clone()))
-        .value_or_else(|| tr("szczegoy_wkrotce").to_owned())
+        .value_or_else(|| tr("details_coming_soon").to_owned())
 }
 
 pub(super) fn event_time_location(starts_at: &str, venue: Option<&str>) -> String {
     format!(
         "{} · {}",
         human_time(starts_at),
-        venue.value_or(tr("miejsce_wkrotce"))
+        venue.value_or(tr("venue_coming_soon"))
     )
 }
 
@@ -87,18 +87,18 @@ pub(super) fn month(value: &str) -> String {
         date.get_month()
     };
     match month {
-        0 => tr("sty"),
-        1 => tr("lut"),
+        0 => tr("jan"),
+        1 => tr("feb"),
         2 => tr("mar"),
-        3 => tr("kwi"),
-        4 => tr("maj"),
-        5 => tr("cze"),
-        6 => tr("lip"),
-        7 => tr("sie"),
-        8 => tr("wrz"),
-        9 => tr("paz"),
-        10 => tr("lis"),
-        11 => tr("gru"),
+        3 => tr("apr"),
+        4 => tr("may"),
+        5 => tr("jun"),
+        6 => tr("jul"),
+        7 => tr("aug"),
+        8 => tr("sep"),
+        9 => tr("oct"),
+        10 => tr("nov"),
+        11 => tr("dec"),
         _ => tr("text"),
     }
     .to_owned()

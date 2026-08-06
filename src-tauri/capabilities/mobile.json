@@ -1,8 +1,18 @@
 {
   "$schema": "../gen/schemas/mobile-schema.json",
   "identifier": "mobile-capability",
-  "description": "Camera access for staff pairing and ticket QR scanning",
-  "windows": ["main"],
-  "platforms": ["iOS", "android"],
-  "permissions": ["barcode-scanner:default"]
+  "description": "Camera access for QR scanning and foreground location access for the AREA game",
+  "windows": [
+    "main"
+  ],
+  "platforms": [
+    "iOS",
+    "android"
+  ],
+  "permissions": [
+    "barcode-scanner:default",
+    "geolocation:allow-check-permissions",
+    "geolocation:allow-request-permissions",
+    "geolocation:allow-get-current-position"
+  ]
 }

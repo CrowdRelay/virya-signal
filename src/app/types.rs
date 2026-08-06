@@ -246,3 +246,17 @@ pub(super) struct AnonymousFeedbackArgs<'a> {
     pub category: &'a str,
     pub message: &'a str,
 }
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AreaDropArgs<'a> {
+    pub drop_id: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AreaClaimArgs<'a> {
+    pub drop_id: &'a str,
+    pub challenge: &'a str,
+    pub samples: &'a [crate::models::AreaPositionSample],
+}

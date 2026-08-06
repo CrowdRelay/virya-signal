@@ -461,10 +461,12 @@ pub struct AreaWallet {
     #[serde(default)]
     pub claims: Vec<AreaClaim>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub vouchers: Vec<AreaVoucher>,
     #[serde(default)]
     pub live_drops: Vec<AreaLiveDrop>,
     #[serde(default)]
+    #[allow(dead_code)]
     pub migration_required: bool,
 }
 
@@ -484,13 +486,19 @@ pub struct AreaCommunity {
 #[serde(rename_all = "camelCase")]
 pub struct AreaClaim {
     pub drop_id: String,
+    #[allow(dead_code)]
     pub number: String,
+    #[allow(dead_code)]
     pub city: String,
+    #[allow(dead_code)]
     pub line: String,
+    #[allow(dead_code)]
     pub track: String,
+    #[allow(dead_code)]
     pub edition: String,
     #[allow(dead_code)]
     pub claimed_at: String,
+    #[allow(dead_code)]
     pub edition_number: Option<u32>,
 }
 
@@ -513,6 +521,52 @@ pub struct AreaVoucher {
 pub struct AreaLiveDrop {
     #[allow(dead_code)]
     pub id: String,
+}
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaChallenge {
+    pub challenge: String,
+    #[allow(dead_code)]
+    pub issued_at: u64,
+    #[allow(dead_code)]
+    pub expires_at: u64,
+    pub min_samples: u32,
+    pub max_samples: u32,
+    pub min_duration_ms: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaPositionSample {
+    pub lat: f64,
+    pub lng: f64,
+    pub accuracy: f64,
+    pub captured_at: u64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaClaimResult {
+    #[allow(dead_code)]
+    pub ok: bool,
+    pub already_claimed: bool,
+    pub collectible: Option<AreaCollectible>,
+    pub reward_credits_awarded: u32,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaCollectible {
+    #[allow(dead_code)]
+    pub drop_id: String,
+    pub number: String,
+    pub city: String,
+    #[allow(dead_code)]
+    pub line: String,
+    pub track: String,
+    pub edition: String,
+    #[allow(dead_code)]
+    pub riddle: String,
 }
 
 // Operator responses keep diagnostics that are not shown on the compact screen yet.

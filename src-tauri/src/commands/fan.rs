@@ -14,9 +14,10 @@ use crate::{
     AppError, AppState, MAX_SECRET_BYTES,
     api::{SignalMerchBundleCatalog, TicketCheckoutInput, TicketCheckoutStart, TicketSaleOffer},
     models::{
-        AdmissionPass, FanAuthResult, FanConfirmationInput, FanEventInterest, FanProfile,
-        FanSessionStatus, FanSignupInput, MerchCatalog, PublicEvent, ReferralProgress,
-        TicketWallet, TicketWalletApi, WalletBatch, WalletCredential, WalletTicket,
+        AdmissionPass, AreaChallenge, AreaClaimResult, AreaPositionSample, FanAuthResult,
+        FanConfirmationInput, FanEventInterest, FanProfile, FanSessionStatus, FanSignupInput,
+        MerchCatalog, PublicEvent, ReferralProgress, TicketWallet, TicketWalletApi, WalletBatch,
+        WalletCredential, WalletTicket,
     },
     session::{fan_profile, persist_fan, run_blocking},
     validation::{bounded_secret, validate_fan_confirmation, validate_fan_signup, validate_pin},
@@ -171,6 +172,47 @@ pub(crate) async fn fan_area_wallet(
 ) -> Result<crate::models::AreaWallet, AppError> {
     let profile = fan_profile(&state).await?;
     state.api.fan_area_wallet(&profile).await
+}
+
+#[tauri::command]
+pub(crate) async fn fan_area_challenge(
+    state: State<'_, AppState>,
+    drop_id: String,
+) -> Result<AreaChallenge, AppError> {
+    let profile = fan_profile(&state).await?;
+    state.api.fan_area_challenge(&profile, &drop_id).await
+}
+
+#[tauri::command]
+pub(crate) async fn fan_area_claim(
+    state: State<'_, AppState>,
+    drop_id: String,
+    challenge: String,
+    samples: Vec<AreaPositionSample>,
+) -> Result<AreaClaimResult, AppError> {
+    let challenge = challenge.trim();
+    if !(40..=2048).contains(&challenge.len())
+        || samples.len() < 3
+        || samples.len() > 8
+        || samples.iter().any(|sample| {
+            !sample.lat.is_finite()
+                || !(-90.0..=90.0).contains(&sample.lat)
+                || !sample.lng.is_finite()
+                || !(-180.0..=180.0).contains(&sample.lng)
+                || !sample.accuracy.is_finite()
+                || !(0.0..=10_000.0).contains(&sample.accuracy)
+                || sample.captured_at == 0
+        })
+    {
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_area_claim_invalid").into(),
+        ));
+    }
+    let profile = fan_profile(&state).await?;
+    state
+        .api
+        .fan_area_claim(&profile, &drop_id, challenge, &samples)
+        .await
 }
 
 #[tauri::command]

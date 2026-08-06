@@ -1,5 +1,5 @@
 use crate::{i18n, util::OptionValueOrElseExt};
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(inline_js = r#"
@@ -12,6 +12,9 @@ let viryaTexts = {
   operationTimeout: 'Operation {command} timed out.',
   cameraModuleUnavailable: 'The camera permission module is unavailable in this app version.',
   cameraDenied: 'Camera access is denied. Enable Camera for Virya Signal in the app settings.',
+  locationModuleUnavailable: 'The location module is unavailable in this app version.',
+  locationDenied: 'Location access is denied. Enable Location for Virya Signal in the app settings.',
+  locationUnavailable: 'Could not read a fresh location. Move outdoors and retry.',
   scannerLabel: 'QR code scanner', scannerTitle: 'SCAN QR CODE', scannerHint: 'Place the code inside the frame', scannerCancel: '← CANCEL SCANNING', scannerClosing: 'CLOSING…', scannerUnavailable: 'The scanner is available only in the iOS/Android app.',
   unknownError: 'Unknown application error', reportType: 'Type', reportTime: 'Time', reportOperation: 'Operation', reportPath: 'Path', reportError: 'Error',
   diagnostics: 'VIRYA SIGNAL / DIAGNOSTICS', previousFailure: 'The previous launch ended with an error', currentFailure: 'The app caught an error', reportHelp: 'We do not hide failures. Copy the report and send it with a note about what you tapped.', copyReport: 'COPY REPORT', restart: 'RESTART APP', close: 'CLOSE', reportCopied: 'Report copied.', copyManually: 'Press and hold the report text and copy it manually.', interrupted: 'The previous launch interrupted operation {command}.', uncleanShutdown: 'The previous launch ended without a clean shutdown.'
@@ -238,6 +241,76 @@ export async function viryaScanQr() {
 }
 
 
+function viryaLocationState(value) {
+  if (typeof value === 'string') return value;
+  return value?.location ?? value?.coarseLocation ?? value?.status ?? value?.state ?? 'prompt';
+}
+
+async function viryaEnsureLocationPermission(core) {
+  if (!core?.invoke) throw new Error(viryaTexts.locationModuleUnavailable);
+  let permissions;
+  try {
+    permissions = await core.invoke('plugin:geolocation|check_permissions');
+  } catch {
+    throw new Error(viryaTexts.locationModuleUnavailable);
+  }
+  let state = viryaLocationState(permissions);
+  if (state === 'prompt' || state === 'prompt-with-rationale') {
+    permissions = await core.invoke('plugin:geolocation|request_permissions', {
+      permissions: ['location'],
+    });
+    state = viryaLocationState(permissions);
+  }
+  if (state !== 'granted') throw new Error(viryaTexts.locationDenied);
+}
+
+function viryaNormalizePosition(position) {
+  const coords = position?.coords;
+  const lat = Number(coords?.latitude);
+  const lng = Number(coords?.longitude);
+  const accuracy = Number(coords?.accuracy);
+  const capturedAt = Math.round(Number(position?.timestamp) || Date.now());
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
+      !Number.isFinite(lng) || lng < -180 || lng > 180 ||
+      !Number.isFinite(accuracy) || accuracy < 0 || accuracy > 10000) {
+    throw new Error(viryaTexts.locationUnavailable);
+  }
+  return { lat, lng, accuracy, capturedAt };
+}
+
+export async function viryaCurrentPosition() {
+  const core = await viryaWaitForNativeCore();
+  await viryaEnsureLocationPermission(core);
+  try {
+    const position = await core.invoke('plugin:geolocation|get_current_position', {
+      options: { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+    });
+    return viryaNormalizePosition(position);
+  } catch (error) {
+    window.console?.warn?.('[virya:location] current position failed', error);
+    throw new Error(viryaTexts.locationUnavailable);
+  }
+}
+
+export async function viryaCollectLocationSamples(minSamples, maxSamples, minDurationMs) {
+  const minimum = Math.max(3, Math.min(Number(minSamples) || 3, 8));
+  const maximum = Math.max(minimum, Math.min(Number(maxSamples) || 8, 8));
+  const duration = Math.max(3000, Math.min(Number(minDurationMs) || 6000, 20000));
+  const startedAt = Date.now();
+  const samples = [];
+  while (samples.length < maximum) {
+    samples.push(await viryaCurrentPosition());
+    const elapsed = Date.now() - startedAt;
+    if (samples.length >= minimum && elapsed >= duration) break;
+    await sleep(Math.min(1500, Math.max(700, duration - elapsed)));
+  }
+  if (samples.length < minimum || samples.at(-1).capturedAt - samples[0].capturedAt < duration) {
+    throw new Error(viryaTexts.locationUnavailable);
+  }
+  return samples;
+}
+
+
 const VIRYA_FAILURE_STORAGE_KEY = 'virya:last-runtime-failure:v2';
 const VIRYA_FAILURE_HISTORY_KEY = 'virya:runtime-failure-history:v3';
 const MAX_RUNTIME_FAILURES = 8;
@@ -434,6 +507,16 @@ extern "C" {
     #[wasm_bindgen(catch, js_name = viryaScanQr)]
     async fn scan_qr_js() -> Result<JsValue, JsValue>;
 
+    #[wasm_bindgen(catch, js_name = viryaCurrentPosition)]
+    async fn current_position_js() -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(catch, js_name = viryaCollectLocationSamples)]
+    async fn collect_location_samples_js(
+        min_samples: u32,
+        max_samples: u32,
+        min_duration_ms: u32,
+    ) -> Result<JsValue, JsValue>;
+
     #[wasm_bindgen(js_name = viryaInstallRuntimeGuards)]
     fn install_runtime_guards_js();
 
@@ -448,6 +531,9 @@ struct RuntimeTranslations {
     operation_timeout: &'static str,
     camera_module_unavailable: &'static str,
     camera_denied: &'static str,
+    location_module_unavailable: &'static str,
+    location_denied: &'static str,
+    location_unavailable: &'static str,
     scanner_label: &'static str,
     scanner_title: &'static str,
     scanner_hint: &'static str,
@@ -561,47 +647,99 @@ pub async fn scan_qr() -> Result<Option<String>, String> {
     let value = scan_qr_js().await.map_err(js_error)?;
     let value = value
         .as_string()
-        .ok_or_else(|| i18n::tr("skaner_nie_zwroci_kodu").to_owned())?;
+        .ok_or_else(|| i18n::tr("scanner_returned_no_code").to_owned())?;
     if value == CANCELLED {
         return Ok(None);
     }
     let value = value.trim();
     if value.is_empty() {
-        Err(i18n::tr("skaner_nie_zwroci_kodu").to_owned())
+        Err(i18n::tr("scanner_returned_no_code").to_owned())
     } else {
         Ok(Some(value.to_owned()))
     }
 }
 
+pub async fn current_position() -> Result<crate::models::AreaPositionSample, String> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct RawPosition {
+        lat: f64,
+        lng: f64,
+        accuracy: f64,
+        captured_at: u64,
+    }
+
+    let value = current_position_js().await.map_err(js_error)?;
+    let value: RawPosition = serde_wasm_bindgen::from_value(value).map_err(decode_error)?;
+    Ok(crate::models::AreaPositionSample {
+        lat: value.lat,
+        lng: value.lng,
+        accuracy: value.accuracy,
+        captured_at: value.captured_at,
+    })
+}
+
+pub async fn collect_location_samples(
+    min_samples: u32,
+    max_samples: u32,
+    min_duration_ms: u32,
+) -> Result<Vec<crate::models::AreaPositionSample>, String> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct RawPosition {
+        lat: f64,
+        lng: f64,
+        accuracy: f64,
+        captured_at: u64,
+    }
+
+    let value = collect_location_samples_js(min_samples, max_samples, min_duration_ms)
+        .await
+        .map_err(js_error)?;
+    let values: Vec<RawPosition> = serde_wasm_bindgen::from_value(value).map_err(decode_error)?;
+    Ok(values
+        .into_iter()
+        .map(|value| crate::models::AreaPositionSample {
+            lat: value.lat,
+            lng: value.lng,
+            accuracy: value.accuracy,
+            captured_at: value.captured_at,
+        })
+        .collect())
+}
+
 pub fn install_runtime_guards() {
     let translations = RuntimeTranslations {
-        native_bridge_unavailable: i18n::tr("natywny_most_aplikacji_nie_jest_dostepny"),
-        operation_timeout: i18n::tr("operacja_command_przekroczya_limit_czasu"),
-        camera_module_unavailable: i18n::tr("modu_uprawnien_aparatu_nie_jest_dostepny_w_tej"),
-        camera_denied: i18n::tr("brak_dostepu_do_aparatu_wacz_aparat_dla_virya"),
-        scanner_label: i18n::tr("skaner_kodu_qr"),
-        scanner_title: i18n::tr("skanuj_kod_qr"),
-        scanner_hint: i18n::tr("umiesc_kod_wewnatrz_ramki"),
-        scanner_cancel: i18n::tr("anuluj_skanowanie"),
-        scanner_closing: i18n::tr("zamykam"),
-        scanner_unavailable: i18n::tr("skaner_jest_dostepny_tylko_w_aplikacji_ios_android"),
-        unknown_error: i18n::tr("nieznany_bad_aplikacji"),
-        report_type: i18n::tr("rodzaj"),
-        report_time: i18n::tr("czas"),
-        report_operation: i18n::tr("operacja"),
-        report_path: i18n::tr("sciezka"),
-        report_error: i18n::tr("bad"),
-        diagnostics: i18n::tr("virya_signal_diagnostyka"),
-        previous_failure: i18n::tr("poprzednie_uruchomienie_zakonczyo_sie_bedem"),
-        current_failure: i18n::tr("aplikacja_zatrzymaa_bad"),
-        report_help: i18n::tr("nie_ukrywamy_awarii_skopiuj_raport_i_wyslij_go"),
-        copy_report: i18n::tr("kopiuj_raport"),
-        restart: i18n::tr("uruchom_ponownie"),
-        close: i18n::tr("zamknij"),
-        report_copied: i18n::tr("raport_skopiowany"),
-        copy_manually: i18n::tr("przytrzymaj_tekst_raportu_i_skopiuj_recznie"),
-        interrupted: i18n::tr("poprzednie_uruchomienie_przerwao_operacje_command"),
-        unclean_shutdown: i18n::tr("poprzednie_uruchomienie_zakonczyo_sie_bez_czystego_zamkniecia"),
+        native_bridge_unavailable: i18n::tr("native_app_bridge_is_unavailable"),
+        operation_timeout: i18n::tr("operation_command_timed_out"),
+        camera_module_unavailable: i18n::tr("camera_permission_module_is_unavailable_in_this"),
+        camera_denied: i18n::tr("camera_access_is_denied_enable_camera_for"),
+        location_module_unavailable: i18n::tr("location_module_is_unavailable_in_this_app"),
+        location_denied: i18n::tr("location_access_is_denied_enable_location_for"),
+        location_unavailable: i18n::tr("could_not_read_a_fresh_location_move"),
+        scanner_label: i18n::tr("qr_code_scanner"),
+        scanner_title: i18n::tr("scan_qr_code_2"),
+        scanner_hint: i18n::tr("place_the_code_inside_the_frame"),
+        scanner_cancel: i18n::tr("back_cancel_scanning"),
+        scanner_closing: i18n::tr("closing"),
+        scanner_unavailable: i18n::tr("scanner_is_available_only_in_the_ios"),
+        unknown_error: i18n::tr("unknown_application_error"),
+        report_type: i18n::tr("type"),
+        report_time: i18n::tr("time"),
+        report_operation: i18n::tr("operation"),
+        report_path: i18n::tr("path"),
+        report_error: i18n::tr("bug_label"),
+        diagnostics: i18n::tr("virya_signal_diagnostics"),
+        previous_failure: i18n::tr("previous_launch_ended_with_an_error"),
+        current_failure: i18n::tr("app_caught_an_error"),
+        report_help: i18n::tr("we_do_not_hide_failures_copy_the"),
+        copy_report: i18n::tr("copy_report"),
+        restart: i18n::tr("restart_app"),
+        close: i18n::tr("close"),
+        report_copied: i18n::tr("report_copied"),
+        copy_manually: i18n::tr("press_and_hold_the_report_text_and"),
+        interrupted: i18n::tr("previous_launch_interrupted_operation_command"),
+        unclean_shutdown: i18n::tr("previous_launch_ended_without_a_clean_shutdown"),
     };
     if let Ok(value) = serde_wasm_bindgen::to_value(&translations) {
         set_runtime_translations_js(value);
@@ -612,9 +750,9 @@ pub fn install_runtime_guards() {
 fn decode_error(error: serde_wasm_bindgen::Error) -> String {
     let raw = error.to_string();
     if raw.len() > 200 {
-        i18n::tr("odpowiedz_serwera_ma_nieoczekiwany_format").to_owned()
+        i18n::tr("server_response_has_an_unexpected_format").to_owned()
     } else {
-        i18n::format("bad_odczytu_odpowiedzi_raw", &[raw])
+        i18n::format("response_decoding_error_raw", &[raw])
     }
 }
 
@@ -631,5 +769,5 @@ fn js_error(value: JsValue) -> String {
                 .ok()
                 .and_then(|v| v.as_string())
         })
-        .value_or_else(|| i18n::tr("nieznany_bad_aplikacji").to_owned())
+        .value_or_else(|| i18n::tr("unknown_application_error").to_owned())
 }

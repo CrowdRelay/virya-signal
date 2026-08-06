@@ -50,7 +50,7 @@ if tomllib is not None:
 
 required = [
     'src-tauri/src/lib.rs', 'src-tauri/src/api/mod.rs', 'src-tauri/src/api/ticketing.rs', 'src-tauri/src/vault.rs',
-    'src/app/mod.rs', 'src/bridge.rs', 'src-tauri/capabilities/mobile.json',
+    'src/app/mod.rs', 'src/app/area.rs', 'src/bridge.rs', 'src-tauri/capabilities/mobile.json',
     '.github/workflows/check.yml', '.github/workflows/mobile-smoke.yml',
     'rust-toolchain.toml', '.cargo/config.toml', 'scripts/collect-mobile-artifact.py', 'boot.js', 'boot-i18n.js',
     'boot-initializer.mjs', 'scripts/generate-boot-i18n.py',
@@ -68,7 +68,8 @@ for item in required:
     if not (root / item).is_file():
         raise SystemExit(f'missing {item}')
 
-ui = (root / 'src/app/mod.rs').read_text()
+ui_main = (root / 'src/app/mod.rs').read_text()
+ui = ui_main + '\n' + (root / 'src/app/area.rs').read_text()
 native = (root / 'src-tauri/src/lib.rs').read_text()
 api = '\n'.join(
     path.read_text(encoding='utf-8')
@@ -79,6 +80,11 @@ boot = (root / 'boot.js').read_text()
 index = (root / 'index.html').read_text()
 pl_catalog, en_catalog = load_catalog_pair(root)
 i18n_keys = set(pl_catalog)
+invalid_i18n_keys = sorted(
+    key for key in i18n_keys if not re.fullmatch(r'[a-z][a-z0-9_]*', key)
+)
+if invalid_i18n_keys:
+    raise SystemExit(f'i18n identifiers must use English ASCII snake_case: {invalid_i18n_keys}')
 i18n_source_paths = [
     *source_files('*.rs'),
     root / 'boot.js',
@@ -107,9 +113,9 @@ for required_i18n_file in (
         raise SystemExit(f'missing {required_i18n_file}')
 if 'virya:language:v1' not in (root / 'src/i18n/mod.rs').read_text():
     raise SystemExit('language preference must be persisted locally')
-if '<LanguageSwitch />' not in ui or ui.count('<LanguageSwitch />') < 2:
+if '<LanguageSwitch />' not in ui_main or ui_main.count('<LanguageSwitch />') < 2:
     raise SystemExit('language switch must be available in fan and staff settings')
-if 'locale: i18n::current().code()' not in ui and 'locale: i18n::current().code().to_owned()' not in ui:
+if 'locale: i18n::current().code()' not in ui_main and 'locale: i18n::current().code().to_owned()' not in ui_main:
     raise SystemExit('fan API locale must follow the selected language')
 if re.search(r'[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]', ui):
     raise SystemExit('Polish UI copy must live in the i18n catalog, not src/app/mod.rs')
@@ -156,13 +162,13 @@ for contract in (
     'FanTicketSale',
     'fan_ticket_sale',
     'fan_start_ticket_checkout',
-    'przejdz_do_patnosci_stripe',
-    'otworz_patnosc_ponownie',
-    '<FanNavButton tab=tab own=FanTab::Merch icon="shop" label=tr("sklep")/>',
-    'kup_w_sklepie',
+    'continue_to_stripe_payment',
+    'reopen_payment',
+    '<FanNavButton tab=tab own=FanTab::Merch icon="shop" label=tr("store_tab")/>',
+    'buy_in_store',
     'fan_merch_bundles',
     'submit_anonymous_feedback',
-    'anonimowy_feedback',
+    'anonymous_feedback',
 ):
     if contract not in ui:
         raise SystemExit(f'fan commerce UX contract is missing: {contract}')
@@ -190,8 +196,8 @@ if 'Zeroizing::new(response.checkout_token)' not in native_fan:
 for contract in (
     'fn new_operator_pin_is_valid',
     '(4..=6).contains(&pin.len())',
-    'utworz_pin_do_odblokowania',
-    'wpisz_46_cyfr_np_2580_to_pin_tylko',
+    'create_an_unlock_pin',
+    'enter_4_6_digits_for_example_2580',
     'inputmode="numeric"',
     'vault::save_verified',
 ):
@@ -209,12 +215,12 @@ if 'operator_pin_survives_a_fresh_vault_round_trip' not in vault:
 if 'native_operator_pin_4_6' not in validation:
     raise SystemExit('native staff PIN validation contract is missing')
 
-operator_nav = ui[ui.find('<nav class="overflow-menu">'):ui.find('<div class="content">')]
+operator_nav = ui_main[ui_main.find('<nav class="overflow-menu">'):ui_main.find('<div class="content">')]
 if 'OperatorTab::Signal' in operator_nav:
     raise SystemExit('staff Signal must live in the bottom navigation, not the overflow menu')
 for contract in (
     '<nav class="bottom-nav four primary-four">',
-    '<NavButton tab=tab own=OperatorTab::Signal icon="signal" label=tr("sygna_2") />',
+    '<NavButton tab=tab own=OperatorTab::Signal icon="signal" label=tr("signal_tab") />',
 ):
     if contract not in ui:
         raise SystemExit(f'staff four-tab navigation contract is missing: {contract}')
@@ -225,9 +231,34 @@ for contract in (
     '.advanced-config > .ghost { width: 100%; min-height: 54px;',
     'align-items: stretch',
     'height: 100%',
+    '.ticket-pool-status {',
+    '.area-native-map {',
 ):
     if contract not in css:
         raise SystemExit(f'mobile UX consistency contract is missing: {contract}')
+
+for contract in (
+    'tauri-plugin-geolocation = "2.3.2"',
+    'tauri_plugin_geolocation::init()',
+    'geolocation:allow-get-current-position',
+    'geolocation:allow-request-permissions',
+):
+    source = (
+        (root / 'src-tauri/Cargo.toml').read_text()
+        + native
+        + (root / 'src-tauri/capabilities/mobile.json').read_text()
+    )
+    if contract not in source:
+        raise SystemExit(f'native AREA geolocation contract is missing: {contract}')
+for contract in (
+    'fan_area_challenge',
+    'fan_area_claim',
+    'collect_location_samples',
+    'AreaGameScreen',
+    'area_location_privacy',
+):
+    if contract not in ui + bridge + native_fan:
+        raise SystemExit(f'native AREA game contract is missing: {contract}')
 
 index = (root / 'index.html').read_text()
 boot = (root / 'boot.js').read_text()
@@ -294,7 +325,7 @@ for contract in (
     'RwSignal::new(RootMode::Fan)',
     'RootMode::StaffGate',
     'verify_staff_access',
-    'jestes_w_staffie',
+    'are_you_on_the_staff',
     '<NavGlyph icon=icon/>',
     '<StatusFailure',
     'status_failed=fan_status_failed',

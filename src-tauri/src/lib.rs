@@ -19,11 +19,11 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use api::CrowdRelayClient;
 use commands::{
     fan::{
-        fan_admission_pass, fan_admission_qr, fan_area_wallet, fan_claim_pass, fan_confirm,
-        fan_events, fan_forget, fan_import_wallet, fan_interests, fan_lock, fan_merch_bundles,
-        fan_merch_catalog, fan_referral, fan_register_interest, fan_request_access,
-        fan_request_delivery, fan_signup, fan_start_ticket_checkout, fan_status, fan_ticket_sale,
-        fan_unlock, fan_wallets, render_wallet_qr,
+        fan_admission_pass, fan_admission_qr, fan_area_challenge, fan_area_claim, fan_area_wallet,
+        fan_claim_pass, fan_confirm, fan_events, fan_forget, fan_import_wallet, fan_interests,
+        fan_lock, fan_merch_bundles, fan_merch_catalog, fan_referral, fan_register_interest,
+        fan_request_access, fan_request_delivery, fan_signup, fan_start_ticket_checkout,
+        fan_status, fan_ticket_sale, fan_unlock, fan_wallets, render_wallet_qr,
     },
     misc::{
         launcher_status, open_external_url, request_city, submit_anonymous_feedback,
@@ -79,7 +79,10 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             #[cfg(mobile)]
-            app.handle().plugin(tauri_plugin_barcode_scanner::init())?;
+            {
+                app.handle().plugin(tauri_plugin_barcode_scanner::init())?;
+                app.handle().plugin(tauri_plugin_geolocation::init())?;
+            }
             let app_data_dir = app.path().app_local_data_dir()?;
             let crash_report_path = app_data_dir.join(crash::NATIVE_CRASH_REPORT_FILE);
             let _ = crash::NATIVE_CRASH_REPORT_PATH.set(crash_report_path);
@@ -145,6 +148,8 @@ pub fn run() {
             fan_ticket_sale,
             fan_start_ticket_checkout,
             fan_area_wallet,
+            fan_area_challenge,
+            fan_area_claim,
             fan_referral,
             fan_interests,
             fan_admission_pass,

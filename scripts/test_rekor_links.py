@@ -15,7 +15,7 @@ class RekorLinkTests(unittest.TestCase):
     def test_fan_draw_card_opens_public_proof(self):
         app = (ROOT / "src/app/mod.rs").read_text()
         self.assertIn("/pl/dowody/losowania/{}/?source=signal-app", app)
-        self.assertIn('label=tr("dowod")', app)
+        self.assertIn('label=tr("proof")', app)
         self.assertIn("open_external_url", app)
 
 

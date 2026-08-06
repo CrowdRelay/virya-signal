@@ -1,9 +1,11 @@
 use crate::i18n::{self, Language, tr};
 use crate::util::{OptionValueOrElseExt, OptionValueOrExt};
 
+mod area;
 mod formatters;
 mod types;
 
+use area::AreaGameScreen;
 use formatters::{
     day, event_location, event_time_location, human_time, local_to_rfc3339, money, month, optional,
 };
@@ -97,7 +99,7 @@ pub fn App() -> impl IntoView {
 
 #[component]
 fn BackButton(mode: RwSignal<RootMode>) -> impl IntoView {
-    view! { <button class="back-button" on:click=move |_| mode.set(RootMode::Fan)>{tr("sygna")}</button> }
+    view! { <button class="back-button" on:click=move |_| mode.set(RootMode::Fan)>{tr("back_signal")}</button> }
 }
 
 #[component]
@@ -109,7 +111,7 @@ fn StaffEntryButton(mode: RwSignal<RootMode>) -> impl IntoView {
             on:click=move |_| mode.set(RootMode::StaffGate)
         >
             <span aria-hidden="true">"⌁"</span>
-            {tr("jestes_w_staffie")}
+            {tr("are_you_on_the_staff")}
         </button>
     }
 }
@@ -125,9 +127,7 @@ fn StaffGate(mode: RwSignal<RootMode>, error: RwSignal<Option<String>>) -> impl 
         }
         let current_password = password.get_untracked();
         if current_password.is_empty() {
-            error.set(Some(
-                tr("podaj_haso_staff_uzywane_w_panelu_virya").to_owned(),
-            ));
+            error.set(Some(tr("enter_the_staff_password_used_in_the").to_owned()));
             return;
         }
         busy.set(true);
@@ -155,22 +155,22 @@ fn StaffGate(mode: RwSignal<RootMode>, error: RwSignal<Option<String>>) -> impl 
                 disabled=move || busy.get()
                 on:click=move |_| mode.set(RootMode::Fan)
             >
-                {tr("sygna")}
+                {tr("back_signal")}
             </button>
             <header class="hero compact staff-gate-hero">
                 <p class="eyebrow">"VIRYA / STAFF"</p>
-                <h1>{tr("strefa")}<em>{tr("zespou")}</em></h1>
-                <p>{tr("dostep_do_bramki_sprzedazy_i_obsugi_koncertu_jest")}</p>
+                <h1>{tr("zone_prefix")}<em>{tr("team_zone_suffix")}</em></h1>
+                <p>{tr("gate_sales_and_show_operations_access_is")}</p>
             </header>
             <div class="access-card staff-gate-card">
                 <div class="staff-gate-lock" aria-hidden="true">"⌁"</div>
                 <div>
-                    <p class="eyebrow">{tr("weryfikacja_staff")}</p>
-                    <h2>{tr("haso_panelu_virya")}</h2>
-                    <p>{tr("uzyj_tego_samego_hasa_co_w_qr_bramce")}</p>
+                    <p class="eyebrow">{tr("staff_verification")}</p>
+                    <h2>{tr("virya_panel_password")}</h2>
+                    <p>{tr("use_the_same_password_as_in_qr")}</p>
                 </div>
                 <label>
-                    {tr("haso_staff")}
+                    {tr("staff_password")}
                     <input
                         type="password"
                         autocomplete="current-password"
@@ -184,9 +184,9 @@ fn StaffGate(mode: RwSignal<RootMode>, error: RwSignal<Option<String>>) -> impl 
                     disabled=move || busy.get() || password.get().is_empty()
                     on:click=submit
                 >
-                    {move || if busy.get() { tr("sprawdzam") } else { tr("otworz_strefe_staff") }}
+                    {move || if busy.get() { tr("checking") } else { tr("open_staff_zone") }}
                 </button>
-                <p class="staff-gate-note">{tr("haso_jest_sprawdzane_po_stronie_virya_music_nie")}</p>
+                <p class="staff-gate-note">{tr("password_is_verified_by_virya_music_and")}</p>
             </div>
         </section>
     }
@@ -206,9 +206,9 @@ fn OperatorPortal(
 
     view! {
         {move || if status_failed.get() {
-            view! { <StatusFailure mode=mode status_refresh=status_refresh label=tr("nie_udao_sie_odczytac_sejfu_staff") show_back=true /> }.into_any()
+            view! { <StatusFailure mode=mode status_refresh=status_refresh label=tr("failed_to_read_the_staff_vault") show_back=true /> }.into_any()
         } else if status_loading.get() {
-            view! { <AccessLoader mode=mode label=tr("sprawdzam_bezpieczny_sejf") show_back=true /> }.into_any()
+            view! { <AccessLoader mode=mode label=tr("checking_the_secure_vault") show_back=true /> }.into_any()
         } else if status.get().unlocked {
             view! { <OperatorApp mode=mode status=status dashboard=dashboard tab=tab error=error /> }.into_any()
         } else {
@@ -242,8 +242,10 @@ fn OperatorAccess(
 
     let unlock = move |_| {
         let current_pin = pin.get();
-        if current_pin.chars().count() < 4 {
-            error.set(Some(tr("pin_musi_miec_co_najmniej_4_znaki").to_owned()));
+        if !new_operator_pin_is_valid(&current_pin) {
+            error.set(Some(
+                tr("pin_must_contain_at_least_4_characters").to_owned(),
+            ));
             return;
         }
         busy.set(true);
@@ -263,9 +265,7 @@ fn OperatorAccess(
     let pair = move |payload: String| {
         let current_pin = pin.get();
         if !new_operator_pin_is_valid(&current_pin) || payload.trim().is_empty() {
-            error.set(Some(
-                tr("podaj_46_cyfrowy_pin_i_zeskanuj_albo_wklej").to_owned(),
-            ));
+            error.set(Some(tr("enter_a_4_6_digit_pin_and").to_owned()));
             return;
         }
         busy.set(true);
@@ -315,9 +315,7 @@ fn OperatorAccess(
             bearer_token: token.get(),
         };
         if !new_operator_pin_is_valid(&current_pin) || profile.bearer_token.trim().len() < 24 {
-            error.set(Some(
-                tr("podaj_46_cyfrowy_pin_i_poprawny_token_urzadzenia").to_owned(),
-            ));
+            error.set(Some(tr("enter_a_4_6_digit_pin_and_2").to_owned()));
             return;
         }
         busy.set(true);
@@ -347,8 +345,8 @@ fn OperatorAccess(
             <BackButton mode=mode />
             <header class="hero compact">
                 <p class="eyebrow">{tr("virya_control")}</p>
-                <h1>{tr("sparuj")}<em>{tr("urzadzenie")}</em></h1>
-                <p>{tr("bez_przepisywania_api_roli_i_dugiego_sekretu")}</p>
+                <h1>{tr("pair")}<em>{tr("device_label")}</em></h1>
+                <p>{tr("no_retyping_the_api_role_or_long")}</p>
             </header>
             <div class="access-card">
                 <Show when=move || status.get().configured fallback=move || view! {
@@ -356,49 +354,49 @@ fn OperatorAccess(
                         <Show when=move || pairing.get().trim().is_empty() fallback=move || view! {
                             <div class="pairing-scanned">
                                 <span class="pairing-ok">"✓"</span>
-                                <strong>{tr("kod_zeskanowany")}</strong>
-                                <small>{tr("wpisz_pin_ponizej_i_kliknij_sparuj")}</small>
+                                <strong>{tr("code_scanned")}</strong>
+                                <small>{tr("enter_the_pin_below_and_tap_pair")}</small>
                             </div>
                         }>
                             <button class="pairing-scan primary" on:click=scan_pairing disabled=move || busy.get()>
                                 <span class="pairing-qr">"▦"</span>
-                                <strong>{move || if busy.get() { tr("acze") } else { tr("zeskanuj_kod_qr") }}</strong>
-                                <small>{tr("kod_pokazany_w_panelu_virya")}</small>
+                                <strong>{move || if busy.get() { tr("connecting") } else { tr("scan_qr_code") }}</strong>
+                                <small>{tr("code_shown_in_the_virya_panel")}</small>
                             </button>
                         </Show>
-                        <div class="pairing-divider"><span></span><small>{tr("albo")}</small><span></span></div>
-                        <label>{tr("kod_parowania")}<textarea rows="2" placeholder="virya-signal://pair?…" prop:value=move || pairing.get() on:input=move |e| pairing.set(event_target_value(&e))></textarea></label>
+                        <div class="pairing-divider"><span></span><small>{tr("or_label")}</small><span></span></div>
+                        <label>{tr("pairing_code")}<textarea rows="2" placeholder="virya-signal://pair?…" prop:value=move || pairing.get() on:input=move |e| pairing.set(event_target_value(&e))></textarea></label>
                         <label class="pin-field">
-                            <span class="pin-field-label">{tr("utworz_pin_do_odblokowania")}</span>
-                            <small id="operator-new-pin-help">{tr("wpisz_46_cyfr_np_2580_to_pin_tylko")}</small>
-                            <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("np_2580") aria-describedby="operator-new-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) />
+                            <span class="pin-field-label">{tr("create_an_unlock_pin")}</span>
+                            <small id="operator-new-pin-help">{tr("enter_4_6_digits_for_example_2580")}</small>
+                            <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="operator-new-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) />
                         </label>
-                        <button class="primary" on:click=submit_pairing disabled=move || busy.get() || pairing.get().trim().is_empty() || !new_operator_pin_is_valid(&pin.get())>{tr("sparuj_2")}</button>
+                        <button class="primary" on:click=submit_pairing disabled=move || busy.get() || pairing.get().trim().is_empty() || !new_operator_pin_is_valid(&pin.get())>{tr("pair_2")}</button>
                         <button class="text-button" type="button" on:click=move |_| advanced.update(|v| *v = !*v)>
-                            {move || if advanced.get() { tr("ukryj_ustawienia_reczne") } else { tr("ustawienia_zaawansowane") }}
+                            {move || if advanced.get() { tr("hide_manual_settings") } else { tr("advanced_settings") }}
                         </button>
                         <Show when=move || advanced.get()>
                             <div class="advanced-config">
-                                <label>{tr("nazwa_urzadzenia_osoby")}<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e)) /></label>
+                                <label>{tr("device_person_name")}<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e)) /></label>
                                 <label>"API CrowdRelay"<input prop:value=move || api.get() on:input=move |e| api.set(event_target_value(&e)) /></label>
                                 <div class="segmented">
                                     <button class:active=move || role.get() == OperatorRole::Owner on:click=move |_| role.set(OperatorRole::Owner)>{tr("owner")}</button>
                                     <button class:active=move || role.get() == OperatorRole::Staff on:click=move |_| role.set(OperatorRole::Staff)>{tr("staff")}</button>
                                 </div>
-                                <label>{tr("token_urzadzenia")}<textarea rows="3" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
-                                <button class="ghost" on:click=configure_manual disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get())>{tr("zapisz_recznie")}</button>
+                                <label>{tr("device_token")}<textarea rows="3" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
+                                <button class="ghost" on:click=configure_manual disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get())>{tr("save_manually")}</button>
                             </div>
                         </Show>
                     </div>
                 }>
                     <div class="form-grid">
-                        <p class="lock-copy">{tr("profil_operatora_jest_zaszyfrowany_lokalnie")}</p>
+                        <p class="lock-copy">{tr("operator_profile_is_encrypted_locally")}</p>
                         <label class="pin-field">
-                            <span class="pin-field-label">{tr("pin_do_odblokowania_aplikacji")}</span>
-                            <small id="operator-unlock-pin-help">{tr("wpisz_pin_ustawiony_podczas_parowania_tego_urzadzenia")}</small>
-                            <input type="password" autocomplete="current-password" inputmode="numeric" placeholder=tr("twoj_pin") aria-describedby="operator-unlock-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e)) />
+                            <span class="pin-field-label">{tr("app_unlock_pin")}</span>
+                            <small id="operator-unlock-pin-help">{tr("enter_the_pin_created_when_this_device")}</small>
+                            <input type="password" autocomplete="current-password" inputmode="numeric" placeholder=tr("your_pin") aria-describedby="operator-unlock-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e)) />
                         </label>
-                        <button class="primary" disabled=move || busy.get() || pin.get().chars().count() < 4 on:click=unlock>{tr("odblokuj")}</button>
+                        <button class="primary" disabled=move || busy.get() || pin.get().chars().count() < 4 on:click=unlock>{tr("unlock")}</button>
                     </div>
                 </Show>
             </div>
@@ -478,16 +476,16 @@ fn OperatorApp(
                 <div on:dblclick=move |_| refresh_operator_parts(dashboard, loading, error) style="cursor:pointer"><p class="eyebrow">{tr("virya_control")}</p><strong>{move || status.get().session.map(|s| s.display_name).value_or_else(Default::default)}</strong></div>
                 <div class="topbar-actions">
                     <span class="role-pill">{move || role().label()}</span>
-                    <button class="menu-trigger" aria-label=tr("otworz_menu") aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|v| *v = !*v)><i></i><i></i><i></i></button>
-                    <button aria-label=tr("zamknij_i_zablokuj_panel") on:click=close>"×"</button>
+                    <button class="menu-trigger" aria-label=tr("open_menu") aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|v| *v = !*v)><i></i><i></i><i></i></button>
+                    <button aria-label=tr("close_and_lock_panel") on:click=close>"×"</button>
                 </div>
             </header>
             <Show when=move || menu_open.get()>
                 <div class="overflow-backdrop" on:click=move |_| menu_open.set(false)></div>
                 <nav class="overflow-menu">
-                    <button class:active=move || tab.get() == OperatorTab::Discounts on:click=move |_| { tab.set(OperatorTab::Discounts); menu_open.set(false); }><span>"%"</span>{tr("znizki")}</button>
-                    <button class:active=move || tab.get() == OperatorTab::Campaigns on:click=move |_| { tab.set(OperatorTab::Campaigns); menu_open.set(false); }><span>"◫"</span>{tr("kody_qr")}</button>
-                    <button class:active=move || tab.get() == OperatorTab::Settings on:click=move |_| { tab.set(OperatorTab::Settings); menu_open.set(false); }><span>"⚙"</span>{tr("ustawienia")}</button>
+                    <button class:active=move || tab.get() == OperatorTab::Discounts on:click=move |_| { tab.set(OperatorTab::Discounts); menu_open.set(false); }><span>"%"</span>{tr("discounts")}</button>
+                    <button class:active=move || tab.get() == OperatorTab::Campaigns on:click=move |_| { tab.set(OperatorTab::Campaigns); menu_open.set(false); }><span>"◫"</span>{tr("qr_codes")}</button>
+                    <button class:active=move || tab.get() == OperatorTab::Settings on:click=move |_| { tab.set(OperatorTab::Settings); menu_open.set(false); }><span>"⚙"</span>{tr("settings")}</button>
                 </nav>
             </Show>
             <div class="content">
@@ -502,10 +500,10 @@ fn OperatorApp(
                 }}
             </div>
             <nav class="bottom-nav four primary-four">
-                <NavButton tab=tab own=OperatorTab::Home icon="home" label=tr("start") />
-                <NavButton tab=tab own=OperatorTab::Signal icon="signal" label=tr("sygna_2") />
-                <NavButton tab=tab own=OperatorTab::Scan icon="scan" label=tr("skan") />
-                <NavButton tab=tab own=OperatorTab::Tickets icon="ticket" label=tr("bilety") />
+                <NavButton tab=tab own=OperatorTab::Home icon="home" label=tr("home_tab") />
+                <NavButton tab=tab own=OperatorTab::Signal icon="signal" label=tr("signal_tab") />
+                <NavButton tab=tab own=OperatorTab::Scan icon="scan" label=tr("scan_tab") />
+                <NavButton tab=tab own=OperatorTab::Tickets icon="ticket" label=tr("tickets_tab") />
             </nav>
         </section>
     }
@@ -571,7 +569,7 @@ fn OperatorHome(
 ) -> impl IntoView {
     view! {
         <section class="screen">
-            <header class="screen-title"><p class="eyebrow">LIVE OPERATIONS</p><h2>{tr("dzisiaj_pod_kontrola")}</h2></header>
+            <header class="screen-title"><p class="eyebrow">LIVE OPERATIONS</p><h2>{tr("today_under_control")}</h2></header>
             <Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }>
             {move || dashboard.with(|state| state.as_ref().map(|data| {
                 let next = data.events.first().cloned();
@@ -586,13 +584,13 @@ fn OperatorHome(
                         let time = human_time(&event.starts_at);
                         let title = event.title;
                         view! {
-                            <article class="hero-card"><p class="eyebrow">{tr("nastepny_koncert")}</p><h3>{title}</h3><p>{location}</p><time>{time}</time></article>
+                            <article class="hero-card"><p class="eyebrow">{tr("next_show")}</p><h3>{title}</h3><p>{location}</p><time>{time}</time></article>
                         }
                     })}
-                    <div class="stats-grid"><Metric value=event_count.to_string() label=tr("koncerty_2")/><Metric value=if qr_loading { "…".to_owned() } else { active.to_string() } label=tr("aktywne_qr")/><Metric value=if qr_loading { "…".to_owned() } else { checkins.to_string() } label=tr("check_iny")/></div>
-                    <div class="section-head"><h3>{tr("nadchodzace")}</h3><span>{event_count}</span></div>
+                    <div class="stats-grid"><Metric value=event_count.to_string() label=tr("shows_count_label")/><Metric value=if qr_loading { "…".to_owned() } else { active.to_string() } label=tr("active_qr")/><Metric value=if qr_loading { "…".to_owned() } else { checkins.to_string() } label=tr("check_ins")/></div>
+                    <div class="section-head"><h3>{tr("upcoming")}</h3><span>{event_count}</span></div>
                     {if events.is_empty() {
-                        view! { <div class="empty-state"><strong>{tr("brak_nadchodzacych_koncertow")}</strong><p>{tr("kiedy_pojawi_sie_nowe_wydarzenie_zobaczysz_je_tutaj")}</p></div> }.into_any()
+                        view! { <div class="empty-state"><strong>{tr("no_upcoming_shows")}</strong><p>{tr("new_events_will_appear_here")}</p></div> }.into_any()
                     } else {
                         view! { <div class="card-list">{events.into_iter().map(|event| view! { <EventCard event=event /> }).collect_view()}</div> }.into_any()
                     }}
@@ -639,22 +637,22 @@ fn OperatorSignal(
         <section class="screen signal-admin-screen">
             <header class="screen-title">
                 <p class="eyebrow">{tr("virya_signal")}</p>
-                <h2>{tr("spoecznosc_i_wzrost")}</h2>
-                <p class="screen-copy">{tr("zbiorczy_obraz_sygnau_bez_danych_osobowych_fanow")}</p>
+                <h2>{tr("community_and_growth")}</h2>
+                <p class="screen-copy">{tr("combined_signal_overview_without_fans_personal_data")}</p>
             </header>
             <Show
                 when=move || owner.get()
                 fallback=move || view! {
                     <div class="empty-state">
-                        <strong>{tr("widok_tylko_dla_ownera")}</strong>
-                        <p>{tr("statystyki_zgod_wzrostu_i_miast_sa_dostepne_wyacznie")}</p>
+                        <strong>{tr("owner_only_view")}</strong>
+                        <p>{tr("consent_growth_and_city_statistics_are_available")}</p>
                     </div>
                 }
             >
                 <div class="signal-admin-toolbar">
-                    <p>{tr("dane_sa_agregowane_w_crowdrelay_i_nie_zawieraja")}</p>
+                    <p>{tr("data_is_aggregated_in_crowdrelay_and_contains")}</p>
                     <button class="text-button" on:click=refresh disabled=move || loading.get()>
-                        {move || if loading.get() { tr("odswiezam") } else { tr("odswiez") }}
+                        {move || if loading.get() { tr("refreshing") } else { tr("refresh") }}
                     </button>
                 </div>
                 <Show when=move || !loading.get() fallback=move || view! { <Skeleton rows=4 /> }>
@@ -665,8 +663,8 @@ fn OperatorSignal(
                             .value_or_else(|| {
                                 view! {
                                     <div class="empty-state">
-                                        <strong>{tr("brak_snapshotu_sygnau")}</strong>
-                                        <p>{tr("odswiez_dane_jezeli_backend_jest_jeszcze_w_trakcie")}</p>
+                                        <strong>{tr("no_signal_snapshot")}</strong>
+                                        <p>{tr("refresh_the_data_if_the_backend_is")}</p>
                                     </div>
                                 }
                                 .into_any()
@@ -698,7 +696,7 @@ fn SignalOverviewContent(data: OperatorSignalOverview) -> impl IntoView {
     } else {
         Some(view! {
             <p class="security-note warning">
-                {i18n::format("snapshot_czesciowy_niedostepne_zroda_value", &[unavailable.join(", ").to_string()])}
+                {i18n::format("partial_snapshot_unavailable_sources", &[unavailable.join(", ").to_string()])}
             </p>
         })
     };
@@ -713,7 +711,7 @@ fn SignalOverviewContent(data: OperatorSignalOverview) -> impl IntoView {
                         <strong>{city.name}</strong>
                         <small>{city.country_code}</small>
                     </div>
-                    <span>{i18n::format("value_aktywnych", &[city.active_fans.max(0).to_string()])}</span>
+                    <span>{i18n::format("active_2", &[city.active_fans.max(0).to_string()])}</span>
                 </article>
             }
         })
@@ -721,8 +719,8 @@ fn SignalOverviewContent(data: OperatorSignalOverview) -> impl IntoView {
     let cities_view = if city_count == 0 {
         view! {
             <div class="empty-state compact">
-                <strong>{tr("brak_agregatu_miast")}</strong>
-                <p>{tr("sygna_nie_ma_jeszcze_potwierdzonych_danych_miejskich_albo")}</p>
+                <strong>{tr("no_city_aggregate")}</strong>
+                <p>{tr("signal_has_no_confirmed_city_data_yet")}</p>
             </div>
         }
         .into_any()
@@ -733,36 +731,36 @@ fn SignalOverviewContent(data: OperatorSignalOverview) -> impl IntoView {
     view! {
         <div class="signal-admin-content">
             <div class="stats-grid">
-                <Metric value=summary.active_fans.max(0).to_string() label=tr("aktywni")/>
-                <Metric value=summary.marketing_opted_in.max(0).to_string() label=tr("zgody_marketingowe")/>
-                <Metric value=activity.new_fans_30d.max(0).to_string() label=tr("nowi_30_dni")/>
+                <Metric value=summary.active_fans.max(0).to_string() label=tr("active_status")/>
+                <Metric value=summary.marketing_opted_in.max(0).to_string() label=tr("marketing_consents")/>
+                <Metric value=activity.new_fans_30d.max(0).to_string() label=tr("new_30_days")/>
             </div>
             <article class="signal-health-card">
                 <div>
-                    <p class="eyebrow">{tr("zdrowie_bazy")}</p>
+                    <p class="eyebrow">{tr("database_health")}</p>
                     <strong>{confirmation_rate}</strong>
-                    <span>{tr("potwierdzonych_sposrod_aktywnych_i_oczekujacych")}</span>
+                    <span>{tr("confirmed_among_active_and_pending")}</span>
                 </div>
                 <dl>
-                    <div><dt>{tr("wszyscy")}</dt><dd>{summary.total_fans.max(0)}</dd></div>
-                    <div><dt>{tr("oczekujacy")}</dt><dd>{summary.pending_fans.max(0)}</dd></div>
-                    <div><dt>{tr("wypisani")}</dt><dd>{summary.unsubscribed_fans.max(0)}</dd></div>
-                    <div><dt>{tr("wyciszeni")}</dt><dd>{summary.suppressed_fans.max(0)}</dd></div>
-                    <div><dt>{tr("powiadomienia_w_poblizu")}</dt><dd>{summary.nearby_enabled.max(0)}</dd></div>
+                    <div><dt>{tr("all")}</dt><dd>{summary.total_fans.max(0)}</dd></div>
+                    <div><dt>{tr("pending")}</dt><dd>{summary.pending_fans.max(0)}</dd></div>
+                    <div><dt>{tr("unsubscribed")}</dt><dd>{summary.unsubscribed_fans.max(0)}</dd></div>
+                    <div><dt>{tr("muted")}</dt><dd>{summary.suppressed_fans.max(0)}</dd></div>
+                    <div><dt>{tr("nearby_notifications")}</dt><dd>{summary.nearby_enabled.max(0)}</dd></div>
                 </dl>
             </article>
-            <div class="section-head"><h3>{tr("aktywnosc")}</h3><span>{tr("30_dni_caosc")}</span></div>
+            <div class="section-head"><h3>{tr("activity")}</h3><span>{tr("text_30_days_total")}</span></div>
             <div class="signal-activity-grid">
-                <article><strong>{activity.new_fans_7d.max(0)}</strong><span>{tr("nowi_7_dni")}</span></article>
-                <article><strong>{format!("{} / {}", activity.referral_attributions_30d.max(0), activity.referral_attributions_total.max(0))}</strong><span>{tr("polecenia")}</span></article>
-                <article><strong>{format!("{} / {}", activity.event_interests_30d.max(0), activity.event_interests_total.max(0))}</strong><span>{tr("zainteresowania_koncertami")}</span></article>
-                <article><strong>{activity.nearby_notifications_30d.max(0)}</strong><span>{tr("powiadomienia_nearby")}</span></article>
-                <article><strong>{activity.pending_city_requests.max(0)}</strong><span>{tr("miasta_do_moderacji")}</span></article>
+                <article><strong>{activity.new_fans_7d.max(0)}</strong><span>{tr("new_7_days")}</span></article>
+                <article><strong>{format!("{} / {}", activity.referral_attributions_30d.max(0), activity.referral_attributions_total.max(0))}</strong><span>{tr("referrals")}</span></article>
+                <article><strong>{format!("{} / {}", activity.event_interests_30d.max(0), activity.event_interests_total.max(0))}</strong><span>{tr("show_interests")}</span></article>
+                <article><strong>{activity.nearby_notifications_30d.max(0)}</strong><span>{tr("nearby_notifications_2")}</span></article>
+                <article><strong>{activity.pending_city_requests.max(0)}</strong><span>{tr("cities_awaiting_moderation")}</span></article>
             </div>
             {degraded_view}
-            <div class="section-head"><h3>{tr("najsilniejsze_miasta")}</h3><span>{city_count}</span></div>
+            <div class="section-head"><h3>{tr("strongest_cities")}</h3><span>{city_count}</span></div>
             {cities_view}
-            <p class="security-note">{i18n::format("snapshot_generated_at_dane_wyacznie_zagregowane", std::slice::from_ref(&generated_at))}</p>
+            <p class="security-note">{i18n::format("snapshot_generated_at_aggregated_data_only", std::slice::from_ref(&generated_at))}</p>
         </div>
     }
 }
@@ -816,7 +814,7 @@ fn Scanner(
     let redeem_code = move |code: String| {
         let slug = event_slug.get_untracked();
         if slug.is_empty() {
-            error.set(Some(tr("najpierw_wybierz_koncert").to_owned()));
+            error.set(Some(tr("select_a_show_first").to_owned()));
             return;
         }
         busy.set(true);
@@ -880,7 +878,7 @@ fn Scanner(
     let prepare = move |_| {
         let slug = event_slug.get();
         if slug.is_empty() {
-            error.set(Some(tr("wybierz_koncert").to_owned()));
+            error.set(Some(tr("select_a_show").to_owned()));
             return;
         }
         busy.set(true);
@@ -953,7 +951,7 @@ fn Scanner(
                 Ok(value) => {
                     show_mode.set(value);
                     offline.set(false);
-                    show_message.set(tr("dane_koncertu_usuniete_z_urzadzenia").to_owned());
+                    show_message.set(tr("show_data_removed_from_the_device").to_owned());
                 }
                 Err(message) => error.set(Some(message)),
             }
@@ -963,16 +961,16 @@ fn Scanner(
 
     view! {
         <section class="screen">
-            <header class="screen-title"><p class="eyebrow">GATE MODE</p><h2>{tr("skanuj_wejscie")}</h2></header>
-            <label class="select-label">{tr("koncert")}<select disabled=move || loading.get().events prop:value=move || event_slug.get() on:change=select_event><option value="">{move || if loading.get().events { tr("aduje_koncerty") } else { tr("wybierz_wydarzenie") }}</option><For each=move || operator_events(dashboard) key=|event| event.slug.clone() children=move |event| view! { <option value=event.slug.clone()>{event.title}</option> } /></select></label>
+            <header class="screen-title"><p class="eyebrow">GATE MODE</p><h2>{tr("scan_entry")}</h2></header>
+            <label class="select-label">{tr("show")}<select disabled=move || loading.get().events prop:value=move || event_slug.get() on:change=select_event><option value="">{move || if loading.get().events { tr("loading_shows") } else { tr("select_an_event") }}</option><For each=move || operator_events(dashboard) key=|event| event.slug.clone() children=move |event| view! { <option value=event.slug.clone()>{event.title}</option> } /></select></label>
             <article class:show-mode-active=move || offline.get() class="show-mode-card">
-                <div class="section-head"><div><p class="eyebrow">OFFLINE SHOW MODE</p><h3>{move || if offline.get() { tr("bramka_pracuje_lokalnie") } else { tr("odpornosc_na_brak_lte") }}</h3></div><button type="button" class:active=move || offline.get() disabled=move || !show_mode.get().prepared || busy.get() on:click=move |_| offline.update(|value| *value = !*value)>{move || if offline.get() { tr("offline_on") } else { tr("offline_off") }}</button></div>
-                <p>{move || if show_mode.get().prepared { i18n::format("value_biletow_value_oczekuje_value_konfliktow", &[show_mode.get().eligible_passes.to_string(), show_mode.get().pending.to_string(), show_mode.get().conflicts.to_string()]) } else { tr("pobierz_bezpieczny_snapshot_przed_otwarciem_bram").to_owned() }}</p>
-                <div class="show-mode-actions"><button type="button" on:click=prepare disabled=move || busy.get() || event_slug.get().is_empty()>{tr("przygotuj_offline")}</button><button type="button" on:click=sync disabled=move || busy.get() || !show_mode.get().prepared>{tr("synchronizuj")}</button><button type="button" class="danger ghost" on:click=clear disabled=move || busy.get() || !show_mode.get().prepared>{tr("wyczysc")}</button></div>
+                <div class="section-head"><div><p class="eyebrow">OFFLINE SHOW MODE</p><h3>{move || if offline.get() { tr("gate_works_locally") } else { tr("works_without_lte") }}</h3></div><button type="button" class:active=move || offline.get() disabled=move || !show_mode.get().prepared || busy.get() on:click=move |_| offline.update(|value| *value = !*value)>{move || if offline.get() { tr("offline_on") } else { tr("offline_off") }}</button></div>
+                <p>{move || if show_mode.get().prepared { i18n::format("tickets_pending_conflicts", &[show_mode.get().eligible_passes.to_string(), show_mode.get().pending.to_string(), show_mode.get().conflicts.to_string()]) } else { tr("download_a_secure_snapshot_before_opening_the").to_owned() }}</p>
+                <div class="show-mode-actions"><button type="button" on:click=prepare disabled=move || busy.get() || event_slug.get().is_empty()>{tr("prepare_offline")}</button><button type="button" on:click=sync disabled=move || busy.get() || !show_mode.get().prepared>{tr("sync")}</button><button type="button" class="danger ghost" on:click=clear disabled=move || busy.get() || !show_mode.get().prepared>{tr("clear")}</button></div>
                 <Show when=move || !show_message.get().is_empty()><small>{move || show_message.get()}</small></Show>
             </article>
-            <button class="scanner-button" on:click=scan disabled=move || busy.get()><span class="scanner-frame"></span><strong>{move || if busy.get() { tr("weryfikuje") } else if offline.get() { tr("skanuj_lokalnie") } else { tr("uruchom_aparat") }}</strong><small>{move || if offline.get() { tr("wyacznie_trway_qr_biletu_t1") } else { tr("qr_biletu_lub_wejsciowki") }}</small></button>
-            <Show when=move || !offline.get()><div class="manual-row"><input placeholder=tr("kod_qr_lub_numer_wejsciowki") prop:value=move || manual.get() on:input=move |e| manual.set(event_target_value(&e))/><button on:click=manual_submit disabled=move || busy.get()>{tr("sprawdz")}</button></div></Show>
+            <button class="scanner-button" on:click=scan disabled=move || busy.get()><span class="scanner-frame"></span><strong>{move || if busy.get() { tr("verifying") } else if offline.get() { tr("scan_locally") } else { tr("open_camera") }}</strong><small>{move || if offline.get() { tr("durable_t1_ticket_qr_only") } else { tr("ticket_or_admission_pass_qr") }}</small></button>
+            <Show when=move || !offline.get()><div class="manual-row"><input placeholder=tr("qr_code_or_admission_pass_number") prop:value=move || manual.get() on:input=move |e| manual.set(event_target_value(&e))/><button on:click=manual_submit disabled=move || busy.get()>{tr("check")}</button></div></Show>
             {move || result.get().map(|entry| {
                 let success = matches!(
                     entry.status.as_str(),
@@ -1002,7 +1000,7 @@ fn Tickets(
     let load = move |_| {
         let slug = event_slug.get();
         if slug.is_empty() {
-            error.set(Some(tr("wybierz_koncert").to_owned()));
+            error.set(Some(tr("select_a_show").to_owned()));
             return;
         }
         busy.set(true);
@@ -1028,7 +1026,7 @@ fn Tickets(
             claim_expires_hours: 72,
         };
         if input.event_slug.is_empty() || input.fan_email.trim().is_empty() {
-            error.set(Some(tr("wybierz_koncert_i_podaj_e_mail_fana").to_owned()));
+            error.set(Some(tr("select_a_show_and_enter_the_fan").to_owned()));
             return;
         }
         busy.set(true);
@@ -1045,7 +1043,9 @@ fn Tickets(
     let revoke = move |_| {
         let reference = revoke_ref.get().trim().to_owned();
         if reference.is_empty() {
-            error.set(Some(tr("podaj_public_reference_wejsciowki").to_owned()));
+            error.set(Some(
+                tr("enter_the_admission_pass_public_reference").to_owned(),
+            ));
             return;
         }
         busy.set(true);
@@ -1058,7 +1058,7 @@ fn Tickets(
             )
             .await
             {
-                Ok(_) => error.set(Some(tr("wejsciowka_zostaa_uniewazniona").to_owned())),
+                Ok(_) => error.set(Some(tr("admission_pass_has_been_revoked").to_owned())),
                 Err(message) => error.set(Some(message)),
             }
             busy.set(false);
@@ -1067,15 +1067,15 @@ fn Tickets(
 
     view! {
         <section class="screen">
-            <header class="screen-title"><p class="eyebrow">TICKETING</p><h2>{tr("bilety_i_wejsciowki")}</h2></header>
-            <div class="toolbar"><select disabled=move || loading.get().events prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">{move || if loading.get().events { tr("aduje_koncerty") } else { tr("wybierz_koncert_2") }}</option>{move || operator_events(dashboard).into_iter().map(|event| view! { <option value=event.slug.clone()>{event.title}</option> }).collect_view()}</select><button on:click=load disabled=move || busy.get() || loading.get().events>{tr("odswiez")}</button></div>
+            <header class="screen-title"><p class="eyebrow">TICKETING</p><h2>{tr("tickets_and_admission_passes")}</h2></header>
+            <div class="toolbar"><select disabled=move || loading.get().events prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">{move || if loading.get().events { tr("loading_shows") } else { tr("select_a_show_2") }}</option>{move || operator_events(dashboard).into_iter().map(|event| view! { <option value=event.slug.clone()>{event.title}</option> }).collect_view()}</select><button on:click=load disabled=move || busy.get() || loading.get().events>{tr("refresh")}</button></div>
             {move || overview.get().map(|data| view! {
-                <div class="stats-grid wide"><Metric value=data.paid_tickets.to_string() label=tr("sprzedane")/><Metric value=data.sale.reserved.to_string() label=tr("w_trakcie")/><Metric value=data.sale.available.to_string() label=tr("dostepne")/></div>
-                <div class="revenue-card"><p>{tr("obrot_brutto")}</p><strong>{money(data.gross_sales_minor, &data.sale.currency)}</strong><span>{format!("zwroty: {}", money(data.refunded_minor, &data.sale.currency))}</span></div>
-                <div class="section-head"><h3>{tr("ostatnie_zamowienia")}</h3><span>{data.recent_orders.len()}</span></div>
+                <div class="stats-grid wide"><Metric value=data.paid_tickets.to_string() label=tr("sold")/><Metric value=data.sale.reserved.to_string() label=tr("in_checkout")/><Metric value=data.sale.available.to_string() label=tr("available_label")/></div>
+                <div class="revenue-card"><p>{tr("gross_revenue")}</p><strong>{money(data.gross_sales_minor, &data.sale.currency)}</strong><span>{format!("zwroty: {}", money(data.refunded_minor, &data.sale.currency))}</span></div>
+                <div class="section-head"><h3>{tr("recent_orders")}</h3><span>{data.recent_orders.len()}</span></div>
                 <div class="card-list">{data.recent_orders.into_iter().map(|order| view! { <article class="order-card"><div><strong>{order.public_reference}</strong><p>{order.buyer_name.value_or(order.buyer_email_masked)}</p></div><span>{money(order.amount_gross_minor, &order.currency)}</span></article> }).collect_view()}</div>
             })}
-            <Show when=move || owner.get()><div class="admin-box"><p class="eyebrow">OWNER ONLY</p><h3>{tr("reczna_wejsciowka")}</h3><p class="inline-note">{tr("numer_wejsciowki_to_bezpieczny_publiczny_identyfikator_np_vry")}</p><input placeholder="fan@email.com" prop:value=move || fan_email.get() on:input=move |e| fan_email.set(event_target_value(&e))/><input placeholder="pool slug" prop:value=move || pool_slug.get() on:input=move |e| pool_slug.set(event_target_value(&e))/><button class="primary" on:click=issue disabled=move || busy.get()>{tr("wydaj_wejsciowke")}</button>{move || issued.get().map(|pass| view! { <div class="token-box"><strong>{pass.public_reference}</strong><p>Token roszczenia: {pass.claim_token}</p></div> })}<hr/><input placeholder=tr("numer_wejsciowki_np_vry") prop:value=move || revoke_ref.get() on:input=move |e| revoke_ref.set(event_target_value(&e))/><button class="danger" on:click=revoke disabled=move || busy.get()>{tr("uniewaznij")}</button></div></Show>
+            <Show when=move || owner.get()><div class="admin-box"><p class="eyebrow">OWNER ONLY</p><h3>{tr("manual_admission_pass")}</h3><p class="inline-note">{tr("admission_pass_number_is_a_safe_public")}</p><input placeholder="fan@email.com" prop:value=move || fan_email.get() on:input=move |e| fan_email.set(event_target_value(&e))/><input placeholder="pool slug" prop:value=move || pool_slug.get() on:input=move |e| pool_slug.set(event_target_value(&e))/><button class="primary" on:click=issue disabled=move || busy.get()>{tr("issue_pass")}</button>{move || issued.get().map(|pass| view! { <div class="token-box"><strong>{pass.public_reference}</strong><p>Token roszczenia: {pass.claim_token}</p></div> })}<hr/><input placeholder=tr("admission_pass_number_e_g_vry") prop:value=move || revoke_ref.get() on:input=move |e| revoke_ref.set(event_target_value(&e))/><button class="danger" on:click=revoke disabled=move || busy.get()>{tr("revoke")}</button></div></Show>
         </section>
     }
 }
@@ -1090,7 +1090,7 @@ fn Discounts(error: RwSignal<Option<String>>) -> impl IntoView {
         let c = code.get().trim().to_owned();
         let o = order.get().trim().to_owned();
         if c.is_empty() || o.is_empty() {
-            error.set(Some(tr("podaj_kod_i_numer_sprzedazy").to_owned()));
+            error.set(Some(tr("enter_the_code_and_sale_number").to_owned()));
             return;
         }
         busy.set(true);
@@ -1111,7 +1111,7 @@ fn Discounts(error: RwSignal<Option<String>>) -> impl IntoView {
         });
     };
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">MERCH DESK</p><h2>{tr("realizuj_znizke")}</h2></header><div class="coupon-visual"><span>%</span><div><strong>{tr("virya_signal")}</strong><p>{tr("kupon_fanowski_kontrolowane_uzycie")}</p></div></div><div class="form-grid panel"><label>{tr("kod_znizkowy")}<input autocapitalize="characters" placeholder="VIRYA-…" prop:value=move || code.get() on:input=move |e| code.set(event_target_value(&e))/></label><label>{tr("numer_sprzedazy")}<input placeholder="MERCH-WRO-001" prop:value=move || order.get() on:input=move |e| order.set(event_target_value(&e))/></label><button class="primary" on:click=redeem disabled=move || busy.get()>{tr("zrealizuj_kupon")}</button></div>{move || result.get().map(|envelope| view! { <article class="scan-result scan-success"><strong>{tr("kupon_zrealizowany")}</strong><span>{envelope.result.status}</span><p>{i18n::format("uzycie_value_value", &[envelope.result.used_count.to_string(), envelope.result.max_uses.to_string()])}</p></article> })}</section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">MERCH DESK</p><h2>{tr("redeem_a_discount")}</h2></header><div class="coupon-visual"><span>%</span><div><strong>{tr("virya_signal")}</strong><p>{tr("fan_coupon_controlled_use")}</p></div></div><div class="form-grid panel"><label>{tr("discount_code")}<input autocapitalize="characters" placeholder="VIRYA-…" prop:value=move || code.get() on:input=move |e| code.set(event_target_value(&e))/></label><label>{tr("sale_number")}<input placeholder="MERCH-WRO-001" prop:value=move || order.get() on:input=move |e| order.set(event_target_value(&e))/></label><button class="primary" on:click=redeem disabled=move || busy.get()>{tr("redeem_coupon")}</button></div>{move || result.get().map(|envelope| view! { <article class="scan-result scan-success"><strong>{tr("coupon_redeemed")}</strong><span>{envelope.result.status}</span><p>{i18n::format("usage", &[envelope.result.used_count.to_string(), envelope.result.max_uses.to_string()])}</p></article> })}</section>
     }
 }
 
@@ -1122,7 +1122,7 @@ fn Campaigns(
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let event_slug = RwSignal::new(String::new());
-    let label = RwSignal::new(tr("wejscie_gowne").to_owned());
+    let label = RwSignal::new(tr("main_entrance").to_owned());
     let valid_from = RwSignal::new(String::new());
     let valid_until = RwSignal::new(String::new());
     let max_checkins = RwSignal::new(String::new());
@@ -1130,11 +1130,11 @@ fn Campaigns(
 
     let create = move |_| {
         let Some(from) = local_to_rfc3339(&valid_from.get()) else {
-            error.set(Some(tr("podaj_poprawny_poczatek_waznosci").to_owned()));
+            error.set(Some(tr("enter_a_valid_start_date").to_owned()));
             return;
         };
         let Some(until) = local_to_rfc3339(&valid_until.get()) else {
-            error.set(Some(tr("podaj_poprawny_koniec_waznosci").to_owned()));
+            error.set(Some(tr("enter_a_valid_end_date").to_owned()));
             return;
         };
         let max_value = max_checkins.get();
@@ -1144,15 +1144,13 @@ fn Campaigns(
             match max_value.trim().parse::<u32>() {
                 Ok(value) if value > 0 => Some(value),
                 _ => {
-                    error.set(Some(tr("limit_musi_byc_dodatnia_liczba").to_owned()));
+                    error.set(Some(tr("limit_must_be_a_positive_number").to_owned()));
                     return;
                 }
             }
         };
         if until <= from {
-            error.set(Some(
-                tr("koniec_kampanii_musi_byc_pozniej_niz_poczatek").to_owned(),
-            ));
+            error.set(Some(tr("campaign_end_must_be_after_its_start").to_owned()));
             return;
         }
         let input = CreateQrCampaignInput {
@@ -1163,7 +1161,7 @@ fn Campaigns(
             max_checkins: max,
         };
         if input.event_slug.is_empty() || input.label.is_empty() {
-            error.set(Some(tr("wybierz_koncert_i_nazwij_kampanie").to_owned()));
+            error.set(Some(tr("select_a_show_and_name_the_campaign").to_owned()));
             return;
         }
         busy.set(true);
@@ -1175,7 +1173,7 @@ fn Campaigns(
             .await
             {
                 Ok(_) => {
-                    error.set(Some(tr("kampania_qr_utworzona").to_owned()));
+                    error.set(Some(tr("qr_campaign_created").to_owned()));
                     refresh_operator_qr(dashboard, loading, error);
                 }
                 Err(message) => error.set(Some(message)),
@@ -1185,7 +1183,7 @@ fn Campaigns(
     };
 
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">CONCERT SIGNAL</p><h2>{tr("kampanie_qr")}</h2></header><div class="form-grid panel"><label>{tr("koncert")}<select disabled=move || loading.get().qr prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">{move || if loading.get().qr { tr("aduje_kampanie") } else { tr("wybierz_koncert_2") }}</option><For each=move || operator_qr_events(dashboard) key=|event| event.slug.clone() children=move |event| view! { <option value=event.slug.clone()>{event.title}</option> } /></select></label><label>{tr("nazwa_punktu_kampanii")}<input prop:value=move || label.get() on:input=move |e| label.set(event_target_value(&e))/></label><div class="two-cols"><label>{tr("wazna_od")}<input type="datetime-local" prop:value=move || valid_from.get() on:input=move |e| valid_from.set(event_target_value(&e))/></label><label>{tr("wazna_do")}<input type="datetime-local" prop:value=move || valid_until.get() on:input=move |e| valid_until.set(event_target_value(&e))/></label></div><label>{tr("limit_check_inow_opcjonalnie")}<input inputmode="numeric" prop:value=move || max_checkins.get() on:input=move |e| max_checkins.set(event_target_value(&e))/></label><button class="primary" on:click=create disabled=move || busy.get() || loading.get().qr>{tr("utworz_kampanie")}</button></div><div class="section-head"><h3>{tr("aktywne_i_historyczne")}</h3></div><Show when=move || !loading.get().qr fallback=move || view! { <Skeleton /> }><div class="card-list"><For each=move || operator_campaigns(dashboard) key=|campaign| campaign.id.clone() children=move |campaign| view! { <CampaignCard campaign=campaign dashboard=dashboard loading=loading error=error /> } /></div></Show></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">CONCERT SIGNAL</p><h2>{tr("qr_campaigns")}</h2></header><div class="form-grid panel"><label>{tr("show")}<select disabled=move || loading.get().qr prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">{move || if loading.get().qr { tr("loading_campaigns") } else { tr("select_a_show_2") }}</option><For each=move || operator_qr_events(dashboard) key=|event| event.slug.clone() children=move |event| view! { <option value=event.slug.clone()>{event.title}</option> } /></select></label><label>{tr("point_campaign_name")}<input prop:value=move || label.get() on:input=move |e| label.set(event_target_value(&e))/></label><div class="two-cols"><label>{tr("valid_from")}<input type="datetime-local" prop:value=move || valid_from.get() on:input=move |e| valid_from.set(event_target_value(&e))/></label><label>{tr("valid_until")}<input type="datetime-local" prop:value=move || valid_until.get() on:input=move |e| valid_until.set(event_target_value(&e))/></label></div><label>{tr("check_in_limit_optional")}<input inputmode="numeric" prop:value=move || max_checkins.get() on:input=move |e| max_checkins.set(event_target_value(&e))/></label><button class="primary" on:click=create disabled=move || busy.get() || loading.get().qr>{tr("create_campaign")}</button></div><div class="section-head"><h3>{tr("active_and_historical")}</h3></div><Show when=move || !loading.get().qr fallback=move || view! { <Skeleton /> }><div class="card-list"><For each=move || operator_campaigns(dashboard) key=|campaign| campaign.id.clone() children=move |campaign| view! { <CampaignCard campaign=campaign dashboard=dashboard loading=loading error=error /> } /></div></Show></section>
     }
 }
 
@@ -1210,7 +1208,7 @@ fn CampaignCard(
             .await
             {
                 Ok(_) => {
-                    error.set(Some(tr("kampania_zostaa_wyaczona").to_owned()));
+                    error.set(Some(tr("campaign_has_been_disabled").to_owned()));
                     refresh_operator_qr(dashboard, loading, error);
                 }
                 Err(message) => error.set(Some(message)),
@@ -1220,14 +1218,14 @@ fn CampaignCard(
     let revoke_button = if active {
         Some(view! {
             <button class="danger ghost" on:click=revoke>
-                {tr("wyacz_kampanie")}
+                {tr("disable_campaign")}
             </button>
         })
     } else {
         None
     };
     view! {
-        <article class="campaign-card"><div class="campaign-head"><div><strong>{campaign.label}</strong><p>{campaign.event_title}</p></div><span class:online=active class:offline=!active>{if active { tr("active") } else { tr("closed") }}</span></div><div class="campaign-stats"><span>{i18n::format("value_check_inow", &[campaign.checkin_count.to_string()])}</span><span>{campaign.max_checkins.map(|v| i18n::format("limit_value", &[v.to_string()])).value_or_else(|| tr("bez_limitu").to_owned())}</span></div>{campaign.token.map(|token| view! { <code>{token}</code> })}{revoke_button}</article>
+        <article class="campaign-card"><div class="campaign-head"><div><strong>{campaign.label}</strong><p>{campaign.event_title}</p></div><span class:online=active class:offline=!active>{if active { tr("active_status") } else { tr("closed") }}</span></div><div class="campaign-stats"><span>{i18n::format("check_ins_2", &[campaign.checkin_count.to_string()])}</span><span>{campaign.max_checkins.map(|v| i18n::format("limit_v", &[v.to_string()])).value_or_else(|| tr("no_limit").to_owned())}</span></div>{campaign.token.map(|token| view! { <code>{token}</code> })}{revoke_button}</article>
     }
 }
 
@@ -1237,10 +1235,10 @@ fn LanguageSwitch() -> impl IntoView {
     view! {
         <article class="language-setting">
             <div>
-                <strong>{tr("jezyk_aplikacji")}</strong>
-                <p>{tr("zmiana_jezyka_przeaduje_interfejs_dane_i_sesja_pozostana")}</p>
+                <strong>{tr("app_language")}</strong>
+                <p>{tr("changing_the_language_reloads_the_interface_your")}</p>
             </div>
-            <div class="language-switch" role="group" aria-label=tr("jezyk")>
+            <div class="language-switch" role="group" aria-label=tr("language")>
                 <button type="button" class:active=selected == Language::Pl on:click=move |_| i18n::select(Language::Pl)>"PL"</button>
                 <button type="button" class:active=selected == Language::En on:click=move |_| i18n::select(Language::En)>"EN"</button>
             </div>
@@ -1300,18 +1298,18 @@ fn OperatorSettings(
     };
     view! {
         <section class="screen">
-            <header class="screen-title"><p class="eyebrow">{tr("device")}</p><h2>{tr("ustawienia")}</h2></header>
+            <header class="screen-title"><p class="eyebrow">{tr("device_label")}</p><h2>{tr("settings")}</h2></header>
             <div class="settings-list">
                 <LanguageSwitch />
-                <article><div><strong>{tr("poaczenie")}</strong><p>{move || status.get().session.map(|s| s.api_base_url).value_or_else(Default::default)}</p></div><span class:online=move || !loading.get().events && !loading.get().qr>{move || if loading.get().events || loading.get().qr { tr("acze_2") } else { tr("online") }}</span></article>
-                <article><div><strong>{tr("uprawnienia")}</strong><p>{move || status.get().session.map(|s| s.role.label().to_owned()).value_or_else(Default::default)}</p></div></article>
-                <button on:click=refresh disabled=move || loading.get().events || loading.get().qr>{tr("odswiez_wszystkie_dane")}</button>
-                <button on:click=lock>{tr("zablokuj_panel")}</button>
-                <button class="danger ghost" on:click=forget>{tr("usun_profil_operatora")}</button>
+                <article><div><strong>{tr("connection")}</strong><p>{move || status.get().session.map(|s| s.api_base_url).value_or_else(Default::default)}</p></div><span class:online=move || !loading.get().events && !loading.get().qr>{move || if loading.get().events || loading.get().qr { tr("connecting_2") } else { tr("online") }}</span></article>
+                <article><div><strong>{tr("permissions")}</strong><p>{move || status.get().session.map(|s| s.role.label().to_owned()).value_or_else(Default::default)}</p></div></article>
+                <button on:click=refresh disabled=move || loading.get().events || loading.get().qr>{tr("refresh_all_data")}</button>
+                <button on:click=lock>{tr("lock_panel")}</button>
+                <button class="danger ghost" on:click=forget>{tr("remove_operator_profile")}</button>
             </div>
             <Show when=move || owner.get()><OpsPanel overview=ops loading=ops_loading error=error /></Show>
             <AnonymousFeedback error=error />
-            <p class="security-note">{tr("token_operatora_przechowuje_zaszyfrowany_sejf_stronghold_warstwa_webview")}</p>
+            <p class="security-note">{tr("operator_token_is_stored_in_an_encrypted")}</p>
         </section>
     }
 }
@@ -1324,7 +1322,7 @@ fn OpsPanel(
 ) -> impl IntoView {
     let refresh = move |_| refresh_operator_ops(overview, loading, error);
     view! {
-        <section class="ops-panel"><div class="section-head"><div><p class="eyebrow">CONTROL PLANE</p><h3>{tr("kolejki_i_dostawy")}</h3></div><button class="text-button" on:click=refresh disabled=move || loading.get()>{tr("odswiez_2")}</button></div>
+        <section class="ops-panel"><div class="section-head"><div><p class="eyebrow">CONTROL PLANE</p><h3>{tr("queues_and_deliveries")}</h3></div><button class="text-button" on:click=refresh disabled=move || loading.get()>{tr("refresh_2")}</button></div>
             <Show when=move || !loading.get() fallback=move || view! { <Skeleton rows=2 /> }>
                 {move || overview.get().map(|data| {
                     let summary = data.summary;
@@ -1333,17 +1331,17 @@ fn OpsPanel(
                     let unavailable_sources = data.unavailable_sources;
                     let healthy = deliveries.is_empty() && outbox.is_empty() && unavailable_sources.is_empty();
                     let degraded_view = (!unavailable_sources.is_empty()).then(|| view! {
-                        <p class="security-note warning">{i18n::format("cockpit_dziaa_czesciowo_niedostepne_value", &[unavailable_sources.join(", ").to_string()])}</p>
+                        <p class="security-note warning">{i18n::format("cockpit_is_partially_available_unavailable", &[unavailable_sources.join(", ").to_string()])}</p>
                     });
                     let deliveries_view = (!deliveries.is_empty()).then(|| view! {
-                        <div class="section-head"><h3>{tr("martwe_dostawy")}</h3></div>
+                        <div class="section-head"><h3>{tr("dead_deliveries")}</h3></div>
                         <div class="ops-list"><For each=move || deliveries.clone() key=|item| item.id.clone() children=move |item| view! { <OpsDeliveryCard item=item overview=overview loading=loading error=error /> } /></div>
                     });
                     let outbox_view = (!outbox.is_empty()).then(|| view! {
-                        <div class="section-head"><h3>{tr("martwy_outbox")}</h3></div>
+                        <div class="section-head"><h3>{tr("dead_outbox")}</h3></div>
                         <div class="ops-list"><For each=move || outbox.clone() key=|item| item.id.clone() children=move |item| view! { <OpsOutboxCard item=item overview=overview loading=loading error=error /> } /></div>
                     });
-                    let healthy_view = healthy.then(|| view! { <p class="ops-healthy">{tr("brak_martwych_wpisow_tor_dostaw_jest_czysty")}</p> });
+                    let healthy_view = healthy.then(|| view! { <p class="ops-healthy">{tr("no_dead_entries_the_delivery_pipeline_is")}</p> });
                     view! {
                         <div class="ops-metrics"><Metric value=summary.outbox.pending.to_string() label="outbox pending"/><Metric value=summary.outbox.dead.to_string() label="outbox dead"/><Metric value=summary.deliveries.pending.to_string() label="delivery pending"/><Metric value=summary.deliveries.dead.to_string() label="delivery dead"/></div>
                         {degraded_view}
@@ -1368,7 +1366,7 @@ fn OpsDeliveryCard(
     let endpoint_active = item.endpoint_active;
     let retry =
         move |_| retry_operator_item("deliveries", target_id.clone(), overview, loading, error);
-    view! { <article class="ops-item"><div><strong>{item.event_type}</strong><p>{i18n::format("value_proba_value_value", &[item.endpoint_name.to_string(), item.attempt_count.to_string(), item.max_attempts.to_string()])}</p><small>{item.last_error_kind.value_or_else(|| tr("brak_kodu_bedu").to_owned())}</small></div><button class="danger ghost" on:click=retry disabled=move || loading.get() || !endpoint_active>{tr("retry")}</button></article> }
+    view! { <article class="ops-item"><div><strong>{item.event_type}</strong><p>{i18n::format("attempt_2", &[item.endpoint_name.to_string(), item.attempt_count.to_string(), item.max_attempts.to_string()])}</p><small>{item.last_error_kind.value_or_else(|| tr("no_error_code").to_owned())}</small></div><button class="danger ghost" on:click=retry disabled=move || loading.get() || !endpoint_active>{tr("retry")}</button></article> }
 }
 
 #[component]
@@ -1380,7 +1378,7 @@ fn OpsOutboxCard(
 ) -> impl IntoView {
     let target_id = item.id.clone();
     let retry = move |_| retry_operator_item("outbox", target_id.clone(), overview, loading, error);
-    view! { <article class="ops-item"><div><strong>{item.event_type}</strong><p>{i18n::format("proba_value_value", &[item.attempts.to_string(), item.max_attempts.to_string()])}</p><small>{item.last_error_kind.value_or_else(|| tr("brak_kodu_bedu").to_owned())}</small></div><button class="danger ghost" on:click=retry disabled=move || loading.get()>{tr("retry")}</button></article> }
+    view! { <article class="ops-item"><div><strong>{item.event_type}</strong><p>{i18n::format("attempt", &[item.attempts.to_string(), item.max_attempts.to_string()])}</p><small>{item.last_error_kind.value_or_else(|| tr("no_error_code").to_owned())}</small></div><button class="danger ghost" on:click=retry disabled=move || loading.get()>{tr("retry")}</button></article> }
 }
 
 fn retry_operator_item(
@@ -1406,9 +1404,9 @@ fn retry_operator_item(
         {
             Ok(result) => {
                 error.set(Some(if result.replayed {
-                    tr("retry_by_juz_wczesniej_przyjety").to_owned()
+                    tr("retry_had_already_been_accepted").to_owned()
                 } else {
-                    tr("wpis_wroci_do_kolejki").to_owned()
+                    tr("item_returned_to_the_queue").to_owned()
                 }));
                 refresh_operator_ops(overview, loading, error);
             }
@@ -1438,9 +1436,9 @@ fn FanPortal(
             <StaffEntryButton mode=mode />
         </Show>
         {move || if status_failed.get() {
-            view! { <StatusFailure mode=mode status_refresh=status_refresh label=tr("nie_udao_sie_odczytac_profilu_fana") show_back=false /> }.into_any()
+            view! { <StatusFailure mode=mode status_refresh=status_refresh label=tr("failed_to_read_the_fan_profile") show_back=false /> }.into_any()
         } else if status_loading.get() {
-            view! { <AccessLoader mode=mode label=tr("sprawdzam_twoj_sygna") show_back=false /> }.into_any()
+            view! { <AccessLoader mode=mode label=tr("checking_your_signal") show_back=false /> }.into_any()
         } else if status.get().unlocked {
             view! { <FanApp mode=mode status=status public=public error=error /> }.into_any()
         } else {
@@ -1463,13 +1461,13 @@ fn StatusFailure(
             </Show>
             <div class="access-card">
                 <p class="eyebrow">{label}</p>
-                <h2>{tr("profil_pozostaje_nietkniety")}</h2>
-                <p>{tr("aplikacja_nie_przejdzie_do_rejestracji_ani_parowania_dopoki")}</p>
+                <h2>{tr("your_profile_remains_untouched")}</h2>
+                <p>{tr("app_will_not_continue_to_signup_or")}</p>
                 <button
                     class="primary"
                     on:click=move |_| status_refresh.update(|value| *value = value.wrapping_add(1))
                 >
-                    {tr("sprobuj_ponownie")}
+                    {tr("try_again")}
                 </button>
             </div>
         </section>
@@ -1508,19 +1506,15 @@ fn submit_fan_confirmation(
     let current_token = token.get_untracked().trim().to_owned();
     let current_pin = pin.get_untracked();
     if input_email.is_empty() {
-        error.set(Some(
-            tr("podaj_e_mail_uzyty_przy_zapisie_do_sygnau").to_owned(),
-        ));
+        error.set(Some(tr("enter_the_email_used_to_join_signal").to_owned()));
         return;
     }
     if current_token.is_empty() {
-        error.set(Some(tr("wklej_kod_cay_link_albo_zeskanuj_qr_z").to_owned()));
+        error.set(Some(tr("paste_the_code_or_full_link_or").to_owned()));
         return;
     }
     if current_pin.chars().count() < 4 {
-        error.set(Some(
-            tr("ustaw_lokalny_pin_majacy_co_najmniej_4_znaki").to_owned(),
-        ));
+        error.set(Some(tr("enter_4_6_digits_for_this_fan_profile").to_owned()));
         return;
     }
     let input = FanConfirmationInput {
@@ -1593,7 +1587,7 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
     let signup = move |_| {
         if !consent.get() {
             error.set(Some(
-                tr("zgoda_marketingowa_jest_wymagana_do_doaczenia_do_sygnau").to_owned(),
+                tr("marketing_consent_is_required_to_join_signal").to_owned(),
             ));
             return;
         }
@@ -1619,7 +1613,7 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
                 Ok(value) => value.city_slug,
                 Err(message) => {
                     error.set(Some(i18n::format(
-                        "nie_udao_sie_zapisac_miasta_message",
+                        "could_not_save_city_message",
                         std::slice::from_ref(&message),
                     )));
                     busy.set(false);
@@ -1627,7 +1621,7 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
                 }
             };
             if city_slug.trim().is_empty() {
-                error.set(Some(tr("wybierz_miasto_albo_wpisz_wasne").to_owned()));
+                error.set(Some(tr("select_a_city_or_enter_your_own").to_owned()));
                 busy.set(false);
                 return;
             }
@@ -1661,13 +1655,9 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
                             Some(true)
                                 if result.email_kind.as_deref() == Some("session_recovery") =>
                             {
-                                { tr("wysalismy_bezpieczny_link_dostepu_zeskanuj_qr_albo_wklej") }
-                                    .to_owned()
+                                { tr("we_sent_a_secure_access_link_scan") }.to_owned()
                             }
-                            Some(true) => {
-                                { tr("wysalismy_kod_potwierdzajacy_zeskanuj_qr_albo_wklej_kod") }
-                                    .to_owned()
-                            }
+                            Some(true) => { tr("we_sent_a_confirmation_code_scan_the") }.to_owned(),
                             Some(false) => {
                                 let minutes = result
                                     .retry_after_seconds
@@ -1675,14 +1665,11 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
                                     .unwrap_or(15)
                                     .max(1);
                                 i18n::format(
-                                    "nowa_wiadomosc_nie_zostaa_wysana_bo_poprzedni_kod",
+                                    "new_message_not_sent_previous_code_still_valid_minutes",
                                     &[minutes.to_string()],
                                 )
                             }
-                            None => {
-                                { tr("zgoszenie_zostao_przyjete_sprawdz_skrzynke_i_spam_jesli") }
-                                    .to_owned()
-                            }
+                            None => { tr("request_was_accepted_check_your_inbox_and") }.to_owned(),
                         };
                         error.set(Some(message));
                     }
@@ -1703,7 +1690,7 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
         }
         let current_email = email.get_untracked().trim().to_owned();
         if current_email.is_empty() {
-            error.set(Some(tr("podaj_e_mail_uzyty_w_virya_signal").to_owned()));
+            error.set(Some(tr("enter_the_email_used_in_virya_signal").to_owned()));
             return;
         }
         busy.set(true);
@@ -1720,9 +1707,7 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
             {
                 Ok(()) => {
                     access_mode.set(FanAccessMode::Confirm);
-                    error.set(Some(
-                        tr("jesli_ten_e_mail_jest_zapisany_w_virya").to_owned(),
-                    ));
+                    error.set(Some(tr("if_this_email_is_registered_in_virya").to_owned()));
                 }
                 Err(message) => error.set(Some(message)),
             }
@@ -1745,9 +1730,7 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
                     {
                         submit_fan_confirmation(email, name, token, pin, busy, status, error);
                     } else {
-                        error.set(Some(
-                            tr("qr_zeskanowany_uzupenij_e_mail_i_lokalny_pin").to_owned(),
-                        ));
+                        error.set(Some(tr("qr_scanned_enter_your_email_and_local").to_owned()));
                     }
                     return;
                 }
@@ -1762,50 +1745,54 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
         <section class="fan-access">
             <header class="fan-access-hero">
                 <p class="eyebrow">{tr("virya_signal")}</p>
-                <h1>{tr("koncerty_bilety")}<br/><em>{tr("i_nagrody")}</em></h1>
-                <p class="hero-subtitle">{tr("doacz_w_3_krokach")}</p>
-                <ol class="signal-steps" aria-label=tr("jak_doaczyc")>
-                    <li><span class="step-num">"1"</span>{tr("podaj_e_mail_i_miasto")}</li>
-                    <li><span class="step-num">"2"</span>{tr("potwierdz_kod_z_wiadomosci")}</li>
-                    <li><span class="step-num">"3"</span>{tr("odkrywaj_koncerty_blisko_ciebie")}</li>
+                <h1>{tr("shows_tickets")}<br/><em>{tr("and_rewards")}</em></h1>
+                <p class="hero-subtitle">{tr("join_in_3_steps")}</p>
+                <ol class="signal-steps" aria-label=tr("how_to_join")>
+                    <li><span class="step-num">"1"</span>{tr("enter_your_email_and_city")}</li>
+                    <li><span class="step-num">"2"</span>{tr("confirm_the_code_from_the_message")}</li>
+                    <li><span class="step-num">"3"</span>{tr("discover_shows_near_you")}</li>
                 </ol>
-                <div class="signal-purpose-grid" aria-label=tr("co_daje_virya_signal")>
-                    <span><b aria-hidden="true">"⌁"</b>{tr("koncerty_blisko_ciebie")}</span>
-                    <span><b aria-hidden="true">"▣"</b>{tr("bilety_i_qr_w_telefonie")}</span>
-                    <span><b aria-hidden="true">"✦"</b>{tr("nagrody_za_proste_akcje")}</span>
+                <div class="signal-purpose-grid" aria-label=tr("what_virya_signal_gives_you")>
+                    <span><b aria-hidden="true">"⌁"</b>{tr("shows_near_you")}</span>
+                    <span><b aria-hidden="true">"▣"</b>{tr("tickets_and_qr_codes_on_your_phone")}</span>
+                    <span><b aria-hidden="true">"✦"</b>{tr("rewards_for_simple_actions")}</span>
                 </div>
             </header>
             <Show when=move || status.get().configured fallback=move || view! {
                 <div class="access-card fan-card">
                     <div class="segmented">
-                        <button class:active=move || access_mode.get() == FanAccessMode::Signup on:click=move |_| access_mode.set(FanAccessMode::Signup)>{tr("zaczynam")}</button>
-                        <button class:active=move || access_mode.get() == FanAccessMode::Confirm on:click=move |_| access_mode.set(FanAccessMode::Confirm)>{tr("mam_kod")}</button>
+                        <button class:active=move || access_mode.get() == FanAccessMode::Signup on:click=move |_| access_mode.set(FanAccessMode::Signup)>{tr("get_started")}</button>
+                        <button class:active=move || access_mode.get() == FanAccessMode::Confirm on:click=move |_| access_mode.set(FanAccessMode::Confirm)>{tr("i_have_a_code")}</button>
                     </div>
                     <div class="form-grid fan-form">
-                        <label>{tr("e_mail")}<input type="email" autocomplete="email" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label>
-                        <label>{tr("imie_nazwa_opcjonalnie")}<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/></label>
+                        <label>{tr("email")}<input type="email" autocomplete="email" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label>
+                        <label>{tr("name_optional")}<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/></label>
                         <Show when=move || access_mode.get() == FanAccessMode::Signup fallback=move || view! {
                             <>
-                                <p class="confirm-hint"><strong>{tr("najszybciej_zeskanuj_qr_z_maila")}</strong><br/>{tr("mozesz_tez_wkleic_cay_link_albo_64_znakowy")}</p>
-                                <label>{tr("link_lub_kod_z_e_maila")}<textarea rows="3" autocomplete="one-time-code" spellcheck="false" autocapitalize="none" placeholder=tr("wklej_link_kod_albo_uzyj_qr") prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
+                                <p class="confirm-hint"><strong>{tr("fastest_scan_the_qr_from_the_email")}</strong><br/>{tr("you_can_also_paste_the_full_link")}</p>
+                                <label>{tr("email_link_or_code")}<textarea rows="3" autocomplete="one-time-code" spellcheck="false" autocapitalize="none" placeholder=tr("paste_a_link_or_code_or_use") prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
                                 <div class="confirmation-actions single">
-                                    <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("skanuj_qr")}</strong><small>{tr("albo_przytrzymaj_pole_wyzej_i_wybierz_wklej")}</small></button>
+                                    <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("or_hold_the_field_above_and_choose")}</small></button>
                                 </div>
-                                <label>{tr("lokalny_pin")}<input type="password" autocomplete="new-password" inputmode="numeric" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
-                                <p class="confirmation-note">{tr("pin_szyfruje_profil_tylko_na_tym_urzadzeniu_nie")}</p>
-                                <button class="primary" disabled=move || busy.get() || email.get().trim().is_empty() || token.get().trim().is_empty() || pin.get().chars().count() < 4 on:click=confirm>{tr("potwierdz_i_wejdz")}</button>
-                                <button type="button" class="text-button" disabled=move || busy.get() || email.get().trim().is_empty() on:click=request_access>{tr("mam_juz_konto_wyslij_link_logowania")}</button>
-                                <p class="confirmation-resend">{tr("nie_ma_wiadomosci_sprawdz_spam_po_15_minutach")}</p>
+                                <label class="pin-field">
+                                    <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
+                                    <small id="fan-confirm-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
+                                    <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-confirm-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e)))/>
+                                </label>
+                                <p class="confirmation-note">{tr("pin_encrypts_your_profile_on_this_device")}</p>
+                                <button class="primary" disabled=move || busy.get() || email.get().trim().is_empty() || token.get().trim().is_empty() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_enter")}</button>
+                                <button type="button" class="text-button" disabled=move || busy.get() || email.get().trim().is_empty() on:click=request_access>{tr("i_already_have_an_account_send_login")}</button>
+                                <p class="confirmation-resend">{tr("no_message_check_spam_after_15_minutes")}</p>
                             </>
                         }>
                             <>
                                 <div class="custom-city-fields city-stable-entry">
-                                    <label>{tr("miejscowosc")}<input placeholder=tr("np_bielawa") prop:value=move || custom_city_name.get() on:input=move |e| custom_city_name.set(event_target_value(&e))/></label>
-                                    <label>{tr("wojewodztwo_region_opcjonalnie")}<input placeholder=tr("dolnoslaskie") prop:value=move || custom_region.get() on:input=move |e| custom_region.set(event_target_value(&e))/></label>
-                                    <p class="inline-note">{tr("wpisz_miejscowosc_recznie_dopasujemy_ja_do_mapy_sygnau")}</p>
+                                    <label>{tr("city")}<input placeholder=tr("e_g_bielawa") prop:value=move || custom_city_name.get() on:input=move |e| custom_city_name.set(event_target_value(&e))/></label>
+                                    <label>{tr("province_region_optional")}<input placeholder=tr("lower_silesia") prop:value=move || custom_region.get() on:input=move |e| custom_region.set(event_target_value(&e))/></label>
+                                    <p class="inline-note">{tr("enter_your_city_manually_we_will_match")}</p>
                                 </div>
                                 <div class="nearby-pref">
-                                    <label class="check-label"><input type="checkbox" prop:checked=move || nearby_enabled.get() on:change=move |e| nearby_enabled.set(event_target_checked(&e))/><span>{tr("powiadamiaj_mnie_o_koncertach_w_poblizu")}</span></label>
+                                    <label class="check-label"><input type="checkbox" prop:checked=move || nearby_enabled.get() on:change=move |e| nearby_enabled.set(event_target_checked(&e))/><span>{tr("notify_me_about_nearby_shows")}</span></label>
                                     <Show when=move || nearby_enabled.get()>
                                         <div class="radius-picker">
                                             <button type="button" class:active=move || radius_km.get()==50 on:click=move |_| radius_km.set(50)>"50 km"</button>
@@ -1815,10 +1802,14 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
                                         </div>
                                     </Show>
                                 </div>
-                                <label>{tr("kod_polecajacy_opcjonalnie")}<input prop:value=move || referral.get() on:input=move |e| referral.set(event_target_value(&e))/></label>
-                                <label>{tr("lokalny_pin")}<input type="password" autocomplete="new-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
-                                <label class="check-label"><input type="checkbox" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/><span>{tr("chce_otrzymywac_informacje_o_koncertach_premierach_i_nagrodach")}</span></label>
-                                <button class="primary" disabled=move || busy.get() on:click=signup>{tr("doacz_do_sygnau")}</button>
+                                <label>{tr("referral_code_optional")}<input prop:value=move || referral.get() on:input=move |e| referral.set(event_target_value(&e))/></label>
+                                <label class="pin-field">
+                                    <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
+                                    <small id="fan-signup-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
+                                    <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-signup-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e)))/>
+                                </label>
+                                <label class="check-label"><input type="checkbox" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/><span>{tr("i_want_to_receive_information_about_virya")}</span></label>
+                                <button class="primary" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=signup>{tr("join_signal")}</button>
                             </>
                         </Show>
                     </div>
@@ -1827,25 +1818,33 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
                 <div class="access-card fan-card">
                     <Show when=move || recovery_open.get() fallback=move || view! {
                         <>
-                            <p class="lock-copy">{tr("twoj_profil_i_bilety_sa_zaszyfrowane_na_urzadzeniu")}</p>
+                            <p class="lock-copy">{tr("your_profile_and_tickets_are_encrypted_on")}</p>
                             <div class="form-grid">
-                                <label>"PIN"<input type="password" autocomplete="current-password" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
-                                <button class="primary" disabled=move || busy.get() on:click=unlock>{tr("otworz_moj_sygna")}</button>
-                                <button type="button" class="text-button recovery-link" on:click=move |_| recovery_open.set(true)>{tr("nie_pamietam_pin_u_zaloguj_ponownie")}</button>
+                                <label class="pin-field">
+                                    <span class="pin-field-label">{tr("fan_app_unlock_pin")}</span>
+                                    <small id="fan-unlock-pin-help">{tr("enter_the_pin_created_for_this_fan")}</small>
+                                    <input type="password" autocomplete="current-password" placeholder=tr("your_pin") aria-describedby="fan-unlock-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/>
+                                </label>
+                                <button class="primary" disabled=move || busy.get() || pin.get().chars().count() < 4 on:click=unlock>{tr("open_my_signal")}</button>
+                                <button type="button" class="text-button recovery-link" on:click=move |_| recovery_open.set(true)>{tr("i_forgot_my_pin_sign_in_again")}</button>
                             </div>
                         </>
                     }>
                         <div class="form-grid recovery-panel">
-                            <div class="recovery-heading"><p class="eyebrow">{tr("odzyskiwanie_dostepu")}</p><h3>{tr("ustaw_nowy_pin")}</h3><p>{tr("podaj_e_mail_wyslij_swiezy_link_a_potem")}</p></div>
-                            <label>{tr("e_mail")}<input type="email" autocomplete="email" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label>
-                            <button type="button" class="ghost" disabled=move || busy.get() || email.get().trim().is_empty() on:click=request_access>{tr("wyslij_link_logowania")}</button>
-                            <label>{tr("link_lub_kod_z_e_maila")}<textarea rows="3" autocomplete="one-time-code" spellcheck="false" autocapitalize="none" placeholder=tr("wklej_link_lub_kod") prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
+                            <div class="recovery-heading"><p class="eyebrow">{tr("access_recovery")}</p><h3>{tr("create_a_new_pin")}</h3><p>{tr("enter_your_email_request_a_fresh_link")}</p></div>
+                            <label>{tr("email")}<input type="email" autocomplete="email" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label>
+                            <button type="button" class="ghost" disabled=move || busy.get() || email.get().trim().is_empty() on:click=request_access>{tr("send_login_link")}</button>
+                            <label>{tr("email_link_or_code")}<textarea rows="3" autocomplete="one-time-code" spellcheck="false" autocapitalize="none" placeholder=tr("paste_link_or_code") prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
                             <div class="confirmation-actions single">
-                                <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("skanuj_qr")}</strong><small>{tr("albo_przytrzymaj_pole_i_wybierz_wklej")}</small></button>
+                                <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("or_hold_the_field_and_choose_paste")}</small></button>
                             </div>
-                            <label>{tr("nowy_lokalny_pin")}<input type="password" autocomplete="new-password" inputmode="numeric" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
-                            <button class="primary" disabled=move || busy.get() || email.get().trim().is_empty() || token.get().trim().is_empty() || pin.get().chars().count() < 4 on:click=confirm>{tr("potwierdz_i_ustaw_nowy_pin")}</button>
-                            <button type="button" class="text-button" on:click=move |_| recovery_open.set(false)>{tr("wroc_do_logowania_pin_em")}</button>
+                            <label class="pin-field">
+                                <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
+                                <small id="fan-recovery-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
+                                <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-recovery-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e)))/>
+                            </label>
+                            <button class="primary" disabled=move || busy.get() || email.get().trim().is_empty() || token.get().trim().is_empty() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_set_new_pin")}</button>
+                            <button type="button" class="text-button" on:click=move |_| recovery_open.set(false)>{tr("back_to_pin_login")}</button>
                         </div>
                     </Show>
                 </div>
@@ -1984,15 +1983,15 @@ fn FanApp(
     view! {
         <section class="authenticated fan-authenticated">
             <header class="topbar fan-topbar">
-                <div on:dblclick=move |_| { loaded.set(FanLoadedState::default()); refresh_fan_parts(dashboard, loading, error); refresh_fan_merch(merch, loading, error); refresh_fan_merch_bundles(merch_bundles); refresh_wallets(wallets, Some(loading), error); refresh_fan_area(area, loading, error); } style="cursor:pointer"><p class="eyebrow">{tr("virya_signal")}</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| tr("moj_sygna").to_owned())}</strong></div>
-                <div class="topbar-actions"><span class="live-dot"></span><button class="menu-trigger" aria-label=tr("otworz_menu") aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|value| *value = !*value)><i></i><i></i><i></i></button><button aria-label=tr("zamknij_i_zablokuj_sygna") on:click=close>"×"</button></div>
+                <div on:dblclick=move |_| { loaded.set(FanLoadedState::default()); refresh_fan_parts(dashboard, loading, error); refresh_fan_merch(merch, loading, error); refresh_fan_merch_bundles(merch_bundles); refresh_wallets(wallets, Some(loading), error); refresh_fan_area(area, loading, error); } style="cursor:pointer"><p class="eyebrow">{tr("virya_signal")}</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| tr("my_signal").to_owned())}</strong></div>
+                <div class="topbar-actions"><span class="live-dot"></span><button class="menu-trigger" aria-label=tr("open_menu") aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|value| *value = !*value)><i></i><i></i><i></i></button><button aria-label=tr("close_and_lock_signal") on:click=close>"×"</button></div>
             </header>
             <Show when=move || menu_open.get()>
                 <div class="overflow-backdrop" on:click=move |_| menu_open.set(false)></div>
                 <nav class="overflow-menu">
-                    <button class:active=move || tab.get() == FanTab::Game on:click=move |_| { tab.set(FanTab::Game); menu_open.set(false); }><span>"◇"</span>{tr("gra_area")}</button>
-                    <button class:active=move || tab.get() == FanTab::Profile on:click=move |_| { tab.set(FanTab::Profile); menu_open.set(false); }><span>"◎"</span>{tr("profil")}</button>
-                    <button on:click=move |_| { menu_open.set(false); mode.set(RootMode::StaffGate); }><span>"⌁"</span>{tr("strefa_staff")}</button>
+                    <button class:active=move || tab.get() == FanTab::Game on:click=move |_| { tab.set(FanTab::Game); menu_open.set(false); }><span>"◇"</span>{tr("area_game_tab")}</button>
+                    <button class:active=move || tab.get() == FanTab::Profile on:click=move |_| { tab.set(FanTab::Profile); menu_open.set(false); }><span>"◎"</span>{tr("profile_tab")}</button>
+                    <button on:click=move |_| { menu_open.set(false); mode.set(RootMode::StaffGate); }><span>"⌁"</span>{tr("staff_zone")}</button>
                 </nav>
             </Show>
             <div class="content">{move || match tab.get() {
@@ -2011,11 +2010,11 @@ fn FanApp(
                     <FanEvents dashboard=dashboard public=public checkout_event=checkout_event loading=loading error=error />
                 }.into_any()),
                 FanTab::Merch => view! { <FanMerch merch=merch bundles=merch_bundles loading=loading error=error /> }.into_any(),
-                FanTab::Game => view! { <FanGame area=area loading=loading error=error /> }.into_any(),
+                FanTab::Game => view! { <AreaGameScreen area=area loading=loading error=error /> }.into_any(),
                 FanTab::Wallet => view! { <FanWallet dashboard=dashboard wallets=wallets admission_qr=admission_qr loading=loading error=error /> }.into_any(),
                 FanTab::Profile => view! { <FanProfileScreen status=status dashboard=dashboard wallets=wallets area=area loading=loading error=error /> }.into_any(),
             }}</div>
-            <nav class="bottom-nav four primary-four"><FanNavButton tab=tab own=FanTab::Signal icon="signal" label=tr("sygna_2")/><FanNavButton tab=tab own=FanTab::Events icon="events" label=tr("koncerty")/><FanNavButton tab=tab own=FanTab::Merch icon="shop" label=tr("sklep")/><FanNavButton tab=tab own=FanTab::Wallet icon="ticket" label=tr("bilety")/></nav>
+            <nav class="bottom-nav four primary-four"><FanNavButton tab=tab own=FanTab::Signal icon="signal" label=tr("signal_tab")/><FanNavButton tab=tab own=FanTab::Events icon="events" label=tr("shows_tab")/><FanNavButton tab=tab own=FanTab::Merch icon="shop" label=tr("store_tab")/><FanNavButton tab=tab own=FanTab::Wallet icon="ticket" label=tr("tickets_tab")/></nav>
         </section>
     }
 }
@@ -2039,10 +2038,10 @@ fn FanSignal(
     view! {
         <section class="screen fan-screen">
             <header class="signal-dashboard-hero">
-                <p class="eyebrow">{tr("twoj_wpyw")}</p>
+                <p class="eyebrow">{tr("your_impact")}</p>
                 <h2>{move || dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned())}</h2>
-                <strong>{tr("potwierdzonych_polecen")}</strong>
-                <p>{move || dashboard.with(|state| state.as_ref().map(|d| i18n::format("kod_value", std::slice::from_ref(&d.referral.referral_code)))).value_or_else(|| tr("adowanie_sygnau").to_owned())}</p>
+                <strong>{tr("confirmed_referrals")}</strong>
+                <p>{move || dashboard.with(|state| state.as_ref().map(|d| i18n::format("code", std::slice::from_ref(&d.referral.referral_code)))).value_or_else(|| tr("loading_signal").to_owned())}</p>
             </header>
             <Show when=move || !loading.get().referral fallback=move || view! { <Skeleton /> }>
             {move || dashboard.with(|state| state.as_ref().map(|data| data.referral.clone())).map(|referral| {
@@ -2053,20 +2052,20 @@ fn FanSignal(
                 let coupons = referral.coupons;
                 let rewards = referral.physical_rewards;
                 let coupons_view = (!coupons.is_empty()).then(|| view! {
-                    <div class="section-head"><h3>{tr("twoje_kupony")}</h3></div>
+                    <div class="section-head"><h3>{tr("your_coupons")}</h3></div>
                     <div class="card-list">{coupons.into_iter().map(|coupon| view! {
                         <article class="fan-coupon"><div><span>{format!("-{}%", coupon.discount_percent)}</span><strong>{coupon.code}</strong></div><small>{coupon.status}</small></article>
                     }).collect_view()}</div>
                 });
                 let rewards_view = (!rewards.is_empty()).then(|| view! {
-                    <div class="section-head"><h3>{tr("nagrody")}</h3></div>
+                    <div class="section-head"><h3>{tr("rewards")}</h3></div>
                     <div class="card-list">{rewards.into_iter().map(|reward| view! {
                         <article class="reward-card"><div><strong>{reward.item_name}</strong><p>{reward.sku}</p></div><span>{reward.status}</span></article>
                     }).collect_view()}</div>
                 });
                 view! {
-                    <div class="stats-grid"><Metric value=referral.pending_referrals.to_string() label=tr("oczekujace")/><Metric value=entries_total.to_string() label=tr("losy")/><Metric value=coupon_count.to_string() label=tr("kupony")/></div>
-                    <div class="section-head"><h3>{tr("aktywne_losowania")}</h3><span>{draw_count}</span></div>
+                    <div class="stats-grid"><Metric value=referral.pending_referrals.to_string() label=tr("pending_2")/><Metric value=entries_total.to_string() label=tr("entries")/><Metric value=coupon_count.to_string() label=tr("coupons")/></div>
+                    <div class="section-head"><h3>{tr("active_draws")}</h3><span>{draw_count}</span></div>
                     <div class="card-list">{draws.into_iter().map(|draw| {
                         let proof_url = (!draw.slug.is_empty()).then(|| format!(
                             "https://virya.music/pl/dowody/losowania/{}/?source=signal-app",
@@ -2074,10 +2073,10 @@ fn FanSignal(
                         ));
                         view! {
                             <article class="draw-card">
-                                <div><p class="eyebrow">{draw.prize_kind}</p><strong>{draw.name}</strong><span>{i18n::format("losowanie_value", &[human_time(&draw.draw_at).to_string()])}</span></div>
+                                <div><p class="eyebrow">{draw.prize_kind}</p><strong>{draw.name}</strong><span>{i18n::format("draw", &[human_time(&draw.draw_at).to_string()])}</span></div>
                                 <div class="draw-actions">
-                                    <div class="entry-count"><b>{draw.total_entries}</b><small>{tr("losow")}</small></div>
-                                    {proof_url.map(|url| view! { <ExternalLink url=url label=tr("dowod") error=error /> })}
+                                    <div class="entry-count"><b>{draw.total_entries}</b><small>{tr("entries_2")}</small></div>
+                                    {proof_url.map(|url| view! { <ExternalLink url=url label=tr("proof") error=error /> })}
                                 </div>
                             </article>
                         }
@@ -2103,7 +2102,7 @@ fn FanMerch(
             <header class="screen-title">
                 <p class="eyebrow">{tr("virya_store")}</p>
                 <h2>{tr("merch")}</h2>
-                <p>{tr("produkty_i_zestawy_korzystaja_z_tego_samego_stanu")}</p>
+                <p>{tr("products_and_bundles_use_the_same_inventory")}</p>
             </header>
             <Show when=move || !loading.get().merch fallback=move || view! { <Skeleton rows=4 /> }>
                 {move || merch.get().map(|catalog| {
@@ -2113,12 +2112,12 @@ fn FanMerch(
                     if products.is_empty() {
                         view! {
                             <div class="empty-state">
-                                <strong>{tr("sklep_jest_chwilowo_niedostepny")}</strong>
-                                <p>{tr("pozostae_czesci_sygnau_dziaaja_normalnie_sprobuj_ponownie_za")}</p>
+                                <strong>{tr("store_is_temporarily_unavailable")}</strong>
+                                <p>{tr("rest_of_signal_is_working_normally_try")}</p>
                                 <button class="ghost" on:click=move |_| {
                                     refresh_fan_merch(merch, loading, error);
                                     refresh_fan_merch_bundles(bundles);
-                                }>{tr("odswiez_merch")}</button>
+                                }>{tr("refresh_merch")}</button>
                             </div>
                         }.into_any()
                     } else {
@@ -2126,26 +2125,26 @@ fn FanMerch(
                         view! {
                             <div class="fan-merch-list">
                                 <div class="merch-grid-action">
-                                    <ExternalLink url="https://virya.music/pl/merch/?source=signal-app".to_owned() label=tr("otworz_peny_sklep") error=error />
+                                    <ExternalLink url="https://virya.music/pl/merch/?source=signal-app".to_owned() label=tr("open_full_store") error=error />
                                 </div>
                                 <div class="merch-grid-heading">
-                                    <div><p class="eyebrow">{tr("zestawy")}</p><h3>{tr("bundle_ze_sklepu_online")}</h3></div>
-                                    <span>{tr("do_30")}</span>
+                                    <div><p class="eyebrow">{tr("bundles")}</p><h3>{tr("bundles_from_the_online_store")}</h3></div>
+                                    <span>{tr("up_to_30")}</span>
                                 </div>
                                 {bundle_catalog.map(|catalog| {
                                     if catalog.bundles.is_empty() {
                                         view! {
                                             <div class="merch-grid-message">
-                                                <p>{tr("zestawy_sa_teraz_niedostepne_w_live_inventory")}</p>
-                                                <ExternalLink url="https://virya.music/pl/merch/?source=signal-app&product=bundle-stage-pack".to_owned() label=tr("zobacz_zestawy") error=error />
+                                                <p>{tr("bundles_are_currently_unavailable_in_live_inventory")}</p>
+                                                <ExternalLink url="https://virya.music/pl/merch/?source=signal-app&product=bundle-stage-pack".to_owned() label=tr("view_bundles") error=error />
                                             </div>
                                         }.into_any()
                                     } else {
                                         catalog.bundles.into_iter().map(|bundle| {
                                             let availability_label = match bundle.availability.as_str() {
-                                                "low_stock" => {tr("ostatnie_sztuki")},
-                                                "available" => {tr("dostepny")},
-                                                _ => {tr("brak_na_stanie")},
+                                                "low_stock" => {tr("low_stock")},
+                                                "available" => {tr("available_status")},
+                                                _ => {tr("out_of_stock")},
                                             };
                                             let available = bundle.available;
                                             let product_url = bundle.product_url.clone();
@@ -2191,9 +2190,9 @@ fn FanMerch(
                                                         {includes_view}
                                                         {variants_view}
                                                         <Show when=move || available fallback=move || view! {
-                                                            <button class="ghost" on:click=move |_| refresh_fan_merch_bundles(bundles)>{tr("sprawdz_ponownie")}</button>
+                                                            <button class="ghost" on:click=move |_| refresh_fan_merch_bundles(bundles)>{tr("check_again")}</button>
                                                         }>
-                                                            <ExternalLink url=product_url.clone() label=tr("kup_w_sklepie") error=error />
+                                                            <ExternalLink url=product_url.clone() label=tr("buy_in_store") error=error />
                                                         </Show>
                                                     </div>
                                                 </article>
@@ -2202,12 +2201,12 @@ fn FanMerch(
                                     }
                                 }).value_or_else(|| view! {
                                     <div class="merch-grid-message">
-                                        <p>{tr("zestawy_doczytuja_sie_niezaleznie_od_produktow")}</p>
-                                        <ExternalLink url="https://virya.music/pl/merch/?source=signal-app&product=bundle-stage-pack".to_owned() label=tr("zobacz_zestawy") error=error />
+                                        <p>{tr("bundles_load_independently_from_products")}</p>
+                                        <ExternalLink url="https://virya.music/pl/merch/?source=signal-app&product=bundle-stage-pack".to_owned() label=tr("view_bundles") error=error />
                                     </div>
                                 }.into_any())}
                                 <div class="merch-grid-heading merch-products-heading">
-                                    <div><p class="eyebrow">{tr("pojedyncze_produkty")}</p><h3>{tr("wybierz_swoj_merch")}</h3></div>
+                                    <div><p class="eyebrow">{tr("individual_products")}</p><h3>{tr("choose_your_merch")}</h3></div>
                                 </div>
                                 {products.into_iter().map(|product| {
                                     let available_variants = product.variants.iter()
@@ -2220,13 +2219,13 @@ fn FanMerch(
                                     let low_stock = available_variants.iter()
                                         .any(|variant| variant.availability == "low_stock");
                                     let availability_label = if preorder {
-                                        tr("przedsprzedaz")
+                                        tr("pre_order")
                                     } else if low_stock {
-                                        tr("ostatnie_sztuki")
+                                        tr("low_stock")
                                     } else if has_stock {
-                                        tr("dostepny")
+                                        tr("available_status")
                                     } else {
-                                        tr("brak_na_stanie")
+                                        tr("out_of_stock")
                                     };
                                     let shop_url = format!(
                                         "https://virya.music/pl/merch/?source=signal-app&product={}",
@@ -2260,9 +2259,9 @@ fn FanMerch(
                                                 {product.description.map(|description| view! { <p>{description}</p> })}
                                                 {variants_view}
                                                 <Show when=move || has_stock fallback=move || view! {
-                                                    <button class="ghost" on:click=move |_| refresh_fan_merch(merch, loading, error)>{tr("sprawdz_ponownie")}</button>
+                                                    <button class="ghost" on:click=move |_| refresh_fan_merch(merch, loading, error)>{tr("check_again")}</button>
                                                 }>
-                                                    <ExternalLink url=shop_url.clone() label=tr("kup_w_sklepie") error=error />
+                                                    <ExternalLink url=shop_url.clone() label=tr("buy_in_store") error=error />
                                                 </Show>
                                             </div>
                                         </article>
@@ -2273,12 +2272,12 @@ fn FanMerch(
                     }
                 }).value_or_else(|| view! {
                     <div class="empty-state">
-                        <strong>{tr("nie_udao_sie_pobrac_stanu_sklepu")}</strong>
-                        <p>{tr("koncerty_bilety_i_profil_pozostaja_dostepne")}</p>
+                        <strong>{tr("could_not_load_store_status")}</strong>
+                        <p>{tr("shows_tickets_and_profile_remain_available")}</p>
                         <button class="ghost" on:click=move |_| {
                             refresh_fan_merch(merch, loading, error);
                             refresh_fan_merch_bundles(bundles);
-                        }>{tr("sprobuj_ponownie")}</button>
+                        }>{tr("try_again")}</button>
                     </div>
                 }.into_any())}
             </Show>
@@ -2295,8 +2294,16 @@ fn FanEvents(
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">{tr("gdzie_gramy")}</p><h2>{tr("koncerty")}</h2></header><Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }>{move || { let events = fan_events(dashboard, public); if events.is_empty() { view! { <div class="empty-state"><strong>{tr("brak_koncertow_w_kalendarzu")}</strong><p>{tr("kiedy_pojawi_sie_nowy_event_bedzie_tutaj")}</p></div> }.into_any() } else { view! { <div class="card-list fan-event-list">{events.into_iter().map(|event| view! { <FanEventCard event=event checkout_event=checkout_event dashboard=dashboard loading=loading error=error /> }).collect_view()}</div> }.into_any() }}}</Show></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">{tr("where_we_play")}</p><h2>{tr("shows_tab")}</h2></header><Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }>{move || { let events = fan_events(dashboard, public); if events.is_empty() { view! { <div class="empty-state"><strong>{tr("no_shows_in_the_calendar")}</strong><p>{tr("new_events_will_appear_here_2")}</p></div> }.into_any() } else { view! { <div class="card-list fan-event-list">{events.into_iter().map(|event| view! { <FanEventCard event=event checkout_event=checkout_event dashboard=dashboard loading=loading error=error /> }).collect_view()}</div> }.into_any() }}}</Show></section>
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TicketPoolAvailability {
+    Checking,
+    Available,
+    Missing,
+    Failed,
 }
 
 #[component]
@@ -2307,8 +2314,41 @@ fn FanEventCard(
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
+    let should_probe_pool = event.ticket_url.is_none();
+    let pool = RwSignal::new(if should_probe_pool {
+        TicketPoolAvailability::Checking
+    } else {
+        TicketPoolAvailability::Available
+    });
+    let pool_slug = event.slug.clone();
+    let pool_scope = format!("fan:ticket-pool:{pool_slug}");
+    let request_scope = pool_scope.clone();
+    Effect::new(move |_| {
+        if !should_probe_pool {
+            return;
+        }
+        let event_slug = pool_slug.clone();
+        let request_scope = request_scope.clone();
+        spawn_local(async move {
+            match bridge::invoke_latest::<Option<TicketSaleOffer>, _>(
+                "fan_ticket_sale",
+                &EventArgs {
+                    event_slug: &event_slug,
+                },
+                10_000,
+                &request_scope,
+            )
+            .await
+            {
+                Ok(Some(Some(_))) => pool.set(TicketPoolAvailability::Available),
+                Ok(Some(None)) => pool.set(TicketPoolAvailability::Missing),
+                Ok(None) => {}
+                Err(_) => pool.set(TicketPoolAvailability::Failed),
+            }
+        });
+    });
+    on_cleanup(move || bridge::invalidate_latest(&pool_scope));
     let checkout = event.clone();
-    let buy = move |_| checkout_event.set(Some(checkout.clone()));
     let event_slug = event.slug.clone();
     let interested = Signal::derive(move || {
         dashboard.with(|state| {
@@ -2337,7 +2377,7 @@ fn FanEventCard(
             .await
             {
                 Ok(_) => {
-                    error.set(Some(tr("koncert_zapisany_w_twoim_sygnale").to_owned()));
+                    error.set(Some(tr("show_saved_to_your_signal").to_owned()));
                     refresh_fan_interests(dashboard, loading, error);
                 }
                 Err(message) => error.set(Some(message)),
@@ -2352,7 +2392,7 @@ fn FanEventCard(
     let image = event.image_thumbnail_url.or(event.image_url);
     let description = event.description;
     let title = event.title;
-    let image_alt = i18n::format("value_koncert_virya", std::slice::from_ref(&title));
+    let image_alt = i18n::format("virya_show", std::slice::from_ref(&title));
     view! {
         <article class="fan-event-card">
             {image.map(|url| view! {
@@ -2372,8 +2412,24 @@ fn FanEventCard(
                 <h3>{title}</h3><p>{location}</p>
                 {description.map(|text| view! { <p class="event-description">{text}</p> })}
                 <div class="event-actions">
-                    <button class:active=move || interested.get() on:click=interest disabled=move || busy.get() || interested.get()>{move || if busy.get() { tr("zapisuje") } else if interested.get() { tr("mam_to") } else { tr("interesuje_mnie") }}</button>
-                    <button class="ticket-buy-button" on:click=buy>{tr("kup_bilet")}</button>
+                    <button type="button" class:active=move || interested.get() on:click=interest disabled=move || busy.get() || interested.get()>{move || if busy.get() { tr("saving") } else if interested.get() { tr("saved") } else { tr("interested") }}</button>
+                    {move || match pool.get() {
+                        TicketPoolAvailability::Available => {
+                            let checkout = checkout.clone();
+                            view! {
+                                <button type="button" class="ticket-buy-button" on:click=move |_| checkout_event.set(Some(checkout.clone()))>{tr("buy_ticket")}</button>
+                            }.into_any()
+                        },
+                        TicketPoolAvailability::Checking => view! {
+                            <div class="ticket-pool-status is-loading" role="status">{tr("ticket_pool_status_loading")}</div>
+                        }.into_any(),
+                        TicketPoolAvailability::Missing => view! {
+                            <div class="ticket-pool-status" role="status">{tr("this_show_has_no_ticket_pool")}</div>
+                        }.into_any(),
+                        TicketPoolAvailability::Failed => view! {
+                            <div class="ticket-pool-status is-warning" role="status">{tr("ticket_pool_temporarily_unavailable")}</div>
+                        }.into_any(),
+                    }}
                 </div>
             </div>
         </article>
@@ -2443,9 +2499,9 @@ fn FanTicketCheckout(
 
     view! {
         <section class="screen fan-ticket-checkout-screen">
-            <button class="checkout-back" on:click=back>{tr("wroc_do_koncertow")}</button>
+            <button class="checkout-back" on:click=back>{tr("back_back_to_shows")}</button>
             <header class="ticket-checkout-hero">
-                <p class="eyebrow">{tr("virya_bilety")}</p>
+                <p class="eyebrow">{tr("virya_tickets")}</p>
                 <h2>{event_title}</h2>
                 <p>{event_meta}</p>
             </header>
@@ -2473,9 +2529,9 @@ fn FanTicketCheckout(
                         .into_any(),
                         None => view! {
                             <div class="empty-state">
-                                <strong>{if sale_failed.get() { tr("nie_udao_sie_sprawdzic_sprzedazy") } else { tr("brak_wasnej_puli_virya") }}</strong>
-                                <p>{tr("mozesz_przejsc_do_strony_koncertu_lub_sprzedazy_prowadzonej")}</p>
-                                <ExternalLink url=fallback_url label=tr("sprawdz_bilety") error=error />
+                                <strong>{if sale_failed.get() { tr("could_not_check_ticket_sales") } else { tr("no_virya_ticket_pool") }}</strong>
+                                <p>{tr("you_can_open_the_show_page_or")}</p>
+                                <ExternalLink url=fallback_url label=tr("check_tickets") error=error />
                             </div>
                         }
                         .into_any(),
@@ -2521,13 +2577,13 @@ fn FanTicketSale(
         && max_per_order > 0
         && has_available_type;
     let state_copy = match offer.sales_state.as_str() {
-        "upcoming" => tr("sprzedaz_rozpocznie_sie_wkrotce"),
-        "closed" => tr("sprzedaz_online_zostaa_zakonczona"),
-        "sold_out" => tr("ta_pula_biletow_jest_wyprzedana"),
-        "inactive" => tr("sprzedaz_jest_chwilowo_wyaczona"),
-        "event_unavailable" => tr("ten_koncert_nie_jest_obecnie_dostepny_w_sprzedazy"),
-        _ if !is_open => tr("bilety_nie_sa_teraz_dostepne"),
-        _ => tr("wybierz_bilety_miejsca_zostana_zarezerwowane_na_czas_patnosci"),
+        "upcoming" => tr("ticket_sales_will_open_soon"),
+        "closed" => tr("online_sales_have_ended"),
+        "sold_out" => tr("this_ticket_pool_is_sold_out"),
+        "inactive" => tr("ticket_sales_are_temporarily_disabled"),
+        "event_unavailable" => tr("this_show_is_not_currently_on_sale"),
+        _ if !is_open => tr("tickets_are_not_available_right_now"),
+        _ => tr("select_tickets_places_will_be_reserved_while"),
     };
     let sale_available = offer.available.max(0);
     let sale_reserved = offer.reserved.max(0);
@@ -2536,15 +2592,15 @@ fn FanTicketSale(
     if !is_open {
         return view! {
             <div class="ticket-sale-summary">
-                <div><strong>{sale_available}</strong><span>{tr("dostepne")}</span></div>
-                <div><strong>{sale_reserved}</strong><span>{tr("w_patnosci")}</span></div>
-                <div><strong>{sale_sold}</strong><span>{tr("sprzedane")}</span></div>
+                <div><strong>{sale_available}</strong><span>{tr("available_label")}</span></div>
+                <div><strong>{sale_reserved}</strong><span>{tr("in_checkout_2")}</span></div>
+                <div><strong>{sale_sold}</strong><span>{tr("sold")}</span></div>
             </div>
             <p class="checkout-state-copy">{state_copy}</p>
             <div class="empty-state compact">
-                <strong>{tr("sprawdz_strone_koncertu")}</strong>
-                <p>{tr("jezeli_organizator_prowadzi_osobna_sprzedaz_znajdziesz_ja_pod")}</p>
-                <ExternalLink url=fallback_url label=tr("sprawdz_bilety") error=error />
+                <strong>{tr("open_the_show_page")}</strong>
+                <p>{tr("if_the_organiser_runs_a_separate_ticket")}</p>
+                <ExternalLink url=fallback_url label=tr("check_tickets") error=error />
             </div>
         }
         .into_any();
@@ -2583,7 +2639,7 @@ fn FanTicketSale(
             .filter(|item| item.quantity > 0)
             .collect::<Vec<_>>();
         if items.is_empty() {
-            error.set(Some(tr("wybierz_co_najmniej_jeden_bilet").to_owned()));
+            error.set(Some(tr("select_at_least_one_ticket").to_owned()));
             return;
         }
         let name = buyer_name.get_untracked().trim().to_owned();
@@ -2659,9 +2715,9 @@ fn FanTicketSale(
     });
     view! {
         <div class="ticket-sale-summary">
-            <div><strong>{sale_available}</strong><span>{tr("dostepne")}</span></div>
-            <div><strong>{sale_reserved}</strong><span>{tr("w_patnosci")}</span></div>
-            <div><strong>{sale_sold}</strong><span>{tr("sprzedane")}</span></div>
+            <div><strong>{sale_available}</strong><span>{tr("available_label")}</span></div>
+            <div><strong>{sale_reserved}</strong><span>{tr("in_checkout_2")}</span></div>
+            <div><strong>{sale_sold}</strong><span>{tr("sold")}</span></div>
         </div>
         <p class="checkout-state-copy">{state_copy}</p>
         <div class="ticket-type-list">
@@ -2702,30 +2758,30 @@ fn FanTicketSale(
                             <h3>{ticket_type.name}</h3>
                             {ticket_type.description.map(|description| view! { <p>{description}</p> })}
                             <strong>{money(ticket_type.price_gross_minor, &currency)}</strong>
-                            <small>{i18n::format("dostepne_value", &[ticket_type.available.max(0).to_string()])}</small>
+                            <small>{i18n::format("available", &[ticket_type.available.max(0).to_string()])}</small>
                         </div>
-                        <div class="ticket-stepper" aria-label=tr("liczba_biletow")>
-                            <button type="button" aria-label=tr("zmniejsz_liczbe_biletow") on:click=decrement disabled=move || decrement_disabled.get()>"−"</button>
+                        <div class="ticket-stepper" aria-label=tr("ticket_quantity")>
+                            <button type="button" aria-label=tr("decrease_ticket_quantity") on:click=decrement disabled=move || decrement_disabled.get()>"−"</button>
                             <output aria-live="polite">{move || quantity.get()}</output>
-                            <button type="button" aria-label=tr("zwieksz_liczbe_biletow") on:click=increment disabled=move || increment_disabled.get()>"+"</button>
+                            <button type="button" aria-label=tr("increase_ticket_quantity") on:click=increment disabled=move || increment_disabled.get()>"+"</button>
                         </div>
                     </article>
                 }
             }).collect_view()}
         </div>
         <div class="ticket-buyer-panel">
-            <label>{tr("imie_i_nazwisko_na_zamowieniu_opcjonalnie")}<input autocomplete="name" maxlength="160" prop:value=move || buyer_name.get() on:input=move |event| buyer_name.set(event_target_value(&event))/></label>
-            <p>{move || status.get().session.map(|profile| i18n::format("bilety_i_potwierdzenie_trafia_na_value", std::slice::from_ref(&profile.email))).value_or_else(|| tr("bilety_trafia_na_e_mail_konta_fana").to_owned())}</p>
-            <ExternalLink url=full_form_url label=tr("faktura_peny_formularz") error=error />
+            <label>{tr("name_on_the_order_optional")}<input autocomplete="name" maxlength="160" prop:value=move || buyer_name.get() on:input=move |event| buyer_name.set(event_target_value(&event))/></label>
+            <p>{move || status.get().session.map(|profile| i18n::format("tickets_and_confirmation_will_be_sent_to", std::slice::from_ref(&profile.email))).value_or_else(|| tr("tickets_will_be_sent_to_the_fan").to_owned())}</p>
+            <ExternalLink url=full_form_url label=tr("invoice_full_form") error=error />
         </div>
         <footer class="ticket-checkout-total">
-            <div><span>{tr("wybrane_bilety")}</span><strong>{move || selected_count.get()}</strong></div>
-            <div><span>{tr("razem_brutto")}</span><strong>{move || money(selected_gross.get(), &currency_for_total)}</strong></div>
-            <button type="button" class="primary" on:click=purchase disabled=move || purchase_disabled.get()>{move || if busy.get() { tr("rezerwuje") } else if pending_checkout.get().is_some() { tr("zamowienie_zapisane") } else { tr("przejdz_do_patnosci_stripe") }}</button>
+            <div><span>{tr("selected_tickets")}</span><strong>{move || selected_count.get()}</strong></div>
+            <div><span>{tr("gross_total")}</span><strong>{move || money(selected_gross.get(), &currency_for_total)}</strong></div>
+            <button type="button" class="primary" on:click=purchase disabled=move || purchase_disabled.get()>{move || if busy.get() { tr("reserving") } else if pending_checkout.get().is_some() { tr("order_saved") } else { tr("continue_to_stripe_payment") }}</button>
             <Show when=move || pending_checkout.get().is_some()>
-                <button type="button" class="ghost checkout-retry" on:click=retry_payment>{tr("otworz_patnosc_ponownie")}</button>
+                <button type="button" class="ghost checkout-retry" on:click=retry_payment>{tr("reopen_payment")}</button>
             </Show>
-            <small>{tr("dane_karty_nie_trafiaja_do_virya_signal_patnosc")}</small>
+            <small>{tr("card_details_never_reach_virya_signal_payment")}</small>
         </footer>
     }
     .into_any()
@@ -2814,58 +2870,15 @@ fn ExternalLink(
 
 fn open_area_game(error: RwSignal<Option<String>>) {
     spawn_local(async move {
-        let url = "https://virya.music/pl/area/#area-map";
-        if let Err(message) = bridge::invoke_unit("open_external_url", &UrlArgs { url }).await {
+        let url = format!(
+            "https://virya.music/{}/area/#area-map",
+            i18n::current().code()
+        );
+        if let Err(message) = bridge::invoke_unit("open_external_url", &UrlArgs { url: &url }).await
+        {
             error.set(Some(message));
         }
     });
-}
-
-#[component]
-fn FanGame(
-    area: RwSignal<Option<AreaWallet>>,
-    loading: RwSignal<FanLoadingState>,
-    error: RwSignal<Option<String>>,
-) -> impl IntoView {
-    let refresh = move |_| refresh_fan_area(area, loading, error);
-    view! {
-        <section class="screen fan-screen area-screen">
-            <header class="screen-title"><p class="eyebrow">{tr("virya_area")}</p><h2>{tr("znajdz_punkt_w_swoim_miescie")}</h2><p>{tr("otworz_mape_wybierz_aktywny_punkt_i_przejdz_do")}</p></header>
-            <Show when=move || !loading.get().area fallback=move || view! { <Skeleton rows=3 /> }>
-                {move || area.get().map(|wallet| {
-                    let claimed = wallet.claims.len() as u32;
-                    let total = wallet.collection_size.max(1);
-                    let percent = (claimed.saturating_mul(100) / total).min(100);
-                    let claims = wallet.claims;
-                    let live_count = wallet.live_drops.len();
-                    let voucher_count = wallet.vouchers.len();
-                    let collection_size = wallet.collection_size;
-                    let reward_credits = wallet.reward_credits;
-                    let community_percent = wallet.community.percent.round();
-                    let migration_notice = wallet.migration_required.then(|| view! {
-                        <p class="security-note warning">{tr("poacz_portfel_przegladarkowy_z_kontem_na_stronie_area")}</p>
-                    });
-                    view! {
-                        <div class="area-hero-card">
-                            <div><p class="eyebrow">{tr("postep_kolekcji")}</p><h3>{format!("{claimed} / {collection_size}")}</h3></div>
-                            <strong>{i18n::format("reward_credits_kredytow", &[reward_credits.to_string()])}</strong>
-                            <div class="area-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow=percent><span style=format!("width:{percent}%")></span></div>
-                            <div class="area-stats"><span>{i18n::format("live_count_aktywne_punkty", &[live_count.to_string()])}</span><span>{i18n::format("voucher_count_nagrody", &[voucher_count.to_string()])}</span><span>{i18n::format("community_percent_spoecznosci", &[community_percent.to_string()])}</span></div>
-                        </div>
-                        {migration_notice}
-                        <div class="section-head"><h3>{tr("odkryte_artefakty")}</h3><span>{claimed}</span></div>
-                        <div class="artifact-list">
-                            <For each=move || claims.clone() key=|claim| claim.drop_id.clone() children=move |claim| view! {
-                                <article class="artifact-card"><span>{claim.number}</span><div><strong>{claim.track}</strong><p>{format!("{} · {}", claim.city, claim.edition)}</p><small>{claim.line}</small></div><em>{claim.edition_number.map(|number| format!("#{number}")).value_or_else(|| "✓".to_owned())}</em></article>
-                            } />
-                        </div>
-                        <div class="area-actions"><button class="primary" on:click=move |_| open_area_game(error)>{tr("otworz_mape_i_zacznij")}</button><button class="ghost" on:click=refresh disabled=move || loading.get().area>{tr("odswiez_progres")}</button></div>
-                        <p class="security-note">{tr("mapa_pokazuje_aktywne_punkty_i_prowadzi_do_startu")}</p>
-                    }.into_any()
-                }).value_or_else(|| view! { <div class="empty-state"><strong>{tr("area_chwilowo_niedostepna")}</strong><p>{tr("odswiez_dane_albo_otworz_pena_gre")}</p><button class="primary" on:click=move |_| open_area_game(error)>{tr("otworz_area")}</button></div> }.into_any())}
-            </Show>
-        </section>
-    }
 }
 
 #[component]
@@ -2885,9 +2898,7 @@ fn FanWallet(
         let order = order_id.get().trim().to_owned();
         let token = checkout_token.get().trim().to_owned();
         if order.is_empty() || token.is_empty() {
-            error.set(Some(
-                tr("podaj_identyfikator_zamowienia_i_prywatny_token").to_owned(),
-            ));
+            error.set(Some(tr("enter_the_order_id_and_private_token").to_owned()));
             return;
         }
         // The recovery token must not remain rendered in the WebView while IPC runs.
@@ -2904,7 +2915,7 @@ fn FanWallet(
             .await
             {
                 Ok(_) => {
-                    error.set(Some(tr("bilety_zapisane_w_portfelu").to_owned()));
+                    error.set(Some(tr("tickets_saved_to_the_wallet").to_owned()));
                     refresh_wallets(wallets, Some(loading), error);
                 }
                 Err(message) => error.set(Some(message)),
@@ -2916,7 +2927,7 @@ fn FanWallet(
     let claim = move |_| {
         let token = claim_token.get().trim().to_owned();
         if token.is_empty() {
-            error.set(Some(tr("wklej_token_wejsciowki").to_owned()));
+            error.set(Some(tr("paste_the_admission_pass_token").to_owned()));
             return;
         }
         busy.set(true);
@@ -2930,7 +2941,9 @@ fn FanWallet(
             .await
             {
                 Ok(_) => {
-                    error.set(Some(tr("wejsciowka_przypisana_do_urzadzenia").to_owned()));
+                    error.set(Some(
+                        tr("admission_pass_assigned_to_this_device").to_owned(),
+                    ));
                     refresh_fan_admission_pass(dashboard, loading, error);
                 }
                 Err(message) => error.set(Some(message)),
@@ -2951,11 +2964,11 @@ fn FanWallet(
     };
 
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">{tr("mobile_wallet")}</p><h2>{tr("bilety_i_wejscie")}</h2></header><Show when=move || !loading.get().admission_pass fallback=move || view! { <Skeleton rows=1 /> }>{move || dashboard.with(|state| state.as_ref().and_then(|d| d.admission_pass.clone())).map(|pass| view! { <article class="admission-card"><p class="eyebrow">{tr("wejsciowka_virya")}</p><h3>{pass.event_title}</h3><p>{event_time_location(&pass.starts_at, pass.venue.as_deref())}</p><strong>{pass.public_reference}</strong><span>{pass.status}</span><button class="primary" on:click=qr disabled=move || busy.get()>{tr("pokaz_qr_na_wejscie")}</button>{move || admission_qr.get().map(|value| view! { <QrPanel svg=value.qr_svg token=value.token expires=value.expires_at /> })}</article> })}
-        <Show when=move || dashboard.with(|state| state.as_ref().is_none_or(|d| d.admission_pass.is_none()))><div class="claim-box"><p class="eyebrow">{tr("wygraes_wejsciowke")}</p><h3>{tr("przypisz_ja_do_telefonu")}</h3><textarea rows="3" placeholder=tr("token_z_wiadomosci") prop:value=move || claim_token.get() on:input=move |e| claim_token.set(event_target_value(&e))></textarea><button class="primary" on:click=claim disabled=move || busy.get()>{tr("odbierz_wejsciowke")}</button></div></Show></Show>
-        <div class="section-head"><h3>{tr("portfel_biletow")}</h3><span>{move || wallets.get().len()}</span></div><Show when=move || !loading.get().wallets fallback=move || view! { <Skeleton rows=2 /> }><div class="wallet-stack">{move || wallets.get().into_iter().map(|wallet| view! {
+        <section class="screen"><header class="screen-title"><p class="eyebrow">{tr("mobile_wallet")}</p><h2>{tr("tickets_and_entry")}</h2></header><Show when=move || !loading.get().admission_pass fallback=move || view! { <Skeleton rows=1 /> }>{move || dashboard.with(|state| state.as_ref().and_then(|d| d.admission_pass.clone())).map(|pass| view! { <article class="admission-card"><p class="eyebrow">{tr("virya_admission_pass")}</p><h3>{pass.event_title}</h3><p>{event_time_location(&pass.starts_at, pass.venue.as_deref())}</p><strong>{pass.public_reference}</strong><span>{pass.status}</span><button class="primary" on:click=qr disabled=move || busy.get()>{tr("show_entry_qr")}</button>{move || admission_qr.get().map(|value| view! { <QrPanel svg=value.qr_svg token=value.token expires=value.expires_at /> })}</article> })}
+        <Show when=move || dashboard.with(|state| state.as_ref().is_none_or(|d| d.admission_pass.is_none()))><div class="claim-box"><p class="eyebrow">{tr("did_you_win_an_admission_pass")}</p><h3>{tr("assign_it_to_your_phone")}</h3><textarea rows="3" placeholder=tr("token_from_the_message") prop:value=move || claim_token.get() on:input=move |e| claim_token.set(event_target_value(&e))></textarea><button class="primary" on:click=claim disabled=move || busy.get()>{tr("claim_admission_pass")}</button></div></Show></Show>
+        <div class="section-head"><h3>{tr("ticket_wallet")}</h3><span>{move || wallets.get().len()}</span></div><Show when=move || !loading.get().wallets fallback=move || view! { <Skeleton rows=2 /> }><div class="wallet-stack">{move || wallets.get().into_iter().map(|wallet| view! {
             <WalletCard wallet=wallet error=error />
-        }).collect_view()}</div></Show><details class="import-box"><summary>{tr("dodaj_istniejace_zamowienie")}</summary><div class="form-grid"><label>"Order ID"<input placeholder=tr("uuid_zamowienia") prop:value=move || order_id.get() on:input=move |e| order_id.set(event_target_value(&e))/></label><label>{tr("prywatny_checkout_token")}<textarea rows="3" autocomplete="off" autocapitalize="none" spellcheck="false" prop:value=move || checkout_token.get() on:input=move |e| checkout_token.set(event_target_value(&e))></textarea></label><button class="primary" on:click=import disabled=move || busy.get()>{tr("dodaj_do_portfela")}</button></div></details></section>
+        }).collect_view()}</div></Show><details class="import-box"><summary>{tr("add_an_existing_order")}</summary><div class="form-grid"><label>"Order ID"<input placeholder=tr("order_uuid") prop:value=move || order_id.get() on:input=move |e| order_id.set(event_target_value(&e))/></label><label>{tr("private_checkout_token")}<textarea rows="3" autocomplete="off" autocapitalize="none" spellcheck="false" prop:value=move || checkout_token.get() on:input=move |e| checkout_token.set(event_target_value(&e))></textarea></label><button class="primary" on:click=import disabled=move || busy.get()>{tr("add_to_wallet")}</button></div></details></section>
     }
 }
 
@@ -2973,14 +2986,14 @@ fn WalletCard(wallet: TicketWallet, error: RwSignal<Option<String>>) -> impl Int
         spawn_local(async move {
             match bridge::invoke_unit("fan_request_delivery", &OrderArgs { order_id: &order }).await
             {
-                Ok(_) => error.set(Some(tr("wysalismy_ponownie_portfel_na_e_mail").to_owned())),
+                Ok(_) => error.set(Some(tr("we_resent_the_wallet_by_email").to_owned())),
                 Err(message) => error.set(Some(message)),
             }
             busy.set(false);
         });
     };
     view! {
-        <article class="wallet-card"><header><div><p class="eyebrow">{wallet.order.status}</p><h3>{wallet.order.event_title}</h3><p>{event_time_location(&wallet.order.starts_at, wallet.order.venue.as_deref())}</p></div><strong>{wallet.order.public_reference}</strong></header><div class="ticket-stack">{wallet.tickets.into_iter().map(|ticket| view! { <WalletTicketCard order_id=order_id.clone() ticket=ticket error=error /> }).collect_view()}</div><button class="text-button" on:click=resend disabled=move || busy.get()>{move || if busy.get() { tr("wysyam") } else { tr("wyslij_bilety_ponownie_na_e_mail") }}</button></article>
+        <article class="wallet-card"><header><div><p class="eyebrow">{wallet.order.status}</p><h3>{wallet.order.event_title}</h3><p>{event_time_location(&wallet.order.starts_at, wallet.order.venue.as_deref())}</p></div><strong>{wallet.order.public_reference}</strong></header><div class="ticket-stack">{wallet.tickets.into_iter().map(|ticket| view! { <WalletTicketCard order_id=order_id.clone() ticket=ticket error=error /> }).collect_view()}</div><button class="text-button" on:click=resend disabled=move || busy.get()>{move || if busy.get() { tr("sending") } else { tr("resend_tickets_by_email") }}</button></article>
     }
 }
 
@@ -3026,13 +3039,13 @@ fn WalletTicketCard(
         });
     };
     view! {
-        <article class="ticket-card"><div><p class="eyebrow">{ticket.ticket_type_name}</p><strong>{ticket.public_reference}</strong><span>{ticket.holder_name.value_or(ticket.holder_email_masked)}</span></div><button class="ticket-qr-button" on:click=toggle_qr disabled=move || busy.get() || !qr_available>{move || if busy.get() { tr("generuje") } else if qr_visible.get() { tr("ukryj_qr") } else if qr_available { tr("pokaz_qr") } else { tr("qr_niedostepny") }}</button><Show when=move || qr_visible.get()>{move || qr_svg.get().map(|svg| view! { <div class="mini-qr" inner_html=svg></div> })}</Show><small>{i18n::format("qr_wazny_do_value", &[human_time(&ticket.qr_expires_at).to_string()])}</small></article>
+        <article class="ticket-card"><div><p class="eyebrow">{ticket.ticket_type_name}</p><strong>{ticket.public_reference}</strong><span>{ticket.holder_name.value_or(ticket.holder_email_masked)}</span></div><button class="ticket-qr-button" on:click=toggle_qr disabled=move || busy.get() || !qr_available>{move || if busy.get() { tr("generating") } else if qr_visible.get() { tr("hide_qr") } else if qr_available { tr("show_qr") } else { tr("qr_unavailable") }}</button><Show when=move || qr_visible.get()>{move || qr_svg.get().map(|svg| view! { <div class="mini-qr" inner_html=svg></div> })}</Show><small>{i18n::format("qr_valid_until", &[human_time(&ticket.qr_expires_at).to_string()])}</small></article>
     }
 }
 
 #[component]
 fn QrPanel(svg: Option<String>, token: String, expires: String) -> impl IntoView {
-    view! { <div class="qr-panel">{svg.map(|markup| view! { <div class="qr-svg" inner_html=markup></div> })}<code>{token}</code><small>{i18n::format("wazny_do_value", &[human_time(&expires).to_string()])}</small></div> }
+    view! { <div class="qr-panel">{svg.map(|markup| view! { <div class="qr-svg" inner_html=markup></div> })}<code>{token}</code><small>{i18n::format("valid_until_2", &[human_time(&expires).to_string()])}</small></div> }
 }
 
 #[component]
@@ -3079,19 +3092,19 @@ fn FanProfileScreen(
     };
     view! {
         <section class="screen">
-            <header class="screen-title"><p class="eyebrow">{tr("moj_profil")}</p><h2>{tr("ustawienia_sygnau")}</h2></header>
+            <header class="screen-title"><p class="eyebrow">{tr("my_profile")}</p><h2>{tr("signal_settings")}</h2></header>
             {move || status.get().session.map(|profile| view! {
-                <div class="profile-card"><div class="avatar">"V"</div><div><strong>{profile.display_name.value_or_else(|| tr("fan_viryi").to_owned())}</strong><p>{profile.email}</p></div></div>
-                <div class="stats-grid"><Metric value=profile.wallet_count.to_string() label=tr("zamowienia")/><Metric value=if profile.has_admission_pass { "1".to_owned() } else { "0".to_owned() } label=tr("wejsciowki")/><Metric value=dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned()) label=tr("polecenia")/></div>
+                <div class="profile-card"><div class="avatar">"V"</div><div><strong>{profile.display_name.value_or_else(|| tr("virya_fan").to_owned())}</strong><p>{profile.email}</p></div></div>
+                <div class="stats-grid"><Metric value=profile.wallet_count.to_string() label=tr("orders")/><Metric value=if profile.has_admission_pass { "1".to_owned() } else { "0".to_owned() } label=tr("admission_passes")/><Metric value=dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned()) label=tr("referrals")/></div>
             })}
             <div class="settings-list">
                 <LanguageSwitch />
-                <button on:click=refresh disabled=move || { let state = loading.get(); state.events || state.referral || state.interests || state.admission_pass || state.wallets }>{move || { let state = loading.get(); if state.events || state.referral || state.interests || state.admission_pass || state.wallets { tr("odswiezam_2") } else { tr("odswiez_dane") } }}</button>
-                <button on:click=lock>{tr("zablokuj_aplikacje")}</button>
-                <button class="danger ghost" on:click=forget>{tr("usun_profil_i_bilety_z_urzadzenia")}</button>
+                <button on:click=refresh disabled=move || { let state = loading.get(); state.events || state.referral || state.interests || state.admission_pass || state.wallets }>{move || { let state = loading.get(); if state.events || state.referral || state.interests || state.admission_pass || state.wallets { tr("refreshing_2") } else { tr("refresh_data") } }}</button>
+                <button on:click=lock>{tr("lock_app")}</button>
+                <button class="danger ghost" on:click=forget>{tr("remove_profile_and_tickets_from_device")}</button>
             </div>
             <AnonymousFeedback error=error />
-            <p class="security-note">{tr("sesja_fana_wejsciowka_oraz_prywatne_tokeny_portfela_sa")}</p>
+            <p class="security-note">{tr("fan_session_admission_pass_and_private_wallet")}</p>
         </section>
     }
 }
@@ -3111,7 +3124,7 @@ fn AnonymousFeedback(error: RwSignal<Option<String>>) -> impl IntoView {
         let length = current_message.chars().count();
         if !(8..=2_000).contains(&length) {
             error.set(Some(
-                tr("feedback_powinien_miec_od_8_do_2000_znakow").to_owned(),
+                tr("feedback_must_contain_between_8_and_2000").to_owned(),
             ));
             return;
         }
@@ -3129,7 +3142,7 @@ fn AnonymousFeedback(error: RwSignal<Option<String>>) -> impl IntoView {
                 Ok(()) => {
                     message.set(String::new());
                     error.set(Some(
-                        tr("feedback_zosta_wysany_anonimowo_dzieki").to_owned(),
+                        tr("feedback_was_sent_anonymously_thank_you").to_owned(),
                     ));
                 }
                 Err(message) => error.set(Some(message)),
@@ -3141,26 +3154,26 @@ fn AnonymousFeedback(error: RwSignal<Option<String>>) -> impl IntoView {
     view! {
         <section class="feedback-card">
             <div class="feedback-heading">
-                <div><p class="eyebrow">{tr("anonimowy_feedback")}</p><h3>{tr("powiedz_nam_co_poprawic")}</h3></div>
+                <div><p class="eyebrow">{tr("anonymous_feedback")}</p><h3>{tr("tell_us_what_to_improve")}</h3></div>
                 <span aria-hidden="true">"◌"</span>
             </div>
-            <p>{tr("aplikacja_wysya_tylko_kategorie_i_tresc_bez_e")}</p>
+            <p>{tr("app_sends_only_the_category_and_message")}</p>
             <label class="select-label">
-                {tr("kategoria")}
+                {tr("category")}
                 <select prop:value=move || category.get() on:change=move |event| category.set(event_target_value(&event))>
-                    <option value="idea">{tr("pomys")}</option>
-                    <option value="bug">{tr("bad")}</option>
-                    <option value="concert">{tr("koncerty_i_bilety")}</option>
+                    <option value="idea">{tr("idea")}</option>
+                    <option value="bug">{tr("bug_label")}</option>
+                    <option value="concert">{tr("shows_and_tickets")}</option>
                     <option value="merch">{tr("merch")}</option>
-                    <option value="other">{tr("inne")}</option>
+                    <option value="other">{tr("other")}</option>
                 </select>
             </label>
             <label>
-                {tr("tresc")}
+                {tr("message")}
                 <textarea
                     rows="6"
                     maxlength="2000"
-                    placeholder=tr("napisz_wprost_co_dziaa_zle_albo_czego_brakuje")
+                    placeholder=tr("tell_us_directly_what_is_broken_or")
                     prop:value=move || message.get()
                     on:input=move |event| message.set(event_target_value(&event))
                 ></textarea>
@@ -3168,7 +3181,7 @@ fn AnonymousFeedback(error: RwSignal<Option<String>>) -> impl IntoView {
             <div class="feedback-submit-row">
                 <small>{move || format!("{} / 2000", message.get().chars().count())}</small>
                 <button type="button" class="primary" disabled=move || busy.get() || message.get().trim().chars().count() < 8 on:click=submit>
-                    {move || if busy.get() { tr("wysyam_2") } else { tr("wyslij_anonimowo") }}
+                    {move || if busy.get() { tr("sending_2") } else { tr("send_anonymously") }}
                 </button>
             </div>
         </section>
@@ -3176,8 +3189,8 @@ fn AnonymousFeedback(error: RwSignal<Option<String>>) -> impl IntoView {
 }
 
 #[component]
-fn Skeleton(#[prop(default = 3)] rows: usize) -> impl IntoView {
-    view! { <div class="skeleton-stack" aria-label=tr("adowanie")>{(0..rows).map(|_| view! { <i></i> }).collect_view()}</div> }
+pub fn Skeleton(#[prop(default = 3)] rows: usize) -> impl IntoView {
+    view! { <div class="skeleton-stack" aria-label=tr("loading")>{(0..rows).map(|_| view! { <i></i> }).collect_view()}</div> }
 }
 
 #[component]
@@ -3193,15 +3206,15 @@ fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
                 let lower = m.to_lowercase();
                 lower.contains("utworzon")
                     || lower.contains("zapisan")
-                    || lower.contains(tr("wysalismy"))
+                    || lower.contains(tr("sent"))
                     || lower.contains("sent")
-                    || lower.contains(tr("uniewaznion"))
+                    || lower.contains(tr("revoked"))
                     || lower.contains("revoked")
                     || lower.contains("zrealizowan")
                     || lower.contains("gotowy")
                     || lower.contains("zeskanowany")
                     || lower.contains("ponownie")
-                    || lower.contains(tr("feedback_zosta_wysany"))
+                    || lower.contains(tr("feedback_was_sent"))
             })
         })
     };
@@ -3529,7 +3542,7 @@ fn refresh_wallets(
                 wallets.set(stable_wallets(value.wallets));
                 if value.failed_count > 0 {
                     error.set(Some(i18n::format(
-                        "nie_udao_sie_odswiezyc_value_zamowien_pozostae_bilety",
+                        "could_not_refresh_orders_count_other_tickets_remain_available",
                         &[value.failed_count.to_string()],
                     )));
                 }

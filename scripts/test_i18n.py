@@ -57,7 +57,7 @@ class I18nContracts(unittest.TestCase):
         subprocess.run(["node", "--check", "boot-i18n.js"], check=True, cwd=ROOT)
 
     def test_runtime_copy_is_not_hardcoded_in_polish(self):
-        for relative in ("src/app/mod.rs", "src/bridge.rs", "boot.js", "index.html"):
+        for relative in ("src/app/mod.rs", "src/app/area.rs", "src/bridge.rs", "boot.js", "index.html"):
             self.assertIsNone(DIACRITICS.search((ROOT / relative).read_text()), relative)
         for path in sorted((ROOT / "src-tauri/src").rglob("*.rs")):
             runtime = path.read_text().split("#[cfg(test)]", 1)[0]
@@ -69,6 +69,16 @@ class I18nContracts(unittest.TestCase):
         self.assertIn("Language::Pl", ui)
         self.assertIn("Language::En", ui)
         self.assertIn("virya:language:v1", (ROOT / "src/i18n/mod.rs").read_text())
+
+    def test_catalog_identifiers_are_english_ascii_snake_case(self):
+        for key in self.en:
+            self.assertRegex(key, r"^[a-z][a-z0-9_]*$")
+        legacy_polish_ids = {
+            "nie_udao_sie_zapisac_miasta_message",
+            "nowa_wiadomosc_nie_zostaa_wysana_bo_poprzedni_kod",
+            "nie_udao_sie_odswiezyc_value_zamowien_pozostae_bilety",
+        }
+        self.assertTrue(legacy_polish_ids.isdisjoint(self.en))
 
 
 if __name__ == "__main__":

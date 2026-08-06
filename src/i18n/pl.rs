@@ -1,621 +1,583 @@
 pub(super) fn text(key: &'static str) -> &'static str {
     match key {
-        "sygna" => "← SYGNAŁ",
-        "jestes_w_staffie" => "JESTEŚ W STAFFIE?",
-        "podaj_haso_staff_uzywane_w_panelu_virya" => "Podaj hasło staff używane w panelu Virya.",
-        "strefa" => "Strefa ",
-        "zespou" => "zespołu.",
-        "dostep_do_bramki_sprzedazy_i_obsugi_koncertu_jest" => {
+        "back_signal" => "← SYGNAŁ",
+        "are_you_on_the_staff" => "JESTEŚ W STAFFIE?",
+        "enter_the_staff_password_used_in_the" => "Podaj hasło staff używane w panelu Virya.",
+        "zone_prefix" => "Strefa ",
+        "team_zone_suffix" => "zespołu.",
+        "gate_sales_and_show_operations_access_is" => {
             "Dostęp do bramki, sprzedaży i obsługi koncertu jest oddzielony od konta fana."
         }
-        "weryfikacja_staff" => "WERYFIKACJA STAFF",
-        "haso_panelu_virya" => "Hasło panelu Virya",
-        "uzyj_tego_samego_hasa_co_w_qr_bramce" => {
+        "staff_verification" => "WERYFIKACJA STAFF",
+        "virya_panel_password" => "Hasło panelu Virya",
+        "use_the_same_password_as_in_qr" => {
             "Użyj tego samego hasła co w QR, bramce i Control Center. Po weryfikacji aplikacja pokaże lokalny PIN lub parowanie urządzenia."
         }
-        "haso_staff" => "Hasło staff",
-        "sprawdzam" => "SPRAWDZAM…",
-        "otworz_strefe_staff" => "OTWÓRZ STREFĘ STAFF",
-        "haso_jest_sprawdzane_po_stronie_virya_music_nie" => {
+        "staff_password" => "Hasło staff",
+        "checking" => "SPRAWDZAM…",
+        "open_staff_zone" => "OTWÓRZ STREFĘ STAFF",
+        "password_is_verified_by_virya_music_and" => {
             "Hasło jest sprawdzane po stronie virya.music, nie jest zapisywane w aplikacji."
         }
-        "nie_udao_sie_odczytac_sejfu_staff" => "NIE UDAŁO SIĘ ODCZYTAĆ SEJFU STAFF",
-        "sprawdzam_bezpieczny_sejf" => "SPRAWDZAM BEZPIECZNY SEJF",
+        "failed_to_read_the_staff_vault" => "NIE UDAŁO SIĘ ODCZYTAĆ SEJFU STAFF",
+        "checking_the_secure_vault" => "SPRAWDZAM BEZPIECZNY SEJF",
         "virya_staff" => "Virya staff",
-        "pin_musi_miec_co_najmniej_4_znaki" => "PIN musi mieć co najmniej 4 znaki.",
-        "podaj_46_cyfrowy_pin_i_zeskanuj_albo_wklej" => {
-            "Podaj 4–6-cyfrowy PIN i zeskanuj albo wklej kod parowania."
-        }
-        "podaj_46_cyfrowy_pin_i_poprawny_token_urzadzenia" => {
-            "Podaj 4–6-cyfrowy PIN i poprawny token urządzenia."
-        }
-        "kod_zeskanowany" => "Kod zeskanowany",
-        "wpisz_pin_ponizej_i_kliknij_sparuj" => "Wpisz PIN poniżej i kliknij SPARUJ.",
-        "acze" => "ŁĄCZĘ…",
-        "zeskanuj_kod_qr" => "ZESKANUJ KOD QR",
-        "kod_pokazany_w_panelu_virya" => "Kod pokazany w panelu Virya",
-        "albo" => "ALBO",
-        "kod_parowania" => "Kod parowania",
-        "utworz_pin_do_odblokowania" => "Utwórz PIN do odblokowania",
-        "wpisz_46_cyfr_np_2580_to_pin_tylko" => {
+        "pin_must_contain_at_least_4_characters" => "PIN musi mieć co najmniej 4 znaki.",
+        "enter_a_4_6_digit_pin_and" => "Podaj 4–6-cyfrowy PIN i zeskanuj albo wklej kod parowania.",
+        "enter_a_4_6_digit_pin_and_2" => "Podaj 4–6-cyfrowy PIN i poprawny token urządzenia.",
+        "code_scanned" => "Kod zeskanowany",
+        "enter_the_pin_below_and_tap_pair" => "Wpisz PIN poniżej i kliknij SPARUJ.",
+        "connecting" => "ŁĄCZĘ…",
+        "scan_qr_code" => "ZESKANUJ KOD QR",
+        "code_shown_in_the_virya_panel" => "Kod pokazany w panelu Virya",
+        "or_label" => "ALBO",
+        "pairing_code" => "Kod parowania",
+        "create_an_unlock_pin" => "Utwórz PIN do odblokowania",
+        "enter_4_6_digits_for_example_2580" => {
             "Wpisz 4–6 cyfr, np. 2580. To PIN tylko do Virya Signal — nie kod QR ani PIN telefonu."
         }
-        "np_2580" => "np. 2580",
-        "ukryj_ustawienia_reczne" => "UKRYJ USTAWIENIA RĘCZNE",
-        "ustawienia_zaawansowane" => "USTAWIENIA ZAAWANSOWANE",
-        "nazwa_urzadzenia_osoby" => "Nazwa urządzenia / osoby",
-        "token_urzadzenia" => "Token urządzenia",
-        "zapisz_recznie" => "ZAPISZ RĘCZNIE",
-        "pin_do_odblokowania_aplikacji" => "PIN do odblokowania aplikacji",
-        "wpisz_pin_ustawiony_podczas_parowania_tego_urzadzenia" => {
+        "pin_example" => "np. 2580",
+        "hide_manual_settings" => "UKRYJ USTAWIENIA RĘCZNE",
+        "advanced_settings" => "USTAWIENIA ZAAWANSOWANE",
+        "device_person_name" => "Nazwa urządzenia / osoby",
+        "device_token" => "Token urządzenia",
+        "save_manually" => "ZAPISZ RĘCZNIE",
+        "app_unlock_pin" => "PIN do odblokowania aplikacji",
+        "enter_the_pin_created_when_this_device" => {
             "Wpisz PIN ustawiony podczas parowania tego urządzenia."
         }
-        "twoj_pin" => "Twój PIN",
-        "odblokuj" => "ODBLOKUJ",
-        "otworz_menu" => "Otwórz menu",
-        "zamknij_i_zablokuj_panel" => "Zamknij i zablokuj panel",
-        "znizki" => "Zniżki",
-        "kody_qr" => "Kody QR",
-        "ustawienia" => "Ustawienia",
-        "start" => "Start",
-        "sygna_2" => "Sygnał",
-        "skan" => "Skan",
-        "bilety" => "Bilety",
-        "koncerty" => "Koncerty",
-        "sklep" => "Sklep",
-        "profil" => "Profil",
-        "gra_area" => "Gra AREA",
-        "strefa_staff" => "Strefa staff",
-        "zamknij_i_zablokuj_sygna" => "Zamknij i zablokuj Sygnał",
-        "koncerty_2" => "koncerty",
-        "aktywne_qr" => "aktywne QR",
-        "check_iny" => "check-iny",
-        "brak_nadchodzacych_koncertow" => "Brak nadchodzących koncertów",
-        "kiedy_pojawi_sie_nowe_wydarzenie_zobaczysz_je_tutaj" => {
-            "Kiedy pojawi się nowe wydarzenie, zobaczysz je tutaj."
-        }
-        "widok_tylko_dla_ownera" => "Widok tylko dla ownera",
-        "statystyki_zgod_wzrostu_i_miast_sa_dostepne_wyacznie" => {
+        "your_pin" => "Twój PIN",
+        "unlock" => "ODBLOKUJ",
+        "open_menu" => "Otwórz menu",
+        "close_and_lock_panel" => "Zamknij i zablokuj panel",
+        "discounts" => "Zniżki",
+        "qr_codes" => "Kody QR",
+        "settings" => "Ustawienia",
+        "home_tab" => "Start",
+        "signal_tab" => "Sygnał",
+        "scan_tab" => "Skan",
+        "tickets_tab" => "Bilety",
+        "shows_tab" => "Koncerty",
+        "store_tab" => "Sklep",
+        "profile_tab" => "Profil",
+        "area_game_tab" => "Gra AREA",
+        "staff_zone" => "Strefa staff",
+        "close_and_lock_signal" => "Zamknij i zablokuj Sygnał",
+        "shows_count_label" => "koncerty",
+        "active_qr" => "aktywne QR",
+        "check_ins" => "check-iny",
+        "no_upcoming_shows" => "Brak nadchodzących koncertów",
+        "new_events_will_appear_here" => "Kiedy pojawi się nowe wydarzenie, zobaczysz je tutaj.",
+        "owner_only_view" => "Widok tylko dla ownera",
+        "consent_growth_and_city_statistics_are_available" => {
             "Statystyki zgód, wzrostu i miast są dostępne wyłącznie dla właściciela."
         }
-        "dane_sa_agregowane_w_crowdrelay_i_nie_zawieraja" => {
+        "data_is_aggregated_in_crowdrelay_and_contains" => {
             "Dane są agregowane w CrowdRelay i nie zawierają adresów e-mail ani identyfikatorów fanów."
         }
-        "odswiezam" => "ODŚWIEŻAM…",
-        "odswiez" => "ODŚWIEŻ",
-        "brak_snapshotu_sygnau" => "Brak snapshotu Sygnału",
-        "odswiez_dane_jezeli_backend_jest_jeszcze_w_trakcie" => {
+        "refreshing" => "ODŚWIEŻAM…",
+        "refresh" => "ODŚWIEŻ",
+        "no_signal_snapshot" => "Brak snapshotu Sygnału",
+        "refresh_the_data_if_the_backend_is" => {
             "Odśwież dane. Jeżeli backend jest jeszcze w trakcie wdrożenia, panel pokaże bezpieczny błąd zamiast pustego ekranu."
         }
-        "snapshot_czesciowy_niedostepne_zroda_value" => {
-            "Snapshot częściowy. Niedostępne źródła: {}."
-        }
-        "brak_agregatu_miast" => "Brak agregatu miast",
-        "sygna_nie_ma_jeszcze_potwierdzonych_danych_miejskich_albo" => {
+        "partial_snapshot_unavailable_sources" => "Snapshot częściowy. Niedostępne źródła: {}.",
+        "no_city_aggregate" => "Brak agregatu miast",
+        "signal_has_no_confirmed_city_data_yet" => {
             "Sygnał nie ma jeszcze potwierdzonych danych miejskich albo źródło jest chwilowo niedostępne."
         }
-        "aktywni" => "aktywni",
-        "zgody_marketingowe" => "zgody marketingowe",
-        "nowi_30_dni" => "nowi / 30 dni",
-        "potwierdzonych_sposrod_aktywnych_i_oczekujacych" => {
-            "potwierdzonych spośród aktywnych i oczekujących"
-        }
-        "wszyscy" => "wszyscy",
-        "oczekujacy" => "oczekujący",
-        "wypisani" => "wypisani",
-        "wyciszeni" => "wyciszeni",
-        "powiadomienia_w_poblizu" => "powiadomienia w pobliżu",
-        "aktywnosc" => "Aktywność",
-        "30_dni_caosc" => "30 dni / całość",
-        "nowi_7_dni" => "nowi / 7 dni",
-        "polecenia" => "polecenia",
-        "zainteresowania_koncertami" => "zainteresowania koncertami",
-        "powiadomienia_nearby" => "powiadomienia nearby",
-        "miasta_do_moderacji" => "miasta do moderacji",
-        "najsilniejsze_miasta" => "Najsilniejsze miasta",
-        "snapshot_generated_at_dane_wyacznie_zagregowane" => {
+        "active" => "aktywni",
+        "marketing_consents" => "zgody marketingowe",
+        "new_30_days" => "nowi / 30 dni",
+        "confirmed_among_active_and_pending" => "potwierdzonych spośród aktywnych i oczekujących",
+        "all" => "wszyscy",
+        "pending" => "oczekujący",
+        "unsubscribed" => "wypisani",
+        "muted" => "wyciszeni",
+        "nearby_notifications" => "powiadomienia w pobliżu",
+        "activity" => "Aktywność",
+        "text_30_days_total" => "30 dni / całość",
+        "new_7_days" => "nowi / 7 dni",
+        "referrals" => "polecenia",
+        "show_interests" => "zainteresowania koncertami",
+        "nearby_notifications_2" => "powiadomienia nearby",
+        "cities_awaiting_moderation" => "miasta do moderacji",
+        "strongest_cities" => "Najsilniejsze miasta",
+        "snapshot_generated_at_aggregated_data_only" => {
             "Snapshot: {generated_at}. Dane wyłącznie zagregowane."
         }
-        "najpierw_wybierz_koncert" => "Najpierw wybierz koncert.",
-        "wybierz_koncert" => "Wybierz koncert.",
-        "snapshot_gotowy_value_trwaych_biletow" => "Snapshot gotowy: {} trwałych biletów.",
-        "sync_value_zapisane_value_konfliktow_value_nadal_czeka" => {
-            "Sync: {} zapisane, {} konfliktów, {} nadal czeka."
-        }
-        "dane_koncertu_usuniete_z_urzadzenia" => "Dane koncertu usunięte z urządzenia.",
-        "koncert" => "Koncert",
-        "aduje_koncerty" => "Ładuję koncerty…",
-        "wybierz_wydarzenie" => "Wybierz wydarzenie",
-        "bramka_pracuje_lokalnie" => "Bramka pracuje lokalnie",
-        "odpornosc_na_brak_lte" => "Odporność na brak LTE",
-        "pobierz_bezpieczny_snapshot_przed_otwarciem_bram" => {
+        "select_a_show_first" => "Najpierw wybierz koncert.",
+        "select_a_show" => "Wybierz koncert.",
+        "snapshot_ready_durable_tickets" => "Snapshot gotowy: {} trwałych biletów.",
+        "sync_saved_conflicts_still_pending" => "Sync: {} zapisane, {} konfliktów, {} nadal czeka.",
+        "show_data_removed_from_the_device" => "Dane koncertu usunięte z urządzenia.",
+        "show" => "Koncert",
+        "loading_shows" => "Ładuję koncerty…",
+        "select_an_event" => "Wybierz wydarzenie",
+        "gate_works_locally" => "Bramka pracuje lokalnie",
+        "works_without_lte" => "Odporność na brak LTE",
+        "download_a_secure_snapshot_before_opening_the" => {
             "Pobierz bezpieczny snapshot przed otwarciem bram."
         }
-        "przygotuj_offline" => "PRZYGOTUJ OFFLINE",
-        "synchronizuj" => "SYNCHRONIZUJ",
-        "wyczysc" => "WYCZYŚĆ",
-        "weryfikuje" => "WERYFIKUJĘ…",
-        "skanuj_lokalnie" => "SKANUJ LOKALNIE",
-        "uruchom_aparat" => "URUCHOM APARAT",
-        "wyacznie_trway_qr_biletu_t1" => "Wyłącznie trwały QR biletu t1",
-        "qr_biletu_lub_wejsciowki" => "QR biletu lub wejściówki",
-        "kod_qr_lub_numer_wejsciowki" => "Kod QR lub numer wejściówki",
-        "sprawdz" => "SPRAWDŹ",
-        "wybierz_koncert_i_podaj_e_mail_fana" => "Wybierz koncert i podaj e-mail fana.",
-        "podaj_public_reference_wejsciowki" => "Podaj public reference wejściówki.",
-        "wejsciowka_zostaa_uniewazniona" => "Wejściówka została unieważniona.",
-        "wybierz_koncert_2" => "Wybierz koncert",
-        "sprzedane" => "sprzedane",
-        "w_trakcie" => "w trakcie",
-        "dostepne" => "dostępne",
-        "zwroty_value" => "zwroty: {}",
-        "numer_wejsciowki_to_bezpieczny_publiczny_identyfikator_np_vry" => {
+        "prepare_offline" => "PRZYGOTUJ OFFLINE",
+        "sync" => "SYNCHRONIZUJ",
+        "clear" => "WYCZYŚĆ",
+        "verifying" => "WERYFIKUJĘ…",
+        "scan_locally" => "SKANUJ LOKALNIE",
+        "open_camera" => "URUCHOM APARAT",
+        "durable_t1_ticket_qr_only" => "Wyłącznie trwały QR biletu t1",
+        "ticket_or_admission_pass_qr" => "QR biletu lub wejściówki",
+        "qr_code_or_admission_pass_number" => "Kod QR lub numer wejściówki",
+        "check" => "SPRAWDŹ",
+        "select_a_show_and_enter_the_fan" => "Wybierz koncert i podaj e-mail fana.",
+        "enter_the_admission_pass_public_reference" => "Podaj public reference wejściówki.",
+        "admission_pass_has_been_revoked" => "Wejściówka została unieważniona.",
+        "select_a_show_2" => "Wybierz koncert",
+        "sold" => "sprzedane",
+        "in_checkout" => "w trakcie",
+        "available_label" => "dostępne",
+        "refunds" => "zwroty: {}",
+        "admission_pass_number_is_a_safe_public" => {
             "Numer wejściówki to bezpieczny publiczny identyfikator, np. VRY-... Nie jest tokenem QR ani prywatnym tokenem zamówienia."
         }
-        "wydaj_wejsciowke" => "WYDAJ WEJŚCIÓWKĘ",
-        "numer_wejsciowki_np_vry" => "Numer wejściówki, np. VRY-…",
-        "uniewaznij" => "UNIEWAŻNIJ",
-        "podaj_kod_i_numer_sprzedazy" => "Podaj kod i numer sprzedaży.",
-        "kod_znizkowy" => "Kod zniżkowy",
-        "numer_sprzedazy" => "Numer sprzedaży",
-        "zrealizuj_kupon" => "ZREALIZUJ KUPON",
-        "uzycie_value_value" => "Użycie {}/{}",
-        "wejscie_gowne" => "Wejście główne",
-        "podaj_poprawny_poczatek_waznosci" => "Podaj poprawny początek ważności.",
-        "podaj_poprawny_koniec_waznosci" => "Podaj poprawny koniec ważności.",
-        "limit_musi_byc_dodatnia_liczba" => "Limit musi być dodatnią liczbą.",
-        "koniec_kampanii_musi_byc_pozniej_niz_poczatek" => {
-            "Koniec kampanii musi być później niż początek."
-        }
-        "wybierz_koncert_i_nazwij_kampanie" => "Wybierz koncert i nazwij kampanię.",
-        "kampania_qr_utworzona" => "Kampania QR utworzona.",
-        "aduje_kampanie" => "Ładuję kampanie…",
-        "nazwa_punktu_kampanii" => "Nazwa punktu / kampanii",
-        "wazna_od" => "Ważna od",
-        "wazna_do" => "Ważna do",
-        "limit_check_inow_opcjonalnie" => "Limit check-inów (opcjonalnie)",
-        "utworz_kampanie" => "UTWÓRZ KAMPANIĘ",
-        "kampania_zostaa_wyaczona" => "Kampania została wyłączona.",
-        "wyacz_kampanie" => "WYŁĄCZ KAMPANIĘ",
-        "limit_value" => "limit {v}",
-        "bez_limitu" => "bez limitu",
-        "poaczenie" => "Połączenie",
-        "uprawnienia" => "Uprawnienia",
-        "odswiez_wszystkie_dane" => "Odśwież wszystkie dane",
-        "zablokuj_panel" => "Zablokuj panel",
-        "usun_profil_operatora" => "Usuń profil operatora",
-        "token_operatora_przechowuje_zaszyfrowany_sejf_stronghold_warstwa_webview" => {
+        "issue_pass" => "WYDAJ WEJŚCIÓWKĘ",
+        "admission_pass_number_e_g_vry" => "Numer wejściówki, np. VRY-…",
+        "revoke" => "UNIEWAŻNIJ",
+        "enter_the_code_and_sale_number" => "Podaj kod i numer sprzedaży.",
+        "discount_code" => "Kod zniżkowy",
+        "sale_number" => "Numer sprzedaży",
+        "redeem_coupon" => "ZREALIZUJ KUPON",
+        "usage" => "Użycie {}/{}",
+        "main_entrance" => "Wejście główne",
+        "enter_a_valid_start_date" => "Podaj poprawny początek ważności.",
+        "enter_a_valid_end_date" => "Podaj poprawny koniec ważności.",
+        "limit_must_be_a_positive_number" => "Limit musi być dodatnią liczbą.",
+        "campaign_end_must_be_after_its_start" => "Koniec kampanii musi być później niż początek.",
+        "select_a_show_and_name_the_campaign" => "Wybierz koncert i nazwij kampanię.",
+        "qr_campaign_created" => "Kampania QR utworzona.",
+        "loading_campaigns" => "Ładuję kampanie…",
+        "point_campaign_name" => "Nazwa punktu / kampanii",
+        "valid_from" => "Ważna od",
+        "valid_until" => "Ważna do",
+        "check_in_limit_optional" => "Limit check-inów (opcjonalnie)",
+        "create_campaign" => "UTWÓRZ KAMPANIĘ",
+        "campaign_has_been_disabled" => "Kampania została wyłączona.",
+        "disable_campaign" => "WYŁĄCZ KAMPANIĘ",
+        "limit_v" => "limit {v}",
+        "no_limit" => "bez limitu",
+        "connection" => "Połączenie",
+        "permissions" => "Uprawnienia",
+        "refresh_all_data" => "Odśwież wszystkie dane",
+        "lock_panel" => "Zablokuj panel",
+        "remove_operator_profile" => "Usuń profil operatora",
+        "operator_token_is_stored_in_an_encrypted" => {
             "Token operatora przechowuje zaszyfrowany sejf Stronghold. Warstwa WebView nigdy go nie odczytuje."
         }
-        "odswiez_2" => "Odśwież",
-        "cockpit_dziaa_czesciowo_niedostepne_value" => "Cockpit działa częściowo. Niedostępne: {}.",
-        "brak_kodu_bedu" => "brak kodu błędu",
-        "proba_value_value" => "próba {}/{}",
-        "retry_by_juz_wczesniej_przyjety" => "Retry był już wcześniej przyjęty.",
-        "wpis_wroci_do_kolejki" => "Wpis wrócił do kolejki.",
-        "jezyk" => "Język",
-        "jezyk_aplikacji" => "Język aplikacji",
-        "zmiana_jezyka_przeaduje_interfejs_dane_i_sesja_pozostana" => {
+        "refresh_2" => "Odśwież",
+        "cockpit_is_partially_available_unavailable" => {
+            "Cockpit działa częściowo. Niedostępne: {}."
+        }
+        "no_error_code" => "brak kodu błędu",
+        "attempt" => "próba {}/{}",
+        "retry_had_already_been_accepted" => "Retry był już wcześniej przyjęty.",
+        "item_returned_to_the_queue" => "Wpis wrócił do kolejki.",
+        "language" => "Język",
+        "app_language" => "Język aplikacji",
+        "changing_the_language_reloads_the_interface_your" => {
             "Zmiana języka przeładuje interfejs. Dane i sesja pozostaną bez zmian."
         }
-        "polski" => "Polski",
-        "angielski" => "Angielski",
-        "nie_udao_sie_odczytac_profilu_fana" => "NIE UDAŁO SIĘ ODCZYTAĆ PROFILU FANA",
-        "sprawdzam_twoj_sygna" => "SPRAWDZAM TWÓJ SYGNAŁ",
-        "profil_pozostaje_nietkniety" => "Profil pozostaje nietknięty.",
-        "aplikacja_nie_przejdzie_do_rejestracji_ani_parowania_dopoki" => {
+        "polish" => "Polski",
+        "english" => "Angielski",
+        "failed_to_read_the_fan_profile" => "NIE UDAŁO SIĘ ODCZYTAĆ PROFILU FANA",
+        "checking_your_signal" => "SPRAWDZAM TWÓJ SYGNAŁ",
+        "your_profile_remains_untouched" => "Profil pozostaje nietknięty.",
+        "app_will_not_continue_to_signup_or" => {
             "Aplikacja nie przejdzie do rejestracji ani parowania, dopóki nie potwierdzi stanu zaszyfrowanego sejfu na urządzeniu."
         }
-        "sprobuj_ponownie" => "SPRÓBUJ PONOWNIE",
-        "podaj_e_mail_uzyty_przy_zapisie_do_sygnau" => {
-            "Podaj e-mail użyty przy zapisie do Sygnału."
-        }
-        "wklej_kod_cay_link_albo_zeskanuj_qr_z" => {
-            "Wklej kod, cały link albo zeskanuj QR z wiadomości."
-        }
-        "ustaw_lokalny_pin_majacy_co_najmniej_4_znaki" => {
-            "Ustaw lokalny PIN mający co najmniej 4 znaki."
-        }
-        "zgoda_marketingowa_jest_wymagana_do_doaczenia_do_sygnau" => {
+        "try_again" => "SPRÓBUJ PONOWNIE",
+        "enter_the_email_used_to_join_signal" => "Podaj e-mail użyty przy zapisie do Sygnału.",
+        "paste_the_code_or_full_link_or" => "Wklej kod, cały link albo zeskanuj QR z wiadomości.",
+        "create_a_local_pin_with_at_least" => "Ustaw lokalny PIN mający co najmniej 4 znaki.",
+        "marketing_consent_is_required_to_join_signal" => {
             "Zgoda marketingowa jest wymagana do dołączenia do Sygnału."
         }
-        "nie_udao_sie_zapisac_miasta_message" => "Nie udało się zapisać miasta: {message}",
-        "wybierz_miasto_albo_wpisz_wasne" => "Wybierz miasto albo wpisz własne.",
-        "wysalismy_bezpieczny_link_dostepu_zeskanuj_qr_albo_wklej" => {
+        "could_not_save_the_city_message" => "Nie udało się zapisać miasta: {message}",
+        "select_a_city_or_enter_your_own" => "Wybierz miasto albo wpisz własne.",
+        "we_sent_a_secure_access_link_scan" => {
             "Wysłaliśmy bezpieczny link dostępu. Zeskanuj QR albo wklej kod z wiadomości."
         }
-        "wysalismy_kod_potwierdzajacy_zeskanuj_qr_albo_wklej_kod" => {
+        "we_sent_a_confirmation_code_scan_the" => {
             "Wysłaliśmy kod potwierdzający. Zeskanuj QR albo wklej kod z wiadomości."
         }
-        "nowa_wiadomosc_nie_zostaa_wysana_bo_poprzedni_kod" => {
+        "new_message_was_not_sent_because_the" => {
             "Nowa wiadomość nie została wysłana, bo poprzedni kod jest jeszcze ważny. Użyj poprzedniej wiadomości albo spróbuj ponownie za około {minutes} min."
         }
-        "zgoszenie_zostao_przyjete_sprawdz_skrzynke_i_spam_jesli" => {
+        "request_was_accepted_check_your_inbox_and" => {
             "Zgłoszenie zostało przyjęte. Sprawdź skrzynkę i spam; jeśli wiadomości nie ma, spróbuj ponownie później."
         }
-        "podaj_e_mail_uzyty_w_virya_signal" => "Podaj e-mail użyty w Virya Signal.",
-        "jesli_ten_e_mail_jest_zapisany_w_virya" => {
+        "enter_the_email_used_in_virya_signal" => "Podaj e-mail użyty w Virya Signal.",
+        "if_this_email_is_registered_in_virya" => {
             "Jeśli ten e-mail jest zapisany w Virya Signal, wysłaliśmy świeży link logowania z QR. Po otwarciu ustaw nowy PIN dla tego urządzenia."
         }
-        "qr_zeskanowany_uzupenij_e_mail_i_lokalny_pin" => {
+        "qr_scanned_enter_your_email_and_local" => {
             "QR zeskanowany. Uzupełnij e-mail i lokalny PIN."
         }
-        "koncerty_bilety" => "Koncerty, bilety",
-        "i_nagrody" => "i nagrody.",
-        "doacz_w_3_krokach" => "Dołącz w 3 krokach:",
-        "jak_doaczyc" => "Jak dołączyć",
-        "podaj_e_mail_i_miasto" => " Podaj e-mail i miasto",
-        "potwierdz_kod_z_wiadomosci" => " Potwierdź kod z wiadomości",
-        "odkrywaj_koncerty_blisko_ciebie" => " Odkrywaj koncerty blisko Ciebie",
-        "co_daje_virya_signal" => "Co daje Virya Signal",
-        "koncerty_blisko_ciebie" => " koncerty blisko Ciebie",
-        "bilety_i_qr_w_telefonie" => " bilety i QR w telefonie",
-        "nagrody_za_proste_akcje" => " nagrody za proste akcje",
-        "zaczynam" => "ZACZYNAM",
-        "mam_kod" => "MAM KOD",
-        "e_mail" => "E-mail",
-        "imie_nazwa_opcjonalnie" => "Imię / nazwa (opcjonalnie)",
-        "najszybciej_zeskanuj_qr_z_maila" => "Najszybciej: zeskanuj QR z maila.",
-        "mozesz_tez_wkleic_cay_link_albo_64_znakowy" => {
+        "shows_tickets" => "Koncerty, bilety",
+        "and_rewards" => "i nagrody.",
+        "join_in_3_steps" => "Dołącz w 3 krokach:",
+        "how_to_join" => "Jak dołączyć",
+        "enter_your_email_and_city" => " Podaj e-mail i miasto",
+        "confirm_the_code_from_the_message" => " Potwierdź kod z wiadomości",
+        "discover_shows_near_you" => " Odkrywaj koncerty blisko Ciebie",
+        "what_virya_signal_gives_you" => "Co daje Virya Signal",
+        "shows_near_you" => " koncerty blisko Ciebie",
+        "tickets_and_qr_codes_on_your_phone" => " bilety i QR w telefonie",
+        "rewards_for_simple_actions" => " nagrody za proste akcje",
+        "get_started" => "ZACZYNAM",
+        "i_have_a_code" => "MAM KOD",
+        "email" => "E-mail",
+        "name_optional" => "Imię / nazwa (opcjonalnie)",
+        "fastest_scan_the_qr_from_the_email" => "Najszybciej: zeskanuj QR z maila.",
+        "you_can_also_paste_the_full_link" => {
             "Możesz też wkleić cały link albo 64-znakowy kod. Aplikacja sama wyciągnie właściwy token."
         }
-        "link_lub_kod_z_e_maila" => "Link lub kod z e-maila",
-        "wklej_link_kod_albo_uzyj_qr" => "Wklej link, kod albo użyj QR",
-        "skanuj_qr" => "SKANUJ QR",
-        "albo_przytrzymaj_pole_wyzej_i_wybierz_wklej" => {
-            "albo przytrzymaj pole wyżej i wybierz Wklej"
-        }
-        "lokalny_pin" => "Lokalny PIN",
-        "pin_szyfruje_profil_tylko_na_tym_urzadzeniu_nie" => {
+        "email_link_or_code" => "Link lub kod z e-maila",
+        "paste_a_link_or_code_or_use" => "Wklej link, kod albo użyj QR",
+        "scan_qr" => "SKANUJ QR",
+        "or_hold_the_field_above_and_choose" => "albo przytrzymaj pole wyżej i wybierz Wklej",
+        "local_pin" => "Lokalny PIN",
+        "pin_encrypts_your_profile_on_this_device" => {
             "PIN szyfruje profil tylko na tym urządzeniu. Nie wysyłamy go do CrowdRelay."
         }
-        "potwierdz_i_wejdz" => "POTWIERDŹ I WEJDŹ",
-        "mam_juz_konto_wyslij_link_logowania" => "MAM JUŻ KONTO — WYŚLIJ LINK LOGOWANIA",
-        "nie_ma_wiadomosci_sprawdz_spam_po_15_minutach" => {
+        "confirm_and_enter" => "POTWIERDŹ I WEJDŹ",
+        "i_already_have_an_account_send_login" => "MAM JUŻ KONTO — WYŚLIJ LINK LOGOWANIA",
+        "no_message_check_spam_after_15_minutes" => {
             "Nie ma wiadomości? Sprawdź spam. Po 15 minutach wróć do ZACZYNAM i wyślij kod ponownie."
         }
-        "miejscowosc" => "Miejscowość",
-        "np_bielawa" => "np. Bielawa",
-        "wojewodztwo_region_opcjonalnie" => "Województwo / region (opcjonalnie)",
-        "dolnoslaskie" => "dolnośląskie",
-        "wpisz_miejscowosc_recznie_dopasujemy_ja_do_mapy_sygnau" => {
+        "city" => "Miejscowość",
+        "e_g_bielawa" => "np. Bielawa",
+        "province_region_optional" => "Województwo / region (opcjonalnie)",
+        "lower_silesia" => "dolnośląskie",
+        "enter_your_city_manually_we_will_match" => {
             "Wpisz miejscowość ręcznie — dopasujemy ją do mapy Sygnału."
         }
-        "powiadamiaj_mnie_o_koncertach_w_poblizu" => "Powiadamiaj mnie o koncertach w pobliżu",
-        "kod_polecajacy_opcjonalnie" => "Kod polecający (opcjonalnie)",
-        "chce_otrzymywac_informacje_o_koncertach_premierach_i_nagrodach" => {
+        "notify_me_about_nearby_shows" => "Powiadamiaj mnie o koncertach w pobliżu",
+        "referral_code_optional" => "Kod polecający (opcjonalnie)",
+        "i_want_to_receive_information_about_virya" => {
             "Chcę otrzymywać informacje o koncertach, premierach i nagrodach Viryi."
         }
-        "doacz_do_sygnau" => "DOŁĄCZ DO SYGNAŁU",
-        "otworz_moj_sygna" => "OTWÓRZ MÓJ SYGNAŁ",
-        "nie_pamietam_pin_u_zaloguj_ponownie" => "NIE PAMIĘTAM PIN-U / ZALOGUJ PONOWNIE",
-        "odzyskiwanie_dostepu" => "ODZYSKIWANIE DOSTĘPU",
-        "ustaw_nowy_pin" => "Ustaw nowy PIN",
-        "podaj_e_mail_wyslij_swiezy_link_a_potem" => {
+        "join_signal" => "DOŁĄCZ DO SYGNAŁU",
+        "open_my_signal" => "OTWÓRZ MÓJ SYGNAŁ",
+        "i_forgot_my_pin_sign_in_again" => "NIE PAMIĘTAM PIN-U / ZALOGUJ PONOWNIE",
+        "access_recovery" => "ODZYSKIWANIE DOSTĘPU",
+        "create_a_new_pin" => "Ustaw nowy PIN",
+        "enter_your_email_request_a_fresh_link" => {
             "Podaj e-mail, wyślij świeży link, a potem zeskanuj QR lub wklej kod w pole."
         }
-        "wyslij_link_logowania" => "WYŚLIJ LINK LOGOWANIA",
-        "wklej_link_lub_kod" => "Wklej link lub kod",
-        "albo_przytrzymaj_pole_i_wybierz_wklej" => "albo przytrzymaj pole i wybierz Wklej",
-        "nowy_lokalny_pin" => "Nowy lokalny PIN",
-        "potwierdz_i_ustaw_nowy_pin" => "POTWIERDŹ I USTAW NOWY PIN",
-        "wroc_do_logowania_pin_em" => "WRÓĆ DO LOGOWANIA PIN-EM",
-        "kod_value" => "Kod: {}",
-        "adowanie_sygnau" => "Ładowanie Sygnału…",
-        "losy" => "losy",
-        "kupony" => "kupony",
-        "losowanie_value" => "Losowanie {}",
-        "dowod" => "DOWÓD ↗",
+        "send_login_link" => "WYŚLIJ LINK LOGOWANIA",
+        "paste_link_or_code" => "Wklej link lub kod",
+        "or_hold_the_field_and_choose_paste" => "albo przytrzymaj pole i wybierz Wklej",
+        "new_local_pin" => "Nowy lokalny PIN",
+        "confirm_and_set_new_pin" => "POTWIERDŹ I USTAW NOWY PIN",
+        "back_to_pin_login" => "WRÓĆ DO LOGOWANIA PIN-EM",
+        "code" => "Kod: {}",
+        "loading_signal" => "Ładowanie Sygnału…",
+        "entries" => "losy",
+        "coupons" => "kupony",
+        "draw" => "Losowanie {}",
+        "proof" => "DOWÓD ↗",
         "merch" => "Merch",
-        "produkty_i_zestawy_korzystaja_z_tego_samego_stanu" => {
+        "products_and_bundles_use_the_same_inventory" => {
             "Produkty i zestawy korzystają z tego samego stanu magazynowego co sklep online. Płatność otworzy bezpieczny Stripe Checkout, a aplikacja nie przechowuje danych karty."
         }
-        "sklep_jest_chwilowo_niedostepny" => "Sklep jest chwilowo niedostępny",
-        "pozostae_czesci_sygnau_dziaaja_normalnie_sprobuj_ponownie_za" => {
+        "store_is_temporarily_unavailable" => "Sklep jest chwilowo niedostępny",
+        "rest_of_signal_is_working_normally_try" => {
             "Pozostałe części Sygnału działają normalnie. Spróbuj ponownie za moment."
         }
-        "odswiez_merch" => "ODŚWIEŻ MERCH",
-        "otworz_peny_sklep" => "OTWÓRZ PEŁNY SKLEP ↗",
-        "zestawy" => "ZESTAWY",
-        "bundle_ze_sklepu_online" => "Bundle ze sklepu online",
-        "do_30" => "DO −30%",
-        "zestawy_sa_teraz_niedostepne_w_live_inventory" => {
+        "refresh_merch" => "ODŚWIEŻ MERCH",
+        "open_full_store" => "OTWÓRZ PEŁNY SKLEP ↗",
+        "bundles" => "ZESTAWY",
+        "bundles_from_the_online_store" => "Bundle ze sklepu online",
+        "up_to_30" => "DO −30%",
+        "bundles_are_currently_unavailable_in_live_inventory" => {
             "Zestawy są teraz niedostępne w live inventory."
         }
-        "zobacz_zestawy" => "ZOBACZ ZESTAWY ↗",
-        "ostatnie_sztuki" => "OSTATNIE SZTUKI",
-        "dostepny" => "DOSTĘPNY",
-        "brak_na_stanie" => "BRAK NA STANIE",
-        "sprawdz_ponownie" => "SPRAWDŹ PONOWNIE",
-        "kup_w_sklepie" => "KUP W SKLEPIE ↗",
-        "zestawy_doczytuja_sie_niezaleznie_od_produktow" => {
+        "view_bundles" => "ZOBACZ ZESTAWY ↗",
+        "low_stock" => "OSTATNIE SZTUKI",
+        "available_status" => "DOSTĘPNY",
+        "out_of_stock" => "BRAK NA STANIE",
+        "check_again" => "SPRAWDŹ PONOWNIE",
+        "buy_in_store" => "KUP W SKLEPIE ↗",
+        "bundles_load_independently_from_products" => {
             "Zestawy doczytują się niezależnie od produktów."
         }
-        "pojedyncze_produkty" => "POJEDYNCZE PRODUKTY",
-        "wybierz_swoj_merch" => "Wybierz swój merch",
-        "przedsprzedaz" => "PRZEDSPRZEDAŻ",
-        "nie_udao_sie_pobrac_stanu_sklepu" => "Nie udało się pobrać stanu sklepu",
-        "koncerty_bilety_i_profil_pozostaja_dostepne" => {
+        "individual_products" => "POJEDYNCZE PRODUKTY",
+        "choose_your_merch" => "Wybierz swój merch",
+        "pre_order" => "PRZEDSPRZEDAŻ",
+        "could_not_load_store_status" => "Nie udało się pobrać stanu sklepu",
+        "shows_tickets_and_profile_remain_available" => {
             "Koncerty, bilety i profil pozostają dostępne."
         }
-        "brak_koncertow_w_kalendarzu" => "Brak koncertów w kalendarzu",
-        "kiedy_pojawi_sie_nowy_event_bedzie_tutaj" => "Kiedy pojawi się nowy event, będzie tutaj.",
-        "koncert_zapisany_w_twoim_sygnale" => "Koncert zapisany w Twoim Sygnale.",
-        "zapisuje" => "ZAPISUJĘ…",
-        "mam_to" => "✓ MAM TO",
-        "interesuje_mnie" => "+ INTERESUJE MNIE",
-        "kup_bilet" => "KUP BILET",
-        "wroc_do_koncertow" => "← WRÓĆ DO KONCERTÓW",
-        "nie_udao_sie_sprawdzic_sprzedazy" => "Nie udało się sprawdzić sprzedaży",
-        "brak_wasnej_puli_virya" => "Brak własnej puli Virya",
-        "mozesz_przejsc_do_strony_koncertu_lub_sprzedazy_prowadzonej" => {
+        "no_shows_in_the_calendar" => "Brak koncertów w kalendarzu",
+        "new_events_will_appear_here_2" => "Kiedy pojawi się nowy event, będzie tutaj.",
+        "show_saved_to_your_signal" => "Koncert zapisany w Twoim Sygnale.",
+        "saving" => "ZAPISUJĘ…",
+        "saved" => "✓ MAM TO",
+        "interested" => "+ INTERESUJE MNIE",
+        "buy_ticket" => "KUP BILET",
+        "back_back_to_shows" => "← WRÓĆ DO KONCERTÓW",
+        "could_not_check_ticket_sales" => "Nie udało się sprawdzić sprzedaży",
+        "no_virya_ticket_pool" => "Brak własnej puli Virya",
+        "you_can_open_the_show_page_or" => {
             "Możesz przejść do strony koncertu lub sprzedaży prowadzonej przez organizatora."
         }
-        "sprawdz_bilety" => "SPRAWDŹ BILETY ↗",
-        "sprzedaz_rozpocznie_sie_wkrotce" => "Sprzedaż rozpocznie się wkrótce.",
-        "sprzedaz_online_zostaa_zakonczona" => "Sprzedaż online została zakończona.",
-        "ta_pula_biletow_jest_wyprzedana" => "Ta pula biletów jest wyprzedana.",
-        "sprzedaz_jest_chwilowo_wyaczona" => "Sprzedaż jest chwilowo wyłączona.",
-        "ten_koncert_nie_jest_obecnie_dostepny_w_sprzedazy" => {
+        "check_tickets" => "SPRAWDŹ BILETY ↗",
+        "ticket_sales_will_open_soon" => "Sprzedaż rozpocznie się wkrótce.",
+        "online_sales_have_ended" => "Sprzedaż online została zakończona.",
+        "this_ticket_pool_is_sold_out" => "Ta pula biletów jest wyprzedana.",
+        "ticket_sales_are_temporarily_disabled" => "Sprzedaż jest chwilowo wyłączona.",
+        "this_show_is_not_currently_on_sale" => {
             "Ten koncert nie jest obecnie dostępny w sprzedaży."
         }
-        "bilety_nie_sa_teraz_dostepne" => "Bilety nie są teraz dostępne.",
-        "wybierz_bilety_miejsca_zostana_zarezerwowane_na_czas_patnosci" => {
+        "tickets_are_not_available_right_now" => "Bilety nie są teraz dostępne.",
+        "select_tickets_places_will_be_reserved_while" => {
             "Wybierz bilety. Miejsca zostaną zarezerwowane na czas płatności."
         }
-        "w_patnosci" => "w płatności",
-        "sprawdz_strone_koncertu" => "Sprawdź stronę koncertu",
-        "jezeli_organizator_prowadzi_osobna_sprzedaz_znajdziesz_ja_pod" => {
+        "in_checkout_2" => "w płatności",
+        "open_the_show_page" => "Sprawdź stronę koncertu",
+        "if_the_organiser_runs_a_separate_ticket" => {
             "Jeżeli organizator prowadzi osobną sprzedaż, znajdziesz ją pod tym przyciskiem."
         }
-        "wybierz_co_najmniej_jeden_bilet" => "Wybierz co najmniej jeden bilet.",
-        "zamowienie_value_zapisane_dokoncz_bezpieczna_patnosc_stripe" => {
+        "select_at_least_one_ticket" => "Wybierz co najmniej jeden bilet.",
+        "order_saved_complete_the_secure_stripe_payment" => {
             "Zamówienie {} zapisane. Dokończ bezpieczną płatność Stripe."
         }
-        "otworzono_patnosc_dla_zamowienia_value" => "Otworzono płatność dla zamówienia {}.",
-        "dostepne_value" => "Dostępne: {}",
-        "liczba_biletow" => "Liczba biletów",
-        "zmniejsz_liczbe_biletow" => "Zmniejsz liczbę biletów",
-        "zwieksz_liczbe_biletow" => "Zwiększ liczbę biletów",
-        "imie_i_nazwisko_na_zamowieniu_opcjonalnie" => {
-            "Imię i nazwisko na zamówieniu (opcjonalnie)"
-        }
-        "bilety_i_potwierdzenie_trafia_na_value" => "Bilety i potwierdzenie trafią na {}",
-        "bilety_trafia_na_e_mail_konta_fana" => "Bilety trafią na e-mail konta fana.",
-        "faktura_peny_formularz" => "FAKTURA / PEŁNY FORMULARZ ↗",
-        "wybrane_bilety" => "Wybrane bilety",
-        "razem_brutto" => "Razem brutto",
-        "rezerwuje" => "REZERWUJĘ…",
-        "zamowienie_zapisane" => "ZAMÓWIENIE ZAPISANE",
-        "przejdz_do_patnosci_stripe" => "PRZEJDŹ DO PŁATNOŚCI STRIPE",
-        "otworz_patnosc_ponownie" => "OTWÓRZ PŁATNOŚĆ PONOWNIE ↗",
-        "dane_karty_nie_trafiaja_do_virya_signal_patnosc" => {
+        "payment_opened_for_order" => "Otworzono płatność dla zamówienia {}.",
+        "available" => "Dostępne: {}",
+        "ticket_quantity" => "Liczba biletów",
+        "decrease_ticket_quantity" => "Zmniejsz liczbę biletów",
+        "increase_ticket_quantity" => "Zwiększ liczbę biletów",
+        "name_on_the_order_optional" => "Imię i nazwisko na zamówieniu (opcjonalnie)",
+        "tickets_and_confirmation_will_be_sent_to" => "Bilety i potwierdzenie trafią na {}",
+        "tickets_will_be_sent_to_the_fan" => "Bilety trafią na e-mail konta fana.",
+        "invoice_full_form" => "FAKTURA / PEŁNY FORMULARZ ↗",
+        "selected_tickets" => "Wybrane bilety",
+        "gross_total" => "Razem brutto",
+        "reserving" => "REZERWUJĘ…",
+        "order_saved" => "ZAMÓWIENIE ZAPISANE",
+        "continue_to_stripe_payment" => "PRZEJDŹ DO PŁATNOŚCI STRIPE",
+        "reopen_payment" => "OTWÓRZ PŁATNOŚĆ PONOWNIE ↗",
+        "card_details_never_reach_virya_signal_payment" => {
             "Dane karty nie trafiają do Virya Signal. Płatność otworzy się w bezpiecznym Stripe Checkout."
         }
-        "otworz_mape_i_zacznij" => "OTWÓRZ MAPĘ I ZACZNIJ",
-        "odswiez_progres" => "Odśwież progres",
-        "otworz_area" => "OTWÓRZ AREA",
-        "podaj_identyfikator_zamowienia_i_prywatny_token" => {
+        "open_map_and_start" => "OTWÓRZ MAPĘ I ZACZNIJ",
+        "refresh_progress" => "Odśwież progres",
+        "open_area" => "OTWÓRZ AREA",
+        "enter_the_order_id_and_private_token" => {
             "Podaj identyfikator zamówienia i prywatny token."
         }
-        "bilety_zapisane_w_portfelu" => "Bilety zapisane w portfelu.",
-        "wklej_token_wejsciowki" => "Wklej token wejściówki.",
-        "wejsciowka_przypisana_do_urzadzenia" => "Wejściówka przypisana do urządzenia.",
-        "pokaz_qr_na_wejscie" => "POKAŻ QR NA WEJŚCIE",
-        "token_z_wiadomosci" => "Token z wiadomości",
-        "odbierz_wejsciowke" => "ODBIERZ WEJŚCIÓWKĘ",
-        "dodaj_istniejace_zamowienie" => "Dodaj istniejące zamówienie",
-        "uuid_zamowienia" => "UUID zamówienia",
-        "prywatny_checkout_token" => "Prywatny checkout token",
-        "dodaj_do_portfela" => "DODAJ DO PORTFELA",
-        "wysalismy_ponownie_portfel_na_e_mail" => "Wysłaliśmy ponownie portfel na e-mail.",
-        "wysyam" => "Wysyłam…",
-        "wyslij_bilety_ponownie_na_e_mail" => "Wyślij bilety ponownie na e-mail",
-        "generuje" => "GENERUJĘ…",
-        "ukryj_qr" => "UKRYJ QR",
-        "pokaz_qr" => "POKAŻ QR",
-        "qr_niedostepny" => "QR NIEDOSTĘPNY",
-        "qr_wazny_do_value" => "QR ważny do {}",
-        "wazny_do_value" => "ważny do {}",
-        "moj_profil" => "MÓJ PROFIL",
-        "ustawienia_sygnau" => "Ustawienia Sygnału",
-        "fan_viryi" => "Fan Viryi",
-        "zamowienia" => "zamówienia",
-        "wejsciowki" => "wejściówki",
-        "odswiezam_2" => "Odświeżam…",
-        "odswiez_dane" => "Odśwież dane",
-        "zablokuj_aplikacje" => "Zablokuj aplikację",
-        "usun_profil_i_bilety_z_urzadzenia" => "Usuń profil i bilety z urządzenia",
-        "sesja_fana_wejsciowka_oraz_prywatne_tokeny_portfela_sa" => {
+        "tickets_saved_to_the_wallet" => "Bilety zapisane w portfelu.",
+        "paste_the_admission_pass_token" => "Wklej token wejściówki.",
+        "admission_pass_assigned_to_this_device" => "Wejściówka przypisana do urządzenia.",
+        "show_entry_qr" => "POKAŻ QR NA WEJŚCIE",
+        "token_from_the_message" => "Token z wiadomości",
+        "claim_admission_pass" => "ODBIERZ WEJŚCIÓWKĘ",
+        "add_an_existing_order" => "Dodaj istniejące zamówienie",
+        "order_uuid" => "UUID zamówienia",
+        "private_checkout_token" => "Prywatny checkout token",
+        "add_to_wallet" => "DODAJ DO PORTFELA",
+        "we_resent_the_wallet_by_email" => "Wysłaliśmy ponownie portfel na e-mail.",
+        "sending" => "Wysyłam…",
+        "resend_tickets_by_email" => "Wyślij bilety ponownie na e-mail",
+        "generating" => "GENERUJĘ…",
+        "hide_qr" => "UKRYJ QR",
+        "show_qr" => "POKAŻ QR",
+        "qr_unavailable" => "QR NIEDOSTĘPNY",
+        "qr_valid_until" => "QR ważny do {}",
+        "valid_until_2" => "ważny do {}",
+        "my_profile" => "MÓJ PROFIL",
+        "signal_settings" => "Ustawienia Sygnału",
+        "virya_fan" => "Fan Viryi",
+        "orders" => "zamówienia",
+        "admission_passes" => "wejściówki",
+        "refreshing_2" => "Odświeżam…",
+        "refresh_data" => "Odśwież dane",
+        "lock_app" => "Zablokuj aplikację",
+        "remove_profile_and_tickets_from_device" => "Usuń profil i bilety z urządzenia",
+        "fan_session_admission_pass_and_private_wallet" => {
             "Sesja fana, wejściówka oraz prywatne tokeny portfela są przechowywane w osobnym, zaszyfrowanym sejfie Stronghold."
         }
-        "feedback_powinien_miec_od_8_do_2000_znakow" => {
-            "Feedback powinien mieć od 8 do 2000 znaków."
-        }
-        "feedback_zosta_wysany_anonimowo_dzieki" => "Feedback został wysłany anonimowo. Dzięki!",
-        "anonimowy_feedback" => "ANONIMOWY FEEDBACK",
-        "powiedz_nam_co_poprawic" => "Powiedz nam, co poprawić",
-        "aplikacja_wysya_tylko_kategorie_i_tresc_bez_e" => {
+        "feedback_must_contain_between_8_and_2000" => "Feedback powinien mieć od 8 do 2000 znaków.",
+        "feedback_was_sent_anonymously_thank_you" => "Feedback został wysłany anonimowo. Dzięki!",
+        "anonymous_feedback" => "ANONIMOWY FEEDBACK",
+        "tell_us_what_to_improve" => "Powiedz nam, co poprawić",
+        "app_sends_only_the_category_and_message" => {
             "Aplikacja wysyła tylko kategorię i treść — bez e-maila, nazwy, tokenu sesji i identyfikatora profilu. Hosting może zachować standardowe logi techniczne połączenia."
         }
-        "kategoria" => "Kategoria",
-        "pomys" => "Pomysł",
-        "bad" => "Błąd",
-        "koncerty_i_bilety" => "Koncerty i bilety",
-        "inne" => "Inne",
-        "tresc" => "Treść",
-        "napisz_wprost_co_dziaa_zle_albo_czego_brakuje" => {
-            "Napisz wprost, co działa źle albo czego brakuje…"
-        }
-        "wysyam_2" => "WYSYŁAM…",
-        "wyslij_anonimowo" => "WYŚLIJ ANONIMOWO",
-        "adowanie" => "Ładowanie",
-        "feedback_zosta_wysany" => "feedback został wysłany",
-        "nie_udao_sie_odswiezyc_value_zamowien_pozostae_bilety" => {
+        "category" => "Kategoria",
+        "idea" => "Pomysł",
+        "bug_label" => "Błąd",
+        "shows_and_tickets" => "Koncerty i bilety",
+        "other" => "Inne",
+        "message" => "Treść",
+        "tell_us_directly_what_is_broken_or" => "Napisz wprost, co działa źle albo czego brakuje…",
+        "sending_2" => "WYSYŁAM…",
+        "send_anonymously" => "WYŚLIJ ANONIMOWO",
+        "loading" => "Ładowanie",
+        "feedback_was_sent" => "feedback został wysłany",
+        "could_not_refresh_orders_the_remaining_tickets" => {
             "Nie udało się odświeżyć {} zamówień. Pozostałe bilety są dostępne."
         }
-        "szczegoy_wkrotce" => "Szczegóły wkrótce",
-        "miejsce_wkrotce" => "miejsce wkrótce",
-        "skaner_nie_zwroci_kodu" => "Skaner nie zwrócił kodu.",
-        "odpowiedz_serwera_ma_nieoczekiwany_format" => "Odpowiedź serwera ma nieoczekiwany format.",
-        "bad_odczytu_odpowiedzi_raw" => "Błąd odczytu odpowiedzi: {raw}",
-        "nieznany_bad_aplikacji" => "Nieznany błąd aplikacji",
-        "sparuj" => "Sparuj",
-        "urzadzenie" => "urządzenie.",
-        "bez_przepisywania_api_roli_i_dugiego_sekretu" => {
-            "Bez przepisywania API, roli i długiego sekretu."
-        }
-        "sparuj_2" => "SPARUJ",
-        "profil_operatora_jest_zaszyfrowany_lokalnie" => {
-            "Profil operatora jest zaszyfrowany lokalnie."
-        }
-        "dzisiaj_pod_kontrola" => "Dzisiaj pod kontrolą",
-        "nastepny_koncert" => "NASTĘPNY KONCERT",
-        "nadchodzace" => "Nadchodzące",
-        "spoecznosc_i_wzrost" => "Społeczność i wzrost",
-        "zbiorczy_obraz_sygnau_bez_danych_osobowych_fanow" => {
+        "details_coming_soon" => "Szczegóły wkrótce",
+        "venue_coming_soon" => "miejsce wkrótce",
+        "scanner_returned_no_code" => "Skaner nie zwrócił kodu.",
+        "server_response_has_an_unexpected_format" => "Odpowiedź serwera ma nieoczekiwany format.",
+        "response_decoding_error_raw" => "Błąd odczytu odpowiedzi: {raw}",
+        "unknown_application_error" => "Nieznany błąd aplikacji",
+        "pair" => "Sparuj",
+        "device" => "urządzenie.",
+        "no_retyping_the_api_role_or_long" => "Bez przepisywania API, roli i długiego sekretu.",
+        "pair_2" => "SPARUJ",
+        "operator_profile_is_encrypted_locally" => "Profil operatora jest zaszyfrowany lokalnie.",
+        "today_under_control" => "Dzisiaj pod kontrolą",
+        "next_show" => "NASTĘPNY KONCERT",
+        "upcoming" => "Nadchodzące",
+        "community_and_growth" => "Społeczność i wzrost",
+        "combined_signal_overview_without_fans_personal_data" => {
             "Zbiorczy obraz Sygnału bez danych osobowych fanów."
         }
-        "zdrowie_bazy" => "ZDROWIE BAZY",
-        "skanuj_wejscie" => "Skanuj wejście",
-        "bilety_i_wejsciowki" => "Bilety i wejściówki",
-        "obrot_brutto" => "OBRÓT BRUTTO",
-        "ostatnie_zamowienia" => "Ostatnie zamówienia",
-        "reczna_wejsciowka" => "Ręczna wejściówka",
-        "realizuj_znizke" => "Realizuj zniżkę",
-        "kupon_fanowski_kontrolowane_uzycie" => "kupon fanowski / kontrolowane użycie",
-        "kupon_zrealizowany" => "KUPON ZREALIZOWANY",
-        "kampanie_qr" => "Kampanie QR",
-        "aktywne_i_historyczne" => "Aktywne i historyczne",
-        "kolejki_i_dostawy" => "Kolejki i dostawy",
-        "martwe_dostawy" => "Martwe dostawy",
-        "martwy_outbox" => "Martwy outbox",
-        "brak_martwych_wpisow_tor_dostaw_jest_czysty" => {
+        "database_health" => "ZDROWIE BAZY",
+        "scan_entry" => "Skanuj wejście",
+        "tickets_and_admission_passes" => "Bilety i wejściówki",
+        "gross_revenue" => "OBRÓT BRUTTO",
+        "recent_orders" => "Ostatnie zamówienia",
+        "manual_admission_pass" => "Ręczna wejściówka",
+        "redeem_a_discount" => "Realizuj zniżkę",
+        "fan_coupon_controlled_use" => "kupon fanowski / kontrolowane użycie",
+        "coupon_redeemed" => "KUPON ZREALIZOWANY",
+        "qr_campaigns" => "Kampanie QR",
+        "active_and_historical" => "Aktywne i historyczne",
+        "queues_and_deliveries" => "Kolejki i dostawy",
+        "dead_deliveries" => "Martwe dostawy",
+        "dead_outbox" => "Martwy outbox",
+        "no_dead_entries_the_delivery_pipeline_is" => {
             "Brak martwych wpisów. Tor dostaw jest czysty."
         }
-        "twoj_profil_i_bilety_sa_zaszyfrowane_na_urzadzeniu" => {
+        "your_profile_and_tickets_are_encrypted_on" => {
             "Twój profil i bilety są zaszyfrowane na urządzeniu."
         }
-        "twoj_wpyw" => "TWÓJ WPŁYW",
-        "potwierdzonych_polecen" => "potwierdzonych poleceń",
-        "twoje_kupony" => "Twoje kupony",
-        "nagrody" => "Nagrody",
-        "aktywne_losowania" => "Aktywne losowania",
-        "losow" => "LOSÓW",
-        "gdzie_gramy" => "GDZIE GRAMY",
-        "znajdz_punkt_w_swoim_miescie" => "Znajdź punkt w swoim mieście",
-        "otworz_mape_wybierz_aktywny_punkt_i_przejdz_do" => {
+        "your_impact" => "TWÓJ WPŁYW",
+        "confirmed_referrals" => "potwierdzonych poleceń",
+        "your_coupons" => "Twoje kupony",
+        "rewards" => "Nagrody",
+        "active_draws" => "Aktywne losowania",
+        "entries_2" => "LOSÓW",
+        "where_we_play" => "GDZIE GRAMY",
+        "find_a_point_in_your_city" => "Znajdź punkt w swoim mieście",
+        "open_the_map_choose_an_active_point" => {
             "Otwórz mapę, wybierz aktywny punkt i przejdź do niego. Nie musisz zbierać wszystkiego ani jeździć po kraju."
         }
-        "poacz_portfel_przegladarkowy_z_kontem_na_stronie_area" => {
+        "connect_your_browser_wallet_to_your_area" => {
             "Połącz portfel przeglądarkowy z kontem na stronie AREA, aby zachować cały postęp."
         }
-        "postep_kolekcji" => "POSTĘP KOLEKCJI",
-        "odkryte_artefakty" => "Odkryte artefakty",
-        "mapa_pokazuje_aktywne_punkty_i_prowadzi_do_startu" => {
+        "collection_progress" => "POSTĘP KOLEKCJI",
+        "discovered_artifacts" => "Odkryte artefakty",
+        "map_shows_active_points_and_gets_you" => {
             "Mapa pokazuje aktywne punkty i prowadzi do startu. Dokładna lokalizacja odsłania się w grze dopiero wtedy, gdy jest potrzebna."
         }
-        "area_chwilowo_niedostepna" => "AREA chwilowo niedostępna",
-        "odswiez_dane_albo_otworz_pena_gre" => "Odśwież dane albo otwórz pełną grę.",
-        "bilety_i_wejscie" => "Bilety i wejście",
-        "wejsciowka_virya" => "WEJŚCIÓWKA VIRYA",
-        "wygraes_wejsciowke" => "WYGRAŁEŚ WEJŚCIÓWKĘ?",
-        "przypisz_ja_do_telefonu" => "Przypisz ją do telefonu",
-        "portfel_biletow" => "Portfel biletów",
-        "pojedyncze_produkty_2" => "Pojedyncze produkty",
-        "zestawy_2" => "Zestawy",
+        "area_is_temporarily_unavailable" => "AREA chwilowo niedostępna",
+        "refresh_the_data_or_open_the_full" => "Odśwież dane albo otwórz pełną grę.",
+        "tickets_and_entry" => "Bilety i wejście",
+        "virya_admission_pass" => "WEJŚCIÓWKA VIRYA",
+        "did_you_win_an_admission_pass" => "WYGRAŁEŚ WEJŚCIÓWKĘ?",
+        "assign_it_to_your_phone" => "Przypisz ją do telefonu",
+        "ticket_wallet" => "Portfel biletów",
+        "individual_products_2" => "Pojedyncze produkty",
+        "bundles_2" => "Zestawy",
         "retry" => "RETRY",
-        "acze_2" => "ŁĄCZĘ",
+        "connecting_2" => "ŁĄCZĘ",
         "online" => "ONLINE",
         "offline_on" => "OFFLINE ON",
         "offline_off" => "OFFLINE OFF",
-        "active" => "ACTIVE",
+        "active_status" => "ACTIVE",
         "closed" => "CLOSED",
         "owner" => "OWNER",
         "staff" => "STAFF",
-        "device" => "DEVICE",
+        "device_label" => "DEVICE",
         "mobile_wallet" => "MOBILE WALLET",
         "virya_control" => "VIRYA CONTROL",
         "virya_signal" => "VIRYA SIGNAL",
         "virya_store" => "VIRYA STORE",
         "virya_area" => "VIRYA AREA",
-        "virya_bilety" => "VIRYA // BILETY",
-        "value_biletow_value_oczekuje_value_konfliktow" => {
-            "{} biletów · {} oczekuje · {} konfliktów"
-        }
-        "value_check_inow" => "{} check-inów",
-        "value_proba_value_value" => "{} · próba {}/{}",
-        "moj_sygna" => "Mój Sygnał",
-        "oczekujace" => "oczekujące",
-        "message_zamowienie_value_jest_zapisane_uzyj_przycisku_ponownego" => {
+        "virya_tickets" => "VIRYA // BILETY",
+        "tickets_pending_conflicts" => "{} biletów · {} oczekuje · {} konfliktów",
+        "check_ins_2" => "{} check-inów",
+        "attempt_2" => "{} · próba {}/{}",
+        "my_signal" => "Mój Sygnał",
+        "pending_2" => "oczekujące",
+        "message_order_is_saved_use_the_reopen" => {
             "{message} Zamówienie {} jest zapisane — użyj przycisku ponownego otwarcia płatności."
         }
-        "reward_credits_kredytow" => "{reward_credits} kredytów",
-        "live_count_aktywne_punkty" => "{live_count} aktywne punkty",
-        "voucher_count_nagrody" => "{voucher_count} nagrody",
-        "community_percent_spoecznosci" => "{community_percent}% społeczności",
-        "wysalismy" => "wysłaliśmy",
-        "uniewaznion" => "unieważnion",
-        "sty" => "STY",
-        "lut" => "LUT",
+        "reward_credits_credits" => "{reward_credits} kredytów",
+        "live_count_active_points" => "{live_count} aktywne punkty",
+        "voucher_count_rewards" => "{voucher_count} nagrody",
+        "community_percent_community" => "{community_percent}% społeczności",
+        "sent" => "wysłaliśmy",
+        "revoked" => "unieważnion",
+        "jan" => "STY",
+        "feb" => "LUT",
         "mar" => "MAR",
-        "kwi" => "KWI",
-        "maj" => "MAJ",
-        "cze" => "CZE",
-        "lip" => "LIP",
-        "sie" => "SIE",
-        "wrz" => "WRZ",
-        "paz" => "PAŹ",
-        "lis" => "LIS",
-        "gru" => "GRU",
+        "apr" => "KWI",
+        "may" => "MAJ",
+        "jun" => "CZE",
+        "jul" => "LIP",
+        "aug" => "SIE",
+        "sep" => "WRZ",
+        "oct" => "PAŹ",
+        "nov" => "LIS",
+        "dec" => "GRU",
         "text" => "---",
-        "value_aktywnych" => "{} aktywnych",
-        "value_zestaw_merchu_virya" => "{} — zestaw merchu Virya",
-        "value_merch_virya" => "{} — merch Virya",
-        "value_koncert_virya" => "{} — koncert Virya",
-        "natywny_most_aplikacji_nie_jest_dostepny" => "Natywny most aplikacji nie jest dostępny.",
-        "operacja_command_przekroczya_limit_czasu" => {
-            "Operacja {command} przekroczyła limit czasu."
-        }
-        "modu_uprawnien_aparatu_nie_jest_dostepny_w_tej" => {
+        "active_2" => "{} aktywnych",
+        "virya_merch_bundle" => "{} — zestaw merchu Virya",
+        "virya_merch" => "{} — merch Virya",
+        "virya_show" => "{} — koncert Virya",
+        "native_app_bridge_is_unavailable" => "Natywny most aplikacji nie jest dostępny.",
+        "operation_command_timed_out" => "Operacja {command} przekroczyła limit czasu.",
+        "camera_permission_module_is_unavailable_in_this" => {
             "Moduł uprawnień aparatu nie jest dostępny w tej wersji aplikacji."
         }
-        "brak_dostepu_do_aparatu_wacz_aparat_dla_virya" => {
+        "camera_access_is_denied_enable_camera_for" => {
             "Brak dostępu do aparatu. Włącz Aparat dla Virya Signal w ustawieniach aplikacji."
         }
-        "skaner_kodu_qr" => "Skaner kodu QR",
-        "skanuj_kod_qr" => "SKANUJ KOD QR",
-        "umiesc_kod_wewnatrz_ramki" => "Umieść kod wewnątrz ramki",
-        "anuluj_skanowanie" => "← ANULUJ SKANOWANIE",
-        "zamykam" => "ZAMYKAM…",
-        "skaner_jest_dostepny_tylko_w_aplikacji_ios_android" => {
+        "qr_code_scanner" => "Skaner kodu QR",
+        "scan_qr_code_2" => "SKANUJ KOD QR",
+        "place_the_code_inside_the_frame" => "Umieść kod wewnątrz ramki",
+        "back_cancel_scanning" => "← ANULUJ SKANOWANIE",
+        "closing" => "ZAMYKAM…",
+        "scanner_is_available_only_in_the_ios" => {
             "Skaner jest dostępny tylko w aplikacji iOS/Android."
         }
-        "rodzaj" => "Rodzaj",
-        "czas" => "Czas",
-        "operacja" => "Operacja",
-        "sciezka" => "Ścieżka",
-        "poprzednie_uruchomienie_zakonczyo_sie_bedem" => {
-            "Poprzednie uruchomienie zakończyło się błędem"
-        }
-        "aplikacja_zatrzymaa_bad" => "Aplikacja zatrzymała błąd",
-        "nie_ukrywamy_awarii_skopiuj_raport_i_wyslij_go" => {
+        "type" => "Rodzaj",
+        "time" => "Czas",
+        "operation" => "Operacja",
+        "path" => "Ścieżka",
+        "previous_launch_ended_with_an_error" => "Poprzednie uruchomienie zakończyło się błędem",
+        "app_caught_an_error" => "Aplikacja zatrzymała błąd",
+        "we_do_not_hide_failures_copy_the" => {
             "Nie ukrywamy awarii. Skopiuj raport i wyślij go razem z informacją, co było kliknięte."
         }
-        "kopiuj_raport" => "KOPIUJ RAPORT",
-        "uruchom_ponownie" => "URUCHOM PONOWNIE",
-        "zamknij" => "ZAMKNIJ",
-        "raport_skopiowany" => "Raport skopiowany.",
-        "przytrzymaj_tekst_raportu_i_skopiuj_recznie" => {
-            "Przytrzymaj tekst raportu i skopiuj ręcznie."
-        }
-        "poprzednie_uruchomienie_przerwao_operacje_command" => {
+        "copy_report" => "KOPIUJ RAPORT",
+        "restart_app" => "URUCHOM PONOWNIE",
+        "close" => "ZAMKNIJ",
+        "report_copied" => "Raport skopiowany.",
+        "press_and_hold_the_report_text_and" => "Przytrzymaj tekst raportu i skopiuj ręcznie.",
+        "previous_launch_interrupted_operation_command" => {
             "Poprzednie uruchomienie przerwało operację {command}."
         }
-        "poprzednie_uruchomienie_zakonczyo_sie_bez_czystego_zamkniecia" => {
+        "previous_launch_ended_without_a_clean_shutdown" => {
             "Poprzednie uruchomienie zakończyło się bez czystego zamknięcia."
         }
-        "virya_signal_diagnostyka" => "VIRYA SIGNAL / DIAGNOSTYKA",
+        "virya_signal_diagnostics" => "VIRYA SIGNAL / DIAGNOSTYKA",
         "native_error_not_configured" => "Profil urządzenia nie jest skonfigurowany",
         "native_error_invalid_pin" => "Nieprawidłowy PIN",
         "native_error_locked" => "Sesja jest zablokowana",
@@ -770,6 +732,124 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "native_store_url_label" => "adres sklepu",
         "native_bundle_variant_label" => "wariant zestawu",
         "native_prepare_offline_event_first" => "Najpierw przygotuj koncert offline",
+        "location_module_is_unavailable_in_this_app" => {
+            "Moduł lokalizacji nie jest dostępny w tej wersji aplikacji."
+        }
+        "location_access_is_denied_enable_location_for" => {
+            "Brak dostępu do lokalizacji. Włącz lokalizację dla Virya Signal w ustawieniach aplikacji."
+        }
+        "could_not_read_a_fresh_location_move" => {
+            "Nie udało się odczytać świeżej lokalizacji. Wyjdź na zewnątrz i spróbuj ponownie."
+        }
+        "native_area_claim_invalid" => "Dane potwierdzenia punktu AREA są nieprawidłowe.",
+        "native_area_drop_inactive" => "Ten punkt AREA nie jest teraz aktywny.",
+        "native_area_challenge_invalid" => {
+            "Próba lokalizacji wygasła. Uruchom weryfikację ponownie."
+        }
+        "native_area_rate_limited" => "Za dużo prób. Odczekaj kilka minut i spróbuj ponownie.",
+        "native_area_not_enough_samples" => {
+            "Nie udało się zebrać wystarczającej liczby świeżych pomiarów. Pozostań chwilę w miejscu i spróbuj ponownie."
+        }
+        "native_area_low_accuracy" => {
+            "Lokalizacja jest zbyt mało dokładna. Wyjdź na otwartą przestrzeń i spróbuj ponownie."
+        }
+        "native_area_outside_zone" => "Jesteś poza aktywną strefą punktu AREA.",
+        "native_area_drop_full" => "Limit odbiorów tego punktu został już osiągnięty.",
+        "native_area_temporary" => {
+            "Weryfikacja AREA jest chwilowo niedostępna. Spróbuj ponownie za moment."
+        }
+        "area_in_the_app" => "AREA W APLIKACJI",
+        "choose_an_active_point_and_follow_the" => {
+            "Wybierz aktywny punkt, sprawdź kierunek i potwierdź wygraną bez wychodzenia z aplikacji."
+        }
+        "active_area_point" => "Aktywny punkt AREA",
+        "inactive_area_point" => "Punkt oczekuje na aktywację",
+        "claimed_area_point" => "Punkt już odkryty",
+        "locate_nearest_point" => "ZNAJDŹ NAJBLIŻSZY PUNKT",
+        "locating_you" => "LOKALIZUJĘ…",
+        "nearest_active_point_is_city" => "Najbliższy aktywny punkt: {city}.",
+        "you_are_about_distance_from_city" => "Jesteś około {distance} od punktu w mieście {city}.",
+        "no_active_area_points_now" => {
+            "Teraz nie ma aktywnych punktów AREA. Mapa nadal pokazuje miasta kolejnych aktywacji."
+        }
+        "open_route_start" => "OTWÓRZ START TRASY",
+        "verify_location_and_win" => "POTWIERDŹ LOKALIZACJĘ I WYGRAJ",
+        "verifying_location" => "SPRAWDZAM LOKALIZACJĘ…",
+        "area_location_privacy" => {
+            "Lokalizacja jest używana tylko podczas tej próby. Aplikacja wysyła kilka świeżych próbek do weryfikacji i nie zapisuje trasy."
+        }
+        "area_point_won" => "PUNKT ODKRYTY",
+        "area_point_already_won" => "TEN PUNKT JUŻ MASZ",
+        "area_reward_added" => "Do kolekcji dodano „{track}” i {credits} kredyt nagrody.",
+        "area_reward_already_present" => "„{track}” jest już w Twojej kolekcji.",
+        "select_an_active_point_first" => "Najpierw wybierz aktywny punkt AREA.",
+        "location_accuracy_value" => "Dokładność: ±{accuracy} m",
+        "approximate_distance_meters" => "{distance} m",
+        "approximate_distance_kilometers" => "{distance} km",
+        "open_full_area_game" => "OTWÓRZ PEŁNĄ GRĘ AREA",
+        "fan_app_unlock_pin" => "PIN do odblokowania profilu fana",
+        "enter_the_pin_created_for_this_fan" => {
+            "Wpisz PIN ustawiony podczas konfiguracji tego profilu fana. To nie jest kod QR ani PIN telefonu."
+        }
+        "create_fan_unlock_pin" => "Utwórz PIN do profilu fana",
+        "enter_4_6_digits_for_this_fan_profile" => {
+            "Wpisz 4–6 cyfr, np. 2580. Ten PIN odblokowuje tylko profil fana w Virya Signal."
+        }
+        "this_show_has_no_ticket_pool" => "Ten koncert nie ma puli biletowej.",
+        "ticket_pool_status_loading" => "SPRAWDZAM PULĘ…",
+        "ticket_pool_temporarily_unavailable" => "Pula biletowa jest chwilowo niedostępna.",
+        "could_not_save_city_message" => "Nie udało się zapisać miasta: {message}.",
+        "new_message_not_sent_previous_code_still_valid_minutes" => {
+            "Nowa wiadomość nie została wysłana, bo poprzedni kod jest nadal ważny. Spróbuj ponownie za około {minutes} min."
+        }
+        "could_not_refresh_orders_count_other_tickets_remain_available" => {
+            "Nie udało się odświeżyć {count} zamówień. Pozostałe bilety są nadal dostępne."
+        }
+        "area_city_wroclaw" => "Wrocław",
+        "area_city_poznan" => "Poznań",
+        "area_city_gdansk" => "Gdańsk",
+        "area_city_warsaw" => "Warszawa",
+        "area_city_katowice" => "Katowice",
+        "area_city_krakow" => "Kraków",
+        "area_city_lodz" => "Łódź",
+        "area_city_szczecin" => "Szczecin",
+        "area_city_lublin" => "Lublin",
+        "area_city_rzeszow" => "Rzeszów",
+        "area_city_bialystok" => "Białystok",
+        "area_city_torun" => "Toruń",
+        "area_region_lower_silesia" => "Dolny Śląsk",
+        "area_region_greater_poland" => "Wielkopolska",
+        "area_region_pomerania" => "Pomorze",
+        "area_region_masovia" => "Mazowsze",
+        "area_region_silesia" => "Śląsk",
+        "area_region_lesser_poland" => "Małopolska",
+        "area_region_lodz" => "Łódzkie",
+        "area_region_west_pomerania" => "Zachodniopomorskie",
+        "area_region_lublin" => "Lubelskie",
+        "area_region_subcarpathia" => "Podkarpackie",
+        "area_region_podlasie" => "Podlaskie",
+        "area_region_kuyavia_pomerania" => "Kujawsko-Pomorskie",
+        "area_clue_wroclaw" => "Sygnał zbiera się gdzieś pomiędzy betonem, wodą i hałasem.",
+        "area_clue_poznan" => "Idź za złotym sygnałem. Zostaw oczywistą trasę za sobą.",
+        "area_clue_gdansk" => "Szukaj echa tam, gdzie stal spotyka sól.",
+        "area_clue_warsaw" => "Najgłośniejsze miasto ukrywa najcichszą transmisję.",
+        "area_clue_katowice" => "Przemysłowy puls czeka tuż pod powierzchnią.",
+        "area_clue_krakow" => "Stary kamień. Nowy hałas. Jedna linia zamknięta w środku.",
+        "area_clue_lodz" => "Idź za nicią przez cegłę, tory i miasto wymyślone na nowo.",
+        "area_clue_szczecin" => "Sygnał płynie w głąb lądu od wody ułożonej jak labirynt.",
+        "area_clue_lublin" => "Słuchaj tam, gdzie stare bramy niosą nową częstotliwość.",
+        "area_clue_rzeszow" => "Południowy puls ukrywa się między ruchem a otwartym niebem.",
+        "area_clue_bialystok" => "Na skraju lasu cichy sygnał dociera najdalej.",
+        "area_clue_torun" => "Spójrz w górę, potem sprowadź orbitę z powrotem na ulicę.",
+        "direction_to_point" => "{arrow} {direction}",
+        "direction_north" => "północ",
+        "direction_northeast" => "północny wschód",
+        "direction_east" => "wschód",
+        "direction_southeast" => "południowy wschód",
+        "direction_south" => "południe",
+        "direction_southwest" => "południowy zachód",
+        "direction_west" => "zachód",
+        "direction_northwest" => "północny zachód",
         _ => key,
     }
 }

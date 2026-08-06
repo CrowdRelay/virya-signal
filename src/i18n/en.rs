@@ -1,611 +1,585 @@
 pub(super) fn text(key: &'static str) -> &'static str {
     match key {
-        "sygna" => "← SIGNAL",
-        "jestes_w_staffie" => "ARE YOU ON THE STAFF?",
-        "podaj_haso_staff_uzywane_w_panelu_virya" => {
+        "back_signal" => "← SIGNAL",
+        "are_you_on_the_staff" => "ARE YOU ON THE STAFF?",
+        "enter_the_staff_password_used_in_the" => {
             "Enter the staff password used in the Virya panel."
         }
-        "strefa" => "The ",
-        "zespou" => "team zone.",
-        "dostep_do_bramki_sprzedazy_i_obsugi_koncertu_jest" => {
+        "zone_prefix" => "The ",
+        "team_zone_suffix" => "team zone.",
+        "gate_sales_and_show_operations_access_is" => {
             "Gate, sales and show operations access is separate from the fan account."
         }
-        "weryfikacja_staff" => "STAFF VERIFICATION",
-        "haso_panelu_virya" => "Virya panel password",
-        "uzyj_tego_samego_hasa_co_w_qr_bramce" => {
+        "staff_verification" => "STAFF VERIFICATION",
+        "virya_panel_password" => "Virya panel password",
+        "use_the_same_password_as_in_qr" => {
             "Use the same password as in QR, Gate and Control Center. After verification, the app will show the local PIN or device pairing."
         }
-        "haso_staff" => "Staff password",
-        "sprawdzam" => "CHECKING…",
-        "otworz_strefe_staff" => "OPEN STAFF ZONE",
-        "haso_jest_sprawdzane_po_stronie_virya_music_nie" => {
+        "staff_password" => "Staff password",
+        "checking" => "CHECKING…",
+        "open_staff_zone" => "OPEN STAFF ZONE",
+        "password_is_verified_by_virya_music_and" => {
             "The password is verified by virya.music and is not stored in the app."
         }
-        "nie_udao_sie_odczytac_sejfu_staff" => "FAILED TO READ THE STAFF VAULT",
-        "sprawdzam_bezpieczny_sejf" => "CHECKING THE SECURE VAULT",
+        "failed_to_read_the_staff_vault" => "FAILED TO READ THE STAFF VAULT",
+        "checking_the_secure_vault" => "CHECKING THE SECURE VAULT",
         "virya_staff" => "Virya staff",
-        "pin_musi_miec_co_najmniej_4_znaki" => "The PIN must contain at least 4 characters.",
-        "podaj_46_cyfrowy_pin_i_zeskanuj_albo_wklej" => {
-            "Enter a 4–6 digit PIN and scan or paste the pairing code."
-        }
-        "podaj_46_cyfrowy_pin_i_poprawny_token_urzadzenia" => {
-            "Enter a 4–6 digit PIN and a valid device token."
-        }
-        "kod_zeskanowany" => "Code scanned",
-        "wpisz_pin_ponizej_i_kliknij_sparuj" => "Enter the PIN below and tap PAIR.",
-        "acze" => "CONNECTING…",
-        "zeskanuj_kod_qr" => "SCAN QR CODE",
-        "kod_pokazany_w_panelu_virya" => "Code shown in the Virya panel",
-        "albo" => "OR",
-        "kod_parowania" => "Pairing code",
-        "utworz_pin_do_odblokowania" => "Create an unlock PIN",
-        "wpisz_46_cyfr_np_2580_to_pin_tylko" => {
+        "pin_must_contain_at_least_4_characters" => "The PIN must contain at least 4 characters.",
+        "enter_a_4_6_digit_pin_and" => "Enter a 4–6 digit PIN and scan or paste the pairing code.",
+        "enter_a_4_6_digit_pin_and_2" => "Enter a 4–6 digit PIN and a valid device token.",
+        "code_scanned" => "Code scanned",
+        "enter_the_pin_below_and_tap_pair" => "Enter the PIN below and tap PAIR.",
+        "connecting" => "CONNECTING…",
+        "scan_qr_code" => "SCAN QR CODE",
+        "code_shown_in_the_virya_panel" => "Code shown in the Virya panel",
+        "or_label" => "OR",
+        "pairing_code" => "Pairing code",
+        "create_an_unlock_pin" => "Create an unlock PIN",
+        "enter_4_6_digits_for_example_2580" => {
             "Enter 4–6 digits, for example 2580. This PIN unlocks Virya Signal only — it is not the QR code or your phone PIN."
         }
-        "np_2580" => "e.g. 2580",
-        "ukryj_ustawienia_reczne" => "HIDE MANUAL SETTINGS",
-        "ustawienia_zaawansowane" => "ADVANCED SETTINGS",
-        "nazwa_urzadzenia_osoby" => "Device / person name",
-        "token_urzadzenia" => "Device token",
-        "zapisz_recznie" => "SAVE MANUALLY",
-        "pin_do_odblokowania_aplikacji" => "App unlock PIN",
-        "wpisz_pin_ustawiony_podczas_parowania_tego_urzadzenia" => {
+        "pin_example" => "e.g. 2580",
+        "hide_manual_settings" => "HIDE MANUAL SETTINGS",
+        "advanced_settings" => "ADVANCED SETTINGS",
+        "device_person_name" => "Device / person name",
+        "device_token" => "Device token",
+        "save_manually" => "SAVE MANUALLY",
+        "app_unlock_pin" => "App unlock PIN",
+        "enter_the_pin_created_when_this_device" => {
             "Enter the PIN created when this device was paired."
         }
-        "twoj_pin" => "Your PIN",
-        "odblokuj" => "UNLOCK",
-        "otworz_menu" => "Open menu",
-        "zamknij_i_zablokuj_panel" => "Close and lock panel",
-        "znizki" => "Discounts",
-        "kody_qr" => "QR codes",
-        "ustawienia" => "Settings",
-        "start" => "Home",
-        "sygna_2" => "Signal",
-        "skan" => "Scan",
-        "bilety" => "Tickets",
-        "koncerty" => "Shows",
-        "sklep" => "Store",
-        "profil" => "Profile",
-        "gra_area" => "AREA game",
-        "strefa_staff" => "Staff zone",
-        "zamknij_i_zablokuj_sygna" => "Close and lock Signal",
-        "koncerty_2" => "shows",
-        "aktywne_qr" => "active QR",
-        "check_iny" => "check-ins",
-        "brak_nadchodzacych_koncertow" => "No upcoming shows",
-        "kiedy_pojawi_sie_nowe_wydarzenie_zobaczysz_je_tutaj" => "New events will appear here.",
-        "widok_tylko_dla_ownera" => "Owner-only view",
-        "statystyki_zgod_wzrostu_i_miast_sa_dostepne_wyacznie" => {
+        "your_pin" => "Your PIN",
+        "unlock" => "UNLOCK",
+        "open_menu" => "Open menu",
+        "close_and_lock_panel" => "Close and lock panel",
+        "discounts" => "Discounts",
+        "qr_codes" => "QR codes",
+        "settings" => "Settings",
+        "home_tab" => "Home",
+        "signal_tab" => "Signal",
+        "scan_tab" => "Scan",
+        "tickets_tab" => "Tickets",
+        "shows_tab" => "Shows",
+        "store_tab" => "Store",
+        "profile_tab" => "Profile",
+        "area_game_tab" => "AREA game",
+        "staff_zone" => "Staff zone",
+        "close_and_lock_signal" => "Close and lock Signal",
+        "shows_count_label" => "shows",
+        "active_qr" => "active QR",
+        "check_ins" => "check-ins",
+        "no_upcoming_shows" => "No upcoming shows",
+        "new_events_will_appear_here" => "New events will appear here.",
+        "owner_only_view" => "Owner-only view",
+        "consent_growth_and_city_statistics_are_available" => {
             "Consent, growth and city statistics are available to the owner only."
         }
-        "dane_sa_agregowane_w_crowdrelay_i_nie_zawieraja" => {
+        "data_is_aggregated_in_crowdrelay_and_contains" => {
             "Data is aggregated in CrowdRelay and contains no email addresses or fan identifiers."
         }
-        "odswiezam" => "REFRESHING…",
-        "odswiez" => "REFRESH",
-        "brak_snapshotu_sygnau" => "No Signal snapshot",
-        "odswiez_dane_jezeli_backend_jest_jeszcze_w_trakcie" => {
+        "refreshing" => "REFRESHING…",
+        "refresh" => "REFRESH",
+        "no_signal_snapshot" => "No Signal snapshot",
+        "refresh_the_data_if_the_backend_is" => {
             "Refresh the data. If the backend is still being deployed, the panel will show a safe error instead of an empty screen."
         }
-        "snapshot_czesciowy_niedostepne_zroda_value" => {
-            "Partial snapshot. Unavailable sources: {}."
-        }
-        "brak_agregatu_miast" => "No city aggregate",
-        "sygna_nie_ma_jeszcze_potwierdzonych_danych_miejskich_albo" => {
+        "partial_snapshot_unavailable_sources" => "Partial snapshot. Unavailable sources: {}.",
+        "no_city_aggregate" => "No city aggregate",
+        "signal_has_no_confirmed_city_data_yet" => {
             "Signal has no confirmed city data yet, or the source is temporarily unavailable."
         }
-        "aktywni" => "active",
-        "zgody_marketingowe" => "marketing consents",
-        "nowi_30_dni" => "new / 30 days",
-        "potwierdzonych_sposrod_aktywnych_i_oczekujacych" => "confirmed among active and pending",
-        "wszyscy" => "all",
-        "oczekujacy" => "pending",
-        "wypisani" => "unsubscribed",
-        "wyciszeni" => "muted",
-        "powiadomienia_w_poblizu" => "nearby notifications",
-        "aktywnosc" => "Activity",
-        "30_dni_caosc" => "30 days / total",
-        "nowi_7_dni" => "new / 7 days",
-        "polecenia" => "referrals",
-        "zainteresowania_koncertami" => "show interests",
-        "powiadomienia_nearby" => "nearby notifications",
-        "miasta_do_moderacji" => "cities awaiting moderation",
-        "najsilniejsze_miasta" => "Strongest cities",
-        "snapshot_generated_at_dane_wyacznie_zagregowane" => {
+        "active" => "active",
+        "marketing_consents" => "marketing consents",
+        "new_30_days" => "new / 30 days",
+        "confirmed_among_active_and_pending" => "confirmed among active and pending",
+        "all" => "all",
+        "pending" => "pending",
+        "unsubscribed" => "unsubscribed",
+        "muted" => "muted",
+        "nearby_notifications" => "nearby notifications",
+        "activity" => "Activity",
+        "text_30_days_total" => "30 days / total",
+        "new_7_days" => "new / 7 days",
+        "referrals" => "referrals",
+        "show_interests" => "show interests",
+        "nearby_notifications_2" => "nearby notifications",
+        "cities_awaiting_moderation" => "cities awaiting moderation",
+        "strongest_cities" => "Strongest cities",
+        "snapshot_generated_at_aggregated_data_only" => {
             "Snapshot: {generated_at}. Aggregated data only."
         }
-        "najpierw_wybierz_koncert" => "Select a show first.",
-        "wybierz_koncert" => "Select a show.",
-        "snapshot_gotowy_value_trwaych_biletow" => "Snapshot ready: {} durable tickets.",
-        "sync_value_zapisane_value_konfliktow_value_nadal_czeka" => {
-            "Sync: {} saved, {} conflicts, {} still pending."
-        }
-        "dane_koncertu_usuniete_z_urzadzenia" => "Show data removed from the device.",
-        "koncert" => "Show",
-        "aduje_koncerty" => "Loading shows…",
-        "wybierz_wydarzenie" => "Select an event",
-        "bramka_pracuje_lokalnie" => "Gate works locally",
-        "odpornosc_na_brak_lte" => "Works without LTE",
-        "pobierz_bezpieczny_snapshot_przed_otwarciem_bram" => {
+        "select_a_show_first" => "Select a show first.",
+        "select_a_show" => "Select a show.",
+        "snapshot_ready_durable_tickets" => "Snapshot ready: {} durable tickets.",
+        "sync_saved_conflicts_still_pending" => "Sync: {} saved, {} conflicts, {} still pending.",
+        "show_data_removed_from_the_device" => "Show data removed from the device.",
+        "show" => "Show",
+        "loading_shows" => "Loading shows…",
+        "select_an_event" => "Select an event",
+        "gate_works_locally" => "Gate works locally",
+        "works_without_lte" => "Works without LTE",
+        "download_a_secure_snapshot_before_opening_the" => {
             "Download a secure snapshot before opening the gates."
         }
-        "przygotuj_offline" => "PREPARE OFFLINE",
-        "synchronizuj" => "SYNC",
-        "wyczysc" => "CLEAR",
-        "weryfikuje" => "VERIFYING…",
-        "skanuj_lokalnie" => "SCAN LOCALLY",
-        "uruchom_aparat" => "OPEN CAMERA",
-        "wyacznie_trway_qr_biletu_t1" => "Durable t1 ticket QR only",
-        "qr_biletu_lub_wejsciowki" => "Ticket or admission-pass QR",
-        "kod_qr_lub_numer_wejsciowki" => "QR code or admission-pass number",
-        "sprawdz" => "CHECK",
-        "wybierz_koncert_i_podaj_e_mail_fana" => "Select a show and enter the fan email.",
-        "podaj_public_reference_wejsciowki" => "Enter the admission pass public reference.",
-        "wejsciowka_zostaa_uniewazniona" => "The admission pass has been revoked.",
-        "wybierz_koncert_2" => "Select a show",
-        "sprzedane" => "sold",
-        "w_trakcie" => "in checkout",
-        "dostepne" => "available",
-        "zwroty_value" => "refunds: {}",
-        "numer_wejsciowki_to_bezpieczny_publiczny_identyfikator_np_vry" => {
+        "prepare_offline" => "PREPARE OFFLINE",
+        "sync" => "SYNC",
+        "clear" => "CLEAR",
+        "verifying" => "VERIFYING…",
+        "scan_locally" => "SCAN LOCALLY",
+        "open_camera" => "OPEN CAMERA",
+        "durable_t1_ticket_qr_only" => "Durable t1 ticket QR only",
+        "ticket_or_admission_pass_qr" => "Ticket or admission-pass QR",
+        "qr_code_or_admission_pass_number" => "QR code or admission-pass number",
+        "check" => "CHECK",
+        "select_a_show_and_enter_the_fan" => "Select a show and enter the fan email.",
+        "enter_the_admission_pass_public_reference" => "Enter the admission pass public reference.",
+        "admission_pass_has_been_revoked" => "The admission pass has been revoked.",
+        "select_a_show_2" => "Select a show",
+        "sold" => "sold",
+        "in_checkout" => "in checkout",
+        "available_label" => "available",
+        "refunds" => "refunds: {}",
+        "admission_pass_number_is_a_safe_public" => {
             "The admission-pass number is a safe public identifier, e.g. VRY-... It is not a QR token or a private order token."
         }
-        "wydaj_wejsciowke" => "ISSUE PASS",
-        "numer_wejsciowki_np_vry" => "Admission-pass number, e.g. VRY-…",
-        "uniewaznij" => "REVOKE",
-        "podaj_kod_i_numer_sprzedazy" => "Enter the code and sale number.",
-        "kod_znizkowy" => "Discount code",
-        "numer_sprzedazy" => "Sale number",
-        "zrealizuj_kupon" => "REDEEM COUPON",
-        "uzycie_value_value" => "Usage {}/{}",
-        "wejscie_gowne" => "Main entrance",
-        "podaj_poprawny_poczatek_waznosci" => "Enter a valid start date.",
-        "podaj_poprawny_koniec_waznosci" => "Enter a valid end date.",
-        "limit_musi_byc_dodatnia_liczba" => "The limit must be a positive number.",
-        "koniec_kampanii_musi_byc_pozniej_niz_poczatek" => {
-            "The campaign end must be after its start."
-        }
-        "wybierz_koncert_i_nazwij_kampanie" => "Select a show and name the campaign.",
-        "kampania_qr_utworzona" => "QR campaign created.",
-        "aduje_kampanie" => "Loading campaigns…",
-        "nazwa_punktu_kampanii" => "Point / campaign name",
-        "wazna_od" => "Valid from",
-        "wazna_do" => "Valid until",
-        "limit_check_inow_opcjonalnie" => "Check-in limit (optional)",
-        "utworz_kampanie" => "CREATE CAMPAIGN",
-        "kampania_zostaa_wyaczona" => "The campaign has been disabled.",
-        "wyacz_kampanie" => "DISABLE CAMPAIGN",
-        "limit_value" => "limit {v}",
-        "bez_limitu" => "no limit",
-        "poaczenie" => "Connection",
-        "uprawnienia" => "Permissions",
-        "odswiez_wszystkie_dane" => "Refresh all data",
-        "zablokuj_panel" => "Lock panel",
-        "usun_profil_operatora" => "Remove operator profile",
-        "token_operatora_przechowuje_zaszyfrowany_sejf_stronghold_warstwa_webview" => {
+        "issue_pass" => "ISSUE PASS",
+        "admission_pass_number_e_g_vry" => "Admission-pass number, e.g. VRY-…",
+        "revoke" => "REVOKE",
+        "enter_the_code_and_sale_number" => "Enter the code and sale number.",
+        "discount_code" => "Discount code",
+        "sale_number" => "Sale number",
+        "redeem_coupon" => "REDEEM COUPON",
+        "usage" => "Usage {}/{}",
+        "main_entrance" => "Main entrance",
+        "enter_a_valid_start_date" => "Enter a valid start date.",
+        "enter_a_valid_end_date" => "Enter a valid end date.",
+        "limit_must_be_a_positive_number" => "The limit must be a positive number.",
+        "campaign_end_must_be_after_its_start" => "The campaign end must be after its start.",
+        "select_a_show_and_name_the_campaign" => "Select a show and name the campaign.",
+        "qr_campaign_created" => "QR campaign created.",
+        "loading_campaigns" => "Loading campaigns…",
+        "point_campaign_name" => "Point / campaign name",
+        "valid_from" => "Valid from",
+        "valid_until" => "Valid until",
+        "check_in_limit_optional" => "Check-in limit (optional)",
+        "create_campaign" => "CREATE CAMPAIGN",
+        "campaign_has_been_disabled" => "The campaign has been disabled.",
+        "disable_campaign" => "DISABLE CAMPAIGN",
+        "limit_v" => "limit {v}",
+        "no_limit" => "no limit",
+        "connection" => "Connection",
+        "permissions" => "Permissions",
+        "refresh_all_data" => "Refresh all data",
+        "lock_panel" => "Lock panel",
+        "remove_operator_profile" => "Remove operator profile",
+        "operator_token_is_stored_in_an_encrypted" => {
             "The operator token is stored in an encrypted Stronghold vault. The WebView layer never reads it."
         }
-        "odswiez_2" => "Refresh",
-        "cockpit_dziaa_czesciowo_niedostepne_value" => {
+        "refresh_2" => "Refresh",
+        "cockpit_is_partially_available_unavailable" => {
             "Cockpit is partially available. Unavailable: {}."
         }
-        "brak_kodu_bedu" => "no error code",
-        "proba_value_value" => "attempt {}/{}",
-        "retry_by_juz_wczesniej_przyjety" => "The retry had already been accepted.",
-        "wpis_wroci_do_kolejki" => "The item returned to the queue.",
-        "jezyk" => "Language",
-        "jezyk_aplikacji" => "App language",
-        "zmiana_jezyka_przeaduje_interfejs_dane_i_sesja_pozostana" => {
+        "no_error_code" => "no error code",
+        "attempt" => "attempt {}/{}",
+        "retry_had_already_been_accepted" => "The retry had already been accepted.",
+        "item_returned_to_the_queue" => "The item returned to the queue.",
+        "language" => "Language",
+        "app_language" => "App language",
+        "changing_the_language_reloads_the_interface_your" => {
             "Changing the language reloads the interface. Your data and session remain unchanged."
         }
-        "polski" => "Polish",
-        "angielski" => "English",
-        "nie_udao_sie_odczytac_profilu_fana" => "FAILED TO READ THE FAN PROFILE",
-        "sprawdzam_twoj_sygna" => "CHECKING YOUR SIGNAL",
-        "profil_pozostaje_nietkniety" => "Your profile remains untouched.",
-        "aplikacja_nie_przejdzie_do_rejestracji_ani_parowania_dopoki" => {
+        "polish" => "Polish",
+        "english" => "English",
+        "failed_to_read_the_fan_profile" => "FAILED TO READ THE FAN PROFILE",
+        "checking_your_signal" => "CHECKING YOUR SIGNAL",
+        "your_profile_remains_untouched" => "Your profile remains untouched.",
+        "app_will_not_continue_to_signup_or" => {
             "The app will not continue to signup or pairing until it confirms the encrypted vault state on this device."
         }
-        "sprobuj_ponownie" => "TRY AGAIN",
-        "podaj_e_mail_uzyty_przy_zapisie_do_sygnau" => "Enter the email used to join Signal.",
-        "wklej_kod_cay_link_albo_zeskanuj_qr_z" => {
+        "try_again" => "TRY AGAIN",
+        "enter_the_email_used_to_join_signal" => "Enter the email used to join Signal.",
+        "paste_the_code_or_full_link_or" => {
             "Paste the code or full link, or scan the QR from the message."
         }
-        "ustaw_lokalny_pin_majacy_co_najmniej_4_znaki" => {
-            "Create a local PIN with at least 4 characters."
-        }
-        "zgoda_marketingowa_jest_wymagana_do_doaczenia_do_sygnau" => {
+        "create_a_local_pin_with_at_least" => "Create a local PIN with at least 4 characters.",
+        "marketing_consent_is_required_to_join_signal" => {
             "Marketing consent is required to join Signal."
         }
-        "nie_udao_sie_zapisac_miasta_message" => "Could not save the city: {message}",
-        "wybierz_miasto_albo_wpisz_wasne" => "Select a city or enter your own.",
-        "wysalismy_bezpieczny_link_dostepu_zeskanuj_qr_albo_wklej" => {
+        "could_not_save_the_city_message" => "Could not save the city: {message}",
+        "select_a_city_or_enter_your_own" => "Select a city or enter your own.",
+        "we_sent_a_secure_access_link_scan" => {
             "We sent a secure access link. Scan the QR or paste the code from the message."
         }
-        "wysalismy_kod_potwierdzajacy_zeskanuj_qr_albo_wklej_kod" => {
+        "we_sent_a_confirmation_code_scan_the" => {
             "We sent a confirmation code. Scan the QR or paste the code from the message."
         }
-        "nowa_wiadomosc_nie_zostaa_wysana_bo_poprzedni_kod" => {
+        "new_message_was_not_sent_because_the" => {
             "A new message was not sent because the previous code is still valid. Use the previous message or try again in about {minutes} min."
         }
-        "zgoszenie_zostao_przyjete_sprawdz_skrzynke_i_spam_jesli" => {
+        "request_was_accepted_check_your_inbox_and" => {
             "The request was accepted. Check your inbox and spam; if the message is missing, try again later."
         }
-        "podaj_e_mail_uzyty_w_virya_signal" => "Enter the email used in Virya Signal.",
-        "jesli_ten_e_mail_jest_zapisany_w_virya" => {
+        "enter_the_email_used_in_virya_signal" => "Enter the email used in Virya Signal.",
+        "if_this_email_is_registered_in_virya" => {
             "If this email is registered in Virya Signal, we sent a fresh login link with a QR code. After opening it, set a new PIN for this device."
         }
-        "qr_zeskanowany_uzupenij_e_mail_i_lokalny_pin" => {
-            "QR scanned. Enter your email and local PIN."
-        }
-        "koncerty_bilety" => "Shows, tickets",
-        "i_nagrody" => "and rewards.",
-        "doacz_w_3_krokach" => "Join in 3 steps:",
-        "jak_doaczyc" => "How to join",
-        "podaj_e_mail_i_miasto" => " Enter your email and city",
-        "potwierdz_kod_z_wiadomosci" => " Confirm the code from the message",
-        "odkrywaj_koncerty_blisko_ciebie" => " Discover shows near you",
-        "co_daje_virya_signal" => "What Virya Signal gives you",
-        "koncerty_blisko_ciebie" => " shows near you",
-        "bilety_i_qr_w_telefonie" => " tickets and QR codes on your phone",
-        "nagrody_za_proste_akcje" => " rewards for simple actions",
-        "zaczynam" => "GET STARTED",
-        "mam_kod" => "I HAVE A CODE",
-        "e_mail" => "Email",
-        "imie_nazwa_opcjonalnie" => "Name (optional)",
-        "najszybciej_zeskanuj_qr_z_maila" => "Fastest: scan the QR from the email.",
-        "mozesz_tez_wkleic_cay_link_albo_64_znakowy" => {
+        "qr_scanned_enter_your_email_and_local" => "QR scanned. Enter your email and local PIN.",
+        "shows_tickets" => "Shows, tickets",
+        "and_rewards" => "and rewards.",
+        "join_in_3_steps" => "Join in 3 steps:",
+        "how_to_join" => "How to join",
+        "enter_your_email_and_city" => " Enter your email and city",
+        "confirm_the_code_from_the_message" => " Confirm the code from the message",
+        "discover_shows_near_you" => " Discover shows near you",
+        "what_virya_signal_gives_you" => "What Virya Signal gives you",
+        "shows_near_you" => " shows near you",
+        "tickets_and_qr_codes_on_your_phone" => " tickets and QR codes on your phone",
+        "rewards_for_simple_actions" => " rewards for simple actions",
+        "get_started" => "GET STARTED",
+        "i_have_a_code" => "I HAVE A CODE",
+        "email" => "Email",
+        "name_optional" => "Name (optional)",
+        "fastest_scan_the_qr_from_the_email" => "Fastest: scan the QR from the email.",
+        "you_can_also_paste_the_full_link" => {
             "You can also paste the full link or the 64-character code. The app will extract the correct token."
         }
-        "link_lub_kod_z_e_maila" => "Email link or code",
-        "wklej_link_kod_albo_uzyj_qr" => "Paste a link or code, or use QR",
-        "skanuj_qr" => "SCAN QR",
-        "albo_przytrzymaj_pole_wyzej_i_wybierz_wklej" => "or hold the field above and choose Paste",
-        "lokalny_pin" => "Local PIN",
-        "pin_szyfruje_profil_tylko_na_tym_urzadzeniu_nie" => {
+        "email_link_or_code" => "Email link or code",
+        "paste_a_link_or_code_or_use" => "Paste a link or code, or use QR",
+        "scan_qr" => "SCAN QR",
+        "or_hold_the_field_above_and_choose" => "or hold the field above and choose Paste",
+        "local_pin" => "Local PIN",
+        "pin_encrypts_your_profile_on_this_device" => {
             "The PIN encrypts your profile on this device only. It is never sent to CrowdRelay."
         }
-        "potwierdz_i_wejdz" => "CONFIRM AND ENTER",
-        "mam_juz_konto_wyslij_link_logowania" => "I ALREADY HAVE AN ACCOUNT — SEND LOGIN LINK",
-        "nie_ma_wiadomosci_sprawdz_spam_po_15_minutach" => {
+        "confirm_and_enter" => "CONFIRM AND ENTER",
+        "i_already_have_an_account_send_login" => "I ALREADY HAVE AN ACCOUNT — SEND LOGIN LINK",
+        "no_message_check_spam_after_15_minutes" => {
             "No message? Check spam. After 15 minutes, return to GET STARTED and request another code."
         }
-        "miejscowosc" => "City",
-        "np_bielawa" => "e.g. Bielawa",
-        "wojewodztwo_region_opcjonalnie" => "Province / region (optional)",
-        "dolnoslaskie" => "Lower Silesia",
-        "wpisz_miejscowosc_recznie_dopasujemy_ja_do_mapy_sygnau" => {
+        "city" => "City",
+        "e_g_bielawa" => "e.g. Bielawa",
+        "province_region_optional" => "Province / region (optional)",
+        "lower_silesia" => "Lower Silesia",
+        "enter_your_city_manually_we_will_match" => {
             "Enter your city manually — we will match it to the Signal map."
         }
-        "powiadamiaj_mnie_o_koncertach_w_poblizu" => "Notify me about nearby shows",
-        "kod_polecajacy_opcjonalnie" => "Referral code (optional)",
-        "chce_otrzymywac_informacje_o_koncertach_premierach_i_nagrodach" => {
+        "notify_me_about_nearby_shows" => "Notify me about nearby shows",
+        "referral_code_optional" => "Referral code (optional)",
+        "i_want_to_receive_information_about_virya" => {
             "I want to receive information about Virya shows, releases and rewards."
         }
-        "doacz_do_sygnau" => "JOIN SIGNAL",
-        "otworz_moj_sygna" => "OPEN MY SIGNAL",
-        "nie_pamietam_pin_u_zaloguj_ponownie" => "I FORGOT MY PIN / SIGN IN AGAIN",
-        "odzyskiwanie_dostepu" => "ACCESS RECOVERY",
-        "ustaw_nowy_pin" => "Create a new PIN",
-        "podaj_e_mail_wyslij_swiezy_link_a_potem" => {
+        "join_signal" => "JOIN SIGNAL",
+        "open_my_signal" => "OPEN MY SIGNAL",
+        "i_forgot_my_pin_sign_in_again" => "I FORGOT MY PIN / SIGN IN AGAIN",
+        "access_recovery" => "ACCESS RECOVERY",
+        "create_a_new_pin" => "Create a new PIN",
+        "enter_your_email_request_a_fresh_link" => {
             "Enter your email, request a fresh link, then scan the QR or paste the code."
         }
-        "wyslij_link_logowania" => "SEND LOGIN LINK",
-        "wklej_link_lub_kod" => "Paste link or code",
-        "albo_przytrzymaj_pole_i_wybierz_wklej" => "or hold the field and choose Paste",
-        "nowy_lokalny_pin" => "New local PIN",
-        "potwierdz_i_ustaw_nowy_pin" => "CONFIRM AND SET NEW PIN",
-        "wroc_do_logowania_pin_em" => "BACK TO PIN LOGIN",
-        "kod_value" => "Code: {}",
-        "adowanie_sygnau" => "Loading Signal…",
-        "losy" => "entries",
-        "kupony" => "coupons",
-        "losowanie_value" => "Draw {}",
-        "dowod" => "PROOF ↗",
+        "send_login_link" => "SEND LOGIN LINK",
+        "paste_link_or_code" => "Paste link or code",
+        "or_hold_the_field_and_choose_paste" => "or hold the field and choose Paste",
+        "new_local_pin" => "New local PIN",
+        "confirm_and_set_new_pin" => "CONFIRM AND SET NEW PIN",
+        "back_to_pin_login" => "BACK TO PIN LOGIN",
+        "code" => "Code: {}",
+        "loading_signal" => "Loading Signal…",
+        "entries" => "entries",
+        "coupons" => "coupons",
+        "draw" => "Draw {}",
+        "proof" => "PROOF ↗",
         "merch" => "Merch",
-        "produkty_i_zestawy_korzystaja_z_tego_samego_stanu" => {
+        "products_and_bundles_use_the_same_inventory" => {
             "Products and bundles use the same inventory as the online store. Payment opens secure Stripe Checkout and the app never stores card data."
         }
-        "sklep_jest_chwilowo_niedostepny" => "The store is temporarily unavailable",
-        "pozostae_czesci_sygnau_dziaaja_normalnie_sprobuj_ponownie_za" => {
+        "store_is_temporarily_unavailable" => "The store is temporarily unavailable",
+        "rest_of_signal_is_working_normally_try" => {
             "The rest of Signal is working normally. Try again in a moment."
         }
-        "odswiez_merch" => "REFRESH MERCH",
-        "otworz_peny_sklep" => "OPEN FULL STORE ↗",
-        "zestawy" => "BUNDLES",
-        "bundle_ze_sklepu_online" => "Bundles from the online store",
-        "do_30" => "UP TO −30%",
-        "zestawy_sa_teraz_niedostepne_w_live_inventory" => {
+        "refresh_merch" => "REFRESH MERCH",
+        "open_full_store" => "OPEN FULL STORE ↗",
+        "bundles" => "BUNDLES",
+        "bundles_from_the_online_store" => "Bundles from the online store",
+        "up_to_30" => "UP TO −30%",
+        "bundles_are_currently_unavailable_in_live_inventory" => {
             "Bundles are currently unavailable in live inventory."
         }
-        "zobacz_zestawy" => "VIEW BUNDLES ↗",
-        "ostatnie_sztuki" => "LOW STOCK",
-        "dostepny" => "AVAILABLE",
-        "brak_na_stanie" => "OUT OF STOCK",
-        "sprawdz_ponownie" => "CHECK AGAIN",
-        "kup_w_sklepie" => "BUY IN STORE ↗",
-        "zestawy_doczytuja_sie_niezaleznie_od_produktow" => {
-            "Bundles load independently from products."
-        }
-        "pojedyncze_produkty" => "INDIVIDUAL PRODUCTS",
-        "wybierz_swoj_merch" => "Choose your merch",
-        "przedsprzedaz" => "PRE-ORDER",
-        "nie_udao_sie_pobrac_stanu_sklepu" => "Could not load store status",
-        "koncerty_bilety_i_profil_pozostaja_dostepne" => {
+        "view_bundles" => "VIEW BUNDLES ↗",
+        "low_stock" => "LOW STOCK",
+        "available_status" => "AVAILABLE",
+        "out_of_stock" => "OUT OF STOCK",
+        "check_again" => "CHECK AGAIN",
+        "buy_in_store" => "BUY IN STORE ↗",
+        "bundles_load_independently_from_products" => "Bundles load independently from products.",
+        "individual_products" => "INDIVIDUAL PRODUCTS",
+        "choose_your_merch" => "Choose your merch",
+        "pre_order" => "PRE-ORDER",
+        "could_not_load_store_status" => "Could not load store status",
+        "shows_tickets_and_profile_remain_available" => {
             "Shows, tickets and profile remain available."
         }
-        "brak_koncertow_w_kalendarzu" => "No shows in the calendar",
-        "kiedy_pojawi_sie_nowy_event_bedzie_tutaj" => "New events will appear here.",
-        "koncert_zapisany_w_twoim_sygnale" => "Show saved to your Signal.",
-        "zapisuje" => "SAVING…",
-        "mam_to" => "✓ SAVED",
-        "interesuje_mnie" => "+ INTERESTED",
-        "kup_bilet" => "BUY TICKET",
-        "wroc_do_koncertow" => "← BACK TO SHOWS",
-        "nie_udao_sie_sprawdzic_sprzedazy" => "Could not check ticket sales",
-        "brak_wasnej_puli_virya" => "No Virya ticket pool",
-        "mozesz_przejsc_do_strony_koncertu_lub_sprzedazy_prowadzonej" => {
+        "no_shows_in_the_calendar" => "No shows in the calendar",
+        "new_events_will_appear_here_2" => "New events will appear here.",
+        "show_saved_to_your_signal" => "Show saved to your Signal.",
+        "saving" => "SAVING…",
+        "saved" => "✓ SAVED",
+        "interested" => "+ INTERESTED",
+        "buy_ticket" => "BUY TICKET",
+        "back_back_to_shows" => "← BACK TO SHOWS",
+        "could_not_check_ticket_sales" => "Could not check ticket sales",
+        "no_virya_ticket_pool" => "No Virya ticket pool",
+        "you_can_open_the_show_page_or" => {
             "You can open the show page or the organiser’s ticket sale."
         }
-        "sprawdz_bilety" => "CHECK TICKETS ↗",
-        "sprzedaz_rozpocznie_sie_wkrotce" => "Ticket sales will open soon.",
-        "sprzedaz_online_zostaa_zakonczona" => "Online sales have ended.",
-        "ta_pula_biletow_jest_wyprzedana" => "This ticket pool is sold out.",
-        "sprzedaz_jest_chwilowo_wyaczona" => "Ticket sales are temporarily disabled.",
-        "ten_koncert_nie_jest_obecnie_dostepny_w_sprzedazy" => {
-            "This show is not currently on sale."
-        }
-        "bilety_nie_sa_teraz_dostepne" => "Tickets are not available right now.",
-        "wybierz_bilety_miejsca_zostana_zarezerwowane_na_czas_patnosci" => {
+        "check_tickets" => "CHECK TICKETS ↗",
+        "ticket_sales_will_open_soon" => "Ticket sales will open soon.",
+        "online_sales_have_ended" => "Online sales have ended.",
+        "this_ticket_pool_is_sold_out" => "This ticket pool is sold out.",
+        "ticket_sales_are_temporarily_disabled" => "Ticket sales are temporarily disabled.",
+        "this_show_is_not_currently_on_sale" => "This show is not currently on sale.",
+        "tickets_are_not_available_right_now" => "Tickets are not available right now.",
+        "select_tickets_places_will_be_reserved_while" => {
             "Select tickets. Places will be reserved while you complete payment."
         }
-        "w_patnosci" => "in checkout",
-        "sprawdz_strone_koncertu" => "Open the show page",
-        "jezeli_organizator_prowadzi_osobna_sprzedaz_znajdziesz_ja_pod" => {
+        "in_checkout_2" => "in checkout",
+        "open_the_show_page" => "Open the show page",
+        "if_the_organiser_runs_a_separate_ticket" => {
             "If the organiser runs a separate ticket sale, you will find it under this button."
         }
-        "wybierz_co_najmniej_jeden_bilet" => "Select at least one ticket.",
-        "zamowienie_value_zapisane_dokoncz_bezpieczna_patnosc_stripe" => {
+        "select_at_least_one_ticket" => "Select at least one ticket.",
+        "order_saved_complete_the_secure_stripe_payment" => {
             "Order {} saved. Complete the secure Stripe payment."
         }
-        "otworzono_patnosc_dla_zamowienia_value" => "Payment opened for order {}.",
-        "dostepne_value" => "Available: {}",
-        "liczba_biletow" => "Ticket quantity",
-        "zmniejsz_liczbe_biletow" => "Decrease ticket quantity",
-        "zwieksz_liczbe_biletow" => "Increase ticket quantity",
-        "imie_i_nazwisko_na_zamowieniu_opcjonalnie" => "Name on the order (optional)",
-        "bilety_i_potwierdzenie_trafia_na_value" => "Tickets and confirmation will be sent to {}",
-        "bilety_trafia_na_e_mail_konta_fana" => "Tickets will be sent to the fan account email.",
-        "faktura_peny_formularz" => "INVOICE / FULL FORM ↗",
-        "wybrane_bilety" => "Selected tickets",
-        "razem_brutto" => "Gross total",
-        "rezerwuje" => "RESERVING…",
-        "zamowienie_zapisane" => "ORDER SAVED",
-        "przejdz_do_patnosci_stripe" => "CONTINUE TO STRIPE PAYMENT",
-        "otworz_patnosc_ponownie" => "REOPEN PAYMENT ↗",
-        "dane_karty_nie_trafiaja_do_virya_signal_patnosc" => {
+        "payment_opened_for_order" => "Payment opened for order {}.",
+        "available" => "Available: {}",
+        "ticket_quantity" => "Ticket quantity",
+        "decrease_ticket_quantity" => "Decrease ticket quantity",
+        "increase_ticket_quantity" => "Increase ticket quantity",
+        "name_on_the_order_optional" => "Name on the order (optional)",
+        "tickets_and_confirmation_will_be_sent_to" => "Tickets and confirmation will be sent to {}",
+        "tickets_will_be_sent_to_the_fan" => "Tickets will be sent to the fan account email.",
+        "invoice_full_form" => "INVOICE / FULL FORM ↗",
+        "selected_tickets" => "Selected tickets",
+        "gross_total" => "Gross total",
+        "reserving" => "RESERVING…",
+        "order_saved" => "ORDER SAVED",
+        "continue_to_stripe_payment" => "CONTINUE TO STRIPE PAYMENT",
+        "reopen_payment" => "REOPEN PAYMENT ↗",
+        "card_details_never_reach_virya_signal_payment" => {
             "Card details never reach Virya Signal. Payment opens in secure Stripe Checkout."
         }
-        "otworz_mape_i_zacznij" => "OPEN MAP AND START",
-        "odswiez_progres" => "Refresh progress",
-        "otworz_area" => "OPEN AREA",
-        "podaj_identyfikator_zamowienia_i_prywatny_token" => {
-            "Enter the order ID and private token."
-        }
-        "bilety_zapisane_w_portfelu" => "Tickets saved to the wallet.",
-        "wklej_token_wejsciowki" => "Paste the admission-pass token.",
-        "wejsciowka_przypisana_do_urzadzenia" => "Admission pass assigned to this device.",
-        "pokaz_qr_na_wejscie" => "SHOW ENTRY QR",
-        "token_z_wiadomosci" => "Token from the message",
-        "odbierz_wejsciowke" => "CLAIM ADMISSION PASS",
-        "dodaj_istniejace_zamowienie" => "Add an existing order",
-        "uuid_zamowienia" => "Order UUID",
-        "prywatny_checkout_token" => "Private checkout token",
-        "dodaj_do_portfela" => "ADD TO WALLET",
-        "wysalismy_ponownie_portfel_na_e_mail" => "We resent the wallet by email.",
-        "wysyam" => "Sending…",
-        "wyslij_bilety_ponownie_na_e_mail" => "Resend tickets by email",
-        "generuje" => "GENERATING…",
-        "ukryj_qr" => "HIDE QR",
-        "pokaz_qr" => "SHOW QR",
-        "qr_niedostepny" => "QR UNAVAILABLE",
-        "qr_wazny_do_value" => "QR valid until {}",
-        "wazny_do_value" => "valid until {}",
-        "moj_profil" => "MY PROFILE",
-        "ustawienia_sygnau" => "Signal settings",
-        "fan_viryi" => "Virya fan",
-        "zamowienia" => "orders",
-        "wejsciowki" => "admission passes",
-        "odswiezam_2" => "Refreshing…",
-        "odswiez_dane" => "Refresh data",
-        "zablokuj_aplikacje" => "Lock app",
-        "usun_profil_i_bilety_z_urzadzenia" => "Remove profile and tickets from device",
-        "sesja_fana_wejsciowka_oraz_prywatne_tokeny_portfela_sa" => {
+        "open_map_and_start" => "OPEN MAP AND START",
+        "refresh_progress" => "Refresh progress",
+        "open_area" => "OPEN AREA",
+        "enter_the_order_id_and_private_token" => "Enter the order ID and private token.",
+        "tickets_saved_to_the_wallet" => "Tickets saved to the wallet.",
+        "paste_the_admission_pass_token" => "Paste the admission-pass token.",
+        "admission_pass_assigned_to_this_device" => "Admission pass assigned to this device.",
+        "show_entry_qr" => "SHOW ENTRY QR",
+        "token_from_the_message" => "Token from the message",
+        "claim_admission_pass" => "CLAIM ADMISSION PASS",
+        "add_an_existing_order" => "Add an existing order",
+        "order_uuid" => "Order UUID",
+        "private_checkout_token" => "Private checkout token",
+        "add_to_wallet" => "ADD TO WALLET",
+        "we_resent_the_wallet_by_email" => "We resent the wallet by email.",
+        "sending" => "Sending…",
+        "resend_tickets_by_email" => "Resend tickets by email",
+        "generating" => "GENERATING…",
+        "hide_qr" => "HIDE QR",
+        "show_qr" => "SHOW QR",
+        "qr_unavailable" => "QR UNAVAILABLE",
+        "qr_valid_until" => "QR valid until {}",
+        "valid_until_2" => "valid until {}",
+        "my_profile" => "MY PROFILE",
+        "signal_settings" => "Signal settings",
+        "virya_fan" => "Virya fan",
+        "orders" => "orders",
+        "admission_passes" => "admission passes",
+        "refreshing_2" => "Refreshing…",
+        "refresh_data" => "Refresh data",
+        "lock_app" => "Lock app",
+        "remove_profile_and_tickets_from_device" => "Remove profile and tickets from device",
+        "fan_session_admission_pass_and_private_wallet" => {
             "The fan session, admission pass and private wallet tokens are stored in a separate encrypted Stronghold vault."
         }
-        "feedback_powinien_miec_od_8_do_2000_znakow" => {
+        "feedback_must_contain_between_8_and_2000" => {
             "Feedback must contain between 8 and 2000 characters."
         }
-        "feedback_zosta_wysany_anonimowo_dzieki" => "Feedback was sent anonymously. Thank you!",
-        "anonimowy_feedback" => "ANONYMOUS FEEDBACK",
-        "powiedz_nam_co_poprawic" => "Tell us what to improve",
-        "aplikacja_wysya_tylko_kategorie_i_tresc_bez_e" => {
+        "feedback_was_sent_anonymously_thank_you" => "Feedback was sent anonymously. Thank you!",
+        "anonymous_feedback" => "ANONYMOUS FEEDBACK",
+        "tell_us_what_to_improve" => "Tell us what to improve",
+        "app_sends_only_the_category_and_message" => {
             "The app sends only the category and message — no email, name, session token or profile identifier. Hosting may retain standard technical connection logs."
         }
-        "kategoria" => "Category",
-        "pomys" => "Idea",
-        "bad" => "Bug",
-        "koncerty_i_bilety" => "Shows and tickets",
-        "inne" => "Other",
-        "tresc" => "Message",
-        "napisz_wprost_co_dziaa_zle_albo_czego_brakuje" => {
-            "Tell us directly what is broken or missing…"
-        }
-        "wysyam_2" => "SENDING…",
-        "wyslij_anonimowo" => "SEND ANONYMOUSLY",
-        "adowanie" => "Loading",
-        "feedback_zosta_wysany" => "feedback was sent",
-        "nie_udao_sie_odswiezyc_value_zamowien_pozostae_bilety" => {
+        "category" => "Category",
+        "idea" => "Idea",
+        "bug_label" => "Bug",
+        "shows_and_tickets" => "Shows and tickets",
+        "other" => "Other",
+        "message" => "Message",
+        "tell_us_directly_what_is_broken_or" => "Tell us directly what is broken or missing…",
+        "sending_2" => "SENDING…",
+        "send_anonymously" => "SEND ANONYMOUSLY",
+        "loading" => "Loading",
+        "feedback_was_sent" => "feedback was sent",
+        "could_not_refresh_orders_the_remaining_tickets" => {
             "Could not refresh {} orders. The remaining tickets are available."
         }
-        "szczegoy_wkrotce" => "Details coming soon",
-        "miejsce_wkrotce" => "venue coming soon",
-        "skaner_nie_zwroci_kodu" => "The scanner returned no code.",
-        "odpowiedz_serwera_ma_nieoczekiwany_format" => {
+        "details_coming_soon" => "Details coming soon",
+        "venue_coming_soon" => "venue coming soon",
+        "scanner_returned_no_code" => "The scanner returned no code.",
+        "server_response_has_an_unexpected_format" => {
             "The server response has an unexpected format."
         }
-        "bad_odczytu_odpowiedzi_raw" => "Response decoding error: {raw}",
-        "nieznany_bad_aplikacji" => "Unknown application error",
-        "sparuj" => "Pair",
-        "urzadzenie" => "device.",
-        "bez_przepisywania_api_roli_i_dugiego_sekretu" => {
-            "No retyping the API, role or long secret."
-        }
-        "sparuj_2" => "PAIR",
-        "profil_operatora_jest_zaszyfrowany_lokalnie" => {
-            "The operator profile is encrypted locally."
-        }
-        "dzisiaj_pod_kontrola" => "Today under control",
-        "nastepny_koncert" => "NEXT SHOW",
-        "nadchodzace" => "Upcoming",
-        "spoecznosc_i_wzrost" => "Community and growth",
-        "zbiorczy_obraz_sygnau_bez_danych_osobowych_fanow" => {
+        "response_decoding_error_raw" => "Response decoding error: {raw}",
+        "unknown_application_error" => "Unknown application error",
+        "pair" => "Pair",
+        "device" => "device.",
+        "no_retyping_the_api_role_or_long" => "No retyping the API, role or long secret.",
+        "pair_2" => "PAIR",
+        "operator_profile_is_encrypted_locally" => "The operator profile is encrypted locally.",
+        "today_under_control" => "Today under control",
+        "next_show" => "NEXT SHOW",
+        "upcoming" => "Upcoming",
+        "community_and_growth" => "Community and growth",
+        "combined_signal_overview_without_fans_personal_data" => {
             "A combined Signal overview without fans’ personal data."
         }
-        "zdrowie_bazy" => "DATABASE HEALTH",
-        "skanuj_wejscie" => "Scan entry",
-        "bilety_i_wejsciowki" => "Tickets and admission passes",
-        "obrot_brutto" => "GROSS REVENUE",
-        "ostatnie_zamowienia" => "Recent orders",
-        "reczna_wejsciowka" => "Manual admission pass",
-        "realizuj_znizke" => "Redeem a discount",
-        "kupon_fanowski_kontrolowane_uzycie" => "fan coupon / controlled use",
-        "kupon_zrealizowany" => "COUPON REDEEMED",
-        "kampanie_qr" => "QR campaigns",
-        "aktywne_i_historyczne" => "Active and historical",
-        "kolejki_i_dostawy" => "Queues and deliveries",
-        "martwe_dostawy" => "Dead deliveries",
-        "martwy_outbox" => "Dead outbox",
-        "brak_martwych_wpisow_tor_dostaw_jest_czysty" => {
+        "database_health" => "DATABASE HEALTH",
+        "scan_entry" => "Scan entry",
+        "tickets_and_admission_passes" => "Tickets and admission passes",
+        "gross_revenue" => "GROSS REVENUE",
+        "recent_orders" => "Recent orders",
+        "manual_admission_pass" => "Manual admission pass",
+        "redeem_a_discount" => "Redeem a discount",
+        "fan_coupon_controlled_use" => "fan coupon / controlled use",
+        "coupon_redeemed" => "COUPON REDEEMED",
+        "qr_campaigns" => "QR campaigns",
+        "active_and_historical" => "Active and historical",
+        "queues_and_deliveries" => "Queues and deliveries",
+        "dead_deliveries" => "Dead deliveries",
+        "dead_outbox" => "Dead outbox",
+        "no_dead_entries_the_delivery_pipeline_is" => {
             "No dead entries. The delivery pipeline is clean."
         }
-        "twoj_profil_i_bilety_sa_zaszyfrowane_na_urzadzeniu" => {
+        "your_profile_and_tickets_are_encrypted_on" => {
             "Your profile and tickets are encrypted on this device."
         }
-        "twoj_wpyw" => "YOUR IMPACT",
-        "potwierdzonych_polecen" => "confirmed referrals",
-        "twoje_kupony" => "Your coupons",
-        "nagrody" => "Rewards",
-        "aktywne_losowania" => "Active draws",
-        "losow" => "ENTRIES",
-        "gdzie_gramy" => "WHERE WE PLAY",
-        "znajdz_punkt_w_swoim_miescie" => "Find a point in your city",
-        "otworz_mape_wybierz_aktywny_punkt_i_przejdz_do" => {
+        "your_impact" => "YOUR IMPACT",
+        "confirmed_referrals" => "confirmed referrals",
+        "your_coupons" => "Your coupons",
+        "rewards" => "Rewards",
+        "active_draws" => "Active draws",
+        "entries_2" => "ENTRIES",
+        "where_we_play" => "WHERE WE PLAY",
+        "find_a_point_in_your_city" => "Find a point in your city",
+        "open_the_map_choose_an_active_point" => {
             "Open the map, choose an active point and go there. You do not need to collect everything or travel across the country."
         }
-        "poacz_portfel_przegladarkowy_z_kontem_na_stronie_area" => {
+        "connect_your_browser_wallet_to_your_area" => {
             "Connect your browser wallet to your AREA account to keep all progress."
         }
-        "postep_kolekcji" => "COLLECTION PROGRESS",
-        "odkryte_artefakty" => "Discovered artifacts",
-        "mapa_pokazuje_aktywne_punkty_i_prowadzi_do_startu" => {
+        "collection_progress" => "COLLECTION PROGRESS",
+        "discovered_artifacts" => "Discovered artifacts",
+        "map_shows_active_points_and_gets_you" => {
             "The map shows active points and gets you started. The exact location is revealed in the game only when needed."
         }
-        "area_chwilowo_niedostepna" => "AREA is temporarily unavailable",
-        "odswiez_dane_albo_otworz_pena_gre" => "Refresh the data or open the full game.",
-        "bilety_i_wejscie" => "Tickets and entry",
-        "wejsciowka_virya" => "VIRYA ADMISSION PASS",
-        "wygraes_wejsciowke" => "DID YOU WIN AN ADMISSION PASS?",
-        "przypisz_ja_do_telefonu" => "Assign it to your phone",
-        "portfel_biletow" => "Ticket wallet",
-        "pojedyncze_produkty_2" => "Individual products",
-        "zestawy_2" => "Bundles",
+        "area_is_temporarily_unavailable" => "AREA is temporarily unavailable",
+        "refresh_the_data_or_open_the_full" => "Refresh the data or open the full game.",
+        "tickets_and_entry" => "Tickets and entry",
+        "virya_admission_pass" => "VIRYA ADMISSION PASS",
+        "did_you_win_an_admission_pass" => "DID YOU WIN AN ADMISSION PASS?",
+        "assign_it_to_your_phone" => "Assign it to your phone",
+        "ticket_wallet" => "Ticket wallet",
+        "individual_products_2" => "Individual products",
+        "bundles_2" => "Bundles",
         "retry" => "RETRY",
-        "acze_2" => "CONNECTING",
+        "connecting_2" => "CONNECTING",
         "online" => "ONLINE",
         "offline_on" => "OFFLINE ON",
         "offline_off" => "OFFLINE OFF",
-        "active" => "ACTIVE",
+        "active_status" => "ACTIVE",
         "closed" => "CLOSED",
         "owner" => "OWNER",
         "staff" => "STAFF",
-        "device" => "DEVICE",
+        "device_label" => "DEVICE",
         "mobile_wallet" => "MOBILE WALLET",
         "virya_control" => "VIRYA CONTROL",
         "virya_signal" => "VIRYA SIGNAL",
         "virya_store" => "VIRYA STORE",
         "virya_area" => "VIRYA AREA",
-        "virya_bilety" => "VIRYA // TICKETS",
-        "value_biletow_value_oczekuje_value_konfliktow" => "{} tickets · {} pending · {} conflicts",
-        "value_check_inow" => "{} check-ins",
-        "value_proba_value_value" => "{} · attempt {}/{}",
-        "moj_sygna" => "My Signal",
-        "oczekujace" => "pending",
-        "message_zamowienie_value_jest_zapisane_uzyj_przycisku_ponownego" => {
+        "virya_tickets" => "VIRYA // TICKETS",
+        "tickets_pending_conflicts" => "{} tickets · {} pending · {} conflicts",
+        "check_ins_2" => "{} check-ins",
+        "attempt_2" => "{} · attempt {}/{}",
+        "my_signal" => "My Signal",
+        "pending_2" => "pending",
+        "message_order_is_saved_use_the_reopen" => {
             "{message} Order {} is saved — use the reopen payment button."
         }
-        "reward_credits_kredytow" => "{reward_credits} credits",
-        "live_count_aktywne_punkty" => "{live_count} active points",
-        "voucher_count_nagrody" => "{voucher_count} rewards",
-        "community_percent_spoecznosci" => "{community_percent}% community",
-        "wysalismy" => "sent",
-        "uniewaznion" => "revoked",
-        "sty" => "JAN",
-        "lut" => "FEB",
+        "reward_credits_credits" => "{reward_credits} credits",
+        "live_count_active_points" => "{live_count} active points",
+        "voucher_count_rewards" => "{voucher_count} rewards",
+        "community_percent_community" => "{community_percent}% community",
+        "sent" => "sent",
+        "revoked" => "revoked",
+        "jan" => "JAN",
+        "feb" => "FEB",
         "mar" => "MAR",
-        "kwi" => "APR",
-        "maj" => "MAY",
-        "cze" => "JUN",
-        "lip" => "JUL",
-        "sie" => "AUG",
-        "wrz" => "SEP",
-        "paz" => "OCT",
-        "lis" => "NOV",
-        "gru" => "DEC",
+        "apr" => "APR",
+        "may" => "MAY",
+        "jun" => "JUN",
+        "jul" => "JUL",
+        "aug" => "AUG",
+        "sep" => "SEP",
+        "oct" => "OCT",
+        "nov" => "NOV",
+        "dec" => "DEC",
         "text" => "---",
-        "value_aktywnych" => "{} active",
-        "value_zestaw_merchu_virya" => "{} — Virya merch bundle",
-        "value_merch_virya" => "{} — Virya merch",
-        "value_koncert_virya" => "{} — Virya show",
-        "natywny_most_aplikacji_nie_jest_dostepny" => "The native app bridge is unavailable.",
-        "operacja_command_przekroczya_limit_czasu" => "Operation {command} timed out.",
-        "modu_uprawnien_aparatu_nie_jest_dostepny_w_tej" => {
+        "active_2" => "{} active",
+        "virya_merch_bundle" => "{} — Virya merch bundle",
+        "virya_merch" => "{} — Virya merch",
+        "virya_show" => "{} — Virya show",
+        "native_app_bridge_is_unavailable" => "The native app bridge is unavailable.",
+        "operation_command_timed_out" => "Operation {command} timed out.",
+        "camera_permission_module_is_unavailable_in_this" => {
             "The camera permission module is unavailable in this app version."
         }
-        "brak_dostepu_do_aparatu_wacz_aparat_dla_virya" => {
+        "camera_access_is_denied_enable_camera_for" => {
             "Camera access is denied. Enable Camera for Virya Signal in the app settings."
         }
-        "skaner_kodu_qr" => "QR code scanner",
-        "skanuj_kod_qr" => "SCAN QR CODE",
-        "umiesc_kod_wewnatrz_ramki" => "Place the code inside the frame",
-        "anuluj_skanowanie" => "← CANCEL SCANNING",
-        "zamykam" => "CLOSING…",
-        "skaner_jest_dostepny_tylko_w_aplikacji_ios_android" => {
+        "qr_code_scanner" => "QR code scanner",
+        "scan_qr_code_2" => "SCAN QR CODE",
+        "place_the_code_inside_the_frame" => "Place the code inside the frame",
+        "back_cancel_scanning" => "← CANCEL SCANNING",
+        "closing" => "CLOSING…",
+        "scanner_is_available_only_in_the_ios" => {
             "The scanner is available only in the iOS/Android app."
         }
-        "rodzaj" => "Type",
-        "czas" => "Time",
-        "operacja" => "Operation",
-        "sciezka" => "Path",
-        "poprzednie_uruchomienie_zakonczyo_sie_bedem" => "The previous launch ended with an error",
-        "aplikacja_zatrzymaa_bad" => "The app caught an error",
-        "nie_ukrywamy_awarii_skopiuj_raport_i_wyslij_go" => {
+        "type" => "Type",
+        "time" => "Time",
+        "operation" => "Operation",
+        "path" => "Path",
+        "previous_launch_ended_with_an_error" => "The previous launch ended with an error",
+        "app_caught_an_error" => "The app caught an error",
+        "we_do_not_hide_failures_copy_the" => {
             "We do not hide failures. Copy the report and send it with a note about what you tapped."
         }
-        "kopiuj_raport" => "COPY REPORT",
-        "uruchom_ponownie" => "RESTART APP",
-        "zamknij" => "CLOSE",
-        "raport_skopiowany" => "Report copied.",
-        "przytrzymaj_tekst_raportu_i_skopiuj_recznie" => {
+        "copy_report" => "COPY REPORT",
+        "restart_app" => "RESTART APP",
+        "close" => "CLOSE",
+        "report_copied" => "Report copied.",
+        "press_and_hold_the_report_text_and" => {
             "Press and hold the report text and copy it manually."
         }
-        "poprzednie_uruchomienie_przerwao_operacje_command" => {
+        "previous_launch_interrupted_operation_command" => {
             "The previous launch interrupted operation {command}."
         }
-        "poprzednie_uruchomienie_zakonczyo_sie_bez_czystego_zamkniecia" => {
+        "previous_launch_ended_without_a_clean_shutdown" => {
             "The previous launch ended without a clean shutdown."
         }
-        "virya_signal_diagnostyka" => "VIRYA SIGNAL / DIAGNOSTICS",
+        "virya_signal_diagnostics" => "VIRYA SIGNAL / DIAGNOSTICS",
         "native_error_not_configured" => "The device profile is not configured",
         "native_error_invalid_pin" => "Invalid PIN",
         "native_error_locked" => "The session is locked",
@@ -756,6 +730,124 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "native_store_url_label" => "store address",
         "native_bundle_variant_label" => "bundle variant",
         "native_prepare_offline_event_first" => "Prepare the event for offline mode first",
+        "location_module_is_unavailable_in_this_app" => {
+            "The location module is unavailable in this app version."
+        }
+        "location_access_is_denied_enable_location_for" => {
+            "Location access is denied. Enable Location for Virya Signal in the app settings."
+        }
+        "could_not_read_a_fresh_location_move" => {
+            "Could not read a fresh location. Move outdoors and retry."
+        }
+        "native_area_claim_invalid" => "The AREA point verification data is invalid.",
+        "native_area_drop_inactive" => "This AREA point is not active now.",
+        "native_area_challenge_invalid" => {
+            "The location attempt expired. Start verification again."
+        }
+        "native_area_rate_limited" => "Too many attempts. Wait a few minutes and try again.",
+        "native_area_not_enough_samples" => {
+            "Not enough fresh location samples were collected. Stay in place briefly and try again."
+        }
+        "native_area_low_accuracy" => "Location accuracy is too low. Move outdoors and try again.",
+        "native_area_outside_zone" => "You are outside the active AREA point zone.",
+        "native_area_drop_full" => "This AREA point has reached its claim limit.",
+        "native_area_temporary" => {
+            "AREA verification is temporarily unavailable. Try again in a moment."
+        }
+        "area_in_the_app" => "AREA IN THE APP",
+        "choose_an_active_point_and_follow_the" => {
+            "Choose an active point, check the direction and confirm your win without leaving the app."
+        }
+        "active_area_point" => "Active AREA point",
+        "inactive_area_point" => "Point awaiting activation",
+        "claimed_area_point" => "Point already discovered",
+        "locate_nearest_point" => "LOCATE NEAREST POINT",
+        "locating_you" => "LOCATING…",
+        "nearest_active_point_is_city" => "Nearest active point: {city}.",
+        "you_are_about_distance_from_city" => "You are about {distance} from the point in {city}.",
+        "no_active_area_points_now" => {
+            "There are no active AREA points now. The map still shows cities for future activations."
+        }
+        "open_route_start" => "OPEN ROUTE START",
+        "verify_location_and_win" => "VERIFY LOCATION AND WIN",
+        "verifying_location" => "VERIFYING LOCATION…",
+        "area_location_privacy" => {
+            "Location is used only during this attempt. The app sends a few fresh samples for verification and does not store your route."
+        }
+        "area_point_won" => "POINT DISCOVERED",
+        "area_point_already_won" => "YOU ALREADY HAVE THIS POINT",
+        "area_reward_added" => {
+            "“{track}” and {credits} reward credit were added to your collection."
+        }
+        "area_reward_already_present" => "“{track}” is already in your collection.",
+        "select_an_active_point_first" => "Select an active AREA point first.",
+        "location_accuracy_value" => "Accuracy: ±{accuracy} m",
+        "approximate_distance_meters" => "{distance} m",
+        "approximate_distance_kilometers" => "{distance} km",
+        "open_full_area_game" => "OPEN FULL AREA GAME",
+        "fan_app_unlock_pin" => "Fan profile unlock PIN",
+        "enter_the_pin_created_for_this_fan" => {
+            "Enter the PIN created when this fan profile was set up. It is not the QR code or your phone PIN."
+        }
+        "create_fan_unlock_pin" => "Create a fan profile PIN",
+        "enter_4_6_digits_for_this_fan_profile" => {
+            "Enter 4–6 digits, for example 2580. This PIN unlocks only the fan profile in Virya Signal."
+        }
+        "this_show_has_no_ticket_pool" => "This show has no ticket pool.",
+        "ticket_pool_status_loading" => "CHECKING TICKET POOL…",
+        "ticket_pool_temporarily_unavailable" => "The ticket pool is temporarily unavailable.",
+        "could_not_save_city_message" => "Could not save the city: {message}.",
+        "new_message_not_sent_previous_code_still_valid_minutes" => {
+            "A new message was not sent because the previous code is still valid. Try again in about {minutes} min."
+        }
+        "could_not_refresh_orders_count_other_tickets_remain_available" => {
+            "Could not refresh {count} orders. Your other tickets remain available."
+        }
+        "area_city_wroclaw" => "Wroclaw",
+        "area_city_poznan" => "Poznan",
+        "area_city_gdansk" => "Gdansk",
+        "area_city_warsaw" => "Warsaw",
+        "area_city_katowice" => "Katowice",
+        "area_city_krakow" => "Krakow",
+        "area_city_lodz" => "Lodz",
+        "area_city_szczecin" => "Szczecin",
+        "area_city_lublin" => "Lublin",
+        "area_city_rzeszow" => "Rzeszow",
+        "area_city_bialystok" => "Bialystok",
+        "area_city_torun" => "Torun",
+        "area_region_lower_silesia" => "Lower Silesia",
+        "area_region_greater_poland" => "Greater Poland",
+        "area_region_pomerania" => "Pomerania",
+        "area_region_masovia" => "Masovia",
+        "area_region_silesia" => "Silesia",
+        "area_region_lesser_poland" => "Lesser Poland",
+        "area_region_lodz" => "Lodz region",
+        "area_region_west_pomerania" => "West Pomerania",
+        "area_region_lublin" => "Lublin region",
+        "area_region_subcarpathia" => "Subcarpathia",
+        "area_region_podlasie" => "Podlasie",
+        "area_region_kuyavia_pomerania" => "Kuyavia-Pomerania",
+        "area_clue_wroclaw" => "A signal is forming somewhere between concrete, water and noise.",
+        "area_clue_poznan" => "Follow the gold signal. Leave the obvious route behind.",
+        "area_clue_gdansk" => "Look for the echo where steel meets salt.",
+        "area_clue_warsaw" => "The loudest city hides its quietest transmission.",
+        "area_clue_katowice" => "An industrial pulse is waiting below the surface.",
+        "area_clue_krakow" => "Old stone. New noise. One line locked inside.",
+        "area_clue_lodz" => "Follow the thread through brick, rails and reinvention.",
+        "area_clue_szczecin" => "The signal drifts inland from water shaped like a maze.",
+        "area_clue_lublin" => "Listen where old gates carry a new frequency.",
+        "area_clue_rzeszow" => "A southern pulse hides between motion and open sky.",
+        "area_clue_bialystok" => "At the forest's edge, the quiet signal travels furthest.",
+        "area_clue_torun" => "Look up, then follow the orbit back to the street.",
+        "direction_to_point" => "{arrow} {direction}",
+        "direction_north" => "north",
+        "direction_northeast" => "north-east",
+        "direction_east" => "east",
+        "direction_southeast" => "south-east",
+        "direction_south" => "south",
+        "direction_southwest" => "south-west",
+        "direction_west" => "west",
+        "direction_northwest" => "north-west",
         _ => key,
     }
 }

@@ -11,7 +11,14 @@ use crate::{AppError, util::OptionValueOrExt};
 pub(super) const MAX_RESPONSE_BYTES: u64 = 2 * 1024 * 1024;
 pub(super) const MAX_TOKEN_BYTES: usize = 4096;
 
-pub(super) async fn decode<T: DeserializeOwned>(mut response: Response) -> Result<T, AppError> {
+pub(super) async fn decode<T: DeserializeOwned>(response: Response) -> Result<T, AppError> {
+    decode_with_error_mapper(response, |_| None).await
+}
+
+pub(super) async fn decode_with_error_mapper<T: DeserializeOwned>(
+    mut response: Response,
+    error_mapper: fn(&serde_json::Value) -> Option<String>,
+) -> Result<T, AppError> {
     let status = response.status();
     let content_length = response.content_length();
     if content_length.is_some_and(|length| length > MAX_RESPONSE_BYTES) {
@@ -46,7 +53,7 @@ pub(super) async fn decode<T: DeserializeOwned>(mut response: Response) -> Resul
             serde_json::Value::Null
         }
     };
-    let detail = remote_detail(&body);
+    let detail = error_mapper(&body).unwrap_or_else(|| remote_detail(&body));
     match status {
         StatusCode::UNAUTHORIZED => Err(AppError::Unauthorized),
         StatusCode::FORBIDDEN => Err(AppError::Forbidden),

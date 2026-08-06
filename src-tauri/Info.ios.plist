@@ -4,6 +4,8 @@
 <dict>
   <key>NSCameraUsageDescription</key>
   <string>Virya używa aparatu wyłącznie do skanowania kodów QR biletów i wejściówek.</string>
+  <key>NSLocationWhenInUseUsageDescription</key>
+  <string>Virya Signal używa lokalizacji tylko podczas gry AREA, aby wskazać najbliższy aktywny punkt i potwierdzić wygraną.</string>
   <key>ITSAppUsesNonExemptEncryption</key>
   <false/>
 </dict>
