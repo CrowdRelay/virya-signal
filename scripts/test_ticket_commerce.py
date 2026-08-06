@@ -38,6 +38,17 @@ class TicketCommerceContracts(unittest.TestCase):
         self.assertIn("fan_merch_bundles", ui)
         self.assertIn("Bundle ze sklepu online", ui)
 
+    def test_ticket_quantity_controls_use_boolean_signals_not_raw_or_chains(self):
+        ui = (ROOT / "src/app/mod.rs").read_text()
+        self.assertIn("let increment_disabled = Signal::derive", ui)
+        self.assertIn("disabled=move || increment_disabled.get()", ui)
+        self.assertIn("disabled=move || decrement_disabled.get()", ui)
+        self.assertIn("disabled=move || purchase_disabled.get()", ui)
+        self.assertNotIn(
+            "disabled=move || quantity.get() >= available || selected_count.get()",
+            ui,
+        )
+
     def test_checkout_uses_existing_bounded_first_party_flow(self):
         ticketing = (ROOT / "src-tauri/src/api/ticketing.rs").read_text()
         self.assertIn('https://virya.music/api/ticket-checkout', ticketing)

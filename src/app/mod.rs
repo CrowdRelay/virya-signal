@@ -2617,6 +2617,9 @@ fn FanTicketSale(
     };
 
     let currency_for_total = offer.currency.clone();
+    let purchase_disabled = Signal::derive(move || {
+        busy.get() || selected_count.get() == 0 || pending_checkout.get().is_some()
+    });
     view! {
         <div class="ticket-sale-summary">
             <div><strong>{sale_available}</strong><span>"dostępne"</span></div>
@@ -2632,6 +2635,10 @@ fn FanTicketSale(
                 let available = ticket_type.available.max(0) as u32;
                 let currency = offer.currency.clone();
                 let quantity = Signal::derive(move || checkout_quantity(quantities, &quantity_slug));
+                let decrement_disabled = Signal::derive(move || quantity.get() == 0);
+                let increment_disabled = Signal::derive(move || {
+                    quantity.get() >= available || selected_count.get() >= max_per_order
+                });
                 let decrement = move |_| {
                     let current = checkout_quantity(quantities, &decrement_slug);
                     set_checkout_quantity(
@@ -2661,9 +2668,9 @@ fn FanTicketSale(
                             <small>{format!("Dostępne: {}", ticket_type.available.max(0))}</small>
                         </div>
                         <div class="ticket-stepper" aria-label="Liczba biletów">
-                            <button aria-label="Zmniejsz liczbę biletów" on:click=decrement disabled=move || quantity.get() == 0>"−"</button>
-                            <output>{move || quantity.get()}</output>
-                            <button aria-label="Zwiększ liczbę biletów" on:click=increment disabled=move || quantity.get() >= available || selected_count.get() >= max_per_order>"+"</button>
+                            <button type="button" aria-label="Zmniejsz liczbę biletów" on:click=decrement disabled=move || decrement_disabled.get()>"−"</button>
+                            <output aria-live="polite">{move || quantity.get()}</output>
+                            <button type="button" aria-label="Zwiększ liczbę biletów" on:click=increment disabled=move || increment_disabled.get()>"+"</button>
                         </div>
                     </article>
                 }
@@ -2677,9 +2684,9 @@ fn FanTicketSale(
         <footer class="ticket-checkout-total">
             <div><span>"Wybrane bilety"</span><strong>{move || selected_count.get()}</strong></div>
             <div><span>"Razem brutto"</span><strong>{move || money(selected_gross.get(), &currency_for_total)}</strong></div>
-            <button class="primary" on:click=purchase disabled=move || busy.get() || selected_count.get() == 0 || pending_checkout.get().is_some()>{move || if busy.get() { "REZERWUJĘ…" } else if pending_checkout.get().is_some() { "ZAMÓWIENIE ZAPISANE" } else { "PRZEJDŹ DO PŁATNOŚCI STRIPE" }}</button>
+            <button type="button" class="primary" on:click=purchase disabled=move || purchase_disabled.get()>{move || if busy.get() { "REZERWUJĘ…" } else if pending_checkout.get().is_some() { "ZAMÓWIENIE ZAPISANE" } else { "PRZEJDŹ DO PŁATNOŚCI STRIPE" }}</button>
             <Show when=move || pending_checkout.get().is_some()>
-                <button class="ghost checkout-retry" on:click=retry_payment>"OTWÓRZ PŁATNOŚĆ PONOWNIE ↗"</button>
+                <button type="button" class="ghost checkout-retry" on:click=retry_payment>"OTWÓRZ PŁATNOŚĆ PONOWNIE ↗"</button>
             </Show>
             <small>"Dane karty nie trafiają do Virya Signal. Płatność otworzy się w bezpiecznym Stripe Checkout."</small>
         </footer>

@@ -808,7 +808,7 @@ html[data-virya-scanner-active] .app-shell {
 
 
 /* Fan commerce V1 — first-class ticket checkout and store navigation. */
-.fan-ticket-checkout-screen { display: grid; gap: 16px; padding-bottom: 44px; }
+.fan-ticket-checkout-screen { display: grid; gap: 16px; padding-bottom: calc(132px + var(--safe-bottom)); }
 .checkout-back { justify-self: start; min-height: 40px; border: 1px solid #39352a; border-radius: 999px; background: #11110f; color: #aaa99f; padding: 8px 13px; font-size: 9px; font-weight: 900; letter-spacing: .1em; }
 .checkout-back:active { color: var(--yellow); border-color: #6b5915; }
 .ticket-checkout-hero { border: 1px solid #514417; background: linear-gradient(145deg, #211b06, #10100e 68%); padding: 20px; overflow: hidden; position: relative; }
@@ -827,15 +827,16 @@ html[data-virya-scanner-active] .app-shell {
 .ticket-type-card p { margin: 0 0 9px; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .ticket-type-card strong { display: block; color: var(--yellow); font-size: 15px; }
 .ticket-type-card small { display: block; margin-top: 5px; color: #777; font-size: 9px; }
-.ticket-stepper { display: grid; grid-template-columns: 42px 40px 42px; align-items: center; border: 1px solid #4b421e; background: #0b0b09; }
-.ticket-stepper button { width: 42px; height: 44px; border: 0; background: transparent; color: var(--yellow); font-size: 24px; line-height: 1; }
-.ticket-stepper button:active:not(:disabled) { background: #f3c51a12; }
-.ticket-stepper output { min-width: 40px; text-align: center; color: #fff; font-weight: 900; }
+.ticket-stepper { display: grid; grid-template-columns: 42px 40px 42px; align-items: center; overflow: hidden; border: 1px solid #4b421e; border-radius: var(--control-radius); background: #0b0b09; }
+.ticket-stepper button { width: 42px; height: 44px; border: 0; border-radius: 0; background: transparent; color: var(--yellow); display: grid; place-items: center; padding: 0; font-size: 24px; font-weight: 700; line-height: 1; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.ticket-stepper button:active:not(:disabled) { background: #f3c51a18; }
+.ticket-stepper button:disabled { background: #080807; color: #625725; opacity: .72; }
+.ticket-stepper output { min-width: 40px; text-align: center; color: #fff; font-weight: 900; font-variant-numeric: tabular-nums; }
 .ticket-buyer-panel { display: grid; gap: 11px; border: 1px solid var(--line); background: #10100e; padding: 15px; }
 .ticket-buyer-panel label { display: grid; gap: 7px; color: #999; font-size: 10px; font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
 .ticket-buyer-panel p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .ticket-buyer-panel .ticket-buy-button { width: 100%; }
-.ticket-checkout-total { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border: 1px solid #5d4d16; background: linear-gradient(145deg, #1a1607, #0e0e0c); padding: 15px; box-shadow: 0 16px 44px #0007; }
+.ticket-checkout-total { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: calc(20px + var(--safe-bottom)); border: 1px solid #5d4d16; background: linear-gradient(145deg, #1a1607, #0e0e0c); padding: 15px; box-shadow: 0 16px 44px #0007; scroll-margin-bottom: calc(112px + var(--safe-bottom)); }
 .ticket-checkout-total > div { min-width: 0; border-bottom: 1px solid #39331c; padding: 0 3px 11px; }
 .ticket-checkout-total > div:nth-child(2) { text-align: right; }
 .ticket-checkout-total span { display: block; color: var(--muted); font-size: 9px; text-transform: uppercase; }
@@ -843,6 +844,8 @@ html[data-virya-scanner-active] .app-shell {
 .ticket-checkout-total .primary,
 .ticket-checkout-total .checkout-retry,
 .ticket-checkout-total > small { grid-column: 1 / -1; }
+.ticket-checkout-total .primary { min-height: 56px; border-radius: var(--control-radius); padding: 16px 14px; font-size: 10px; line-height: 1.25; }
+.ticket-checkout-total .primary:disabled { background: #514515; color: #a99a5d; opacity: .78; }
 .ticket-checkout-total .checkout-retry { min-height: 44px; border: 1px solid var(--yellow); border-radius: 8px; background: transparent; color: var(--yellow); padding: 10px 14px; font-size: 10px; font-weight: 900; letter-spacing: .07em; }
 .ticket-checkout-total > small { color: #777; font-size: 9px; line-height: 1.45; text-align: center; }
 .merch-screen .screen-title > p:last-child { color: var(--muted); line-height: 1.5; }
