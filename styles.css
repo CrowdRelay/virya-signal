@@ -78,7 +78,7 @@ input:hover, textarea:hover, select:hover { border-color: #444; background: #111
 select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' fill='none' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
 textarea { resize: vertical; }
 input:focus, textarea:focus, select:focus { border-color: var(--yellow); box-shadow: 0 0 0 1px var(--yellow), 0 0 16px #f3c51a10; background: #0f0e0a; }
-.check-label { grid-template-columns: 24px 1fr !important; align-items: start; line-height: 1.45; }
+.check-label { grid-template-columns: 24px 1fr !important; align-items: center; line-height: 1.45; }
 .check-label input { width: 20px; height: 20px; padding: 0; accent-color: var(--yellow); }
 .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: #080808; padding: 3px; }
 .segmented button { min-height: 44px; border: 0; border-radius: calc(var(--control-radius) - 2px); background: transparent; color: #777; padding: 12px; font-weight: 900; }
