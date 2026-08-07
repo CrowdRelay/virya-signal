@@ -464,7 +464,30 @@ async function viryaReadCurrentPosition(core, strictFresh = false) {
 
 export async function viryaCurrentPosition() {
   const core = await viryaWaitForNativeCore();
-  await viryaEnsureLocationPermission(core, false);
+  try {
+    await viryaEnsureLocationPermission(core, false);
+  } catch (permissionError) {
+    // Some Android/WebView combinations can report the native plugin permission
+    // as denied/unavailable before Android has ever shown its system prompt.
+    // The generated Tauri WebChromeClient has its own geolocation permission
+    // launcher, so let navigator.geolocation trigger that path before failing.
+    window.console?.warn?.(
+      '[virya:location] native permission gate failed; trying webview permission flow',
+      permissionError,
+    );
+    try {
+      return await viryaBrowserPositionAttempt(
+        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
+        11000,
+      );
+    } catch (browserError) {
+      window.console?.warn?.(
+        '[virya:location] webview permission/location fallback failed',
+        browserError,
+      );
+      throw permissionError;
+    }
+  }
   return viryaReadCurrentPosition(core, false);
 }
 

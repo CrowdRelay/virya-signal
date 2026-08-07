@@ -96,8 +96,15 @@ class MobileAreaContracts(unittest.TestCase):
         self.assertIn("plugin:geolocation|clear_watch", bridge)
         self.assertIn("new core.Channel", bridge)
         self.assertIn("navigator.geolocation.getCurrentPosition", bridge)
-        self.assertIn("await viryaEnsureLocationPermission(core, false)", bridge)
-        self.assertIn("await viryaEnsureLocationPermission(core, true)", bridge)
+        locator = bridge.split("export async function viryaCurrentPosition()", 1)[1]
+        locator = locator.split("export async function viryaCollectLocationSamples", 1)[0]
+        self.assertIn("await viryaEnsureLocationPermission(core, false)", locator)
+        self.assertIn("catch (permissionError)", locator)
+        self.assertIn("viryaBrowserPositionAttempt(", locator)
+        self.assertIn("trying webview permission flow", locator)
+        claim = bridge.split("export async function viryaCollectLocationSamples", 1)[1]
+        claim = claim.split("const VIRYA_FAILURE_STORAGE_KEY", 1)[0]
+        self.assertIn("await viryaEnsureLocationPermission(core, true)", claim)
         self.assertIn("strictFresh", bridge)
         self.assertNotIn("Move outdoors and retry", bridge)
 
