@@ -9,8 +9,7 @@ use crate::{
 };
 
 use super::{
-    AreaClaimArgs, AreaDropArgs, FanLoadingState, Skeleton, UrlArgs, open_area_game,
-    refresh_fan_area,
+    AreaClaimArgs, AreaDropArgs, FanLoadingState, Skeleton, open_area_game, refresh_fan_area,
 };
 
 #[derive(Clone, Copy)]
@@ -230,17 +229,6 @@ fn distance_label(value: f64) -> String {
     }
 }
 
-fn open_route(drop: &AreaDrop, error: RwSignal<Option<String>>) {
-    let (lat, lng) = approximate_position(drop);
-    let url = format!("https://www.google.com/maps/dir/?api=1&destination={lat:.4},{lng:.4}");
-    spawn_local(async move {
-        if let Err(message) = bridge::invoke_unit("open_external_url", &UrlArgs { url: &url }).await
-        {
-            error.set(Some(message));
-        }
-    });
-}
-
 #[component]
 pub(super) fn AreaGameScreen(
     area: RwSignal<Option<AreaWallet>>,
@@ -455,8 +443,6 @@ pub(super) fn AreaGameScreen(
                             let number = drop.number.clone();
                             let drop_clue = clue(&drop);
                             let city_for_distance = city.clone();
-                            let route_drop = drop.clone();
-                            let route_id = drop_id.clone();
                             let claim_id = drop_id;
                             view! {
                                 <article class="area-target-card" class:is-live=is_live>
@@ -470,14 +456,6 @@ pub(super) fn AreaGameScreen(
                                         </div>
                                     })}
                                     <div class="area-target-actions">
-                                        <button
-                                            type="button"
-                                            class="ghost"
-                                            disabled=move || !live(area, &route_id)
-                                            on:click=move |_| open_route(&route_drop, error)
-                                        >
-                                            {tr("open_route_start")}
-                                        </button>
                                         <button
                                             type="button"
                                             class="primary"

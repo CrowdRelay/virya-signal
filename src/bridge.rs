@@ -262,7 +262,12 @@ async function viryaEnsureLocationPermission(core, preciseRequired = false) {
   if (!core?.invoke) throw new Error(viryaTexts.locationModuleUnavailable);
   let permissions;
   try {
-    permissions = await core.invoke('plugin:geolocation|check_permissions');
+    // Match the official @tauri-apps/plugin-geolocation guest binding: permission
+    // state is queried through core.checkPermissions when the global Tauri API
+    // exposes it. Keep the raw invoke only as compatibility fallback.
+    permissions = typeof core.checkPermissions === 'function'
+      ? await core.checkPermissions('geolocation')
+      : await core.invoke('plugin:geolocation|check_permissions');
   } catch (error) {
     window.console?.warn?.('[virya:location] permission check failed', error);
     throw new Error(viryaTexts.locationModuleUnavailable);
@@ -433,7 +438,7 @@ async function viryaReadCurrentPosition(core, strictFresh = false) {
   // reliable fallback recommended by the plugin API for live updates.
   const watchOptions = strictFresh
     ? { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    : { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 };
+    : { enableHighAccuracy: false, timeout: 12000, maximumAge: 300000 };
   try {
     return await viryaWatchPositionAttempt(core, watchOptions, strictFresh ? 18000 : 16000);
   } catch (error) {
@@ -468,9 +473,10 @@ export async function viryaCurrentPosition() {
     await viryaEnsureLocationPermission(core, false);
   } catch (permissionError) {
     // Some Android/WebView combinations can report the native plugin permission
-    // as denied/unavailable before Android has ever shown its system prompt.
-    // The generated Tauri WebChromeClient has its own geolocation permission
-    // launcher, so let navigator.geolocation trigger that path before failing.
+    // as denied/unavailable before Android has presented its system dialog.
+    // Let WebView trigger the OS prompt. If WebView cannot itself obtain a fix,
+    // re-check native permission afterwards: the prompt may still have granted
+    // Android location access and the native provider can then do the real read.
     window.console?.warn?.(
       '[virya:location] native permission gate failed; trying webview permission flow',
       permissionError,
@@ -482,11 +488,13 @@ export async function viryaCurrentPosition() {
       );
     } catch (browserError) {
       window.console?.warn?.(
-        '[virya:location] webview permission/location fallback failed',
+        '[virya:location] webview location path failed; re-checking native after permission prompt',
         browserError,
       );
-      throw permissionError;
     }
+
+    await sleep(250);
+    await viryaEnsureLocationPermission(core, false);
   }
   return viryaReadCurrentPosition(core, false);
 }

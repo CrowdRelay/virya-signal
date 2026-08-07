@@ -63,6 +63,9 @@ class MobileAreaContracts(unittest.TestCase):
 
     def test_area_ui_keeps_inactive_cities_visible(self):
         source = (ROOT / "src/app/area.rs").read_text()
+        self.assertNotIn("google.com/maps/dir", source)
+        self.assertNotIn("open_route(", source)
+        self.assertNotIn('tr("open_route_start")', source)
         self.assertIn("each=move || map_drops.clone()", source)
         self.assertIn("class:is-live", source)
         self.assertIn("inactive_area_point", source)
@@ -99,6 +102,10 @@ class MobileAreaContracts(unittest.TestCase):
         locator = bridge.split("export async function viryaCurrentPosition()", 1)[1]
         locator = locator.split("export async function viryaCollectLocationSamples", 1)[0]
         self.assertIn("await viryaEnsureLocationPermission(core, false)", locator)
+        self.assertIn("core.checkPermissions('geolocation')", bridge)
+        self.assertIn("re-checking native after permission prompt", locator)
+        self.assertGreaterEqual(locator.count("await viryaEnsureLocationPermission(core, false)"), 2)
+        self.assertIn("enableHighAccuracy: false, timeout: 12000, maximumAge: 300000", bridge)
         self.assertIn("catch (permissionError)", locator)
         self.assertIn("viryaBrowserPositionAttempt(", locator)
         self.assertIn("trying webview permission flow", locator)
