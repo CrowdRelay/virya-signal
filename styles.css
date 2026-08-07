@@ -340,15 +340,19 @@ button:disabled { opacity: .48; cursor: default; }
 .area-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 12px; }
 .area-native-screen { padding-bottom: calc(132px + var(--safe-bottom)); }
 .area-native-screen .area-hero-card.compact { padding: 16px; border-radius: var(--control-radius); }
-.area-native-map { position: relative; min-height: min(118vw, 460px); overflow: hidden; border: 1px solid #4a411f; border-radius: 18px; background:
-  radial-gradient(circle at 54% 42%, #f3c51a12 0 2px, transparent 3px),
-  linear-gradient(145deg, #17160f, #0b0b09 70%); box-shadow: inset 0 0 42px #0009; isolation: isolate; }
-.area-native-map::before { content: ""; position: absolute; inset: 9% 11%; border: 1px solid #3e3b2b; border-radius: 46% 54% 42% 58% / 33% 45% 55% 67%; transform: rotate(-4deg); background: linear-gradient(145deg, #242218, #11110e); box-shadow: inset 0 0 0 8px #0c0c0a99; }
-.area-native-map::after { content: ""; position: absolute; inset: 0; z-index: 0; opacity: .2; background-image: linear-gradient(#f3c51a1a 1px, transparent 1px), linear-gradient(90deg, #f3c51a1a 1px, transparent 1px); background-size: 32px 32px; mask-image: linear-gradient(to bottom, transparent, #000 20%, #000 80%, transparent); }
-.area-map-grid { position: absolute; z-index: 1; inset: 0; pointer-events: none; }
-.area-native-marker { position: absolute; z-index: 3; width: 44px; height: 44px; transform: translate(-50%, -50%); border: 1px solid #4a473b; border-radius: 50%; background: #11110f; color: #77756d; display: grid; place-items: center; padding: 0; box-shadow: 0 8px 20px #000a; transition: transform .15s, border-color .15s, color .15s, background .15s; }
-.area-native-marker span { font-size: 19px; line-height: 1; }
-.area-native-marker small { position: absolute; top: calc(100% + 3px); color: inherit; font: 800 8px/1 ui-monospace, monospace; }
+.area-native-map { position: relative; width: 100%; aspect-ratio: 1.08 / 1; min-height: 0; max-height: 440px; overflow: hidden; border: 1px solid #4a411f; border-radius: 16px; background:
+  radial-gradient(circle at 50% 42%, #f3c51a0d 0 2px, transparent 3px),
+  linear-gradient(145deg, #15140e, #090907 72%); box-shadow: inset 0 0 42px #0009; isolation: isolate; }
+.area-native-map::after { content: ""; position: absolute; inset: 0; z-index: 0; opacity: .12; background-image: linear-gradient(#f3c51a16 1px, transparent 1px), linear-gradient(90deg, #f3c51a16 1px, transparent 1px); background-size: 28px 28px; mask-image: linear-gradient(to bottom, transparent, #000 16%, #000 84%, transparent); }
+.area-map-silhouette { position: absolute; z-index: 1; inset: 4% 3% 3%; width: 94%; height: 93%; overflow: visible; pointer-events: none; filter: drop-shadow(0 12px 18px #0009); }
+.area-map-country { fill: #171710; stroke: #5a5230; stroke-width: 1.15; vector-effect: non-scaling-stroke; }
+.area-map-river { fill: none; stroke: #8f7d2d; stroke-width: .65; opacity: .34; vector-effect: non-scaling-stroke; }
+.area-map-river.secondary { opacity: .2; }
+.area-map-grid { position: absolute; z-index: 2; inset: 0; pointer-events: none; }
+.area-native-marker { position: absolute; z-index: 3; width: 44px; height: 44px; transform: translate(-50%, -50%); border: 1px solid #4a473b; border-radius: 50%; background: #0d0d0b; color: #858278; display: grid; place-items: center; padding: 0; box-shadow: 0 7px 18px #000c; transition: transform .15s, border-color .15s, color .15s, background .15s; }
+.area-native-marker::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 4px #0008; }
+.area-native-marker span { position: absolute; opacity: 0; pointer-events: none; }
+.area-native-marker small { position: absolute; top: calc(100% + 2px); left: 50%; transform: translateX(-50%); min-width: 24px; padding: 2px 4px; border-radius: 5px; background: #080808e8; color: inherit; font: 900 8px/1 ui-monospace, monospace; letter-spacing: .04em; }
 .area-native-marker.is-live { border-color: var(--yellow); background: #211b06; color: var(--yellow); box-shadow: 0 0 0 5px #f3c51a10, 0 8px 22px #000b; }
 .area-native-marker.is-claimed { border-color: var(--success); color: var(--success); background: #0c1a11; }
 .area-native-marker.is-selected { transform: translate(-50%, -50%) scale(1.16); outline: 2px solid #fff9; outline-offset: 3px; }
@@ -395,7 +399,7 @@ button:disabled { opacity: .48; cursor: default; }
   .area-target-actions,
   .area-native-actions { grid-template-columns: 1fr; }
   .area-native-actions > :last-child { grid-column: auto; }
-  .area-native-map { min-height: min(126vw, 430px); }
+  .area-native-map { aspect-ratio: 1.03 / 1; max-height: 410px; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

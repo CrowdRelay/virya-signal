@@ -13,12 +13,139 @@ use super::{
     refresh_fan_area,
 };
 
+#[derive(Clone, Copy)]
+struct AreaPublicPoint {
+    id: &'static str,
+    map_x: i16,
+    map_y: i16,
+    approximate_lat: f64,
+    approximate_lng: f64,
+}
+
+// Public/coarse layout only. These values are intentionally safe to ship in
+// the client and keep the mobile map stable even if an older wallet payload
+// contains missing/zero map coordinates. Exact claim coordinates never enter
+// the app and remain server-side in CrowdRelay.
+const AREA_PUBLIC_POINTS: [AreaPublicPoint; 12] = [
+    AreaPublicPoint {
+        id: "wro-001",
+        map_x: 34,
+        map_y: 70,
+        approximate_lat: 51.1,
+        approximate_lng: 17.0,
+    },
+    AreaPublicPoint {
+        id: "poz-002",
+        map_x: 29,
+        map_y: 45,
+        approximate_lat: 52.4,
+        approximate_lng: 16.9,
+    },
+    AreaPublicPoint {
+        id: "gdn-003",
+        map_x: 49,
+        map_y: 17,
+        approximate_lat: 54.4,
+        approximate_lng: 18.6,
+    },
+    AreaPublicPoint {
+        id: "waw-004",
+        map_x: 68,
+        map_y: 48,
+        approximate_lat: 52.2,
+        approximate_lng: 21.0,
+    },
+    AreaPublicPoint {
+        id: "ktw-005",
+        map_x: 53,
+        map_y: 79,
+        approximate_lat: 50.3,
+        approximate_lng: 19.0,
+    },
+    AreaPublicPoint {
+        id: "krk-006",
+        map_x: 65,
+        map_y: 86,
+        approximate_lat: 50.1,
+        approximate_lng: 19.9,
+    },
+    AreaPublicPoint {
+        id: "ldz-007",
+        map_x: 53,
+        map_y: 56,
+        approximate_lat: 51.8,
+        approximate_lng: 19.5,
+    },
+    AreaPublicPoint {
+        id: "szc-008",
+        map_x: 14,
+        map_y: 29,
+        approximate_lat: 53.4,
+        approximate_lng: 14.6,
+    },
+    AreaPublicPoint {
+        id: "lub-009",
+        map_x: 82,
+        map_y: 63,
+        approximate_lat: 51.2,
+        approximate_lng: 22.6,
+    },
+    AreaPublicPoint {
+        id: "rze-010",
+        map_x: 82,
+        map_y: 87,
+        approximate_lat: 50.0,
+        approximate_lng: 22.0,
+    },
+    AreaPublicPoint {
+        id: "bia-011",
+        map_x: 85,
+        map_y: 35,
+        approximate_lat: 53.1,
+        approximate_lng: 23.2,
+    },
+    AreaPublicPoint {
+        id: "tor-012",
+        map_x: 47,
+        map_y: 37,
+        approximate_lat: 53.0,
+        approximate_lng: 18.6,
+    },
+];
+
 #[derive(Clone, Debug)]
 struct NearestPoint {
     drop_id: String,
     distance_meters: f64,
     accuracy_meters: f64,
     bearing_degrees: f64,
+}
+
+fn public_point(id: &str) -> Option<AreaPublicPoint> {
+    AREA_PUBLIC_POINTS
+        .iter()
+        .copied()
+        .find(|point| point.id == id)
+}
+
+fn map_position(drop: &AreaDrop) -> (i16, i16) {
+    public_point(&drop.id)
+        .map(|point| (point.map_x, point.map_y))
+        .unwrap_or_else(|| (drop.map_x.clamp(6, 94), drop.map_y.clamp(8, 92)))
+}
+
+fn approximate_position(drop: &AreaDrop) -> (f64, f64) {
+    // AREA is a Poland campaign. Reject obviously missing/corrupt public
+    // coordinates (notably 0/0) before distance/routing calculations.
+    let backend_is_sane = (48.0..=56.0).contains(&drop.approximate_lat)
+        && (13.0..=25.0).contains(&drop.approximate_lng);
+    if backend_is_sane {
+        (drop.approximate_lat, drop.approximate_lng)
+    } else {
+        public_point(&drop.id)
+            .map(|point| (point.approximate_lat, point.approximate_lng))
+            .unwrap_or((drop.approximate_lat, drop.approximate_lng))
+    }
 }
 
 fn find_drop(area: RwSignal<Option<AreaWallet>>, id: &str) -> Option<AreaDrop> {
@@ -104,10 +231,8 @@ fn distance_label(value: f64) -> String {
 }
 
 fn open_route(drop: &AreaDrop, error: RwSignal<Option<String>>) {
-    let url = format!(
-        "https://www.google.com/maps/dir/?api=1&destination={:.4},{:.4}",
-        drop.approximate_lat, drop.approximate_lng
-    );
+    let (lat, lng) = approximate_position(drop);
+    let url = format!("https://www.google.com/maps/dir/?api=1&destination={lat:.4},{lng:.4}");
     spawn_local(async move {
         if let Err(message) = bridge::invoke_unit("open_external_url", &UrlArgs { url: &url }).await
         {
@@ -176,27 +301,21 @@ pub(super) fn AreaGameScreen(
                     let closest = active
                         .into_iter()
                         .map(|drop| {
-                            let distance = distance_meters(
-                                position.lat,
-                                position.lng,
-                                drop.approximate_lat,
-                                drop.approximate_lng,
-                            );
+                            let (lat, lng) = approximate_position(&drop);
+                            let distance = distance_meters(position.lat, position.lng, lat, lng);
                             (drop, distance)
                         })
                         .min_by(|left, right| left.1.total_cmp(&right.1));
                     if let Some((drop, distance_meters)) = closest {
                         selected.set(Some(drop.id.clone()));
                         nearest.set(Some(NearestPoint {
-                            drop_id: drop.id,
+                            drop_id: drop.id.clone(),
                             distance_meters,
                             accuracy_meters: position.accuracy,
-                            bearing_degrees: bearing_degrees(
-                                position.lat,
-                                position.lng,
-                                drop.approximate_lat,
-                                drop.approximate_lng,
-                            ),
+                            bearing_degrees: {
+                                let (lat, lng) = approximate_position(&drop);
+                                bearing_degrees(position.lat, position.lng, lat, lng)
+                            },
                         }));
                     }
                 }
@@ -280,6 +399,11 @@ pub(super) fn AreaGameScreen(
                         </div>
 
                         <div class="area-native-map" aria-label=tr("area_game_tab")>
+                            <svg class="area-map-silhouette" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+                                <path class="area-map-country" d="M12 30 L16 23 L24 18 L30 13 L39 15 L48 10 L56 12 L62 17 L70 18 L78 23 L87 25 L92 32 L94 40 L91 48 L94 56 L90 63 L92 70 L88 79 L84 88 L76 92 L69 89 L61 94 L54 91 L47 95 L40 91 L32 91 L26 84 L19 82 L16 73 L11 68 L10 60 L7 54 L10 46 L8 39 Z"></path>
+                                <path class="area-map-river" d="M51 15 C49 27 55 35 52 45 C49 55 55 64 59 70 C63 76 65 83 64 90"></path>
+                                <path class="area-map-river secondary" d="M69 31 C66 39 68 47 74 53 C79 58 81 66 80 75"></path>
+                            </svg>
                             <div class="area-map-grid" aria-hidden="true"></div>
                             <For
                                 each=move || map_drops.clone()
@@ -292,7 +416,8 @@ pub(super) fn AreaGameScreen(
                                     let pressed_id = id.clone();
                                     let click_id = id;
                                     let aria = format!("{} {}", drop.number, drop.city);
-                                    let style = format!("left:{}%;top:{}%", drop.map_x, drop.map_y);
+                                    let (map_x, map_y) = map_position(&drop);
+                                    let style = format!("left:{map_x}%;top:{map_y}%");
                                     let number = drop.number;
                                     view! {
                                         <button

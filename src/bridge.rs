@@ -247,68 +247,128 @@ export async function viryaScanQr() {
 }
 
 
-function viryaLocationState(value) {
-  if (typeof value === 'string') return value;
-  return value?.location ?? value?.coarseLocation ?? value?.status ?? value?.state ?? 'prompt';
+function viryaLocationStates(value) {
+  if (typeof value === 'string') {
+    return { precise: value, coarse: value };
+  }
+  const fallback = value?.status ?? value?.state ?? 'prompt';
+  return {
+    precise: value?.location ?? fallback,
+    coarse: value?.coarseLocation ?? value?.location ?? fallback,
+  };
 }
 
-async function viryaEnsureLocationPermission(core) {
+async function viryaEnsureLocationPermission(core, preciseRequired = false) {
   if (!core?.invoke) throw new Error(viryaTexts.locationModuleUnavailable);
   let permissions;
   try {
     permissions = await core.invoke('plugin:geolocation|check_permissions');
-  } catch {
+  } catch (error) {
+    window.console?.warn?.('[virya:location] permission check failed', error);
     throw new Error(viryaTexts.locationModuleUnavailable);
   }
-  let state = viryaLocationState(permissions);
-  if (state === 'prompt' || state === 'prompt-with-rationale') {
-    permissions = await core.invoke('plugin:geolocation|request_permissions', {
-      permissions: ['location'],
-    });
-    state = viryaLocationState(permissions);
+
+  let states = viryaLocationStates(permissions);
+  const prompt = [states.precise, states.coarse].some(
+    (state) => state === 'prompt' || state === 'prompt-with-rationale',
+  );
+  if (prompt) {
+    try {
+      permissions = await core.invoke('plugin:geolocation|request_permissions', {
+        permissions: ['location'],
+      });
+      states = viryaLocationStates(permissions);
+    } catch (error) {
+      window.console?.warn?.('[virya:location] permission request failed', error);
+      throw new Error(viryaTexts.locationDenied);
+    }
   }
-  if (state !== 'granted') throw new Error(viryaTexts.locationDenied);
+
+  if (states.precise === 'granted') return { precise: true };
+  // Android 12+ lets users grant Approximate Location only. That is fully
+  // sufficient for the "nearest AREA city" helper, while claim verification
+  // still asks for precise/fresh samples and keeps the server-side accuracy gate.
+  if (!preciseRequired && states.coarse === 'granted') return { precise: false };
+  throw new Error(viryaTexts.locationDenied);
 }
 
 function viryaNormalizePosition(position) {
-  const coords = position?.coords;
-  const lat = Number(coords?.latitude);
-  const lng = Number(coords?.longitude);
+  // Keep compatibility with the official Position shape while accepting the
+  // common flattened shape from older/generated Android bridges.
+  const coords = position?.coords ?? position?.coordinates ?? position;
+  const lat = Number(coords?.latitude ?? coords?.lat);
+  const lng = Number(coords?.longitude ?? coords?.lng);
   const accuracy = Number(coords?.accuracy);
   const now = Date.now();
-  const rawTimestamp = Number(position?.timestamp);
+  const rawTimestamp = Number(position?.timestamp ?? position?.capturedAt);
   const epochTimestamp = Number.isFinite(rawTimestamp)
     ? (rawTimestamp < 10_000_000_000 ? rawTimestamp * 1000 : rawTimestamp)
     : now;
   // Android providers may return seconds, milliseconds, a monotonic value or
-  // a stale cached timestamp. The AREA protocol needs fresh epoch millis.
+  // a stale cached timestamp. The AREA protocol needs epoch millis.
   const capturedAt = Math.round(
     Math.abs(epochTimestamp - now) <= 5 * 60_000 ? epochTimestamp : now,
   );
   if (!Number.isFinite(lat) || lat < -90 || lat > 90 ||
       !Number.isFinite(lng) || lng < -180 || lng > 180 ||
-      !Number.isFinite(accuracy) || accuracy < 0 || accuracy > 10000) {
+      !Number.isFinite(accuracy) || accuracy < 0 || accuracy > 10000 ||
+      (Math.abs(lat) < 0.000001 && Math.abs(lng) < 0.000001)) {
     throw new Error(viryaTexts.locationUnavailable);
   }
   return { lat, lng, accuracy, capturedAt };
 }
 
-async function viryaReadCurrentPosition(core) {
+async function viryaPositionAttempt(core, options, deadlineMs) {
+  const nativeRead = core.invoke('plugin:geolocation|get_current_position', { options });
+  // The geolocation plugin documents that PositionOptions.timeout is ignored by
+  // getCurrentPosition on Android, so enforce a UI-side deadline as well.
+  let timer;
   try {
-    const position = await core.invoke('plugin:geolocation|get_current_position', {
-      options: { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
-    });
+    const position = await Promise.race([
+      nativeRead,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('location-read-timeout')), deadlineMs);
+      }),
+    ]);
     return viryaNormalizePosition(position);
-  } catch (error) {
-    window.console?.warn?.('[virya:location] current position failed', error);
-    throw new Error(viryaTexts.locationUnavailable);
+  } finally {
+    clearTimeout(timer);
+    // If the native read resolves after the UI deadline, do not leak an
+    // unhandled rejection into the WebView.
+    void nativeRead.catch(() => {});
   }
+}
+
+async function viryaReadCurrentPosition(core, strictFresh = false) {
+  const attempts = strictFresh
+    ? [
+        [{ enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }, 14000],
+      ]
+    : [
+        [{ enableHighAccuracy: true, timeout: 10000, maximumAge: 15000 }, 12000],
+        // Finding the nearest city does not require a fresh GPS fix. A recent
+        // foreground/cached fix makes AREA usable indoors and with Approximate
+        // Location while exact claim coordinates remain server-side.
+        [{ enableHighAccuracy: false, timeout: 7000, maximumAge: 300000 }, 9000],
+      ];
+
+  let lastError;
+  for (const [options, deadlineMs] of attempts) {
+    try {
+      return await viryaPositionAttempt(core, options, deadlineMs);
+    } catch (error) {
+      lastError = error;
+      window.console?.warn?.('[virya:location] position attempt failed', options, error);
+    }
+  }
+  window.console?.warn?.('[virya:location] all position attempts failed', lastError);
+  throw new Error(viryaTexts.locationUnavailable);
 }
 
 export async function viryaCurrentPosition() {
   const core = await viryaWaitForNativeCore();
-  await viryaEnsureLocationPermission(core);
-  return viryaReadCurrentPosition(core);
+  await viryaEnsureLocationPermission(core, false);
+  return viryaReadCurrentPosition(core, false);
 }
 
 export async function viryaCollectLocationSamples(minSamples, maxSamples, minDurationMs) {
@@ -316,13 +376,20 @@ export async function viryaCollectLocationSamples(minSamples, maxSamples, minDur
   const maximum = Math.max(minimum, Math.min(Number(maxSamples) || 8, 8));
   const duration = Math.max(3000, Math.min(Number(minDurationMs) || 6000, 20000));
   const core = await viryaWaitForNativeCore();
-  // A claim samples one location session. Checking permissions once avoids up
-  // to fourteen redundant native IPC calls while collecting eight samples.
-  await viryaEnsureLocationPermission(core);
+  // Claim verification intentionally stays strict: precise permission and fresh
+  // samples only. The relaxed fallback above is used solely for city discovery.
+  await viryaEnsureLocationPermission(core, true);
   const startedAt = Date.now();
   const samples = [];
-  while (samples.length < maximum) {
-    samples.push(await viryaReadCurrentPosition(core));
+  let attempts = 0;
+  const maxAttempts = maximum * 3;
+  while (samples.length < maximum && attempts < maxAttempts) {
+    attempts += 1;
+    try {
+      samples.push(await viryaReadCurrentPosition(core, true));
+    } catch (error) {
+      window.console?.warn?.('[virya:location] fresh claim sample failed', attempts, error);
+    }
     const elapsed = Date.now() - startedAt;
     if (samples.length >= minimum && elapsed >= duration) break;
     await sleep(Math.min(1500, Math.max(700, duration - elapsed)));
