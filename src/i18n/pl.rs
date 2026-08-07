@@ -54,6 +54,11 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "qr_codes" => "Kody QR",
         "settings" => "Ustawienia",
         "home_tab" => "Start",
+        "album_experience" => "Doświadczenie albumu",
+        "synesthesia_five_album_draw" => {
+            "Przejdź wszystkie 11 pokojów. Ukończenie daje 1 los w osobnej puli 5 płyt."
+        }
+        "enter_synesthesia" => "WEJDŹ DO SYNESTHESII",
         "signal_tab" => "Sygnał",
         "scan_tab" => "Skan",
         "tickets_tab" => "Bilety",

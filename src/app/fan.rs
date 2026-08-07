@@ -644,6 +644,16 @@ fn FanSignal(
                     }).collect_view()}</div>
                 });
                 view! {
+                    <article class="draw-card synesthesia-entry-card">
+                        <div>
+                            <p class="eyebrow">{tr("album_experience")}</p>
+                            <strong>"SYNESTHESIA"</strong>
+                            <span>{tr("synesthesia_five_album_draw")}</span>
+                        </div>
+                        <div class="draw-actions">
+                            <ExternalLink url="https://synesthesia.virya.music/?source=signal-app".to_owned() label=tr("enter_synesthesia") error=error />
+                        </div>
+                    </article>
                     <div class="stats-grid"><Metric value=referral.pending_referrals.to_string() label=tr("pending_2")/><Metric value=entries_total.to_string() label=tr("entries")/><Metric value=coupon_count.to_string() label=tr("coupons")/></div>
                     <div class="section-head"><h3>{tr("active_draws")}</h3><span>{draw_count}</span></div>
                     <div class="card-list">{draws.into_iter().map(|draw| {

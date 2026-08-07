@@ -56,6 +56,11 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "qr_codes" => "QR codes",
         "settings" => "Settings",
         "home_tab" => "Home",
+        "album_experience" => "Album experience",
+        "synesthesia_five_album_draw" => {
+            "Walk through all 11 rooms. One completion gives 1 entry in a separate five-album draw."
+        }
+        "enter_synesthesia" => "ENTER SYNESTHESIA",
         "signal_tab" => "Signal",
         "scan_tab" => "Scan",
         "tickets_tab" => "Tickets",
