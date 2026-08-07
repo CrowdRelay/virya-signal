@@ -404,11 +404,89 @@ async function viryaBrowserPositionAttempt(options, deadlineMs) {
       },
       (error) => {
         clearTimeout(timer);
-        reject(error instanceof Error ? error : new Error(String(error?.message ?? error)));
+        const code = Number(error?.code);
+        const message = String(error?.message ?? error ?? 'browser-location-error');
+        reject(new Error(`browser-location-error:${Number.isFinite(code) ? code : 'unknown'}:${message}`));
       },
       options,
     );
   });
+}
+
+async function viryaBrowserWatchPositionAttempt(options, deadlineMs) {
+  const geolocation = window.navigator?.geolocation;
+  if (!geolocation?.watchPosition || !geolocation?.clearWatch) {
+    throw new Error('browser-geolocation-watch-unavailable');
+  }
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let watchId;
+    let lastError;
+    const finish = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (watchId !== undefined) {
+        try { geolocation.clearWatch(watchId); } catch {}
+      }
+      fn(value);
+    };
+    const timer = setTimeout(() => {
+      const detail = lastError ? `:${lastError}` : '';
+      finish(reject, new Error(`browser-location-watch-timeout${detail}`));
+    }, deadlineMs);
+
+    watchId = geolocation.watchPosition(
+      (position) => {
+        try { finish(resolve, viryaNormalizePosition(position)); }
+        catch (error) {
+          lastError = String(error?.message ?? error);
+          window.console?.warn?.('[virya:location] discarded invalid browser watched position', error);
+        }
+      },
+      (error) => {
+        const code = Number(error?.code);
+        const message = String(error?.message ?? error ?? 'browser-location-watch-error');
+        lastError = `${Number.isFinite(code) ? code : 'unknown'}:${message}`;
+        // Permission denied is terminal. POSITION_UNAVAILABLE/TIMEOUT can be
+        // transient while Android warms the provider, so keep the watch alive
+        // until our own bounded deadline.
+        if (code === 1) finish(reject, new Error(`browser-location-denied:${message}`));
+      },
+      options,
+    );
+  });
+}
+
+async function viryaReadBrowserLocatorPosition() {
+  let lastError;
+  try {
+    // AREA discovery only needs city-level accuracy. A cached/network position
+    // is intentionally preferred indoors and mirrors the working web page path.
+    return await viryaBrowserPositionAttempt(
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 900000 },
+      12000,
+    );
+  } catch (error) {
+    lastError = error;
+    window.console?.warn?.('[virya:location] browser locator current-position failed', error);
+  }
+
+  try {
+    // Some Android WebViews return POSITION_UNAVAILABLE for one-shot reads while
+    // the provider is waking up. Watching until the first valid fix avoids that
+    // race without exposing exact coordinates to AREA claim verification.
+    return await viryaBrowserWatchPositionAttempt(
+      { enableHighAccuracy: false, timeout: 12000, maximumAge: 900000 },
+      18000,
+    );
+  } catch (error) {
+    lastError = error;
+    window.console?.warn?.('[virya:location] browser locator watch failed', error);
+  }
+
+  throw lastError ?? new Error('browser-location-unavailable');
 }
 
 async function viryaReadCurrentPosition(core, strictFresh = false) {
@@ -446,56 +524,30 @@ async function viryaReadCurrentPosition(core, strictFresh = false) {
     window.console?.warn?.('[virya:location] watched position attempt failed', error);
   }
 
-  // WebView geolocation uses the platform provider too, but takes a different
-  // path through Android. Keep it as a final compatibility fallback after the
-  // native plugin, never as the primary source.
-  try {
-    return await viryaBrowserPositionAttempt(
-      {
-        enableHighAccuracy: strictFresh,
-        timeout: strictFresh ? 12000 : 8000,
-        maximumAge: strictFresh ? 0 : 300000,
-      },
-      strictFresh ? 13000 : 9000,
-    );
-  } catch (error) {
-    lastError = error;
-    window.console?.warn?.('[virya:location] browser fallback failed', error);
+  // Claim verification must never fall back to browser/WebView coordinates.
+  // The server receives only fresh samples collected through the native plugin.
+  if (strictFresh) {
+    window.console?.warn?.('[virya:location] strict native position paths failed', lastError);
+    throw new Error(viryaTexts.locationUnavailable);
   }
 
-  window.console?.warn?.('[virya:location] all position paths failed', lastError);
+  window.console?.warn?.('[virya:location] native locator paths failed', lastError);
   throw new Error(viryaTexts.locationUnavailable);
 }
 
 export async function viryaCurrentPosition() {
-  const core = await viryaWaitForNativeCore();
+  // Discovery mirrors the website first. Tauri's generated Android
+  // RustWebChromeClient handles navigator.geolocation permission prompts, and
+  // this path does not depend on Google Play Services' FusedLocationProvider.
+  // It is used only to choose/show the nearest AREA city, never to claim a drop.
   try {
-    await viryaEnsureLocationPermission(core, false);
-  } catch (permissionError) {
-    // Some Android/WebView combinations can report the native plugin permission
-    // as denied/unavailable before Android has presented its system dialog.
-    // Let WebView trigger the OS prompt. If WebView cannot itself obtain a fix,
-    // re-check native permission afterwards: the prompt may still have granted
-    // Android location access and the native provider can then do the real read.
-    window.console?.warn?.(
-      '[virya:location] native permission gate failed; trying webview permission flow',
-      permissionError,
-    );
-    try {
-      return await viryaBrowserPositionAttempt(
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 },
-        11000,
-      );
-    } catch (browserError) {
-      window.console?.warn?.(
-        '[virya:location] webview location path failed; re-checking native after permission prompt',
-        browserError,
-      );
-    }
-
-    await sleep(250);
-    await viryaEnsureLocationPermission(core, false);
+    return await viryaReadBrowserLocatorPosition();
+  } catch (browserError) {
+    window.console?.warn?.('[virya:location] browser-first locator failed; trying native plugin', browserError);
   }
+
+  const core = await viryaWaitForNativeCore();
+  await viryaEnsureLocationPermission(core, false);
   return viryaReadCurrentPosition(core, false);
 }
 

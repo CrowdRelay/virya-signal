@@ -99,19 +99,26 @@ class MobileAreaContracts(unittest.TestCase):
         self.assertIn("plugin:geolocation|clear_watch", bridge)
         self.assertIn("new core.Channel", bridge)
         self.assertIn("navigator.geolocation.getCurrentPosition", bridge)
-        locator = bridge.split("export async function viryaCurrentPosition()", 1)[1]
-        locator = locator.split("export async function viryaCollectLocationSamples", 1)[0]
+        self.assertIn("navigator?.geolocation", bridge)
+        self.assertIn("viryaReadBrowserLocatorPosition", bridge)
+        self.assertIn("browser-first locator failed; trying native plugin", bridge)
+        self.assertIn("if (strictFresh)", bridge)
+        locator = bridge.split("export async function viryaCurrentPosition()", 1)[1].split("export async function viryaCollectLocationSamples", 1)[0]
+        self.assertLess(locator.index("viryaReadBrowserLocatorPosition"), locator.index("viryaWaitForNativeCore"))
         self.assertIn("await viryaEnsureLocationPermission(core, false)", locator)
         self.assertIn("core.checkPermissions('geolocation')", bridge)
-        self.assertIn("re-checking native after permission prompt", locator)
-        self.assertGreaterEqual(locator.count("await viryaEnsureLocationPermission(core, false)"), 2)
-        self.assertIn("enableHighAccuracy: false, timeout: 12000, maximumAge: 300000", bridge)
-        self.assertIn("catch (permissionError)", locator)
-        self.assertIn("viryaBrowserPositionAttempt(", locator)
-        self.assertIn("trying webview permission flow", locator)
+        self.assertEqual(locator.count("await viryaEnsureLocationPermission(core, false)"), 1)
+        self.assertIn("maximumAge: 900000", bridge)
+        self.assertIn("viryaBrowserWatchPositionAttempt", bridge)
+        self.assertNotIn("catch (permissionError)", locator)
+        self.assertNotIn("trying webview permission flow", locator)
         claim = bridge.split("export async function viryaCollectLocationSamples", 1)[1]
         claim = claim.split("const VIRYA_FAILURE_STORAGE_KEY", 1)[0]
         self.assertIn("await viryaEnsureLocationPermission(core, true)", claim)
+        strict_fn = bridge.split("async function viryaReadCurrentPosition(core, strictFresh = false)", 1)[1].split("export async function viryaCurrentPosition()", 1)[0]
+        self.assertIn("if (strictFresh)", strict_fn)
+        strict_tail = strict_fn.split("if (strictFresh)", 1)[1]
+        self.assertNotIn("viryaBrowserPositionAttempt", strict_tail)
         self.assertIn("strictFresh", bridge)
         self.assertNotIn("Move outdoors and retry", bridge)
 
