@@ -14,7 +14,7 @@ let viryaTexts = {
   cameraDenied: 'Camera access is denied. Enable Camera for Virya Signal in the app settings.',
   locationModuleUnavailable: 'The location module is unavailable in this app version.',
   locationDenied: 'Location access is denied. Enable Location for Virya Signal in the app settings.',
-  locationUnavailable: 'Could not read location. Check system Location/GPS and app permission, then retry.',
+  locationUnavailable: 'Unfortunately, this is not the correct location. Keep looking!',
   scannerLabel: 'QR code scanner', scannerTitle: 'SCAN QR CODE', scannerHint: 'Place the code inside the frame', scannerCancel: '← CANCEL SCANNING', scannerClosing: 'CLOSING…', scannerUnavailable: 'The scanner is available only in the iOS/Android app.',
   unknownError: 'Unknown application error', reportType: 'Type', reportTime: 'Time', reportOperation: 'Operation', reportPath: 'Path', reportError: 'Error',
   diagnostics: 'VIRYA SIGNAL / DIAGNOSTICS', previousFailure: 'The previous launch ended with an error', currentFailure: 'The app caught an error', reportHelp: 'We do not hide failures. Copy the report and send it with a note about what you tapped.', copyReport: 'COPY REPORT', restart: 'RESTART APP', close: 'CLOSE', reportCopied: 'Report copied.', copyManually: 'Press and hold the report text and copy it manually.', interrupted: 'The previous launch interrupted operation {command}.', uncleanShutdown: 'The previous launch ended without a clean shutdown.'
