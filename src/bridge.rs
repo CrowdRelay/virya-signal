@@ -459,6 +459,44 @@ async function viryaBrowserWatchPositionAttempt(options, deadlineMs) {
   });
 }
 
+const viryaAndroidLocationPending = new Map();
+
+window.__viryaAndroidLocationResult = (requestId, payload) => {
+  const pending = viryaAndroidLocationPending.get(String(requestId));
+  if (!pending) return;
+  viryaAndroidLocationPending.delete(String(requestId));
+  clearTimeout(pending.timer);
+  if (payload?.ok === true) {
+    try { pending.resolve(viryaNormalizePosition(payload)); }
+    catch (error) { pending.reject(error); }
+    return;
+  }
+  pending.reject(new Error(`android-location-error:${String(payload?.error ?? 'unknown')}`));
+};
+
+async function viryaAndroidLocationManagerAttempt(deadlineMs = 12000) {
+  const bridge = window.ViryaAndroidLocation;
+  if (!bridge || typeof bridge.requestLocation !== 'function') {
+    throw new Error('android-location-bridge-unavailable');
+  }
+
+  const requestId = `area-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      viryaAndroidLocationPending.delete(requestId);
+      reject(new Error('android-location-bridge-timeout'));
+    }, deadlineMs);
+    viryaAndroidLocationPending.set(requestId, { resolve, reject, timer });
+    try {
+      bridge.requestLocation(requestId);
+    } catch (error) {
+      clearTimeout(timer);
+      viryaAndroidLocationPending.delete(requestId);
+      reject(error);
+    }
+  });
+}
+
 async function viryaReadBrowserLocatorPosition() {
   let lastError;
   try {
@@ -536,18 +574,25 @@ async function viryaReadCurrentPosition(core, strictFresh = false) {
 }
 
 export async function viryaCurrentPosition() {
-  // Discovery mirrors the website first. Tauri's generated Android
-  // RustWebChromeClient handles navigator.geolocation permission prompts, and
-  // this path does not depend on Google Play Services' FusedLocationProvider.
-  // It is used only to choose/show the nearest AREA city, never to claim a drop.
+  const core = await viryaWaitForNativeCore();
+  // Ask for Android runtime permission through the official plugin, then use a
+  // direct LocationManager bridge for AREA discovery. This avoids both Google
+  // FusedLocationProvider and WebView POSITION_UNAVAILABLE failures observed on
+  // real devices. Exact AREA claim verification does not use this bridge.
+  await viryaEnsureLocationPermission(core, false);
+
+  try {
+    return await viryaAndroidLocationManagerAttempt(12000);
+  } catch (androidError) {
+    window.console?.warn?.('[virya:location] Android LocationManager locator failed; trying WebView', androidError);
+  }
+
   try {
     return await viryaReadBrowserLocatorPosition();
   } catch (browserError) {
-    window.console?.warn?.('[virya:location] browser-first locator failed; trying native plugin', browserError);
+    window.console?.warn?.('[virya:location] WebView locator failed; trying Tauri plugin', browserError);
   }
 
-  const core = await viryaWaitForNativeCore();
-  await viryaEnsureLocationPermission(core, false);
   return viryaReadCurrentPosition(core, false);
 }
 
