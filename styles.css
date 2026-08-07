@@ -350,6 +350,21 @@ button:disabled { opacity: .48; cursor: default; }
 .area-map-river.secondary { opacity: .2; }
 .area-map-grid { position: absolute; z-index: 2; inset: 0; pointer-events: none; }
 .area-native-marker { position: absolute; z-index: 3; width: 44px; height: 44px; transform: translate(-50%, -50%); border: 1px solid #4a473b; border-radius: 50%; background: #0d0d0b; color: #858278; display: grid; place-items: center; padding: 0; box-shadow: 0 7px 18px #000c; transition: transform .15s, border-color .15s, color .15s, background .15s; }
+/* Stable AREA geometry: these coarse/public positions are owned by the client.
+   Backend mapX/mapY can be missing or 0/0 without moving known city markers. */
+.area-native-marker { left: 50%; top: 50%; }
+.area-native-marker[data-area-id="wro-001"] { left: 32.1%; top: 62.6%; }
+.area-native-marker[data-area-id="poz-002"] { left: 31.3%; top: 44.3%; }
+.area-native-marker[data-area-id="gdn-003"] { left: 45.4%; top: 16.3%; }
+.area-native-marker[data-area-id="waw-004"] { left: 65.4%; top: 47.1%; }
+.area-native-marker[data-area-id="ktw-005"] { left: 48.8%; top: 73.8%; }
+.area-native-marker[data-area-id="krk-006"] { left: 56.2%; top: 76.6%; }
+.area-native-marker[data-area-id="ldz-007"] { left: 52.9%; top: 52.8%; }
+.area-native-marker[data-area-id="szc-008"] { left: 12.2%; top: 30.3%; }
+.area-native-marker[data-area-id="lub-009"] { left: 78.7%; top: 61.2%; }
+.area-native-marker[data-area-id="rze-010"] { left: 73.7%; top: 78.0%; }
+.area-native-marker[data-area-id="bia-011"] { left: 83.7%; top: 34.5%; }
+.area-native-marker[data-area-id="tor-012"] { left: 45.4%; top: 35.9%; }
 .area-native-marker::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 4px #0008; }
 .area-native-marker span { position: absolute; opacity: 0; pointer-events: none; }
 .area-native-marker small { position: absolute; top: calc(100% + 2px); left: 50%; transform: translateX(-50%); min-width: 24px; padding: 2px 4px; border-radius: 5px; background: #080808e8; color: inherit; font: 900 8px/1 ui-monospace, monospace; letter-spacing: .04em; }

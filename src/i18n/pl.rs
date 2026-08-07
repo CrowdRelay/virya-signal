@@ -739,7 +739,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "Brak dostępu do lokalizacji. Włącz lokalizację dla Virya Signal w ustawieniach aplikacji."
         }
         "could_not_read_a_fresh_location_move" => {
-            "Nie udało się odczytać świeżej lokalizacji. Wyjdź na zewnątrz i spróbuj ponownie."
+            "Nie udało się odczytać lokalizacji. Sprawdź, czy lokalizacja/GPS jest włączona i czy Virya Signal ma uprawnienie, a potem spróbuj ponownie."
         }
         "native_area_claim_invalid" => "Dane potwierdzenia punktu AREA są nieprawidłowe.",
         "native_area_drop_inactive" => "Ten punkt AREA nie jest teraz aktywny.",

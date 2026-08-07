@@ -416,8 +416,13 @@ pub(super) fn AreaGameScreen(
                                     let pressed_id = id.clone();
                                     let click_id = id;
                                     let aria = format!("{} {}", drop.number, drop.city);
-                                    let (map_x, map_y) = map_position(&drop);
-                                    let style = format!("left:{map_x}%;top:{map_y}%");
+                                    let marker_id = drop.id.clone();
+                                    // Known AREA cities are positioned by stable CSS selectors.
+                                    // Only unknown/future drops fall back to backend mapX/mapY.
+                                    let style = public_point(&drop.id).is_none().then(|| {
+                                        let (map_x, map_y) = map_position(&drop);
+                                        format!("left:{map_x}%;top:{map_y}%")
+                                    });
                                     let number = drop.number;
                                     view! {
                                         <button
@@ -426,6 +431,7 @@ pub(super) fn AreaGameScreen(
                                             class:is-live=move || live(area, &live_id)
                                             class:is-claimed=move || claimed(area, &claimed_id)
                                             class:is-selected=move || selected.get().as_deref() == Some(selected_id.as_str())
+                                            data-area-id=marker_id
                                             style=style
                                             aria-label=aria
                                             aria-pressed=move || selected.get().as_deref() == Some(pressed_id.as_str())

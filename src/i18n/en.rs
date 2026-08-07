@@ -737,7 +737,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "Location access is denied. Enable Location for Virya Signal in the app settings."
         }
         "could_not_read_a_fresh_location_move" => {
-            "Could not read a fresh location. Move outdoors and retry."
+            "Could not read location. Check system Location/GPS and app permission, then retry."
         }
         "native_area_claim_invalid" => "The AREA point verification data is invalid.",
         "native_area_drop_inactive" => "This AREA point is not active now.",

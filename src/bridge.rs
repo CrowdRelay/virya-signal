@@ -14,7 +14,7 @@ let viryaTexts = {
   cameraDenied: 'Camera access is denied. Enable Camera for Virya Signal in the app settings.',
   locationModuleUnavailable: 'The location module is unavailable in this app version.',
   locationDenied: 'Location access is denied. Enable Location for Virya Signal in the app settings.',
-  locationUnavailable: 'Could not read a fresh location. Move outdoors and retry.',
+  locationUnavailable: 'Could not read location. Check system Location/GPS and app permission, then retry.',
   scannerLabel: 'QR code scanner', scannerTitle: 'SCAN QR CODE', scannerHint: 'Place the code inside the frame', scannerCancel: '← CANCEL SCANNING', scannerClosing: 'CLOSING…', scannerUnavailable: 'The scanner is available only in the iOS/Android app.',
   unknownError: 'Unknown application error', reportType: 'Type', reportTime: 'Time', reportOperation: 'Operation', reportPath: 'Path', reportError: 'Error',
   diagnostics: 'VIRYA SIGNAL / DIAGNOSTICS', previousFailure: 'The previous launch ended with an error', currentFailure: 'The app caught an error', reportHelp: 'We do not hide failures. Copy the report and send it with a note about what you tapped.', copyReport: 'COPY REPORT', restart: 'RESTART APP', close: 'CLOSE', reportCopied: 'Report copied.', copyManually: 'Press and hold the report text and copy it manually.', interrupted: 'The previous launch interrupted operation {command}.', uncleanShutdown: 'The previous launch ended without a clean shutdown.'
@@ -333,35 +333,132 @@ async function viryaPositionAttempt(core, options, deadlineMs) {
     return viryaNormalizePosition(position);
   } finally {
     clearTimeout(timer);
-    // If the native read resolves after the UI deadline, do not leak an
-    // unhandled rejection into the WebView.
     void nativeRead.catch(() => {});
   }
 }
 
+async function viryaWatchPositionAttempt(core, options, deadlineMs) {
+  if (typeof core?.Channel !== 'function') {
+    throw new Error('location-watch-channel-unavailable');
+  }
+
+  let settled = false;
+  let resolveMessage;
+  let rejectMessage;
+  const result = new Promise((resolve, reject) => {
+    resolveMessage = resolve;
+    rejectMessage = reject;
+  });
+  const channel = new core.Channel((message) => {
+    if (settled) return;
+    if (typeof message === 'string') {
+      settled = true;
+      rejectMessage(new Error(message));
+      return;
+    }
+    try {
+      const normalized = viryaNormalizePosition(message);
+      settled = true;
+      resolveMessage(normalized);
+    } catch (error) {
+      window.console?.warn?.('[virya:location] discarded invalid watched position', error);
+    }
+  });
+
+  let timer;
+  try {
+    await core.invoke('plugin:geolocation|watch_position', { options, channel });
+    return await Promise.race([
+      result,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('location-watch-timeout')), deadlineMs);
+      }),
+    ]);
+  } finally {
+    settled = true;
+    clearTimeout(timer);
+    if (Number.isFinite(channel.id)) {
+      await core.invoke('plugin:geolocation|clear_watch', { channelId: channel.id }).catch((error) => {
+        window.console?.warn?.('[virya:location] clear watch failed', error);
+      });
+    }
+  }
+}
+
+async function viryaBrowserPositionAttempt(options, deadlineMs) {
+  if (!window.navigator?.geolocation?.getCurrentPosition) {
+    throw new Error('browser-geolocation-unavailable');
+  }
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('browser-location-timeout')), deadlineMs);
+    window.navigator.geolocation.getCurrentPosition(
+      (position) => {
+        clearTimeout(timer);
+        try { resolve(viryaNormalizePosition(position)); }
+        catch (error) { reject(error); }
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error instanceof Error ? error : new Error(String(error?.message ?? error)));
+      },
+      options,
+    );
+  });
+}
+
 async function viryaReadCurrentPosition(core, strictFresh = false) {
-  const attempts = strictFresh
+  const directAttempts = strictFresh
     ? [
         [{ enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }, 14000],
       ]
     : [
-        [{ enableHighAccuracy: true, timeout: 10000, maximumAge: 15000 }, 12000],
-        // Finding the nearest city does not require a fresh GPS fix. A recent
-        // foreground/cached fix makes AREA usable indoors and with Approximate
-        // Location while exact claim coordinates remain server-side.
-        [{ enableHighAccuracy: false, timeout: 7000, maximumAge: 300000 }, 9000],
+        // Prefer a recent cached/network fix first; it is plenty for selecting
+        // the nearest city and avoids waiting for cold GPS indoors.
+        [{ enableHighAccuracy: false, timeout: 4000, maximumAge: 300000 }, 5500],
+        [{ enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }, 12000],
       ];
 
   let lastError;
-  for (const [options, deadlineMs] of attempts) {
+  for (const [options, deadlineMs] of directAttempts) {
     try {
       return await viryaPositionAttempt(core, options, deadlineMs);
     } catch (error) {
       lastError = error;
-      window.console?.warn?.('[virya:location] position attempt failed', options, error);
+      window.console?.warn?.('[virya:location] direct position attempt failed', options, error);
     }
   }
-  window.console?.warn?.('[virya:location] all position attempts failed', lastError);
+
+  // Android getCurrentPosition can return no fix while the provider is still
+  // warming up. A one-shot watch waits for the next provider update and is the
+  // reliable fallback recommended by the plugin API for live updates.
+  const watchOptions = strictFresh
+    ? { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    : { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 };
+  try {
+    return await viryaWatchPositionAttempt(core, watchOptions, strictFresh ? 18000 : 16000);
+  } catch (error) {
+    lastError = error;
+    window.console?.warn?.('[virya:location] watched position attempt failed', error);
+  }
+
+  // WebView geolocation uses the platform provider too, but takes a different
+  // path through Android. Keep it as a final compatibility fallback after the
+  // native plugin, never as the primary source.
+  try {
+    return await viryaBrowserPositionAttempt(
+      {
+        enableHighAccuracy: strictFresh,
+        timeout: strictFresh ? 12000 : 8000,
+        maximumAge: strictFresh ? 0 : 300000,
+      },
+      strictFresh ? 13000 : 9000,
+    );
+  } catch (error) {
+    lastError = error;
+    window.console?.warn?.('[virya:location] browser fallback failed', error);
+  }
+
+  window.console?.warn?.('[virya:location] all position paths failed', lastError);
   throw new Error(viryaTexts.locationUnavailable);
 }
 

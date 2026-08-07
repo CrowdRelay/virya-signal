@@ -17,7 +17,8 @@ class MobileAreaContracts(unittest.TestCase):
         self.assertIn('"geolocation:allow-check-permissions"', capability)
         self.assertIn('"geolocation:allow-request-permissions"', capability)
         self.assertIn('"geolocation:allow-get-current-position"', capability)
-        self.assertNotIn('"geolocation:allow-watch-position"', capability)
+        self.assertIn('"geolocation:allow-watch-position"', capability)
+        self.assertIn('"geolocation:allow-clear-watch"', capability)
 
     def test_area_claim_stays_native_and_bounded(self):
         bridge = (ROOT / "src/bridge.rs").read_text()
@@ -75,6 +76,9 @@ class MobileAreaContracts(unittest.TestCase):
         self.assertRegex(styles, r"\.area-native-marker \{[^}]*width: 44px; height: 44px")
         self.assertIn(".area-map-silhouette", styles)
         self.assertIn("aspect-ratio: 1.08 / 1", styles)
+        self.assertEqual(styles.count('.area-native-marker[data-area-id="'), 12)
+        self.assertIn('.area-native-marker[data-area-id="tor-012"] { left: 45.4%; top: 35.9%; }', styles)
+        self.assertIn('.area-native-marker[data-area-id="wro-001"] { left: 32.1%; top: 62.6%; }', styles)
         self.assertNotIn(".area-native-map::before", styles)
         self.assertIn(
             ".area-target-actions,\n  .area-native-actions { grid-template-columns: 1fr; }",
@@ -88,9 +92,14 @@ class MobileAreaContracts(unittest.TestCase):
         self.assertIn("maximumAge: 300000", bridge)
         self.assertIn("enableHighAccuracy: false", bridge)
         self.assertIn("location-read-timeout", bridge)
+        self.assertIn("plugin:geolocation|watch_position", bridge)
+        self.assertIn("plugin:geolocation|clear_watch", bridge)
+        self.assertIn("new core.Channel", bridge)
+        self.assertIn("navigator.geolocation.getCurrentPosition", bridge)
         self.assertIn("await viryaEnsureLocationPermission(core, false)", bridge)
         self.assertIn("await viryaEnsureLocationPermission(core, true)", bridge)
         self.assertIn("strictFresh", bridge)
+        self.assertNotIn("Move outdoors and retry", bridge)
 
     def test_area_api_error_codes_are_localized(self):
         public_api = (ROOT / "src-tauri/src/api/public.rs").read_text()
