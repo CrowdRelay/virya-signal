@@ -78,14 +78,32 @@ pub fn run() {
     let runtime_result = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            #[cfg(mobile)]
-            {
-                app.handle().plugin(tauri_plugin_barcode_scanner::init())?;
-                app.handle().plugin(tauri_plugin_geolocation::init())?;
-            }
+            // Establish the crash-report destination before any optional mobile
+            // plugin is initialized. A plugin initialization failure used to
+            // abort setup before the reporter knew where to persist evidence.
             let app_data_dir = app.path().app_local_data_dir()?;
             let crash_report_path = app_data_dir.join(crash::NATIVE_CRASH_REPORT_FILE);
             let _ = crash::NATIVE_CRASH_REPORT_PATH.set(crash_report_path);
+
+            #[cfg(mobile)]
+            {
+                let mut plugin_errors = Vec::new();
+                if let Err(error) = app.handle().plugin(tauri_plugin_barcode_scanner::init()) {
+                    plugin_errors.push(format!("barcode-scanner: {error}"));
+                }
+                if let Err(error) = app.handle().plugin(tauri_plugin_geolocation::init()) {
+                    plugin_errors.push(format!("geolocation: {error}"));
+                }
+                if !plugin_errors.is_empty() {
+                    let report = format!(
+                        "mobile plugin initialization degraded: {}",
+                        plugin_errors.join("; ")
+                    );
+                    eprintln!("[virya:mobile-plugin] {report}");
+                    crash::write_native_crash_report(&report);
+                }
+            }
+
             let api = CrowdRelayClient::new(app_data_dir.join("public-cache-v1.json"))?;
             app.manage(AppState {
                 session: RwLock::new(None),
