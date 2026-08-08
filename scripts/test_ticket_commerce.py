@@ -57,6 +57,11 @@ class TicketCommerceContracts(unittest.TestCase):
             ui,
         )
 
+    def test_ticket_quantity_controls_meet_mobile_touch_target(self):
+        styles = (ROOT / "styles.css").read_text()
+        self.assertIn("grid-template-columns: 44px 40px 44px", styles)
+        self.assertIn(".ticket-stepper button { width: 44px; height: 44px;", styles)
+
     def test_checkout_uses_existing_bounded_first_party_flow(self):
         ticketing = (ROOT / "src-tauri/src/api/ticketing.rs").read_text()
         self.assertIn('https://virya.music/api/ticket-checkout', ticketing)

@@ -67,6 +67,7 @@ pub struct CrowdRelayClient {
     pub(super) cache_file: Arc<PathBuf>,
     cache_write: Arc<Mutex<()>>,
     cache_persisting: Arc<AtomicBool>,
+    cache_dirty: Arc<AtomicBool>,
 }
 
 impl CrowdRelayClient {
@@ -93,6 +94,7 @@ impl CrowdRelayClient {
             cache_file: Arc::new(cache_file),
             cache_write: Arc::new(Mutex::new(())),
             cache_persisting: Arc::new(AtomicBool::new(false)),
+            cache_dirty: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -387,13 +389,26 @@ impl CrowdRelayClient {
     }
 
     pub(super) fn persist_public_cache_in_background(&self) {
+        self.cache_dirty.store(true, Ordering::Release);
         if self.cache_persisting.swap(true, Ordering::AcqRel) {
             return;
         }
         let client = self.clone();
         tokio::spawn(async move {
-            client.persist_public_cache().await;
-            client.cache_persisting.store(false, Ordering::Release);
+            loop {
+                client.cache_dirty.store(false, Ordering::Release);
+                client.persist_public_cache().await;
+                if client.cache_dirty.load(Ordering::Acquire) {
+                    continue;
+                }
+                client.cache_persisting.store(false, Ordering::Release);
+                if !client.cache_dirty.load(Ordering::Acquire) {
+                    break;
+                }
+                if client.cache_persisting.swap(true, Ordering::AcqRel) {
+                    break;
+                }
+            }
         });
     }
 

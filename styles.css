@@ -889,8 +889,8 @@ html[data-virya-scanner-active] .app-shell {
 .ticket-type-card p { margin: 0 0 9px; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .ticket-type-card strong { display: block; color: var(--yellow); font-size: 15px; }
 .ticket-type-card small { display: block; margin-top: 5px; color: #777; font-size: 9px; }
-.ticket-stepper { display: grid; grid-template-columns: 42px 40px 42px; align-items: center; overflow: hidden; border: 1px solid #4b421e; border-radius: var(--control-radius); background: #0b0b09; }
-.ticket-stepper button { width: 42px; height: 44px; border: 0; border-radius: 0; background: transparent; color: var(--yellow); display: grid; place-items: center; padding: 0; font-size: 24px; font-weight: 700; line-height: 1; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.ticket-stepper { display: grid; grid-template-columns: 44px 40px 44px; align-items: center; overflow: hidden; border: 1px solid #4b421e; border-radius: var(--control-radius); background: #0b0b09; }
+.ticket-stepper button { width: 44px; height: 44px; border: 0; border-radius: 0; background: transparent; color: var(--yellow); display: grid; place-items: center; padding: 0; font-size: 24px; font-weight: 700; line-height: 1; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .ticket-stepper button:active:not(:disabled) { background: #f3c51a18; }
 .ticket-stepper button:disabled { background: #080807; color: #625725; opacity: .72; }
 .ticket-stepper output { min-width: 40px; text-align: center; color: #fff; font-weight: 900; font-variant-numeric: tabular-nums; }

@@ -112,6 +112,9 @@ class RuntimePerformanceContract(unittest.TestCase):
         source = (ROOT / "src-tauri/src/api/client.rs").read_text()
         self.assertIn("swap(true, Ordering::AcqRel)", source)
         self.assertIn("store(false, Ordering::Release)", source)
+        self.assertIn("cache_dirty.store(true, Ordering::Release)", source)
+        self.assertIn("cache_dirty.load(Ordering::Acquire)", source)
+        self.assertIn("loop {", source[source.index("pub(super) fn persist_public_cache_in_background") :])
         persistence = source[
             source.index("pub(super) fn persist_public_cache_in_background") :
         ]
