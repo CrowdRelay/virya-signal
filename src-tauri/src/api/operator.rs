@@ -3,9 +3,10 @@ use reqwest::Method;
 use crate::{
     AppError,
     models::{
-        ConcertQrOverview, CreateQrCampaignInput, IssuePassInput, OperatorOpsOverview,
-        OperatorProfile, OperatorRole, OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem,
-        OpsRetryResult, OpsSummary, PublicEvent, ShowModeSnapshot, TicketingOverview,
+        AudienceRevenueSummary, AudienceSummary, ConcertQrOverview, CreateQrCampaignInput,
+        IssuePassInput, OperatorOpsOverview, OperatorProfile, OperatorRole, OperatorSignalOverview,
+        OpsDeliveryItem, OpsOutboxItem, OpsRetryResult, OpsSummary, PublicEvent, ShowModeSnapshot,
+        TicketingOverview,
     },
 };
 
@@ -152,14 +153,57 @@ impl super::CrowdRelayClient {
         profile: &OperatorProfile,
     ) -> Result<OperatorSignalOverview, AppError> {
         require_owner(profile)?;
-        let mut overview = self
-            .auth_json::<OperatorSignalOverview, ()>(
-                profile,
-                Method::GET,
-                "admin/signal/overview",
-                None,
-            )
-            .await?;
+        let signal_request = self.auth_json::<OperatorSignalOverview, ()>(
+            profile,
+            Method::GET,
+            "admin/signal/overview",
+            None,
+        );
+        let audience_request = self.auth_json::<AudienceSummary, ()>(
+            profile,
+            Method::GET,
+            "admin/audience/overview",
+            None,
+        );
+        let revenue_request = self.auth_json::<Vec<AudienceRevenueSummary>, ()>(
+            profile,
+            Method::GET,
+            "admin/analytics/revenue",
+            None,
+        );
+        let (signal_result, audience_result, revenue_result) =
+            futures_util::future::join3(signal_request, audience_request, revenue_request).await;
+        let mut overview = signal_result?;
+
+        match audience_result {
+            Ok(mut audience) => {
+                audience.active_fans = audience.active_fans.max(0);
+                audience.marketing_consented_fans = audience.marketing_consented_fans.max(0);
+                audience.ticket_buyers = audience.ticket_buyers.max(0);
+                audience.attendees = audience.attendees.max(0);
+                audience.synesthesia_participants = audience.synesthesia_participants.max(0);
+                audience.qualified_referrals = audience.qualified_referrals.max(0);
+                audience.paid_ticket_orders = audience.paid_ticket_orders.max(0);
+                overview.audience = audience;
+            }
+            Err(_) => overview.unavailable_sources.push("audience".to_owned()),
+        }
+        match revenue_result {
+            Ok(mut revenue) => {
+                revenue.retain(|row| {
+                    row.currency.len() == 3
+                        && row.currency.bytes().all(|byte| byte.is_ascii_uppercase())
+                        && row.paid_orders >= 0
+                        && row.gross_paid_minor >= 0
+                        && row.refunded_minor >= 0
+                        && row.refunded_minor <= row.gross_paid_minor
+                        && row.after_refunds_minor == row.gross_paid_minor - row.refunded_minor
+                });
+                revenue.truncate(8);
+                overview.ticket_revenue = revenue;
+            }
+            Err(_) => overview.unavailable_sources.push("revenue".to_owned()),
+        }
 
         let summary = &mut overview.summary;
         summary.total_fans = summary.total_fans.max(0);
@@ -198,6 +242,8 @@ impl super::CrowdRelayClient {
                     .bytes()
                     .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
         });
+        overview.unavailable_sources.sort_unstable();
+        overview.unavailable_sources.dedup();
         overview.unavailable_sources.truncate(8);
         overview.generated_at = overview.generated_at.chars().take(64).collect();
 

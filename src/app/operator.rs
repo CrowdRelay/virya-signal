@@ -581,6 +581,9 @@ fn OperatorSignal(
 fn SignalOverviewContent(data: OperatorSignalOverview) -> impl IntoView {
     let summary = data.summary;
     let activity = data.activity;
+    let audience = data.audience;
+    let ticket_revenue = data.ticket_revenue;
+    let has_ticket_revenue = !ticket_revenue.is_empty();
     let confirmation_base = summary.active_fans.saturating_add(summary.pending_fans);
     let confirmation_rate = if confirmation_base > 0 {
         format!(
@@ -658,6 +661,24 @@ fn SignalOverviewContent(data: OperatorSignalOverview) -> impl IntoView {
                 <article><strong>{activity.nearby_notifications_30d.max(0)}</strong><span>{tr("nearby_notifications_2")}</span></article>
                 <article><strong>{activity.pending_city_requests.max(0)}</strong><span>{tr("cities_awaiting_moderation")}</span></article>
             </div>
+            <div class="section-head"><h3>{tr("audience_intelligence")}</h3><span>{tr("fan_360_summary")}</span></div>
+            <div class="signal-activity-grid">
+                <article><strong>{audience.ticket_buyers.max(0)}</strong><span>{tr("ticket_buyers")}</span></article>
+                <article><strong>{audience.attendees.max(0)}</strong><span>{tr("concert_attendees")}</span></article>
+                <article><strong>{audience.synesthesia_participants.max(0)}</strong><span>{tr("synesthesia_participants")}</span></article>
+                <article><strong>{audience.qualified_referrals.max(0)}</strong><span>{tr("qualified_referrals")}</span></article>
+            </div>
+            <Show when=move || has_ticket_revenue>
+                <div class="section-head"><h3>{tr("ticket_revenue")}</h3><span>{tr("after_refunds")}</span></div>
+                <div class="signal-city-list">
+                    {ticket_revenue.clone().into_iter().map(|row| view! {
+                        <article class="signal-city-card">
+                            <div><strong>{money(row.after_refunds_minor, &row.currency)}</strong><small>{i18n::format("paid_orders_count", &[row.paid_orders.max(0).to_string()])}</small></div>
+                            <span>{row.currency}</span>
+                        </article>
+                    }).collect_view()}
+                </div>
+            </Show>
             {degraded_view}
             <div class="section-head"><h3>{tr("strongest_cities")}</h3><span>{city_count}</span></div>
             {cities_view}

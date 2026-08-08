@@ -684,7 +684,48 @@ pub struct OperatorSignalOverview {
     #[serde(default)]
     pub top_cities: Vec<SignalCitySummary>,
     #[serde(default)]
+    pub audience: AudienceSummary,
+    #[serde(default)]
+    pub ticket_revenue: Vec<AudienceRevenueSummary>,
+    #[serde(default)]
     pub unavailable_sources: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct AudienceSummary {
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub active_fans: i64,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub marketing_consented_fans: i64,
+    #[serde(default)]
+    pub ticket_buyers: i64,
+    #[serde(default)]
+    pub attendees: i64,
+    #[serde(default)]
+    pub synesthesia_participants: i64,
+    #[serde(default)]
+    pub qualified_referrals: i64,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub paid_ticket_orders: i64,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct AudienceRevenueSummary {
+    #[serde(default)]
+    pub currency: String,
+    #[serde(default)]
+    pub paid_orders: i64,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub gross_paid_minor: i64,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub refunded_minor: i64,
+    #[serde(default)]
+    pub after_refunds_minor: i64,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
