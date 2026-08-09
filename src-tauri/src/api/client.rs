@@ -127,11 +127,10 @@ impl CrowdRelayClient {
             Ok(response) => response,
             Err(error) => return stale.ok_or(error),
         };
-        if transient_public_status(response.status()) {
-            if let Some(events) = stale.as_ref() {
+        if transient_public_status(response.status())
+            && let Some(events) = stale.as_ref() {
                 return Ok(events.clone());
             }
-        }
         if response.status() == reqwest::StatusCode::NOT_MODIFIED {
             let events = stale.ok_or_else(|| AppError::Remote {
                 status: reqwest::StatusCode::NOT_MODIFIED.as_u16(),
@@ -184,11 +183,10 @@ impl CrowdRelayClient {
             Err(error) => return stale.ok_or(error),
         };
 
-        if transient_public_status(response.status()) {
-            if let Some(catalog) = stale.as_ref() {
+        if transient_public_status(response.status())
+            && let Some(catalog) = stale.as_ref() {
                 return Ok(catalog.clone());
             }
-        }
         if response.status() == reqwest::StatusCode::NOT_MODIFIED {
             let catalog = stale.ok_or_else(|| AppError::Remote {
                 status: reqwest::StatusCode::NOT_MODIFIED.as_u16(),
@@ -247,11 +245,10 @@ impl CrowdRelayClient {
             Ok(response) => response,
             Err(error) => return stale.ok_or(error),
         };
-        if transient_public_status(response.status()) {
-            if let Some(cities) = stale.as_ref() {
+        if transient_public_status(response.status())
+            && let Some(cities) = stale.as_ref() {
                 return Ok(cities.clone());
             }
-        }
         if response.status() == reqwest::StatusCode::NOT_MODIFIED {
             let cities = stale.ok_or_else(|| AppError::Remote {
                 status: reqwest::StatusCode::NOT_MODIFIED.as_u16(),
