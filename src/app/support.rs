@@ -148,6 +148,29 @@ fn refresh_fan_status(status: RwSignal<FanSessionStatus>, error: RwSignal<Option
     });
 }
 
+fn refresh_fan_home(
+    home: RwSignal<Option<FanHomeData>>,
+    loading: RwSignal<FanLoadingState>,
+    error: RwSignal<Option<String>>,
+) {
+    loading.update(|state| state.home = true);
+    spawn_local(async move {
+        match bridge::invoke_latest::<FanHomeData, _>(
+            "fan_home",
+            &EmptyArgs {},
+            12_000,
+            "fan:home",
+        )
+        .await
+        {
+            Ok(Some(value)) => home.set(Some(value)),
+            Ok(None) => return,
+            Err(message) => error.set(Some(message)),
+        }
+        loading.update(|state| state.home = false);
+    });
+}
+
 fn refresh_fan_parts(
     dashboard: RwSignal<Option<FanDashboardData>>,
     loading: RwSignal<FanLoadingState>,

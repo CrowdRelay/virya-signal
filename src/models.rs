@@ -65,6 +65,83 @@ pub struct PublicHomeData {
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
+pub struct FanHomeData {
+    pub schema_version: u32,
+    pub generated_at: String,
+    pub profile: FanHomeProfile,
+    pub next_event: Option<FanHomeEvent>,
+    pub synesthesia: FanHomeSynesthesia,
+    pub referral: FanHomeReferral,
+    pub counts: FanHomeCounts,
+    pub recommended_action: String,
+    #[serde(default)]
+    pub stale: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct FanHomeProfile {
+    pub display_name: Option<String>,
+    pub locale: Option<String>,
+    pub primary_city: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct FanHomeEvent {
+    pub slug: String,
+    pub title: String,
+    pub venue: Option<String>,
+    pub city: Option<String>,
+    pub starts_at: String,
+    pub doors_at: Option<String>,
+    pub ends_at: Option<String>,
+    pub phase: String,
+    pub ticket_url: Option<String>,
+    pub interested: bool,
+    pub has_pass: bool,
+    pub has_paid_ticket: bool,
+    pub ticket_sale_active: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct FanHomeSynesthesia {
+    pub started: bool,
+    pub completed: bool,
+    pub rooms_completed: i16,
+    pub client_total_elapsed_ms: Option<i64>,
+    pub linked_at: Option<String>,
+    pub reward_entered: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct FanHomeReferral {
+    pub qualified: i64,
+    pub pending: i64,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct FanHomeCounts {
+    pub event_interests: i64,
+    pub active_passes: i64,
+    pub paid_orders: i64,
+    pub area_claims: i64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct StaffEventDashboard {
+    pub schema_version: i32,
+    pub slug: String,
+    pub title: String,
+    pub venue: Option<String>,
+    pub starts_at: String,
+    pub interested_fans: i64,
+    pub paid_orders: i64,
+    pub paid_tickets: i64,
+    pub passes_issued: i64,
+    pub passes_claimed: i64,
+    pub passes_redeemed: i64,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct MerchCatalog {
     #[serde(default)]
     pub products: Vec<MerchProduct>,
@@ -629,6 +706,24 @@ pub struct OpsSummary {
     pub outbox: QueueSummary,
     #[serde(default)]
     pub deliveries: QueueSummary,
+    #[serde(default)]
+    pub http: HttpRequestSummary,
+    #[serde(default)]
+    pub release: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct HttpRequestSummary {
+    #[serde(default)]
+    pub requests: u64,
+    #[serde(default)]
+    pub errors_5xx: u64,
+    #[serde(default)]
+    pub average_ms: u64,
+    #[serde(default)]
+    pub p50_ms: u64,
+    #[serde(default)]
+    pub p95_ms: u64,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -837,6 +932,8 @@ pub struct TicketWallet {
     pub order: WalletOrder,
     #[serde(default)]
     pub tickets: Vec<WalletTicket>,
+    #[serde(default)]
+    pub cached: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -845,6 +942,8 @@ pub struct WalletBatch {
     pub wallets: Vec<TicketWallet>,
     #[serde(default)]
     pub failed_count: usize,
+    #[serde(default)]
+    pub cached_count: usize,
 }
 
 #[derive(Clone, Debug, Deserialize)]

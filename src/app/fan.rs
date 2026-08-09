@@ -441,6 +441,7 @@ fn FanApp(
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let tab = RwSignal::new(FanTab::Signal);
+    let home = RwSignal::new(None::<FanHomeData>);
     let dashboard = RwSignal::new(None::<FanDashboardData>);
     let merch = RwSignal::new(None::<MerchCatalog>);
     let merch_bundles = RwSignal::new(None::<FanMerchBundleCatalog>);
@@ -463,6 +464,10 @@ fn FanApp(
 
         match tab.get() {
             FanTab::Signal => {
+                if !loaded.get_untracked().home {
+                    loaded.update(|state| state.home = true);
+                    refresh_fan_home(home, loading, error);
+                }
                 if !loaded.get_untracked().referral {
                     loaded.update(|state| state.referral = true);
                     refresh_fan_referral(dashboard, loading, error);
@@ -544,6 +549,7 @@ fn FanApp(
         spawn_local(async move {
             match bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
                 Ok(value) => {
+                    home.set(None);
                     dashboard.set(None);
                     merch.set(None);
                     merch_bundles.set(None);
@@ -563,7 +569,7 @@ fn FanApp(
     view! {
         <section class="authenticated fan-authenticated">
             <header class="topbar fan-topbar">
-                <div on:dblclick=move |_| { loaded.set(FanLoadedState::default()); refresh_fan_parts(dashboard, loading, error); refresh_fan_merch(merch, loading, error); refresh_fan_merch_bundles(merch_bundles); refresh_wallets(wallets, Some(loading), error); refresh_fan_area(area, loading, error); } style="cursor:pointer"><p class="eyebrow">{tr("virya_signal")}</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| tr("my_signal").to_owned())}</strong></div>
+                <div on:dblclick=move |_| { loaded.set(FanLoadedState::default()); refresh_fan_home(home, loading, error); refresh_fan_parts(dashboard, loading, error); refresh_fan_merch(merch, loading, error); refresh_fan_merch_bundles(merch_bundles); refresh_wallets(wallets, Some(loading), error); refresh_fan_area(area, loading, error); } style="cursor:pointer"><p class="eyebrow">{tr("virya_signal")}</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| tr("my_signal").to_owned())}</strong></div>
                 <div class="topbar-actions"><span class="live-dot"></span><button class="menu-trigger" aria-label=tr("open_menu") aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|value| *value = !*value)><i></i><i></i><i></i></button><button aria-label=tr("close_and_lock_signal") on:click=close>"×"</button></div>
             </header>
             <Show when=move || menu_open.get()>
@@ -575,7 +581,7 @@ fn FanApp(
                 </nav>
             </Show>
             <div class="content">{move || match tab.get() {
-                FanTab::Signal => view! { <FanSignal dashboard=dashboard loading=loading error=error /> }.into_any(),
+                FanTab::Signal => view! { <FanSignal home=home dashboard=dashboard tab=tab loading=loading error=error /> }.into_any(),
                 FanTab::Events => checkout_event.get().map(|event| view! {
                     <FanTicketCheckout
                         event=event
@@ -611,13 +617,16 @@ fn FanNavButton(
 
 #[component]
 fn FanSignal(
+    home: RwSignal<Option<FanHomeData>>,
     dashboard: RwSignal<Option<FanDashboardData>>,
+    tab: RwSignal<FanTab>,
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     view! {
         <section class="screen fan-screen">
-            <header class="signal-dashboard-hero">
+            <FanHomeOverview home=home loading=loading tab=tab error=error />
+            <header class="signal-dashboard-hero compact-referral-hero">
                 <p class="eyebrow">{tr("your_impact")}</p>
                 <h2>{move || dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned())}</h2>
                 <strong>{tr("confirmed_referrals")}</strong>
@@ -1564,6 +1573,7 @@ fn FanWallet(
 
 #[component]
 fn WalletCard(wallet: TicketWallet, error: RwSignal<Option<String>>) -> impl IntoView {
+    let cached = wallet.cached;
     let order_id = wallet.order.order_id.clone();
     let delivery_order_id = order_id.clone();
     let busy = RwSignal::new(false);
@@ -1583,7 +1593,7 @@ fn WalletCard(wallet: TicketWallet, error: RwSignal<Option<String>>) -> impl Int
         });
     };
     view! {
-        <article class="wallet-card"><header><div><p class="eyebrow">{wallet.order.status}</p><h3>{wallet.order.event_title}</h3><p>{event_time_location(&wallet.order.starts_at, wallet.order.venue.as_deref())}</p></div><strong>{wallet.order.public_reference}</strong></header><div class="ticket-stack">{wallet.tickets.into_iter().map(|ticket| view! { <WalletTicketCard order_id=order_id.clone() ticket=ticket error=error /> }).collect_view()}</div><button class="text-button" on:click=resend disabled=move || busy.get()>{move || if busy.get() { tr("sending") } else { tr("resend_tickets_by_email") }}</button></article>
+        <article class="wallet-card" class:cached=cached><header><div><p class="eyebrow">{wallet.order.status}</p><h3>{wallet.order.event_title}</h3><p>{event_time_location(&wallet.order.starts_at, wallet.order.venue.as_deref())}</p><Show when=move || cached><span class="cache-badge">{tr("wallet_cached_offline")}</span></Show></div><strong>{wallet.order.public_reference}</strong></header><div class="ticket-stack">{wallet.tickets.into_iter().map(|ticket| view! { <WalletTicketCard order_id=order_id.clone() ticket=ticket error=error /> }).collect_view()}</div><button class="text-button" on:click=resend disabled=move || busy.get()>{move || if busy.get() { tr("sending") } else { tr("resend_tickets_by_email") }}</button></article>
     }
 }
 

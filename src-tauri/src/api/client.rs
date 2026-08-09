@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 use crate::{
     AppError,
-    models::{CitySignal, FanProfile, MerchCatalog, OperatorProfile, PublicEvent},
+    models::{CitySignal, FanHomeData, FanProfile, MerchCatalog, OperatorProfile, PublicEvent},
 };
 
 use super::{
@@ -35,6 +35,8 @@ pub(super) const PASS_COOKIE: &str = "crowdrelay_pass_session";
 pub(super) const WALLET_REQUEST_TIMEOUT: Duration = Duration::from_secs(12);
 const MERCH_CACHE_TTL: Duration = Duration::from_secs(15);
 const MERCH_STALE_TTL: Duration = Duration::from_secs(10 * 60);
+pub(super) const FAN_HOME_CACHE_TTL: Duration = Duration::from_secs(20);
+pub(super) const FAN_HOME_STALE_TTL: Duration = Duration::from_secs(10 * 60);
 fn transient_public_status(status: reqwest::StatusCode) -> bool {
     status == reqwest::StatusCode::TOO_MANY_REQUESTS || status.is_server_error()
 }
@@ -73,6 +75,8 @@ pub struct CrowdRelayClient {
     cities_fetch: Arc<Mutex<()>>,
     merch_fetch: Arc<Mutex<()>>,
     merch_cache: Arc<RwLock<HashMap<String, CacheEntry<MerchCatalog>>>>,
+    pub(super) fan_home_fetch: Arc<Mutex<()>>,
+    pub(super) fan_home_cache: Arc<RwLock<HashMap<String, CacheEntry<FanHomeData>>>>,
     pub(super) cache_file: Arc<PathBuf>,
     cache_write: Arc<Mutex<()>>,
     cache_persisting: Arc<AtomicBool>,
@@ -102,6 +106,8 @@ impl CrowdRelayClient {
             cities_fetch: Arc::new(Mutex::new(())),
             merch_fetch: Arc::new(Mutex::new(())),
             merch_cache: Arc::new(RwLock::new(HashMap::new())),
+            fan_home_fetch: Arc::new(Mutex::new(())),
+            fan_home_cache: Arc::new(RwLock::new(HashMap::new())),
             cache_file: Arc::new(cache_file),
             cache_write: Arc::new(Mutex::new(())),
             cache_persisting: Arc::new(AtomicBool::new(false)),
@@ -299,11 +305,16 @@ impl CrowdRelayClient {
         } else {
             Some(Uuid::new_v4().to_string())
         };
+        // One stable correlation id survives bounded retries so a staff action can
+        // be followed end-to-end in CrowdRelay logs without accepting arbitrary
+        // public client request ids.
+        let correlation_id = Uuid::new_v4().to_string();
         let attempt = || async {
             let mut request = self
                 .http
                 .request(method.clone(), url.clone())
                 .header(ACCEPT, "application/json")
+                .header("X-CrowdRelay-Correlation-Id", correlation_id.as_str())
                 .bearer_auth(profile.bearer_token.trim());
             if let Some(ref key) = idempotency_key {
                 request = request.header("Idempotency-Key", key.as_str());

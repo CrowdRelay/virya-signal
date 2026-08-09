@@ -38,7 +38,7 @@ where
     Err(last_error.unwrap_or(AppError::BackgroundTask))
 }
 
-fn is_transient_failure(error: &AppError) -> bool {
+pub(super) fn is_transient_failure(error: &AppError) -> bool {
     match error {
         AppError::Network(reqwest_error) => {
             reqwest_error.is_timeout() || reqwest_error.is_connect() || reqwest_error.is_request()

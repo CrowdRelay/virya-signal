@@ -11,7 +11,7 @@ use crate::{
     models::{
         ConcertQrOverview, CreateQrCampaignInput, IssuePassInput, OperatorOpsOverview,
         OperatorProfile, OperatorSignalOverview, OpsRetryResult, PublicEvent, SessionStatus,
-        TicketingOverview,
+        StaffEventDashboard, TicketingOverview,
     },
     session::{operator_profile, run_blocking},
     validation::{
@@ -130,6 +130,15 @@ pub(crate) async fn operator_events(
 pub(crate) async fn operator_qr(state: State<'_, AppState>) -> Result<ConcertQrOverview, AppError> {
     let profile = operator_profile(&state).await?;
     state.api.operator_qr(&profile).await
+}
+
+#[tauri::command]
+pub(crate) async fn staff_event_dashboard(
+    state: State<'_, AppState>,
+    event_slug: String,
+) -> Result<StaffEventDashboard, AppError> {
+    let profile = operator_profile(&state).await?;
+    state.api.staff_event_dashboard(&profile, &event_slug).await
 }
 
 #[tauri::command]

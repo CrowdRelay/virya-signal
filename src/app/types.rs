@@ -44,6 +44,7 @@ pub(super) enum FanAccessMode {
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct FanLoadingState {
+    pub home: bool,
     pub events: bool,
     pub referral: bool,
     pub interests: bool,
@@ -55,6 +56,7 @@ pub(super) struct FanLoadingState {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct FanLoadedState {
+    pub home: bool,
     pub referral: bool,
     pub events: bool,
     pub interests: bool,
@@ -73,6 +75,7 @@ pub(super) struct OperatorLoadingState {
 impl OperatorLoadingState {
     pub const fn all() -> Self {
         Self {
+            home: true,
             events: true,
             qr: true,
         }

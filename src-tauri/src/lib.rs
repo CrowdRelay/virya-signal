@@ -5,6 +5,7 @@ mod api;
 mod commands;
 mod crash;
 mod error;
+mod feedback_queue;
 mod i18n;
 mod models;
 mod session;
@@ -20,7 +21,7 @@ use api::CrowdRelayClient;
 use commands::{
     fan::{
         fan_admission_pass, fan_admission_qr, fan_area_challenge, fan_area_claim, fan_area_wallet,
-        fan_claim_pass, fan_confirm, fan_events, fan_forget, fan_import_wallet, fan_interests,
+        fan_claim_pass, fan_confirm, fan_events, fan_forget, fan_home, fan_import_wallet, fan_interests,
         fan_lock, fan_merch_bundles, fan_merch_catalog, fan_referral, fan_register_interest,
         fan_request_access, fan_request_delivery, fan_signup, fan_start_ticket_checkout,
         fan_status, fan_ticket_sale, fan_unlock, fan_wallets, render_wallet_qr,
@@ -33,7 +34,7 @@ use commands::{
         configure, create_qr_campaign, forget_device, issue_pass, lock, operator_events,
         operator_ops_overview, operator_qr, operator_retry, operator_signal_overview,
         public_cities, public_events, redeem_admission, redeem_coupon, revoke_pass,
-        revoke_qr_campaign, session_status, ticketing_overview, unlock,
+        revoke_qr_campaign, session_status, staff_event_dashboard, ticketing_overview, unlock,
     },
     pairing::configure_from_pairing,
     show_mode::{
@@ -58,6 +59,7 @@ pub struct AppState {
     fan_session: RwLock<Option<Arc<FanProfile>>>,
     fan_pin: RwLock<Option<Zeroizing<String>>>,
     fan_mutation: Mutex<()>,
+    feedback_queue_mutation: Mutex<()>,
     wallet_qr_tokens: RwLock<HashMap<String, HashMap<String, Zeroizing<String>>>>,
     api: CrowdRelayClient,
     app_data_dir: PathBuf,
@@ -115,6 +117,7 @@ pub fn run() {
                 fan_session: RwLock::new(None),
                 fan_pin: RwLock::new(None),
                 fan_mutation: Mutex::new(()),
+                feedback_queue_mutation: Mutex::new(()),
                 wallet_qr_tokens: RwLock::new(HashMap::new()),
                 api,
                 app_data_dir,
@@ -142,7 +145,7 @@ pub fn run() {
             show_mode_scan,
             show_mode_sync,
             show_mode_clear,
-            ticketing_overview,
+            staff_event_dashboard, ticketing_overview,
             redeem_admission,
             redeem_coupon,
             issue_pass,
@@ -160,6 +163,7 @@ pub fn run() {
             fan_signup,
             fan_request_access,
             fan_confirm,
+            fan_home,
             fan_events,
             fan_merch_catalog,
             fan_merch_bundles,

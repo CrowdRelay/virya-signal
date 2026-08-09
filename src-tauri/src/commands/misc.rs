@@ -1,14 +1,16 @@
 //! Small commands that don't belong to the operator/fan/show-mode domains.
 
 use tauri::{AppHandle, State};
+use uuid::Uuid;
 use tauri_plugin_opener::OpenerExt;
 use zeroize::Zeroizing;
 
 use crate::{
-    AppError, AppState, i18n,
+    AppError, AppState, feedback_queue, i18n,
     models::{
         FanSessionStatus, LauncherStatus, RequestedCityInput, RequestedCityResult, SessionStatus,
     },
+    session::run_blocking,
     validation::clean_optional,
     vault,
 };
@@ -74,6 +76,7 @@ pub(crate) async fn launcher_status(
     locale: String,
 ) -> Result<LauncherStatus, AppError> {
     i18n::set_language(&locale);
+    flush_feedback_outbox(&state).await;
     let operator_session = state.session.read().await;
     let fan_session = state.fan_session.read().await;
     Ok(LauncherStatus {
@@ -112,8 +115,48 @@ pub(crate) async fn submit_anonymous_feedback(
     category: String,
     message: String,
 ) -> Result<(), AppError> {
-    state
-        .api
-        .submit_anonymous_feedback(&category, &message)
-        .await
+    let submission_id = Uuid::new_v4().to_string();
+    match state.api.submit_anonymous_feedback(&submission_id, &category, &message).await {
+        Ok(()) => Ok(()),
+        Err(error) if feedback_retryable(&error) => {
+            let _queue = state.feedback_queue_mutation.lock().await;
+            let dir = state.app_data_dir.clone();
+            let queued = feedback_queue::QueuedFeedback {
+                submission_id,
+                category,
+                message,
+                queued_at_unix: time::OffsetDateTime::now_utc().unix_timestamp(),
+            };
+            run_blocking(move || feedback_queue::enqueue(&dir, queued)).await?;
+            Ok(())
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn feedback_retryable(error: &AppError) -> bool {
+    matches!(error, AppError::Network(_))
+        || matches!(error, AppError::Remote { status, .. } if *status == 429 || *status >= 500)
+}
+
+async fn flush_feedback_outbox(state: &State<'_, AppState>) {
+    let _queue = state.feedback_queue_mutation.lock().await;
+    let dir = state.app_data_dir.clone();
+    let mut queued = match run_blocking(move || feedback_queue::load(&dir)).await {
+        Ok(values) => values,
+        Err(_) => return,
+    };
+    if queued.is_empty() { return; }
+    let mut delivered = 0usize;
+    for item in queued.iter().take(3) {
+        match state.api.submit_anonymous_feedback(&item.submission_id, &item.category, &item.message).await {
+            Ok(()) => delivered += 1,
+            Err(error) if feedback_retryable(&error) => break,
+            Err(_) => delivered += 1,
+        }
+    }
+    if delivered == 0 { return; }
+    queued.drain(0..delivered.min(queued.len()));
+    let dir = state.app_data_dir.clone();
+    let _ = run_blocking(move || feedback_queue::save(&dir, &queued)).await;
 }

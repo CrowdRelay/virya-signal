@@ -3,7 +3,6 @@ use std::time::Duration;
 use reqwest::header::{ACCEPT, ORIGIN};
 use serde::{Deserialize, Serialize};
 use url::Url;
-use uuid::Uuid;
 
 use crate::AppError;
 
@@ -229,6 +228,7 @@ impl CrowdRelayClient {
 
     pub async fn submit_anonymous_feedback(
         &self,
+        submission_id: &str,
         category: &str,
         message: &str,
     ) -> Result<(), AppError> {
@@ -249,7 +249,7 @@ impl CrowdRelayClient {
             .header(ACCEPT, "application/json")
             .header(ORIGIN, VIRYA_SITE_ORIGIN)
             .json(&SignalFeedbackRequest {
-                submission_id: Uuid::new_v4().to_string(),
+                submission_id: submission_id.to_owned(),
                 category,
                 message: &message,
                 website: "",

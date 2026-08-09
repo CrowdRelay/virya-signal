@@ -6,7 +6,7 @@ use crate::{
         AudienceRevenueSummary, AudienceSummary, ConcertQrOverview, CreateQrCampaignInput,
         IssuePassInput, OperatorOpsOverview, OperatorProfile, OperatorRole, OperatorSignalOverview,
         OpsDeliveryItem, OpsOutboxItem, OpsRetryResult, OpsSummary, PublicEvent, ShowModeSnapshot,
-        TicketingOverview,
+        StaffEventDashboard, TicketingOverview,
     },
 };
 
@@ -41,6 +41,20 @@ impl super::CrowdRelayClient {
         };
         self.auth_json::<ConcertQrOverview, ()>(profile, Method::GET, qr_path, None)
             .await
+    }
+
+    pub async fn staff_event_dashboard(
+        &self,
+        profile: &OperatorProfile,
+        event_slug: &str,
+    ) -> Result<StaffEventDashboard, AppError> {
+        self.auth_json(
+            profile,
+            Method::GET,
+            &format!("staff/events/{}/dashboard", segment(event_slug)?),
+            Option::<&()>::None,
+        )
+        .await
     }
 
     pub async fn ticketing_overview(

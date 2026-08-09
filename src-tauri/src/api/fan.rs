@@ -1,3 +1,4 @@
+use std::{collections::hash_map::DefaultHasher, hash::{Hash, Hasher}, time::Instant};
 use reqwest::{Method, header::ACCEPT};
 use serde::Deserialize;
 use uuid::Uuid;
@@ -5,13 +6,14 @@ use uuid::Uuid;
 use crate::{
     AppError,
     models::{
-        AdmissionPass, FanAuthResult, FanConfirmationInput, FanEventInterest, FanProfile,
+        AdmissionPass, FanAuthResult, FanConfirmationInput, FanEventInterest, FanHomeData, FanProfile,
         FanSignupInput, PublicEvent, ReferralProgress,
     },
 };
 
 use super::{
-    client::FAN_COOKIE,
+    cache::{self, CacheEntry},
+    client::{FAN_COOKIE, FAN_HOME_CACHE_TTL, FAN_HOME_STALE_TTL},
     http::{
         MAX_TOKEN_BYTES, bounded_required, decode, endpoint, normalized_optional, response_cookie,
         segment,
@@ -33,7 +35,64 @@ struct FanConfirmationApiResponse {
     fan_session_token: Option<String>,
 }
 
+fn fan_home_key(profile: &FanProfile) -> String {
+    let mut hasher = DefaultHasher::new();
+    profile.api_base_url.hash(&mut hasher);
+    profile.fan_session_token.hash(&mut hasher);
+    format!("fan-home-{:016x}", hasher.finish())
+}
+
 impl super::CrowdRelayClient {
+    pub async fn fan_home(&self, profile: &FanProfile) -> Result<FanHomeData, AppError> {
+        let key = fan_home_key(profile);
+        if let Some(home) = self.cached_fan_home(&key, FAN_HOME_CACHE_TTL).await {
+            return Ok(home);
+        }
+        let _fetch = self.fan_home_fetch.lock().await;
+        if let Some(home) = self.cached_fan_home(&key, FAN_HOME_CACHE_TTL).await {
+            return Ok(home);
+        }
+        let stale = self.cached_fan_home(&key, FAN_HOME_STALE_TTL).await;
+        match self
+            .fan_json::<FanHomeData, ()>(profile, Method::GET, "me/home", None)
+            .await
+        {
+            Ok(mut home) => {
+                home.stale = false;
+                let mut cache_map = self.fan_home_cache.write().await;
+                cache::prune_cache(&mut cache_map, FAN_HOME_STALE_TTL);
+                cache_map.insert(
+                    key,
+                    CacheEntry {
+                        value: home.clone(),
+                        fetched_at: Instant::now(),
+                        stored_at_unix_secs: cache::unix_now(),
+                        etag: None,
+                        last_modified: None,
+                    },
+                );
+                Ok(home)
+            }
+            Err(error) if super::retry::is_transient_failure(&error) => match stale {
+                Some(mut home) => {
+                    home.stale = true;
+                    Ok(home)
+                }
+                None => Err(error),
+            },
+            Err(error) => Err(error),
+        }
+    }
+
+    async fn cached_fan_home(&self, key: &str, max_age: std::time::Duration) -> Option<FanHomeData> {
+        self.fan_home_cache
+            .read()
+            .await
+            .get(key)
+            .filter(|entry| entry.fetched_at.elapsed() < max_age)
+            .map(|entry| entry.value.clone())
+    }
+
     pub async fn fan_events(&self, profile: &FanProfile) -> Result<Vec<PublicEvent>, AppError> {
         self.public_events(&profile.api_base_url).await
     }

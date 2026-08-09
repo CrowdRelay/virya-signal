@@ -913,6 +913,7 @@ fn Tickets(
 ) -> impl IntoView {
     let event_slug = RwSignal::new(String::new());
     let overview = RwSignal::new(None::<TicketingOverview>);
+    let event_snapshot = RwSignal::new(None::<StaffEventDashboard>);
     let busy = RwSignal::new(false);
     let fan_email = RwSignal::new(String::new());
     let pool_slug = RwSignal::new("tickets".to_owned());
@@ -934,6 +935,15 @@ fn Tickets(
             .await
             {
                 Ok(value) => overview.set(Some(value)),
+                Err(message) => error.set(Some(message)),
+            }
+            match bridge::invoke::<StaffEventDashboard, _>(
+                "staff_event_dashboard",
+                &EventArgs { event_slug: &slug },
+            )
+            .await
+            {
+                Ok(value) => event_snapshot.set(Some(value)),
                 Err(message) => error.set(Some(message)),
             }
             busy.set(false);
@@ -991,6 +1001,14 @@ fn Tickets(
         <section class="screen">
             <header class="screen-title"><p class="eyebrow">TICKETING</p><h2>{tr("tickets_and_admission_passes")}</h2></header>
             <div class="toolbar"><select disabled=move || loading.get().events prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">{move || if loading.get().events { tr("loading_shows") } else { tr("select_a_show_2") }}</option>{move || operator_events(dashboard).into_iter().map(|event| view! { <option value=event.slug.clone()>{event.title}</option> }).collect_view()}</select><button on:click=load disabled=move || busy.get() || loading.get().events>{tr("refresh")}</button></div>
+            {move || event_snapshot.get().map(|snapshot| view! {
+                <div class="stats-grid wide event-context-stats">
+                    <Metric value=snapshot.interested_fans.to_string() label=tr("interested")/>
+                    <Metric value=snapshot.paid_tickets.to_string() label=tr("sold")/>
+                    <Metric value=snapshot.passes_claimed.to_string() label=tr("claimed")/>
+                    <Metric value=snapshot.passes_redeemed.to_string() label=tr("redeemed")/>
+                </div>
+            })}
             {move || overview.get().map(|data| view! {
                 <div class="stats-grid wide"><Metric value=data.paid_tickets.to_string() label=tr("sold")/><Metric value=data.sale.reserved.to_string() label=tr("in_checkout")/><Metric value=data.sale.available.to_string() label=tr("available_label")/></div>
                 <div class="revenue-card"><p>{tr("gross_revenue")}</p><strong>{money(data.gross_sales_minor, &data.sale.currency)}</strong><span>{format!("zwroty: {}", money(data.refunded_minor, &data.sale.currency))}</span></div>
@@ -1266,6 +1284,7 @@ fn OpsPanel(
                     let healthy_view = healthy.then(|| view! { <p class="ops-healthy">{tr("no_dead_entries_the_delivery_pipeline_is")}</p> });
                     view! {
                         <div class="ops-metrics"><Metric value=summary.outbox.pending.to_string() label="outbox pending"/><Metric value=summary.outbox.dead.to_string() label="outbox dead"/><Metric value=summary.deliveries.pending.to_string() label="delivery pending"/><Metric value=summary.deliveries.dead.to_string() label="delivery dead"/></div>
+                        <div class="ops-metrics http-ops-metrics"><Metric value=summary.http.requests.to_string() label="http requests"/><Metric value=format!("{} ms", summary.http.average_ms) label="avg"/><Metric value=format!("≤{} ms", summary.http.p50_ms) label="p50"/><Metric value=format!("≤{} ms", summary.http.p95_ms) label="p95"/><Metric value=summary.http.errors_5xx.to_string() label="5xx"/><Metric value=if summary.release.is_empty() { "—".to_owned() } else { summary.release.clone() } label="release"/></div>
                         {degraded_view}
                         {deliveries_view}
                         {outbox_view}

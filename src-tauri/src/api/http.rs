@@ -20,6 +20,15 @@ pub(super) async fn decode_with_error_mapper<T: DeserializeOwned>(
     error_mapper: fn(&serde_json::Value) -> Option<String>,
 ) -> Result<T, AppError> {
     let status = response.status();
+    let request_id = response.headers().get("x-request-id")
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value.chars().take(24).collect::<String>());
+    let release = response.headers().get("x-crowdrelay-release")
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value.chars().take(32).collect::<String>());
+    let server_timing = response.headers().get("server-timing")
+        .and_then(|value| value.to_str().ok())
+        .map(|value| value.chars().take(96).collect::<String>());
     let content_length = response.content_length();
     if content_length.is_some_and(|length| length > MAX_RESPONSE_BYTES) {
         return Err(AppError::Remote {
@@ -53,7 +62,17 @@ pub(super) async fn decode_with_error_mapper<T: DeserializeOwned>(
             serde_json::Value::Null
         }
     };
-    let detail = error_mapper(&body).unwrap_or_else(|| remote_detail(&body));
+    let mut detail = error_mapper(&body).unwrap_or_else(|| remote_detail(&body));
+    if let Some(ref request_id) = request_id {
+        detail.push_str(&format!(" · ref {request_id}"));
+    }
+    eprintln!(
+        "[virya:http] status={} ref={} release={} timing={}",
+        status.as_u16(),
+        request_id.as_deref().unwrap_or("-"),
+        release.as_deref().unwrap_or("-"),
+        server_timing.as_deref().unwrap_or("-"),
+    );
     match status {
         StatusCode::UNAUTHORIZED => Err(AppError::Unauthorized),
         StatusCode::FORBIDDEN => Err(AppError::Forbidden),

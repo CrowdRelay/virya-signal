@@ -932,3 +932,54 @@ html[data-virya-scanner-active] .app-shell {
 .language-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; }
 .language-switch button { min-height: 48px; border-radius: var(--control-radius); border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-weight: 800; letter-spacing: .08em; }
 .language-switch button.active { border-color: var(--yellow); background: #f3c51a18; color: var(--yellow); }
+
+/* Runtime network state — lives outside the Leptos tree so it also works while
+   the app is mounting or recovering from a transient native/API failure. */
+.network-status {
+  position: fixed;
+  z-index: 10000;
+  left: 50%;
+  bottom: max(82px, calc(env(safe-area-inset-bottom) + 72px));
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(92vw, 420px);
+  border: 1px solid rgba(243, 197, 26, .46);
+  background: rgba(8, 8, 8, .94);
+  color: #f8e8a3;
+  padding: 9px 12px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-align: center;
+  text-transform: uppercase;
+  box-shadow: 0 12px 30px rgba(0,0,0,.45);
+  pointer-events: none;
+}
+.network-status[data-state="online"] { border-color: rgba(84, 214, 143, .42); color: #baf4d3; }
+@media (prefers-reduced-motion: no-preference) {
+  .network-status { animation: network-status-in .16s ease-out; }
+  @keyframes network-status-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+}
+
+/* V4 fan home: one lightweight read-model before tab-specific detail calls. */
+.fan-home-overview { margin-bottom: 18px; }
+.fan-home-header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; margin-bottom: 12px; }
+.fan-home-header h2 { margin: 4px 0 6px; font-size: clamp(28px, 7vw, 44px); line-height: .95; }
+.fan-home-header p:last-child { margin: 0; color: var(--muted); max-width: 34rem; }
+.cache-badge { border: 1px solid var(--line); padding: 5px 8px; font: 700 9px/1 ui-monospace, monospace; letter-spacing: .08em; color: var(--muted); white-space: nowrap; }
+.fan-home-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.home-action-card { min-height: 164px; border: 1px solid var(--line); background: var(--surface); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.home-action-card strong { font-size: 18px; line-height: 1.05; }
+.home-action-card > p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: 11px; }
+.synesthesia-home-card { background: linear-gradient(145deg, rgba(113,220,255,.08), var(--surface) 58%); border-color: rgba(113,220,255,.28); }
+.next-show-card { background: linear-gradient(145deg, rgba(255,226,72,.08), var(--surface) 58%); }
+.progress-track { width: 100%; height: 5px; overflow: hidden; background: #202020; margin-top: auto; }
+.progress-track > span { display: block; height: 100%; background: currentColor; min-width: 2px; }
+.home-card-actions { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+.fan-home-stats { margin-bottom: 14px; }
+.compact-referral-hero { min-height: 170px; }
+.compact-referral-hero h2 { font-size: 64px; }
+@media (max-width: 620px) {
+  .fan-home-grid { grid-template-columns: 1fr; }
+  .home-action-card { min-height: 150px; }
+}

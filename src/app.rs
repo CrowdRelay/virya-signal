@@ -11,6 +11,7 @@ use formatters::{
 };
 use leptos::prelude::*;
 use types::*;
+use wasm_bindgen::{closure::Closure, JsCast, JsValue};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
@@ -18,15 +19,39 @@ use crate::{
     models::{
         AdmissionPass, AdmissionQr, AdmissionRedemption, AreaWallet, CouponEnvelope,
         CreateQrCampaignInput, DashboardData, FanAuthResult, FanConfirmationInput,
-        FanDashboardData, FanEventInterest, FanMerchBundleCatalog, FanSessionStatus,
+        FanDashboardData, FanEventInterest, FanHomeData, FanMerchBundleCatalog, FanSessionStatus,
         FanSignupInput, IssuePassInput, IssuedPass, MerchCatalog, OperatorOpsOverview,
         OperatorProfileInput, OperatorRole, OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem,
         OpsRetryResult, PublicEvent, PublicHomeData, QrCampaign, ReferralProgress,
         RequestedCityInput, RequestedCityResult, SessionStatus, ShowModeScanResult, ShowModeStatus,
-        ShowModeSyncResult, TicketCheckoutInput, TicketCheckoutItemInput, TicketCheckoutStart,
+        ShowModeSyncResult, StaffEventDashboard, TicketCheckoutInput, TicketCheckoutItemInput, TicketCheckoutStart,
         TicketSaleOffer, TicketWallet, TicketingOverview, WalletBatch, WalletTicket,
     },
 };
+
+
+fn install_resume_refresh(status_refresh: RwSignal<u32>) {
+    let global: JsValue = js_sys::global().into();
+    let Ok(listener) = js_sys::Reflect::get(&global, &JsValue::from_str("addEventListener")) else {
+        return;
+    };
+    let Ok(listener) = listener.dyn_into::<js_sys::Function>() else {
+        return;
+    };
+    let callback = Closure::<dyn FnMut(JsValue)>::new(move |_| {
+        status_refresh.update(|value| *value = value.wrapping_add(1));
+    });
+    if listener
+        .call2(
+            &global,
+            &JsValue::from_str("virya:resume"),
+            callback.as_ref().unchecked_ref(),
+        )
+        .is_ok()
+    {
+        callback.forget();
+    }
+}
 
 #[component]
 pub fn App() -> impl IntoView {
@@ -39,6 +64,7 @@ pub fn App() -> impl IntoView {
     let fan_status_failed = RwSignal::new(false);
     let status_refresh = RwSignal::new(0_u32);
     let error = RwSignal::new(None::<String>);
+    install_resume_refresh(status_refresh);
 
     Effect::new(move |_| {
         status_refresh.get();
@@ -101,5 +127,6 @@ pub fn App() -> impl IntoView {
 // It keeps the existing component visibility and contracts unchanged while
 // making the operator, fan and refresh code independently reviewable.
 include!("app/operator.rs");
+include!("app/fan_home.rs");
 include!("app/fan.rs");
 include!("app/support.rs");

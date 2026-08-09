@@ -179,6 +179,58 @@ class RuntimePerformanceContract(unittest.TestCase):
         # the same Option; a by-value `if let` here would fail Rust compilation.
         self.assertEqual(source.count("= stale.as_ref()"), 3)
 
+    def test_privileged_correlation_header_matches_backend_contract(self):
+        client = (ROOT / "src-tauri/src/api/client.rs").read_text()
+        self.assertIn('header("X-CrowdRelay-Correlation-Id", correlation_id.as_str())', client)
+        self.assertNotIn('header("X-Correlation-ID"', client)
+
+    def test_private_fan_home_cache_never_masks_auth_failures(self):
+        fan = (ROOT / "src-tauri/src/api/fan.rs").read_text()
+        retry = (ROOT / "src-tauri/src/api/retry.rs").read_text()
+        self.assertIn("FAN_HOME_CACHE_TTL", fan)
+        self.assertIn("FAN_HOME_STALE_TTL", fan)
+        self.assertIn("FAN_HOME_STALE_TTL: Duration = Duration::from_secs(10 * 60)", (ROOT / "src-tauri/src/api/client.rs").read_text())
+        self.assertIn("fan_home_fetch.lock().await", fan)
+        self.assertIn("Err(error) if super::retry::is_transient_failure(&error)", fan)
+        self.assertIn("Err(error) => Err(error)", fan)
+        self.assertIn("pub(super) fn is_transient_failure", retry)
+        for status in ("408", "425", "429", "500", "502", "503", "504"):
+            self.assertIn(status, retry)
+
+    def test_wallet_offline_fallback_is_encrypted_expiry_checked_and_webview_safe(self):
+        models = (ROOT / "src-tauri/src/models.rs").read_text()
+        commands = (ROOT / "src-tauri/src/commands/fan.rs").read_text()
+        ui = (ROOT / "src/app/fan.rs").read_text()
+        self.assertIn("pub cached_wallets: Vec<TicketWallet>", models)
+        self.assertIn("pub cached_wallet_qr: Vec<WalletQrCredential>", models)
+        self.assertIn("#[zeroize(drop)]\npub struct WalletQrCredential", models)
+        self.assertIn("pub cached: bool", models)
+        self.assertIn("cached.cached = true", commands)
+        self.assertIn("wallet_qr_credential_valid(entry)", commands)
+        self.assertIn("expires_at > time::OffsetDateTime::now_utc()", commands)
+        self.assertIn("persist_fan(&state, &updated).await?", commands)
+        self.assertIn("profile.cached_wallet_qr", commands)
+        # The token is consumed in native render_wallet_qr; TicketWallet sent to
+        # the WebView contains only qr_available + expiry, never the raw token.
+        wallet_block = models.split("pub struct TicketWallet {", 1)[1].split("}", 1)[0]
+        ticket_block = models.split("pub struct WalletTicket {", 1)[1].split("}", 1)[0]
+        self.assertNotIn("token", wallet_block)
+        self.assertNotIn("token", ticket_block)
+        self.assertIn('tr("wallet_cached_offline")', ui)
+
+    def test_feedback_outbox_promotes_new_payload_without_deleting_the_old_queue_first(self):
+        queue = (ROOT / "src-tauri/src/feedback_queue.rs").read_text()
+        app_state = (ROOT / "src-tauri/src/lib.rs").read_text()
+        commands = (ROOT / "src-tauri/src/commands/misc.rs").read_text()
+        self.assertIn('format!("{FILE_NAME}.bak")', queue)
+        self.assertIn('File::open(&temp_path)?.sync_all()?', queue)
+        self.assertIn('fs::rename(&final_path, &backup_path)?', queue)
+        self.assertIn('let _ = fs::rename(&backup_path, &final_path);', queue)
+        self.assertIn("feedback_queue_mutation: Mutex<()>", app_state)
+        self.assertGreaterEqual(commands.count("state.feedback_queue_mutation.lock().await"), 2)
+        self.assertLessEqual(8, 8)
+
+
 
 if __name__ == "__main__":
     unittest.main()

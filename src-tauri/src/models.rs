@@ -286,6 +286,7 @@ pub struct WalletCredential {
 pub struct WalletBatch {
     pub wallets: Vec<TicketWallet>,
     pub failed_count: usize,
+    pub cached_count: usize,
 }
 
 #[derive(Debug, Deserialize)]
@@ -295,13 +296,15 @@ pub struct TicketWalletApi {
     pub tickets: Vec<WalletTicketApi>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct TicketWallet {
     pub order: WalletOrder,
     pub tickets: Vec<WalletTicket>,
+    #[serde(default)]
+    pub cached: bool,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct WalletOrder {
     pub order_id: String,
     pub public_reference: String,
@@ -321,7 +324,7 @@ pub struct WalletTicketApi {
     pub qr_expires_at: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct WalletTicket {
     pub ticket_type_name: String,
     pub public_reference: String,
@@ -329,6 +332,16 @@ pub struct WalletTicket {
     pub holder_email_masked: String,
     pub qr_available: bool,
     pub qr_expires_at: String,
+}
+
+
+#[derive(Clone, Debug, Deserialize, Serialize, Zeroize)]
+#[zeroize(drop)]
+pub struct WalletQrCredential {
+    pub order_id: String,
+    pub public_reference: String,
+    pub token: String,
+    pub expires_at: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Zeroize)]
@@ -351,6 +364,11 @@ pub struct FanProfile {
     pub pass_session_token: Option<String>,
     #[serde(default)]
     pub wallets: Vec<WalletCredential>,
+    #[serde(default)]
+    #[zeroize(skip)]
+    pub cached_wallets: Vec<TicketWallet>,
+    #[serde(default)]
+    pub cached_wallet_qr: Vec<WalletQrCredential>,
 }
 
 fn new_area_wallet_id() -> String {
@@ -389,6 +407,83 @@ pub struct FanSessionStatus {
 pub struct LauncherStatus {
     pub operator: SessionStatus,
     pub fan: FanSessionStatus,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct FanHomeData {
+    pub schema_version: u32,
+    pub generated_at: String,
+    pub profile: FanHomeProfile,
+    pub next_event: Option<FanHomeEvent>,
+    pub synesthesia: FanHomeSynesthesia,
+    pub referral: FanHomeReferral,
+    pub counts: FanHomeCounts,
+    pub recommended_action: String,
+    #[serde(default)]
+    pub stale: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct FanHomeProfile {
+    pub display_name: Option<String>,
+    pub locale: Option<String>,
+    pub primary_city: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct FanHomeEvent {
+    pub slug: String,
+    pub title: String,
+    pub venue: Option<String>,
+    pub city: Option<String>,
+    pub starts_at: String,
+    pub doors_at: Option<String>,
+    pub ends_at: Option<String>,
+    pub phase: String,
+    pub ticket_url: Option<String>,
+    pub interested: bool,
+    pub has_pass: bool,
+    pub has_paid_ticket: bool,
+    pub ticket_sale_active: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct FanHomeSynesthesia {
+    pub started: bool,
+    pub completed: bool,
+    pub rooms_completed: i16,
+    pub client_total_elapsed_ms: Option<i64>,
+    pub linked_at: Option<String>,
+    pub reward_entered: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct FanHomeReferral {
+    pub qualified: i64,
+    pub pending: i64,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct FanHomeCounts {
+    pub event_interests: i64,
+    pub active_passes: i64,
+    pub paid_orders: i64,
+    pub area_claims: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct StaffEventDashboard {
+    pub schema_version: i32,
+    pub slug: String,
+    pub title: String,
+    pub venue: Option<String>,
+    pub starts_at: String,
+    pub interested_fans: i64,
+    pub paid_orders: i64,
+    pub paid_tickets: i64,
+    pub passes_issued: i64,
+    pub passes_claimed: i64,
+    pub passes_redeemed: i64,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -753,6 +848,24 @@ pub struct OpsSummary {
     pub outbox: QueueSummary,
     #[serde(default)]
     pub deliveries: QueueSummary,
+    #[serde(default)]
+    pub http: HttpRequestSummary,
+    #[serde(default)]
+    pub release: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct HttpRequestSummary {
+    #[serde(default)]
+    pub requests: u64,
+    #[serde(default)]
+    pub errors_5xx: u64,
+    #[serde(default)]
+    pub average_ms: u64,
+    #[serde(default)]
+    pub p50_ms: u64,
+    #[serde(default)]
+    pub p95_ms: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
