@@ -143,6 +143,42 @@ class RuntimePerformanceContract(unittest.TestCase):
         ):
             self.assertIn(fragment, source)
 
+    def test_merch_catalog_revalidates_with_bounded_memory_cache(self):
+        source = (ROOT / "src-tauri/src/api/client.rs").read_text()
+        for fragment in (
+            "const MERCH_CACHE_TTL: Duration = Duration::from_secs(15);",
+            "const MERCH_STALE_TTL: Duration = Duration::from_secs(10 * 60);",
+            "merch_fetch: Arc<Mutex<()>>",
+            "merch_cache: Arc<RwLock<HashMap<String, CacheEntry<MerchCatalog>>>>",
+            "self.merch_fetch.lock().await",
+            'public_response_base(api_base_url, "public/merch/catalog", validators)',
+            "self.touch_merch_cache(&cache_key).await",
+            "cache::prune_cache(&mut cache, MERCH_STALE_TTL)",
+        ):
+            self.assertIn(fragment, source)
+        self.assertIn(
+            ".filter(|entry| entry.fetched_at.elapsed() < MERCH_STALE_TTL)",
+            source,
+        )
+
+    def test_conditional_validators_never_outlive_stale_fallback(self):
+        source = (ROOT / "src-tauri/src/api/client.rs").read_text()
+        for ttl in ("EVENTS_STALE_TTL", "CITIES_STALE_TTL", "MERCH_STALE_TTL"):
+            self.assertIn(
+                f".filter(|entry| entry.fetched_at.elapsed() < {ttl})",
+                source,
+            )
+
+    def test_public_cache_serves_stale_on_transient_http_failures(self):
+        source = (ROOT / "src-tauri/src/api/client.rs").read_text()
+        self.assertIn("fn transient_public_status", source)
+        self.assertIn("status == reqwest::StatusCode::TOO_MANY_REQUESTS", source)
+        self.assertIn("status.is_server_error()", source)
+        self.assertEqual(source.count("if transient_public_status(response.status())"), 3)
+        # Borrow stale values before cloning so later 304 handling can still consume
+        # the same Option; a by-value `if let` here would fail Rust compilation.
+        self.assertEqual(source.count("= stale.as_ref()"), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

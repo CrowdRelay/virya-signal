@@ -616,6 +616,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "native_public_cache_too_large" => "Lokalny cache danych publicznych jest zbyt duży",
         "native_missing_events_cache" => "Backend potwierdził nieistniejący cache koncertów",
         "native_missing_cities_cache" => "Backend potwierdził nieistniejący cache miast",
+        "native_missing_merch_cache" => "Backend potwierdził nieistniejący cache merchu",
         "native_invalid_staff_password" => "Nieprawidłowe hasło staff.",
         "native_staff_rate_limited" => {
             "Za dużo prób logowania. Spróbuj ponownie za kilkanaście minut."

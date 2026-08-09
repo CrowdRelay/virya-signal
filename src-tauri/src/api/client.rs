@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     path::PathBuf,
     sync::{
         Arc,
@@ -32,6 +33,12 @@ use super::{
 pub(super) const FAN_COOKIE: &str = "crowdrelay_fan";
 pub(super) const PASS_COOKIE: &str = "crowdrelay_pass_session";
 pub(super) const WALLET_REQUEST_TIMEOUT: Duration = Duration::from_secs(12);
+const MERCH_CACHE_TTL: Duration = Duration::from_secs(15);
+const MERCH_STALE_TTL: Duration = Duration::from_secs(10 * 60);
+fn transient_public_status(status: reqwest::StatusCode) -> bool {
+    status == reqwest::StatusCode::TOO_MANY_REQUESTS || status.is_server_error()
+}
+
 const STAFF_GATE_URL: &str = "https://virya.music/api/staff/qr/login";
 const STAFF_GATE_ORIGIN: &str = "https://virya.music";
 
@@ -64,6 +71,8 @@ pub struct CrowdRelayClient {
     pub(super) public_cache: Arc<RwLock<PublicCache>>,
     events_fetch: Arc<Mutex<()>>,
     cities_fetch: Arc<Mutex<()>>,
+    merch_fetch: Arc<Mutex<()>>,
+    merch_cache: Arc<RwLock<HashMap<String, CacheEntry<MerchCatalog>>>>,
     pub(super) cache_file: Arc<PathBuf>,
     cache_write: Arc<Mutex<()>>,
     cache_persisting: Arc<AtomicBool>,
@@ -91,6 +100,8 @@ impl CrowdRelayClient {
             public_cache: Arc::new(RwLock::new(public_cache)),
             events_fetch: Arc::new(Mutex::new(())),
             cities_fetch: Arc::new(Mutex::new(())),
+            merch_fetch: Arc::new(Mutex::new(())),
+            merch_cache: Arc::new(RwLock::new(HashMap::new())),
             cache_file: Arc::new(cache_file),
             cache_write: Arc::new(Mutex::new(())),
             cache_persisting: Arc::new(AtomicBool::new(false)),
@@ -116,6 +127,11 @@ impl CrowdRelayClient {
             Ok(response) => response,
             Err(error) => return stale.ok_or(error),
         };
+        if transient_public_status(response.status()) {
+            if let Some(events) = stale.as_ref() {
+                return Ok(events.clone());
+            }
+        }
         if response.status() == reqwest::StatusCode::NOT_MODIFIED {
             let events = stale.ok_or_else(|| AppError::Remote {
                 status: reqwest::StatusCode::NOT_MODIFIED.as_u16(),
@@ -146,14 +162,57 @@ impl CrowdRelayClient {
     }
 
     pub async fn public_merch_catalog(&self, api_base_url: &str) -> Result<MerchCatalog, AppError> {
-        let response = self
-            .public_response_base(
-                api_base_url,
-                "public/merch/catalog",
-                CacheValidators::default(),
-            )
-            .await?;
-        decode(response).await
+        let cache_key = cache::cache_key(api_base_url)?;
+        if let Some(catalog) = self.cached_merch(&cache_key, MERCH_CACHE_TTL).await {
+            return Ok(catalog);
+        }
+
+        // Coalesce concurrent UI refreshes (for example returning to the fan tab
+        // while the storefront is mounting) into one conditional GET.
+        let _fetch = self.merch_fetch.lock().await;
+        if let Some(catalog) = self.cached_merch(&cache_key, MERCH_CACHE_TTL).await {
+            return Ok(catalog);
+        }
+
+        let stale = self.cached_merch(&cache_key, MERCH_STALE_TTL).await;
+        let validators = self.merch_cache_validators(&cache_key).await;
+        let response = match self
+            .public_response_base(api_base_url, "public/merch/catalog", validators)
+            .await
+        {
+            Ok(response) => response,
+            Err(error) => return stale.ok_or(error),
+        };
+
+        if transient_public_status(response.status()) {
+            if let Some(catalog) = stale.as_ref() {
+                return Ok(catalog.clone());
+            }
+        }
+        if response.status() == reqwest::StatusCode::NOT_MODIFIED {
+            let catalog = stale.ok_or_else(|| AppError::Remote {
+                status: reqwest::StatusCode::NOT_MODIFIED.as_u16(),
+                detail: crate::i18n::tr("native_missing_merch_cache").into(),
+            })?;
+            self.touch_merch_cache(&cache_key).await;
+            return Ok(catalog);
+        }
+
+        let (etag, last_modified) = cache::response_validators(response.headers());
+        let catalog: MerchCatalog = decode(response).await?;
+        let mut cache = self.merch_cache.write().await;
+        cache::prune_cache(&mut cache, MERCH_STALE_TTL);
+        cache.insert(
+            cache_key,
+            CacheEntry {
+                value: catalog.clone(),
+                fetched_at: Instant::now(),
+                stored_at_unix_secs: cache::unix_now(),
+                etag,
+                last_modified,
+            },
+        );
+        Ok(catalog)
     }
 
     pub async fn verify_staff_access(&self, password: &str) -> Result<(), AppError> {
@@ -188,6 +247,11 @@ impl CrowdRelayClient {
             Ok(response) => response,
             Err(error) => return stale.ok_or(error),
         };
+        if transient_public_status(response.status()) {
+            if let Some(cities) = stale.as_ref() {
+                return Ok(cities.clone());
+            }
+        }
         if response.status() == reqwest::StatusCode::NOT_MODIFIED {
             let cities = stale.ok_or_else(|| AppError::Remote {
                 status: reqwest::StatusCode::NOT_MODIFIED.as_u16(),
@@ -337,6 +401,35 @@ impl CrowdRelayClient {
         }
     }
 
+    async fn cached_merch(&self, cache_key: &str, max_age: Duration) -> Option<MerchCatalog> {
+        let cache = self.merch_cache.read().await;
+        cache
+            .get(cache_key)
+            .filter(|entry| entry.fetched_at.elapsed() < max_age)
+            .map(|entry| entry.value.clone())
+    }
+
+    async fn merch_cache_validators(&self, cache_key: &str) -> CacheValidators {
+        let cache = self.merch_cache.read().await;
+        match cache
+            .get(cache_key)
+            .filter(|entry| entry.fetched_at.elapsed() < MERCH_STALE_TTL)
+        {
+            Some(entry) => CacheValidators {
+                etag: entry.etag.clone(),
+                last_modified: entry.last_modified.clone(),
+            },
+            None => CacheValidators::default(),
+        }
+    }
+
+    async fn touch_merch_cache(&self, cache_key: &str) {
+        if let Some(entry) = self.merch_cache.write().await.get_mut(cache_key) {
+            entry.fetched_at = Instant::now();
+            entry.stored_at_unix_secs = cache::unix_now();
+        }
+    }
+
     async fn cached_events(&self, cache_key: &str, max_age: Duration) -> Option<Vec<PublicEvent>> {
         let c = self.public_cache.read().await;
         c.events
@@ -358,10 +451,12 @@ impl CrowdRelayClient {
         let entry = if events {
             c.events
                 .get(cache_key)
+                .filter(|entry| entry.fetched_at.elapsed() < EVENTS_STALE_TTL)
                 .map(|entry| (entry.etag.as_ref(), entry.last_modified.as_ref()))
         } else {
             c.cities
                 .get(cache_key)
+                .filter(|entry| entry.fetched_at.elapsed() < CITIES_STALE_TTL)
                 .map(|entry| (entry.etag.as_ref(), entry.last_modified.as_ref()))
         };
         match entry {
