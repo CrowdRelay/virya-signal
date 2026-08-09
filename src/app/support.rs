@@ -163,7 +163,11 @@ fn refresh_fan_home(
         )
         .await
         {
-            Ok(Some(value)) => home.set(Some(value)),
+            Ok(Some(value)) if value.has_supported_schema() => home.set(Some(value)),
+            Ok(Some(value)) => error.set(Some(i18n::format(
+                "unsupported_signal_snapshot_version",
+                &[value.schema_version.to_string()],
+            ))),
             Ok(None) => return,
             Err(message) => error.set(Some(message)),
         }
@@ -374,9 +378,17 @@ fn refresh_wallets(
             Ok(Some(value)) => {
                 wallets.set(stable_wallets(value.wallets));
                 if value.failed_count > 0 {
+                    let key = if value.cached_count > 0 {
+                        "could_not_refresh_orders_cached_orders_available"
+                    } else {
+                        "could_not_refresh_orders_count_other_tickets_remain_available"
+                    };
                     error.set(Some(i18n::format(
-                        "could_not_refresh_orders_count_other_tickets_remain_available",
-                        &[value.failed_count.to_string()],
+                        key,
+                        &[
+                            value.failed_count.to_string(),
+                            value.cached_count.to_string(),
+                        ],
                     )));
                 }
             }

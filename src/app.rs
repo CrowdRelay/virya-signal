@@ -11,7 +11,7 @@ use formatters::{
 };
 use leptos::prelude::*;
 use types::*;
-use wasm_bindgen::{closure::Closure, JsCast, JsValue};
+use wasm_bindgen::{JsCast, JsValue, closure::Closure};
 use wasm_bindgen_futures::spawn_local;
 
 use crate::{
@@ -24,11 +24,11 @@ use crate::{
         OperatorProfileInput, OperatorRole, OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem,
         OpsRetryResult, PublicEvent, PublicHomeData, QrCampaign, ReferralProgress,
         RequestedCityInput, RequestedCityResult, SessionStatus, ShowModeScanResult, ShowModeStatus,
-        ShowModeSyncResult, StaffEventDashboard, TicketCheckoutInput, TicketCheckoutItemInput, TicketCheckoutStart,
-        TicketSaleOffer, TicketWallet, TicketingOverview, WalletBatch, WalletTicket,
+        ShowModeSyncResult, StaffEventDashboard, TicketCheckoutInput, TicketCheckoutItemInput,
+        TicketCheckoutStart, TicketSaleOffer, TicketWallet, TicketingOverview, WalletBatch,
+        WalletTicket,
     },
 };
-
 
 fn install_resume_refresh(status_refresh: RwSignal<u32>) {
     let global: JsValue = js_sys::global().into();

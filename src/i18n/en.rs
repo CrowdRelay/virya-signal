@@ -70,7 +70,9 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "continue_the_journey" => "Continue the journey",
         "start_the_journey" => "Start the journey",
         "completion_linked_to_signal" => "This completion is already linked to your Signal.",
-        "completion_saved_link_it_to_signal" => "Completion saved. Open Synesthesia to link it to your profile.",
+        "completion_saved_link_it_to_signal" => {
+            "Completion saved. Open Synesthesia to link it to your profile."
+        }
         "rooms_completed_count" => "Consciousness rooms completed in this journey.",
         "open_synesthesia" => "OPEN SYNESTHESIA",
         "next_signal" => "NEXT SIGNAL",
@@ -78,7 +80,9 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "active_passes" => "active passes",
         "area_findings" => "AREA finds",
         "signal_home_unavailable" => "The Signal snapshot is temporarily unavailable",
-        "signal_home_fallback_hint" => "The other tabs still work independently. Try refreshing again shortly.",
+        "signal_home_fallback_hint" => {
+            "The other tabs still work independently. Try refreshing again shortly."
+        }
         "signal_tab" => "Signal",
         "scan_tab" => "Scan",
         "tickets_tab" => "Tickets",
@@ -431,7 +435,9 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "feedback_must_contain_between_8_and_2000" => {
             "Feedback must contain between 8 and 2000 characters."
         }
-        "feedback_was_sent_anonymously_thank_you" => "Feedback was accepted anonymously. If you are offline, it will be sent automatically when the connection returns.",
+        "feedback_was_sent_anonymously_thank_you" => {
+            "Feedback was accepted anonymously. If you are offline, it will be sent automatically when the connection returns."
+        }
         "anonymous_feedback" => "ANONYMOUS FEEDBACK",
         "tell_us_what_to_improve" => "Tell us what to improve",
         "app_sends_only_the_category_and_message" => {
@@ -894,7 +900,29 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "get_ticket_now" => "GET A TICKET",
         "follow_this_signal" => "FOLLOW THIS SIGNAL",
         "signal_live_note" => "You are in the show window — the essentials are one tap away.",
-        "signal_afterglow_note" => "The show just ended. Leave a short anonymous echo while it is still fresh.",
+        "signal_afterglow_note" => {
+            "The show just ended. Leave a short anonymous echo while it is still fresh."
+        }
+        "unsupported_signal_snapshot_version" => {
+            "This Signal snapshot uses unsupported schema version {}. Please update the app."
+        }
+        "unsupported_staff_snapshot_version" => {
+            "This staff snapshot uses unsupported schema version {}. Please update the app."
+        }
+        "signal_snapshot_updated" => "Updated {}",
+        "synesthesia_completed_in_minutes" => "Completed in about {} min",
+        "reward_entry_confirmed" => "Reward entry confirmed",
+        "doors_open_at" => "Doors: {}",
+        "event_ends_at" => "Ends: {}",
+        "entry_ready" => "Entry ready",
+        "following_event" => "Following",
+        "tickets_on_sale" => "Tickets on sale",
+        "paid_orders" => "paid orders",
+        "pending_referrals" => "pending referrals",
+        "passes_issued" => "passes issued",
+        "could_not_refresh_orders_cached_orders_available" => {
+            "Could not refresh {} orders; {} offline copies remain available."
+        }
         _ => key,
     }
 }

@@ -20,13 +20,19 @@ pub(super) async fn decode_with_error_mapper<T: DeserializeOwned>(
     error_mapper: fn(&serde_json::Value) -> Option<String>,
 ) -> Result<T, AppError> {
     let status = response.status();
-    let request_id = response.headers().get("x-request-id")
+    let request_id = response
+        .headers()
+        .get("x-request-id")
         .and_then(|value| value.to_str().ok())
         .map(|value| value.chars().take(24).collect::<String>());
-    let release = response.headers().get("x-crowdrelay-release")
+    let release = response
+        .headers()
+        .get("x-crowdrelay-release")
         .and_then(|value| value.to_str().ok())
         .map(|value| value.chars().take(32).collect::<String>());
-    let server_timing = response.headers().get("server-timing")
+    let server_timing = response
+        .headers()
+        .get("server-timing")
         .and_then(|value| value.to_str().ok())
         .map(|value| value.chars().take(96).collect::<String>());
     let content_length = response.content_length();

@@ -78,16 +78,22 @@ pub struct FanHomeData {
     pub stale: bool,
 }
 
+impl FanHomeData {
+    pub const SCHEMA_VERSION: u32 = 1;
+
+    pub fn has_supported_schema(&self) -> bool {
+        self.schema_version == Self::SCHEMA_VERSION
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct FanHomeProfile {
     pub display_name: Option<String>,
-    pub locale: Option<String>,
     pub primary_city: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct FanHomeEvent {
-    pub slug: String,
     pub title: String,
     pub venue: Option<String>,
     pub city: Option<String>,
@@ -139,6 +145,14 @@ pub struct StaffEventDashboard {
     pub passes_issued: i64,
     pub passes_claimed: i64,
     pub passes_redeemed: i64,
+}
+
+impl StaffEventDashboard {
+    pub const SCHEMA_VERSION: i32 = 1;
+
+    pub fn has_supported_schema(&self) -> bool {
+        self.schema_version == Self::SCHEMA_VERSION
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]

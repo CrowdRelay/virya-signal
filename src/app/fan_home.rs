@@ -43,6 +43,7 @@ fn FanHomeOverview(
                     let referral = snapshot.referral.clone();
                     let next_event = snapshot.next_event.clone();
                     let city = snapshot.profile.primary_city.clone();
+                    let generated_at = human_time(&snapshot.generated_at);
                     view! {
                         <header class="fan-home-header">
                             <div>
@@ -53,6 +54,7 @@ fn FanHomeOverview(
                             <Show when=move || stale>
                                 <span class="cache-badge">{tr("cached_data")}</span>
                             </Show>
+                            <small>{i18n::format("signal_snapshot_updated", &[generated_at])}</small>
                         </header>
                         <div class="fan-home-grid">
                             <article class="home-action-card synesthesia-home-card">
@@ -63,6 +65,12 @@ fn FanHomeOverview(
                                 } else {
                                     tr("rooms_completed_count")
                                 }}</p>
+                                {synesthesia.client_total_elapsed_ms.map(|elapsed| view! {
+                                    <small>{i18n::format("synesthesia_completed_in_minutes", &[((elapsed / 60_000).max(1)).to_string()])}</small>
+                                })}
+                                <Show when=move || synesthesia.reward_entered>
+                                    <span class="cache-badge">{tr("reward_entry_confirmed")}</span>
+                                </Show>
                                 <Show when=move || !synesthesia.completed>
                                     <div class="progress-track"><span style=format!("width:{}%", (i32::from(synesthesia.rooms_completed).clamp(0, 11) * 100) / 11)></span></div>
                                     <small>{format!("{}/11", synesthesia.rooms_completed.clamp(0, 11))}</small>
@@ -72,28 +80,48 @@ fn FanHomeOverview(
                             {next_event.map(|event| {
                                 let ticket_url = event.ticket_url.clone();
                                 let title = event.title.clone();
+                                let is_live = event.phase == "live";
+                                let is_afterglow = event.phase == "afterglow";
+                                let is_upcoming = event.phase == "upcoming";
+                                let location = event.venue.clone().or(event.city.clone());
+                                let event_meta = event_time_location(&event.starts_at, location.as_deref());
+                                let doors = event.doors_at.as_deref().map(human_time);
+                                let ends = event.ends_at.as_deref().map(human_time);
+                                let admission_ready = event.has_pass || event.has_paid_ticket;
+                                let ticket_sale_active = event.ticket_sale_active;
+                                let interested = event.interested;
                                 view! {
-                                    <article class="home-action-card next-show-card" class:live=event.phase == "live" class:afterglow=event.phase == "afterglow">
+                                    <article class="home-action-card next-show-card" class:live=is_live class:afterglow=is_afterglow>
                                         <p class="eyebrow">{event_phase_label(&event.phase)}</p>
                                         <strong>{title}</strong>
-                                        <p>{event_time_location(&event.starts_at, event.venue.as_deref())}</p>
-                                        <Show when=move || event.phase == "live"><p class="signal-live-note">{tr("signal_live_note")}</p></Show>
-                                        <Show when=move || event.phase == "afterglow"><p class="signal-afterglow-note">{tr("signal_afterglow_note")}</p></Show>
+                                        <p>{event_meta}</p>
+                                        {doors.map(|value| view! { <small>{i18n::format("doors_open_at", &[value])}</small> })}
+                                        {ends.map(|value| view! { <small>{i18n::format("event_ends_at", &[value])}</small> })}
+                                        <div class="home-card-statuses">
+                                            <Show when=move || admission_ready><span class="cache-badge">{tr("entry_ready")}</span></Show>
+                                            <Show when=move || interested><span class="cache-badge">{tr("following_event")}</span></Show>
+                                            <Show when=move || ticket_sale_active && !admission_ready><span class="cache-badge">{tr("tickets_on_sale")}</span></Show>
+                                        </div>
+                                        <Show when=move || is_live><p class="signal-live-note">{tr("signal_live_note")}</p></Show>
+                                        <Show when=move || is_afterglow><p class="signal-afterglow-note">{tr("signal_afterglow_note")}</p></Show>
                                         <div class="home-card-actions">
                                             <button class="ghost" on:click={
                                                 let action = snapshot.recommended_action.clone();
                                                 move |_| tab.set(recommended_tab(&action))
                                             }>{recommended_label(&snapshot.recommended_action)}</button>
-                                            {ticket_url.filter(|_| event.phase == "upcoming").map(|url| view! { <ExternalLink url=url label=tr("tickets_tab") error=error /> })}
+                                            {ticket_url.filter(|_| is_upcoming).map(|url| view! { <ExternalLink url=url label=tr("tickets_tab") error=error /> })}
                                         </div>
                                     </article>
                                 }
                             })}
                         </div>
                         <div class="stats-grid fan-home-stats">
+                            <Metric value=counts.event_interests.to_string() label=tr("show_interests")/>
                             <Metric value=counts.active_passes.to_string() label=tr("active_passes")/>
+                            <Metric value=counts.paid_orders.to_string() label=tr("paid_orders")/>
                             <Metric value=counts.area_claims.to_string() label=tr("area_findings")/>
                             <Metric value=referral.qualified.to_string() label=tr("confirmed_referrals")/>
+                            <Metric value=referral.pending.to_string() label=tr("pending_referrals")/>
                         </div>
                     }.into_any()
                 }).value_or_else(|| view! {

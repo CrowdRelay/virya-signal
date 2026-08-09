@@ -75,7 +75,6 @@ pub(super) struct OperatorLoadingState {
 impl OperatorLoadingState {
     pub const fn all() -> Self {
         Self {
-            home: true,
             events: true,
             qr: true,
         }
@@ -85,6 +84,7 @@ impl OperatorLoadingState {
 impl FanLoadingState {
     pub const fn all() -> Self {
         Self {
+            home: true,
             events: true,
             referral: true,
             interests: true,

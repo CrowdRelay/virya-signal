@@ -1,8 +1,8 @@
 //! Small commands that don't belong to the operator/fan/show-mode domains.
 
 use tauri::{AppHandle, State};
-use uuid::Uuid;
 use tauri_plugin_opener::OpenerExt;
+use uuid::Uuid;
 use zeroize::Zeroizing;
 
 use crate::{
@@ -116,7 +116,11 @@ pub(crate) async fn submit_anonymous_feedback(
     message: String,
 ) -> Result<(), AppError> {
     let submission_id = Uuid::new_v4().to_string();
-    match state.api.submit_anonymous_feedback(&submission_id, &category, &message).await {
+    match state
+        .api
+        .submit_anonymous_feedback(&submission_id, &category, &message)
+        .await
+    {
         Ok(()) => Ok(()),
         Err(error) if feedback_retryable(&error) => {
             let _queue = state.feedback_queue_mutation.lock().await;
@@ -146,16 +150,24 @@ async fn flush_feedback_outbox(state: &State<'_, AppState>) {
         Ok(values) => values,
         Err(_) => return,
     };
-    if queued.is_empty() { return; }
+    if queued.is_empty() {
+        return;
+    }
     let mut delivered = 0usize;
     for item in queued.iter().take(3) {
-        match state.api.submit_anonymous_feedback(&item.submission_id, &item.category, &item.message).await {
+        match state
+            .api
+            .submit_anonymous_feedback(&item.submission_id, &item.category, &item.message)
+            .await
+        {
             Ok(()) => delivered += 1,
             Err(error) if feedback_retryable(&error) => break,
             Err(_) => delivered += 1,
         }
     }
-    if delivered == 0 { return; }
+    if delivered == 0 {
+        return;
+    }
     queued.drain(0..delivered.min(queued.len()));
     let dir = state.app_data_dir.clone();
     let _ = run_blocking(move || feedback_queue::save(&dir, &queued)).await;

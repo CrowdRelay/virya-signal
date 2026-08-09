@@ -1,13 +1,17 @@
-use std::{collections::hash_map::DefaultHasher, hash::{Hash, Hasher}, time::Instant};
 use reqwest::{Method, header::ACCEPT};
 use serde::Deserialize;
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+    time::Instant,
+};
 use uuid::Uuid;
 
 use crate::{
     AppError,
     models::{
-        AdmissionPass, FanAuthResult, FanConfirmationInput, FanEventInterest, FanHomeData, FanProfile,
-        FanSignupInput, PublicEvent, ReferralProgress,
+        AdmissionPass, FanAuthResult, FanConfirmationInput, FanEventInterest, FanHomeData,
+        FanProfile, FanSignupInput, PublicEvent, ReferralProgress,
     },
 };
 
@@ -84,7 +88,11 @@ impl super::CrowdRelayClient {
         }
     }
 
-    async fn cached_fan_home(&self, key: &str, max_age: std::time::Duration) -> Option<FanHomeData> {
+    async fn cached_fan_home(
+        &self,
+        key: &str,
+        max_age: std::time::Duration,
+    ) -> Option<FanHomeData> {
         self.fan_home_cache
             .read()
             .await

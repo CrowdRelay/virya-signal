@@ -943,7 +943,11 @@ fn Tickets(
             )
             .await
             {
-                Ok(value) => event_snapshot.set(Some(value)),
+                Ok(value) if value.has_supported_schema() => event_snapshot.set(Some(value)),
+                Ok(value) => error.set(Some(i18n::format(
+                    "unsupported_staff_snapshot_version",
+                    &[value.schema_version.to_string()],
+                ))),
                 Err(message) => error.set(Some(message)),
             }
             busy.set(false);
@@ -1002,9 +1006,16 @@ fn Tickets(
             <header class="screen-title"><p class="eyebrow">TICKETING</p><h2>{tr("tickets_and_admission_passes")}</h2></header>
             <div class="toolbar"><select disabled=move || loading.get().events prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">{move || if loading.get().events { tr("loading_shows") } else { tr("select_a_show_2") }}</option>{move || operator_events(dashboard).into_iter().map(|event| view! { <option value=event.slug.clone()>{event.title}</option> }).collect_view()}</select><button on:click=load disabled=move || busy.get() || loading.get().events>{tr("refresh")}</button></div>
             {move || event_snapshot.get().map(|snapshot| view! {
+                <article class="event-snapshot-heading">
+                    <p class="eyebrow">{snapshot.slug}</p>
+                    <h3>{snapshot.title}</h3>
+                    <p>{event_time_location(&snapshot.starts_at, snapshot.venue.as_deref())}</p>
+                </article>
                 <div class="stats-grid wide event-context-stats">
                     <Metric value=snapshot.interested_fans.to_string() label=tr("interested")/>
+                    <Metric value=snapshot.paid_orders.to_string() label=tr("paid_orders")/>
                     <Metric value=snapshot.paid_tickets.to_string() label=tr("sold")/>
+                    <Metric value=snapshot.passes_issued.to_string() label=tr("passes_issued")/>
                     <Metric value=snapshot.passes_claimed.to_string() label=tr("claimed")/>
                     <Metric value=snapshot.passes_redeemed.to_string() label=tr("redeemed")/>
                 </div>

@@ -68,7 +68,9 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "continue_the_journey" => "Kontynuuj podróż",
         "start_the_journey" => "Rozpocznij podróż",
         "completion_linked_to_signal" => "Ukończenie jest już połączone z Twoim Sygnałem.",
-        "completion_saved_link_it_to_signal" => "Ukończenie zapisane. Otwórz Synesthesię, aby połączyć je z profilem.",
+        "completion_saved_link_it_to_signal" => {
+            "Ukończenie zapisane. Otwórz Synesthesię, aby połączyć je z profilem."
+        }
         "rooms_completed_count" => "Pokoje świadomości ukończone w tej podróży.",
         "open_synesthesia" => "OTWÓRZ SYNESTHESIĘ",
         "next_signal" => "NASTĘPNY SYGNAŁ",
@@ -76,7 +78,9 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "active_passes" => "aktywne wejściówki",
         "area_findings" => "znaleziska AREA",
         "signal_home_unavailable" => "Snapshot Sygnału jest chwilowo niedostępny",
-        "signal_home_fallback_hint" => "Pozostałe zakładki nadal działają niezależnie. Spróbuj odświeżyć za chwilę.",
+        "signal_home_fallback_hint" => {
+            "Pozostałe zakładki nadal działają niezależnie. Spróbuj odświeżyć za chwilę."
+        }
         "signal_tab" => "Sygnał",
         "scan_tab" => "Skan",
         "tickets_tab" => "Bilety",
@@ -433,7 +437,9 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "Sesja fana, wejściówka oraz prywatne tokeny portfela są przechowywane w osobnym, zaszyfrowanym sejfie Stronghold."
         }
         "feedback_must_contain_between_8_and_2000" => "Feedback powinien mieć od 8 do 2000 znaków.",
-        "feedback_was_sent_anonymously_thank_you" => "Feedback został przyjęty anonimowo. Jeśli jesteś offline, wyślę go automatycznie po powrocie sieci.",
+        "feedback_was_sent_anonymously_thank_you" => {
+            "Feedback został przyjęty anonimowo. Jeśli jesteś offline, wyślę go automatycznie po powrocie sieci."
+        }
         "anonymous_feedback" => "ANONIMOWY FEEDBACK",
         "tell_us_what_to_improve" => "Powiedz nam, co poprawić",
         "app_sends_only_the_category_and_message" => {
@@ -896,7 +902,29 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "get_ticket_now" => "ZDOBĄDŹ BILET",
         "follow_this_signal" => "OBSERWUJ TEN SYGNAŁ",
         "signal_live_note" => "Jesteś w oknie koncertu — najważniejsze rzeczy są pod ręką.",
-        "signal_afterglow_note" => "Koncert właśnie wybrzmiał. Zostaw krótkie anonimowe echo, zanim wrażenie zniknie.",
+        "signal_afterglow_note" => {
+            "Koncert właśnie wybrzmiał. Zostaw krótkie anonimowe echo, zanim wrażenie zniknie."
+        }
+        "unsupported_signal_snapshot_version" => {
+            "Ten snapshot Sygnału używa nieobsługiwanej wersji schematu {}. Zaktualizuj aplikację."
+        }
+        "unsupported_staff_snapshot_version" => {
+            "Ten snapshot staff używa nieobsługiwanej wersji schematu {}. Zaktualizuj aplikację."
+        }
+        "signal_snapshot_updated" => "Aktualizacja: {}",
+        "synesthesia_completed_in_minutes" => "Ukończono w około {} min",
+        "reward_entry_confirmed" => "Udział w nagrodzie potwierdzony",
+        "doors_open_at" => "Otwarcie bram: {}",
+        "event_ends_at" => "Koniec: {}",
+        "entry_ready" => "Wejście gotowe",
+        "following_event" => "Obserwujesz",
+        "tickets_on_sale" => "Bilety w sprzedaży",
+        "paid_orders" => "opłacone zamówienia",
+        "pending_referrals" => "oczekujące polecenia",
+        "passes_issued" => "wydane passy",
+        "could_not_refresh_orders_cached_orders_available" => {
+            "Nie udało się odświeżyć {} zamówień; {} kopii offline jest nadal dostępnych."
+        }
         _ => key,
     }
 }

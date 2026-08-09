@@ -2,8 +2,12 @@
 //! It contains no fan/session identity; only the category, user-written message,
 //! one random submission id and queue timestamp are persisted.
 
-use std::{fs, fs::File, path::{Path, PathBuf}};
 use serde::{Deserialize, Serialize};
+use std::{
+    fs,
+    fs::File,
+    path::{Path, PathBuf},
+};
 
 use crate::AppError;
 
@@ -20,7 +24,9 @@ pub(crate) struct QueuedFeedback {
     pub queued_at_unix: i64,
 }
 
-fn path(dir: &Path) -> PathBuf { dir.join(FILE_NAME) }
+fn path(dir: &Path) -> PathBuf {
+    dir.join(FILE_NAME)
+}
 
 pub(crate) fn load(dir: &Path) -> Result<Vec<QueuedFeedback>, AppError> {
     let path = path(dir);
@@ -57,7 +63,9 @@ pub(crate) fn save(dir: &Path, values: &[QueuedFeedback]) -> Result<(), AppError
         }
     }
     let bytes = serde_json::to_vec(values)?;
-    if bytes.len() as u64 > MAX_BYTES { return Err(AppError::BackgroundTask); }
+    if bytes.len() as u64 > MAX_BYTES {
+        return Err(AppError::BackgroundTask);
+    }
     let temp_path = dir.join(format!("{FILE_NAME}.tmp"));
     let backup_path = dir.join(format!("{FILE_NAME}.bak"));
     fs::write(&temp_path, bytes)?;
@@ -104,8 +112,10 @@ mod tests {
     use super::*;
     #[test]
     fn queue_is_small_and_short_lived() {
-        assert!(MAX_ENTRIES <= 8);
-        assert!(MAX_BYTES <= 64 * 1024);
-        assert!(MAX_AGE_SECONDS <= 7 * 24 * 60 * 60);
+        const {
+            assert!(MAX_ENTRIES <= 8);
+            assert!(MAX_BYTES <= 64 * 1024);
+            assert!(MAX_AGE_SECONDS <= 7 * 24 * 60 * 60);
+        }
     }
 }

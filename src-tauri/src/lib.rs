@@ -21,10 +21,11 @@ use api::CrowdRelayClient;
 use commands::{
     fan::{
         fan_admission_pass, fan_admission_qr, fan_area_challenge, fan_area_claim, fan_area_wallet,
-        fan_claim_pass, fan_confirm, fan_events, fan_forget, fan_home, fan_import_wallet, fan_interests,
-        fan_lock, fan_merch_bundles, fan_merch_catalog, fan_referral, fan_register_interest,
-        fan_request_access, fan_request_delivery, fan_signup, fan_start_ticket_checkout,
-        fan_status, fan_ticket_sale, fan_unlock, fan_wallets, render_wallet_qr,
+        fan_claim_pass, fan_confirm, fan_events, fan_forget, fan_home, fan_import_wallet,
+        fan_interests, fan_lock, fan_merch_bundles, fan_merch_catalog, fan_referral,
+        fan_register_interest, fan_request_access, fan_request_delivery, fan_signup,
+        fan_start_ticket_checkout, fan_status, fan_ticket_sale, fan_unlock, fan_wallets,
+        render_wallet_qr,
     },
     misc::{
         launcher_status, open_external_url, request_city, submit_anonymous_feedback,
@@ -145,7 +146,8 @@ pub fn run() {
             show_mode_scan,
             show_mode_sync,
             show_mode_clear,
-            staff_event_dashboard, ticketing_overview,
+            staff_event_dashboard,
+            ticketing_overview,
             redeem_admission,
             redeem_coupon,
             issue_pass,

@@ -15,9 +15,9 @@ use crate::{
     api::{SignalMerchBundleCatalog, TicketCheckoutInput, TicketCheckoutStart, TicketSaleOffer},
     models::{
         AdmissionPass, AreaChallenge, AreaClaimResult, AreaPositionSample, FanAuthResult,
-        FanConfirmationInput, FanEventInterest, FanHomeData, FanProfile, FanSessionStatus, FanSignupInput,
-        MerchCatalog, PublicEvent, ReferralProgress, TicketWallet, TicketWalletApi, WalletBatch,
-        WalletCredential, WalletQrCredential, WalletTicket,
+        FanConfirmationInput, FanEventInterest, FanHomeData, FanProfile, FanSessionStatus,
+        FanSignupInput, MerchCatalog, PublicEvent, ReferralProgress, TicketWallet, TicketWalletApi,
+        WalletBatch, WalletCredential, WalletQrCredential, WalletTicket,
     },
     session::{fan_profile, persist_fan, run_blocking},
     validation::{bounded_secret, validate_fan_confirmation, validate_fan_signup, validate_pin},
@@ -295,7 +295,11 @@ pub(crate) async fn fan_start_ticket_checkout(
     profile
         .cached_wallet_qr
         .retain(|entry| entry.order_id != checkout.order_id);
-    state.wallet_qr_tokens.write().await.remove(&checkout.order_id);
+    state
+        .wallet_qr_tokens
+        .write()
+        .await
+        .remove(&checkout.order_id);
     persist_fan(&state, &profile).await?;
     *state.fan_session.write().await = Some(Arc::new(profile));
     Ok(checkout)
@@ -409,9 +413,13 @@ pub(crate) async fn fan_import_wallet(
         order_id: order_id.clone(),
         checkout_token: checkout_token.to_string(),
     });
-    profile.cached_wallets.retain(|entry| entry.order.order_id.as_str() != order_id.as_str());
+    profile
+        .cached_wallets
+        .retain(|entry| entry.order.order_id.as_str() != order_id.as_str());
     profile.cached_wallets.push(wallet.clone());
-    profile.cached_wallet_qr.retain(|entry| entry.order_id.as_str() != order_id.as_str());
+    profile
+        .cached_wallet_qr
+        .retain(|entry| entry.order_id.as_str() != order_id.as_str());
     profile.cached_wallet_qr.extend(wallet_qr);
     persist_fan(&state, &profile).await?;
     *state.fan_session.write().await = Some(Arc::new(profile));
@@ -434,7 +442,11 @@ pub(crate) async fn fan_wallets(state: State<'_, AppState>) -> Result<WalletBatc
         let expected_order_id = credential.order_id.clone();
         async move {
             let result = api
-                .ticket_wallet(&api_base_url, &credential.order_id, &credential.checkout_token)
+                .ticket_wallet(
+                    &api_base_url,
+                    &credential.order_id,
+                    &credential.checkout_token,
+                )
                 .await
                 .and_then(|value| {
                     if value.order.order_id.as_str() == credential.order_id.as_str() {
@@ -535,7 +547,9 @@ pub(crate) async fn fan_wallets(state: State<'_, AppState>) -> Result<WalletBatc
                     .cached_wallets
                     .retain(|wallet| wallet.order.order_id.as_str() != order_id.as_str());
                 updated.cached_wallets.push(snapshot);
-                updated.cached_wallet_qr.retain(|entry| entry.order_id.as_str() != order_id.as_str());
+                updated
+                    .cached_wallet_qr
+                    .retain(|entry| entry.order_id.as_str() != order_id.as_str());
                 updated.cached_wallet_qr.extend(qr_credentials);
             }
             if updated.cached_wallets.len() > MAX_WALLETS {
@@ -543,7 +557,9 @@ pub(crate) async fn fan_wallets(state: State<'_, AppState>) -> Result<WalletBatc
             }
             updated.cached_wallet_qr.retain(wallet_qr_credential_valid);
             if updated.cached_wallet_qr.len() > MAX_WALLETS.saturating_mul(8) {
-                updated.cached_wallet_qr.truncate(MAX_WALLETS.saturating_mul(8));
+                updated
+                    .cached_wallet_qr
+                    .truncate(MAX_WALLETS.saturating_mul(8));
             }
             persist_fan(&state, &updated).await?;
             *state.fan_session.write().await = Some(Arc::new(updated));

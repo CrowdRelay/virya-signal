@@ -334,7 +334,6 @@ pub struct WalletTicket {
     pub qr_expires_at: String,
 }
 
-
 #[derive(Clone, Debug, Deserialize, Serialize, Zeroize)]
 #[zeroize(drop)]
 pub struct WalletQrCredential {
