@@ -1204,6 +1204,10 @@ fn OperatorSettings(
     loading: RwSignal<OperatorLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
+    let autopilot = RwSignal::new(None::<OperatorAutopilotOverview>);
+    let autopilot_loading = RwSignal::new(false);
+    let autopilot_chief = RwSignal::new(None::<AutopilotChiefOfStaff>);
+    let autopilot_chief_loading = RwSignal::new(false);
     let ops = RwSignal::new(None::<OperatorOpsOverview>);
     let ops_loading = RwSignal::new(false);
     let owner = Signal::derive(move || {
@@ -1213,13 +1217,23 @@ fn OperatorSettings(
             .is_some_and(|session| session.role == OperatorRole::Owner)
     });
     Effect::new(move |_| {
-        if owner.get() && ops.get().is_none() && !ops_loading.get() {
-            refresh_operator_ops(ops, ops_loading, error);
+        if owner.get() {
+            if autopilot.get().is_none() && !autopilot_loading.get() {
+                refresh_operator_autopilot(autopilot, autopilot_loading, error);
+            }
+            if autopilot_chief.get().is_none() && !autopilot_chief_loading.get() {
+                refresh_operator_chief(autopilot_chief, autopilot_chief_loading, error);
+            }
+            if ops.get().is_none() && !ops_loading.get() {
+                refresh_operator_ops(ops, ops_loading, error);
+            }
         }
     });
     let refresh = move |_| {
         refresh_operator_parts(dashboard, loading, error);
         if owner.get_untracked() {
+            refresh_operator_autopilot(autopilot, autopilot_loading, error);
+            refresh_operator_chief(autopilot_chief, autopilot_chief_loading, error);
             refresh_operator_ops(ops, ops_loading, error);
         }
     };
@@ -1258,10 +1272,354 @@ fn OperatorSettings(
                 <button on:click=lock>{tr("lock_panel")}</button>
                 <button class="danger ghost" on:click=forget>{tr("remove_operator_profile")}</button>
             </div>
-            <Show when=move || owner.get()><OpsPanel overview=ops loading=ops_loading error=error /></Show>
+            <Show when=move || owner.get()>
+                <AutopilotPanel overview=autopilot loading=autopilot_loading chief=autopilot_chief chief_loading=autopilot_chief_loading error=error />
+                <OpsPanel overview=ops loading=ops_loading error=error />
+            </Show>
             <AnonymousFeedback error=error />
             <p class="security-note">{tr("operator_token_is_stored_in_an_encrypted")}</p>
         </section>
+    }
+}
+
+
+#[component]
+fn AutopilotPanel(
+    overview: RwSignal<Option<OperatorAutopilotOverview>>,
+    loading: RwSignal<bool>,
+    chief: RwSignal<Option<AutopilotChiefOfStaff>>,
+    chief_loading: RwSignal<bool>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let refresh = move |_| {
+        refresh_operator_autopilot(overview, loading, error);
+        refresh_operator_chief(chief, chief_loading, error);
+    };
+    view! {
+        <section class="ops-panel autopilot-panel">
+            <div class="section-head">
+                <div><p class="eyebrow">VIRYAOS AUTOPILOT</p><h3>{tr("autopilot_control")}</h3></div>
+                <button class="text-button" on:click=refresh disabled=move || loading.get()>{tr("refresh_2")}</button>
+            </div>
+            <Show when=move || !chief_loading.get() fallback=move || view! { <Skeleton rows=2 /> }>
+                {move || chief.get().map(|brief| {
+                    let opportunities = brief.top_opportunities.into_iter().take(5).collect::<Vec<_>>();
+                    let show_tasks = brief.show_tasks.into_iter().take(5).collect::<Vec<_>>();
+                    let opportunities_view = (!opportunities.is_empty()).then(|| view! {
+                        <div class="section-head"><h3>{tr("autopilot_opportunities")}</h3></div>
+                        <div class="ops-list"><For each=move || opportunities.clone() key=|item| format!("{}:{}:{}", item.context, item.subject_kind, item.subject_id) children=move |item| view! {
+                            <article class="ops-item"><div><strong>{autopilot_context_label(&item.context)}</strong><p>{item.reason}</p><small>{format!("{}% · {}", item.confidence / 100, if item.needs_approval { tr("autopilot_approval") } else { item.decision_kind.as_str() })}</small></div></article>
+                        } /></div>
+                    });
+                    let show_tasks_view = (!show_tasks.is_empty()).then(|| view! {
+                        <div class="section-head"><h3>{tr("autopilot_show_tasks")}</h3></div>
+                        <div class="ops-list"><For each=move || show_tasks.clone() key=|item| format!("{}:{}", item.event_id, item.task_key) children=move |item| view! {
+                            <article class="ops-item"><div><strong>{item.event_title}</strong><p>{autopilot_show_task_label(&item.task_key)}</p><small>{item.status}</small></div></article>
+                        } /></div>
+                    });
+                    view! {
+                        <div class="autopilot-chief">
+                            <div class="section-head"><h3>{tr("autopilot_chief")}</h3><span>{format!("{}", brief.needs_you)}</span></div>
+                            <div class="ops-metrics">
+                                <Metric value=brief.executed_24h.to_string() label=tr("autopilot_actions_24h") />
+                                <Metric value=format!("~{}m", brief.estimated_minutes_saved_24h) label=tr("autopilot_time_saved") />
+                                <Metric value=brief.measured_improved_7d.to_string() label=tr("autopilot_improved_7d") />
+                                <Metric value=brief.needs_you.to_string() label=tr("autopilot_needs_you") />
+                            </div>
+                            {opportunities_view}
+                            {show_tasks_view}
+                        </div>
+                    }
+                })}
+            </Show>
+            <Show when=move || !loading.get() fallback=move || view! { <Skeleton rows=3 /> }>
+                {move || overview.get().map(|data| {
+                    let runtime_enabled = data.runtime_enabled;
+                    let policies = data.policies;
+                    let promotion_budget_guardrails = data.promotion_budget_guardrails;
+                    let needs_you = data.needs_you;
+                    let recent_actions = data.recent_actions.into_iter().take(10).collect::<Vec<_>>();
+                    let recent_effects = data.recent_effects.into_iter().take(6).collect::<Vec<_>>();
+                    let queue = data.queued_actions.saturating_add(data.processing_actions);
+                    let runtime_view = (!runtime_enabled).then(|| view! {
+                        <p class="security-note warning">{tr("autopilot_runtime_disabled")}</p>
+                    });
+                    let needs_view = if needs_you.is_empty() {
+                        view! { <p class="ops-healthy">{tr("autopilot_nothing_needs_you")}</p> }.into_any()
+                    } else {
+                        view! {
+                            <div class="section-head"><h3>{tr("autopilot_needs_you")}</h3><span>{needs_you.len()}</span></div>
+                            <div class="ops-list">
+                                <For each=move || needs_you.clone() key=|action| action.id.clone() children=move |action| view! {
+                                    <AutopilotPendingCard action=action overview=overview loading=loading error=error />
+                                } />
+                            </div>
+                        }.into_any()
+                    };
+                    let effects_view = (!recent_effects.is_empty()).then(|| view! {
+                        <div class="section-head"><h3>{tr("autopilot_measured_effects")}</h3></div>
+                        <div class="ops-list"><For each=move || recent_effects.clone() key=|effect| effect.measurement_id.clone() children=move |effect| {
+                            let delta = effect.delta_basis_points as f64 / 100.0;
+                            view! {
+                                <article class="ops-item"><div>
+                                    <strong>{autopilot_context_label(&effect.context)}</strong>
+                                    <p>{autopilot_measurement_kind_label(&effect.measurement_kind)}</p>
+                                    <small>{format!("{} · {delta:+.1}%", autopilot_effect_label(&effect.assessment))}</small>
+                                </div></article>
+                            }
+                        } /></div>
+                    });
+                    let recent_view = (!recent_actions.is_empty()).then(|| view! {
+                        <div class="section-head"><h3>{tr("autopilot_recent_actions")}</h3></div>
+                        <div class="ops-list"><For each=move || recent_actions.clone() key=|action| action.id.clone() children=move |action| view! {
+                            <article class="ops-item"><div><strong>{autopilot_context_label(&action.context)}</strong><p>{autopilot_action_kind_label(&action.action_kind)}</p><small>{format!("{} · #{}", action.status, action.attempt_count)}</small></div></article>
+                        } /></div>
+                    });
+                    let guardrails_view = (!promotion_budget_guardrails.is_empty()).then(|| view! {
+                        <div class="section-head"><h3>{tr("autopilot_financial_guardrails")}</h3></div>
+                        <div class="ops-list"><For each=move || promotion_budget_guardrails.clone() key=|guardrail| guardrail.currency.clone() children=move |guardrail| view! {
+                            <article class="ops-item"><div><strong>{guardrail.currency}</strong><p>{format!("≤{:.2}/day · ≤{:.2}/month", guardrail.maximum_total_daily_budget_minor as f64 / 100.0, guardrail.maximum_monthly_spend_minor as f64 / 100.0)}</p><small>{format!("v{}", guardrail.version)}</small></div></article>
+                        } /></div>
+                    });
+                    view! {
+                        <div class="ops-metrics">
+                            <Metric value=data.succeeded_24h.to_string() label=tr("autopilot_actions_24h") />
+                            <Metric value=queue.to_string() label=tr("autopilot_queue") />
+                            <Metric value=data.failed_24h.to_string() label=tr("autopilot_failed_24h") />
+                            <Metric value=if runtime_enabled { "ON".to_owned() } else { "OFF".to_owned() } label="runtime" />
+                        </div>
+                        {runtime_view}
+                        <div class="section-head"><h3>{tr("autopilot_authority")}</h3></div>
+                        <div class="ops-list autopilot-policies"><For each=move || policies.clone() key=|policy| policy.context.clone() children=move |policy| view! {
+                            <AutopilotPolicyCard policy=policy overview=overview loading=loading error=error />
+                        } /></div>
+                        {guardrails_view}
+                        {needs_view}
+                        {effects_view}
+                        {recent_view}
+                    }
+                })}
+            </Show>
+        </section>
+    }
+}
+
+#[component]
+fn AutopilotPolicyCard(
+    policy: AutopilotPolicySummary,
+    overview: RwSignal<Option<OperatorAutopilotOverview>>,
+    loading: RwSignal<bool>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let current = if policy.enabled { policy.autonomy_level.as_str() } else { "off" };
+    let observe_policy = policy.clone();
+    let approval_policy = policy.clone();
+    let auto_policy = policy.clone();
+    let off_policy = policy.clone();
+    view! {
+        <article class="ops-item autopilot-policy-card">
+            <div>
+                <strong>{autopilot_context_label(&policy.context)}</strong>
+                <p>{format!("{} · {}% · ≤{}/24h · v{}", current, policy.minimum_confidence / 100, policy.max_actions_24h, policy.version)}</p>
+            </div>
+            <div class="autopilot-policy-actions" role="group" aria-label=tr("autopilot_authority")>
+                <button class="text-button" class:active=current == "off" on:click=move |_| set_autopilot_policy(off_policy.clone(), false, "observe", overview, loading, error)>{tr("autopilot_off")}</button>
+                <button class="text-button" class:active=current == "observe" on:click=move |_| set_autopilot_policy(observe_policy.clone(), true, "observe", overview, loading, error)>{tr("autopilot_observe")}</button>
+                <button class="text-button" class:active=current == "require_approval" on:click=move |_| set_autopilot_policy(approval_policy.clone(), true, "require_approval", overview, loading, error)>{tr("autopilot_approval")}</button>
+                <button class="text-button" class:active=current == "bounded_auto" on:click=move |_| set_autopilot_policy(auto_policy.clone(), true, "bounded_auto", overview, loading, error)>{tr("autopilot_auto")}</button>
+            </div>
+        </article>
+    }
+}
+
+#[component]
+fn AutopilotPendingCard(
+    action: crate::models::PendingAutopilotAction,
+    overview: RwSignal<Option<OperatorAutopilotOverview>>,
+    loading: RwSignal<bool>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let approve_id = action.id.clone();
+    let cancel_id = action.id.clone();
+    let detail = autopilot_payload_detail(&action.payload);
+    view! {
+        <article class="ops-item autopilot-pending-card">
+            <div><strong>{autopilot_context_label(&action.context)}</strong><p>{detail}</p><small>{action.action_kind}</small></div>
+            <div class="autopilot-policy-actions">
+                <button class="primary" on:click=move |_| mutate_autopilot_action("operator_autopilot_approve", approve_id.clone(), overview, loading, error) disabled=move || loading.get()>{tr("autopilot_approve")}</button>
+                <button class="danger ghost" on:click=move |_| mutate_autopilot_action("operator_autopilot_cancel", cancel_id.clone(), overview, loading, error) disabled=move || loading.get()>{tr("autopilot_cancel")}</button>
+            </div>
+        </article>
+    }
+}
+
+fn set_autopilot_policy(
+    policy: AutopilotPolicySummary,
+    enabled: bool,
+    autonomy_level: &'static str,
+    overview: RwSignal<Option<OperatorAutopilotOverview>>,
+    loading: RwSignal<bool>,
+    error: RwSignal<Option<String>>,
+) {
+    if loading.get_untracked() { return; }
+    loading.set(true);
+    spawn_local(async move {
+        let result = bridge::invoke::<AutopilotMutation, _>(
+            "operator_autopilot_set_authority",
+            &AutopilotAuthorityArgs {
+                context: &policy.context,
+                enabled,
+                autonomy_level,
+                minimum_confidence_basis_points: policy.minimum_confidence,
+                max_actions_24h: policy.max_actions_24h,
+                expected_version: policy.version,
+            },
+        ).await;
+        match result {
+            Ok(_) => {
+                loading.set(false);
+                refresh_operator_autopilot(overview, loading, error);
+            }
+            Err(message) => { loading.set(false); error.set(Some(message)); }
+        }
+    });
+}
+
+fn mutate_autopilot_action(
+    command: &'static str,
+    action_id: String,
+    overview: RwSignal<Option<OperatorAutopilotOverview>>,
+    loading: RwSignal<bool>,
+    error: RwSignal<Option<String>>,
+) {
+    if loading.get_untracked() { return; }
+    loading.set(true);
+    spawn_local(async move {
+        let result = match command {
+            "operator_autopilot_approve" => bridge::invoke::<AutopilotMutation, _>(
+                "operator_autopilot_approve", &AutopilotActionArgs { action_id: &action_id }
+            ).await,
+            "operator_autopilot_cancel" => bridge::invoke::<AutopilotMutation, _>(
+                "operator_autopilot_cancel", &AutopilotActionArgs { action_id: &action_id }
+            ).await,
+            _ => Err(tr("autopilot_invalid_action").to_owned()),
+        };
+        match result {
+            Ok(_) => { loading.set(false); refresh_operator_autopilot(overview, loading, error); }
+            Err(message) => { loading.set(false); error.set(Some(message)); }
+        }
+    });
+}
+
+fn autopilot_context_label(context: &str) -> &'static str {
+    match context {
+        "ticket_yield" => "Ticket Yield",
+        "fan_lifecycle" => "Fan Lifecycle",
+        "campaign_lifecycle" => "Campaign Lifecycle",
+        "merchandising" => "Merch Stock",
+        "merch_pricing" => "Merch Yield",
+        "merch_bundle" => "Merch Bundles",
+        "booking_opportunity" => "Gig Opportunity",
+        "outreach" => "Relationship Outreach",
+        "content_supply" => "Content Supply",
+        "promotion_budget" => "Promotion Yield",
+        "experimentation" => "Experiments",
+        "show_operations" => "Show Operations",
+        _ => "Autopilot",
+    }
+}
+
+fn autopilot_action_kind_label(kind: &str) -> &'static str {
+    match kind {
+        "ticket.price.change" => "Ticket price changed",
+        "fan.lifecycle.message.request" => "Fan lifecycle message",
+        "audience.campaign.request" => "Audience campaign",
+        "merch.reorder.request" => "Merch reorder request",
+        "merch.price.change" => "Merch price changed",
+        "merch.bundle.request" => "Merch bundle request",
+        "booking.outreach.request" => "Booking outreach",
+        "outreach.request" => "Relationship outreach",
+        "content.artifact.request" => "Content artifact",
+        "experiment.allocation.change" => "Experiment reallocation",
+        "experiment.complete" => "Experiment winner",
+        "show.task.complete" => "Show task completed",
+        "show.task.escalate" => "Show task needs human",
+        "promotion.budget_change.request" => "Promotion budget change",
+        _ => "Autopilot action",
+    }
+}
+
+fn autopilot_measurement_kind_label(kind: &str) -> &'static str {
+    match kind {
+        "ticket_revenue_72h" => "Ticket revenue · 72h",
+        "merch_gross_proxy_7d" => "Merch gross proxy · 7d",
+        "promotion_roas_7d" => "Promotion ROAS · 7d",
+        _ => "Measured effect",
+    }
+}
+
+fn autopilot_effect_label(assessment: &str) -> String {
+    match assessment {
+        "improved" => tr("autopilot_effect_improved").to_owned(),
+        "neutral" => tr("autopilot_effect_neutral").to_owned(),
+        "worsened" => tr("autopilot_effect_worsened").to_owned(),
+        _ => assessment.to_owned(),
+    }
+}
+
+fn autopilot_payload_detail(payload: &AutopilotActionPayload) -> String {
+    match payload {
+        AutopilotActionPayload::ChangeTicketPrice { from_minor, to_minor, .. } => {
+            format!("{:.2} → {:.2} PLN", *from_minor as f64 / 100.0, *to_minor as f64 / 100.0)
+        }
+        AutopilotActionPayload::RequestFanLifecycleMessage { template_key, .. } => template_key.clone(),
+        AutopilotActionPayload::RequestMerchReorder { quantity, .. } => format!("Reorder ×{quantity}"),
+        AutopilotActionPayload::ChangeMerchPrice { from_minor, to_minor, .. } => {
+            format!("{:.2} → {:.2} PLN", *from_minor as f64 / 100.0, *to_minor as f64 / 100.0)
+        }
+        AutopilotActionPayload::RequestBookingOutreach { target_name, score, phase, .. } => {
+            format!("{target_name} · {phase} · opportunity {score}/100")
+        }
+        AutopilotActionPayload::RequestAudienceCampaign { phase, template_key, .. } => {
+            format!("{phase} · {template_key}")
+        }
+        AutopilotActionPayload::RequestMerchBundle { bundle_price_minor, affinity_basis_points, .. } => {
+            format!("{:.2} PLN · affinity {:.1}%", *bundle_price_minor as f64 / 100.0, *affinity_basis_points as f64 / 100.0)
+        }
+        AutopilotActionPayload::RequestOutreach { target_name, phase, template_key, .. } => {
+            format!("{target_name} · {phase} · {template_key}")
+        }
+        AutopilotActionPayload::RequestContentArtifact { artifact, template_key, .. } => {
+            format!("{artifact} · {template_key}")
+        }
+        AutopilotActionPayload::AdjustExperiment { complete, allocations, .. } => {
+            let state = if *complete { "winner" } else { "reallocate" };
+            format!("{state} · {} variants", allocations.len())
+        }
+        AutopilotActionPayload::CompleteShowTask { task, .. } => format!("✓ {}", autopilot_show_task_label(task)),
+        AutopilotActionPayload::EscalateShowTask { task, .. } => format!("⚠ {}", autopilot_show_task_label(task)),
+        AutopilotActionPayload::RequestPromotionBudgetChange { from_minor, to_minor, roas_basis_points, .. } => format!(
+            "{:.2} → {:.2} PLN/day · ROAS {:.2}×",
+            *from_minor as f64 / 100.0,
+            *to_minor as f64 / 100.0,
+            *roas_basis_points as f64 / 10_000.0,
+        ),
+    }
+}
+
+fn autopilot_show_task_label(task: &str) -> &'static str {
+    match task {
+        "announcement_published" => "Announcement published",
+        "ticketing_verified" => "Ticketing verified",
+        "staff_assigned" => "Staff assigned",
+        "offline_snapshot_ready" => "Offline snapshot ready",
+        "gate_device_charged" => "Gate device charged",
+        "backup_device_ready" => "Backup device ready",
+        "network_tested" => "Network tested",
+        "guestlist_checked" => "Guest list checked",
+        "post_show_reconciliation" => "Post-show reconciliation",
+        "post_show_report" => "Post-show report",
+        _ => "Show task",
     }
 }
 
@@ -1296,6 +1654,7 @@ fn OpsPanel(
                     view! {
                         <div class="ops-metrics"><Metric value=summary.outbox.pending.to_string() label="outbox pending"/><Metric value=summary.outbox.dead.to_string() label="outbox dead"/><Metric value=summary.deliveries.pending.to_string() label="delivery pending"/><Metric value=summary.deliveries.dead.to_string() label="delivery dead"/></div>
                         <div class="ops-metrics http-ops-metrics"><Metric value=summary.http.requests.to_string() label="http requests"/><Metric value=format!("{} ms", summary.http.average_ms) label="avg"/><Metric value=format!("≤{} ms", summary.http.p50_ms) label="p50"/><Metric value=format!("≤{} ms", summary.http.p95_ms) label="p95"/><Metric value=summary.http.errors_4xx.to_string() label="4xx"/><Metric value=summary.http.errors_5xx.to_string() label="5xx"/><Metric value=if summary.release.is_empty() { "—".to_owned() } else { summary.release.clone() } label="release"/></div>
+                        <div class="ops-metrics database-ops-metrics"><Metric value={if summary.database.server_version_num > 0 { format!("{}.{}", summary.database.server_version_num / 10_000, (summary.database.server_version_num / 100) % 100) } else { "—".to_owned() }} label=tr("database_runtime")/><Metric value=summary.database.io_method.clone().unwrap_or_else(|| "—".to_owned()) label="io_method"/><Metric value=summary.database.io_workers.map_or_else(|| "—".to_owned(), |value| value.to_string()) label="io_workers"/><Metric value=summary.database.effective_io_concurrency.map_or_else(|| "—".to_owned(), |value| value.to_string()) label="effective_io"/><Metric value=summary.database.maintenance_io_concurrency.map_or_else(|| "—".to_owned(), |value| value.to_string()) label="maintenance_io"/><Metric value=summary.database.io_max_concurrency.map_or_else(|| "—".to_owned(), |value| if value < 0 { "auto".to_owned() } else { value.to_string() }) label="io_max"/><Metric value={if summary.database.async_io_active { "ACTIVE".to_owned() } else { "OFF".to_owned() }} label=tr("async_io")/></div>
                         {degraded_view}
                         {deliveries_view}
                         {outbox_view}

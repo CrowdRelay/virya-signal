@@ -4,7 +4,7 @@ Tauri 2 / Rust / Leptos mobile client for the VIRYA fan and staff ecosystem. The
 
 ## Product boundary
 
-Fan surfaces: Signal identity/recovery, concerts, tickets, merch, AREA and Synesthesia entry. Staff surfaces: operational overview, ticket/admission scanning, campaigns, commerce and diagnostics.
+Fan surfaces: Signal identity/recovery, concerts, tickets, merch, AREA and Synesthesia entry. Staff surfaces: operational overview, ticket/admission scanning, campaigns, commerce, diagnostics, and the ViryaOS Autopilot exception cockpit / Chief of Staff. The app exposes approvals, cancellations, authority and measured effects, but business decisions remain in CrowdRelay domain code.
 
 CrowdRelay remains authoritative for fan/event/ticket/draw/inventory state. The app does not duplicate Stripe, fulfillment, winner selection or consent logic. Synesthesia is launched as an external first-party album experience at `https://synesthesia.virya.music/?source=signal-app`.
 

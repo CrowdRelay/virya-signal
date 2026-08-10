@@ -715,6 +715,24 @@ pub struct QueueSummary {
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
+pub struct DatabaseRuntimeSummary {
+    #[serde(default)]
+    pub server_version_num: i32,
+    #[serde(default)]
+    pub io_method: Option<String>,
+    #[serde(default)]
+    pub io_workers: Option<i32>,
+    #[serde(default)]
+    pub io_max_concurrency: Option<i32>,
+    #[serde(default)]
+    pub effective_io_concurrency: Option<i32>,
+    #[serde(default)]
+    pub maintenance_io_concurrency: Option<i32>,
+    #[serde(default)]
+    pub async_io_active: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct OpsSummary {
     #[serde(default)]
     pub outbox: QueueSummary,
@@ -722,6 +740,8 @@ pub struct OpsSummary {
     pub deliveries: QueueSummary,
     #[serde(default)]
     pub http: HttpRequestSummary,
+    #[serde(default)]
+    pub database: DatabaseRuntimeSummary,
     #[serde(default)]
     pub release: String,
 }
@@ -782,6 +802,249 @@ pub struct OperatorOpsOverview {
     pub dead_outbox: Vec<OpsOutboxItem>,
     #[serde(default)]
     pub unavailable_sources: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct AutopilotPolicySummary {
+    pub context: String,
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub autonomy_level: String,
+    #[serde(default)]
+    pub minimum_confidence: u16,
+    #[serde(default)]
+    pub max_actions_24h: u32,
+    #[serde(default)]
+    pub version: i64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct PromotionBudgetGuardrailSummary {
+    pub currency: String,
+    pub maximum_total_daily_budget_minor: i64,
+    pub maximum_monthly_spend_minor: i64,
+    pub version: i64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct ExperimentAllocation {
+    pub variant_id: String,
+    pub allocation_basis_points: u16,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[allow(dead_code)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum AutopilotActionPayload {
+    ChangeTicketPrice {
+        ticket_type_id: String,
+        from_minor: i64,
+        to_minor: i64,
+    },
+    RequestFanLifecycleMessage {
+        fan_id: String,
+        template_key: String,
+    },
+    RequestMerchReorder {
+        variant_id: String,
+        quantity: u32,
+    },
+    ChangeMerchPrice {
+        product_id: String,
+        from_minor: i64,
+        to_minor: i64,
+        economics_version: i64,
+    },
+    RequestBookingOutreach {
+        city_id: String,
+        target_id: String,
+        target_version: i64,
+        target_name: String,
+        score: u16,
+        phase: String,
+    },
+    RequestAudienceCampaign {
+        event_id: String,
+        phase: String,
+        template_key: String,
+    },
+    RequestMerchBundle {
+        product_a: String,
+        product_b: String,
+        bundle_price_minor: i64,
+        affinity_basis_points: u16,
+    },
+    RequestOutreach {
+        opportunity_id: String,
+        target_id: String,
+        target_version: i64,
+        target_name: String,
+        phase: String,
+        template_key: String,
+    },
+    RequestContentArtifact {
+        source_id: String,
+        source_version: i64,
+        artifact: String,
+        template_key: String,
+    },
+    AdjustExperiment {
+        experiment_id: String,
+        expected_version: i64,
+        winner_variant_id: String,
+        allocations: Vec<ExperimentAllocation>,
+        complete: bool,
+    },
+    CompleteShowTask {
+        event_id: String,
+        task: String,
+    },
+    EscalateShowTask {
+        event_id: String,
+        task: String,
+    },
+    RequestPromotionBudgetChange {
+        campaign_id: String,
+        from_minor: i64,
+        to_minor: i64,
+        roas_basis_points: u32,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct PendingAutopilotAction {
+    pub id: String,
+    pub context: String,
+    pub action_kind: String,
+    pub subject_kind: String,
+    pub subject_id: String,
+    pub payload: AutopilotActionPayload,
+    pub created_at: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct RecentAutopilotDecision {
+    pub id: String,
+    pub context: String,
+    pub decision_kind: String,
+    pub confidence: u16,
+    pub disposition: String,
+    pub reason: String,
+    pub evaluated_at: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct RecentAutopilotAction {
+    pub id: String,
+    pub context: String,
+    pub action_kind: String,
+    pub subject_kind: String,
+    pub subject_id: String,
+    pub status: String,
+    pub attempt_count: u32,
+    pub created_at: String,
+    pub finished_at: Option<String>,
+    pub last_error_kind: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct RecentAutopilotEffect {
+    pub measurement_id: String,
+    pub action_id: String,
+    pub context: String,
+    pub measurement_kind: String,
+    pub assessment: String,
+    pub delta_basis_points: i32,
+    pub baseline_value: f64,
+    pub observed_value: f64,
+    pub observed_at: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[allow(dead_code)]
+pub struct OperatorAutopilotOverview {
+    #[serde(default)]
+    pub runtime_enabled: bool,
+    #[serde(default)]
+    pub policies: Vec<AutopilotPolicySummary>,
+    #[serde(default)]
+    pub promotion_budget_guardrails: Vec<PromotionBudgetGuardrailSummary>,
+    #[serde(default)]
+    pub needs_you: Vec<PendingAutopilotAction>,
+    #[serde(default)]
+    pub recent_decisions: Vec<RecentAutopilotDecision>,
+    #[serde(default)]
+    pub recent_actions: Vec<RecentAutopilotAction>,
+    #[serde(default)]
+    pub recent_effects: Vec<RecentAutopilotEffect>,
+    #[serde(default)]
+    pub queued_actions: i64,
+    #[serde(default)]
+    pub processing_actions: i64,
+    #[serde(default)]
+    pub succeeded_24h: i64,
+    #[serde(default)]
+    pub failed_24h: i64,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct ChiefOfStaffOpportunity {
+    pub context: String,
+    pub decision_kind: String,
+    pub subject_kind: String,
+    pub subject_id: String,
+    pub confidence: u16,
+    pub reason: String,
+    pub needs_approval: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[allow(dead_code)]
+pub struct ChiefOfStaffShowTask {
+    pub event_id: String,
+    pub event_title: String,
+    pub task_key: String,
+    pub status: String,
+    pub starts_at: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+#[allow(dead_code)]
+pub struct AutopilotChiefOfStaff {
+    #[serde(default)]
+    pub executed_24h: i64,
+    #[serde(default)]
+    pub failed_24h: i64,
+    #[serde(default)]
+    pub needs_you: i64,
+    #[serde(default)]
+    pub estimated_minutes_saved_24h: i64,
+    #[serde(default)]
+    pub measured_improved_7d: i64,
+    #[serde(default)]
+    pub measured_neutral_7d: i64,
+    #[serde(default)]
+    pub measured_worsened_7d: i64,
+    #[serde(default)]
+    pub top_opportunities: Vec<ChiefOfStaffOpportunity>,
+    #[serde(default)]
+    pub show_tasks: Vec<ChiefOfStaffShowTask>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct AutopilotMutation {
+    pub operation_id: String,
+    pub target_id: String,
+    pub status: String,
+    #[serde(default)]
+    pub replayed: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]

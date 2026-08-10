@@ -116,6 +116,59 @@ fn refresh_operator_signal(
     });
 }
 
+
+fn refresh_operator_autopilot(
+    overview: RwSignal<Option<OperatorAutopilotOverview>>,
+    loading: RwSignal<bool>,
+    error: RwSignal<Option<String>>,
+) {
+    if loading.get_untracked() {
+        return;
+    }
+    loading.set(true);
+    spawn_local(async move {
+        match bridge::invoke_latest::<OperatorAutopilotOverview, _>(
+            "operator_autopilot_overview",
+            &EmptyArgs {},
+            20_000,
+            "operator:autopilot",
+        )
+        .await
+        {
+            Ok(Some(value)) => overview.set(Some(value)),
+            Ok(None) => return,
+            Err(message) => error.set(Some(message)),
+        }
+        loading.set(false);
+    });
+}
+
+fn refresh_operator_chief(
+    brief: RwSignal<Option<AutopilotChiefOfStaff>>,
+    loading: RwSignal<bool>,
+    error: RwSignal<Option<String>>,
+) {
+    if loading.get_untracked() {
+        return;
+    }
+    loading.set(true);
+    spawn_local(async move {
+        match bridge::invoke_latest::<AutopilotChiefOfStaff, _>(
+            "operator_autopilot_chief_of_staff",
+            &EmptyArgs {},
+            20_000,
+            "operator:autopilot:chief",
+        )
+        .await
+        {
+            Ok(Some(value)) => brief.set(Some(value)),
+            Ok(None) => {}
+            Err(message) => error.set(Some(message)),
+        }
+        loading.set(false);
+    });
+}
+
 fn refresh_operator_ops(
     overview: RwSignal<Option<OperatorOpsOverview>>,
     loading: RwSignal<bool>,

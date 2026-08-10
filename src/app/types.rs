@@ -263,3 +263,20 @@ pub(super) struct AreaClaimArgs<'a> {
     pub challenge: &'a str,
     pub samples: &'a [crate::models::AreaPositionSample],
 }
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AutopilotAuthorityArgs<'a> {
+    pub context: &'a str,
+    pub enabled: bool,
+    pub autonomy_level: &'a str,
+    pub minimum_confidence_basis_points: u16,
+    pub max_actions_24h: u32,
+    pub expected_version: i64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AutopilotActionArgs<'a> {
+    pub action_id: &'a str,
+}

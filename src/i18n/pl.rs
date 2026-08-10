@@ -925,6 +925,38 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "could_not_refresh_orders_cached_orders_available" => {
             "Nie udało się odświeżyć {} zamówień; {} kopii offline jest nadal dostępnych."
         }
+        "autopilot_control" => "Autonomiczne operacje",
+        "autopilot_runtime_disabled" => {
+            "Runtime Autopilota jest globalnie wyłączony. Polityki można przygotować, ale żadna decyzja nie zostanie wykonana."
+        }
+        "autopilot_nothing_needs_you" => {
+            "Nic nie wymaga Twojej decyzji — ViryaOS obsługuje bieżące operacje."
+        }
+        "autopilot_needs_you" => "Wymaga Ciebie",
+        "autopilot_recent_actions" => "Ostatnie działania",
+        "autopilot_measured_effects" => "Zmierzony efekt",
+        "autopilot_effect_improved" => "poprawa",
+        "autopilot_effect_neutral" => "bez istotnej zmiany",
+        "autopilot_effect_worsened" => "pogorszenie",
+        "autopilot_actions_24h" => "wykonane 24h",
+        "autopilot_queue" => "w kolejce",
+        "autopilot_failed_24h" => "błędy 24h",
+        "autopilot_authority" => "Poziom autonomii",
+        "autopilot_financial_guardrails" => "Limity finansowe",
+        "autopilot_off" => "OFF",
+        "autopilot_observe" => "OBSERWUJ",
+        "autopilot_approval" => "AKCEPTACJA",
+        "autopilot_auto" => "AUTO",
+        "autopilot_approve" => "AKCEPTUJ",
+        "autopilot_cancel" => "ANULUJ",
+        "autopilot_chief" => "Szef operacyjny",
+        "autopilot_time_saved" => "czas zdjęty z zespołu",
+        "autopilot_improved_7d" => "poprawione 7d",
+        "autopilot_opportunities" => "Najlepsze okazje",
+        "autopilot_show_tasks" => "Rzeczy koncertowe do dopięcia",
+        "autopilot_invalid_action" => "Nieprawidłowa akcja Autopilota",
+        "database_runtime" => "PostgreSQL runtime",
+        "async_io" => "async I/O",
         _ => key,
     }
 }

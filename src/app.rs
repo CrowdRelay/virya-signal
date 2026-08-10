@@ -17,16 +17,17 @@ use wasm_bindgen_futures::spawn_local;
 use crate::{
     bridge,
     models::{
-        AdmissionPass, AdmissionQr, AdmissionRedemption, AreaWallet, CouponEnvelope,
+        AdmissionPass, AdmissionQr, AdmissionRedemption, AreaWallet, AutopilotActionPayload,
+        AutopilotChiefOfStaff, AutopilotMutation, AutopilotPolicySummary, CouponEnvelope,
         CreateQrCampaignInput, DashboardData, FanAuthResult, FanConfirmationInput,
         FanDashboardData, FanEventInterest, FanHomeData, FanMerchBundleCatalog, FanSessionStatus,
-        FanSignupInput, IssuePassInput, IssuedPass, MerchCatalog, OperatorOpsOverview,
-        OperatorProfileInput, OperatorRole, OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem,
-        OpsRetryResult, PublicEvent, PublicHomeData, QrCampaign, ReferralProgress,
-        RequestedCityInput, RequestedCityResult, SessionStatus, ShowModeScanResult, ShowModeStatus,
-        ShowModeSyncResult, StaffEventDashboard, TicketCheckoutInput, TicketCheckoutItemInput,
-        TicketCheckoutStart, TicketSaleOffer, TicketWallet, TicketingOverview, WalletBatch,
-        WalletTicket,
+        FanSignupInput, IssuePassInput, IssuedPass, MerchCatalog, OperatorAutopilotOverview,
+        OperatorOpsOverview, OperatorProfileInput, OperatorRole, OperatorSignalOverview,
+        OpsDeliveryItem, OpsOutboxItem, OpsRetryResult, PublicEvent, PublicHomeData, QrCampaign,
+        ReferralProgress, RequestedCityInput, RequestedCityResult, SessionStatus,
+        ShowModeScanResult, ShowModeStatus, ShowModeSyncResult, StaffEventDashboard,
+        TicketCheckoutInput, TicketCheckoutItemInput, TicketCheckoutStart, TicketSaleOffer,
+        TicketWallet, TicketingOverview, WalletBatch, WalletTicket,
     },
 };
 

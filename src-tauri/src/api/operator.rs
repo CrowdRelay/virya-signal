@@ -3,10 +3,11 @@ use reqwest::Method;
 use crate::{
     AppError,
     models::{
-        AudienceRevenueSummary, AudienceSummary, ConcertQrOverview, CreateQrCampaignInput,
-        IssuePassInput, OperatorOpsOverview, OperatorProfile, OperatorRole, OperatorSignalOverview,
-        OpsDeliveryItem, OpsOutboxItem, OpsRetryResult, OpsSummary, PublicEvent, ShowModeSnapshot,
-        StaffEventDashboard, TicketingOverview,
+        AudienceRevenueSummary, AudienceSummary, AutopilotAuthorityRequest, AutopilotChiefOfStaff,
+        AutopilotMutation, ConcertQrOverview, CreateQrCampaignInput, IssuePassInput,
+        OperatorAutopilotOverview, OperatorOpsOverview, OperatorProfile, OperatorRole,
+        OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem, OpsRetryResult, OpsSummary,
+        PublicEvent, ShowModeSnapshot, StaffEventDashboard, TicketingOverview,
     },
 };
 
@@ -319,6 +320,110 @@ impl super::CrowdRelayClient {
             dead_outbox,
             unavailable_sources,
         })
+    }
+
+    pub async fn operator_autopilot_overview(
+        &self,
+        profile: &OperatorProfile,
+    ) -> Result<OperatorAutopilotOverview, AppError> {
+        require_owner(profile)?;
+        self.auth_json::<OperatorAutopilotOverview, ()>(
+            profile,
+            Method::GET,
+            "admin/autopilot/overview",
+            None,
+        )
+        .await
+    }
+
+    pub async fn operator_autopilot_chief_of_staff(
+        &self,
+        profile: &OperatorProfile,
+    ) -> Result<AutopilotChiefOfStaff, AppError> {
+        require_owner(profile)?;
+        self.auth_json::<AutopilotChiefOfStaff, ()>(
+            profile,
+            Method::GET,
+            "admin/autopilot/chief-of-staff",
+            None,
+        )
+        .await
+    }
+
+    pub async fn operator_autopilot_set_authority(
+        &self,
+        profile: &OperatorProfile,
+        context: &str,
+        mut body: AutopilotAuthorityRequest,
+    ) -> Result<AutopilotMutation, AppError> {
+        require_owner(profile)?;
+        let context = match context {
+            "ticket_yield"
+            | "fan_lifecycle"
+            | "campaign_lifecycle"
+            | "merchandising"
+            | "merch_pricing"
+            | "merch_bundle"
+            | "booking_opportunity"
+            | "outreach"
+            | "content_supply"
+            | "promotion_budget"
+            | "experimentation"
+            | "show_operations" => context,
+            _ => return Err(AppError::InvalidInput("Invalid Autopilot context".into())),
+        };
+        let autonomy_level = match body.autonomy_level.trim() {
+            "observe" | "recommend" | "require_approval" | "bounded_auto" => {
+                body.autonomy_level.trim().to_owned()
+            }
+            _ => return Err(AppError::InvalidInput("Invalid Autopilot authority".into())),
+        };
+        if body.minimum_confidence_basis_points > 10_000
+            || !(1..=1000).contains(&body.max_actions_24h)
+            || body.expected_version <= 0
+        {
+            return Err(AppError::InvalidInput("Invalid Autopilot policy".into()));
+        }
+        body.autonomy_level = autonomy_level;
+        self.auth_json(
+            profile,
+            Method::POST,
+            &format!("admin/autopilot/policies/{context}"),
+            Some(&body),
+        )
+        .await
+    }
+
+    pub async fn operator_autopilot_approve(
+        &self,
+        profile: &OperatorProfile,
+        action_id: &str,
+    ) -> Result<AutopilotMutation, AppError> {
+        require_owner(profile)?;
+        let action_id = uuid_segment(action_id)?;
+        self.auth_json::<AutopilotMutation, ()>(
+            profile,
+            Method::POST,
+            &format!("admin/autopilot/actions/{action_id}/approve"),
+            None,
+        )
+        .await
+    }
+
+    pub async fn operator_autopilot_cancel(
+        &self,
+        profile: &OperatorProfile,
+        action_id: &str,
+    ) -> Result<AutopilotMutation, AppError> {
+        require_owner(profile)?;
+        let action_id = uuid_segment(action_id)?;
+        self.auth_json::<AutopilotMutation, ()>(
+            profile,
+            Method::POST,
+            &format!("admin/autopilot/actions/{action_id}/cancel"),
+            None,
+        )
+        .await
     }
 
     pub async fn operator_retry(

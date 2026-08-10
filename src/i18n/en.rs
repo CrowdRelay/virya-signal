@@ -923,6 +923,38 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "could_not_refresh_orders_cached_orders_available" => {
             "Could not refresh {} orders; {} offline copies remain available."
         }
+        "autopilot_control" => "Autonomous operations",
+        "autopilot_runtime_disabled" => {
+            "Autopilot runtime is globally disabled. Policies can be prepared, but no decision will execute."
+        }
+        "autopilot_nothing_needs_you" => {
+            "Nothing needs your decision — ViryaOS is handling current operations."
+        }
+        "autopilot_needs_you" => "Needs you",
+        "autopilot_recent_actions" => "Recent actions",
+        "autopilot_measured_effects" => "Measured effect",
+        "autopilot_effect_improved" => "improved",
+        "autopilot_effect_neutral" => "no material change",
+        "autopilot_effect_worsened" => "worsened",
+        "autopilot_actions_24h" => "executed 24h",
+        "autopilot_queue" => "queued",
+        "autopilot_failed_24h" => "failed 24h",
+        "autopilot_authority" => "Autonomy level",
+        "autopilot_financial_guardrails" => "Financial guardrails",
+        "autopilot_off" => "OFF",
+        "autopilot_observe" => "OBSERVE",
+        "autopilot_approval" => "APPROVAL",
+        "autopilot_auto" => "AUTO",
+        "autopilot_approve" => "APPROVE",
+        "autopilot_cancel" => "CANCEL",
+        "autopilot_chief" => "Operations chief",
+        "autopilot_time_saved" => "team time saved",
+        "autopilot_improved_7d" => "improved 7d",
+        "autopilot_opportunities" => "Top opportunities",
+        "autopilot_show_tasks" => "Show tasks to close",
+        "autopilot_invalid_action" => "Invalid Autopilot action",
+        "database_runtime" => "PostgreSQL runtime",
+        "async_io" => "async I/O",
         _ => key,
     }
 }

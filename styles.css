@@ -983,3 +983,14 @@ html[data-virya-scanner-active] .app-shell {
   .fan-home-grid { grid-template-columns: 1fr; }
   .home-action-card { min-height: 150px; }
 }
+
+.autopilot-policies { gap: 10px; }
+.autopilot-policy-card { grid-template-columns: minmax(0, 1fr); }
+.autopilot-policy-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.autopilot-policy-actions .text-button { width: auto; min-width: 74px; margin-top: 0; }
+.autopilot-policy-actions .text-button.active { border-color: var(--yellow); background: color-mix(in srgb, var(--yellow) 9%, transparent); }
+.autopilot-pending-card { align-items: start; }
+@media (max-width: 680px) {
+  .autopilot-pending-card { grid-template-columns: 1fr; }
+  .autopilot-policy-actions { justify-content: flex-start; }
+}

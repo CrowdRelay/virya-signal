@@ -9,7 +9,8 @@ use zeroize::Zeroizing;
 use crate::{
     AppError, AppState,
     models::{
-        ConcertQrOverview, CreateQrCampaignInput, IssuePassInput, OperatorOpsOverview,
+        AutopilotAuthorityRequest, AutopilotChiefOfStaff, AutopilotMutation, ConcertQrOverview,
+        CreateQrCampaignInput, IssuePassInput, OperatorAutopilotOverview, OperatorOpsOverview,
         OperatorProfile, OperatorSignalOverview, OpsRetryResult, PublicEvent, SessionStatus,
         StaffEventDashboard, TicketingOverview,
     },
@@ -247,6 +248,73 @@ pub(crate) async fn operator_ops_overview(
 ) -> Result<OperatorOpsOverview, AppError> {
     let profile = operator_profile(&state).await?;
     state.api.operator_ops_overview(&profile).await
+}
+
+#[tauri::command]
+pub(crate) async fn operator_autopilot_overview(
+    state: State<'_, AppState>,
+) -> Result<OperatorAutopilotOverview, AppError> {
+    let profile = operator_profile(&state).await?;
+    state.api.operator_autopilot_overview(&profile).await
+}
+
+#[tauri::command]
+pub(crate) async fn operator_autopilot_chief_of_staff(
+    state: State<'_, AppState>,
+) -> Result<AutopilotChiefOfStaff, AppError> {
+    let profile = operator_profile(&state).await?;
+    state.api.operator_autopilot_chief_of_staff(&profile).await
+}
+
+#[tauri::command]
+pub(crate) async fn operator_autopilot_set_authority(
+    state: State<'_, AppState>,
+    context: String,
+    enabled: bool,
+    autonomy_level: String,
+    minimum_confidence_basis_points: u16,
+    max_actions_24h: u32,
+    expected_version: i64,
+) -> Result<AutopilotMutation, AppError> {
+    let profile = operator_profile(&state).await?;
+    state
+        .api
+        .operator_autopilot_set_authority(
+            &profile,
+            context.trim(),
+            AutopilotAuthorityRequest {
+                enabled,
+                autonomy_level,
+                minimum_confidence_basis_points,
+                max_actions_24h,
+                expected_version,
+            },
+        )
+        .await
+}
+
+#[tauri::command]
+pub(crate) async fn operator_autopilot_approve(
+    state: State<'_, AppState>,
+    action_id: String,
+) -> Result<AutopilotMutation, AppError> {
+    let profile = operator_profile(&state).await?;
+    state
+        .api
+        .operator_autopilot_approve(&profile, action_id.trim())
+        .await
+}
+
+#[tauri::command]
+pub(crate) async fn operator_autopilot_cancel(
+    state: State<'_, AppState>,
+    action_id: String,
+) -> Result<AutopilotMutation, AppError> {
+    let profile = operator_profile(&state).await?;
+    state
+        .api
+        .operator_autopilot_cancel(&profile, action_id.trim())
+        .await
 }
 
 #[tauri::command]
