@@ -30,7 +30,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Enforce immutable CI policy
-        run: python3 scripts/check-ci-policy.py
+        run: |
+          python3 scripts/check-ci-policy.py
           python3 scripts/source-size-ratchet.py
       - name: Static and release-tool contracts
         run: |
@@ -63,7 +64,6 @@ jobs:
       - name: Format and UI quality
         run: |
           cargo fmt --all --check
-          cargo check --locked -p virya-signal-ui --target wasm32-unknown-unknown
           cargo clippy --locked -p virya-signal-ui --target wasm32-unknown-unknown -- -D warnings
       - name: Release frontend and size budget
         run: |
@@ -96,7 +96,6 @@ jobs:
           sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Native shell quality
         run: |
-          cargo check --locked -p virya-signal
           cargo test --locked -p virya-signal
           cargo clippy --locked -p virya-signal --all-targets -- -D warnings
       - name: Compiler cache statistics
