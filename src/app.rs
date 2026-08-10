@@ -128,6 +128,7 @@ pub fn App() -> impl IntoView {
 // It keeps the existing component visibility and contracts unchanged while
 // making the operator, fan and refresh code independently reviewable.
 include!("app/operator.rs");
+include!("app/scanner.rs");
 include!("app/fan_home.rs");
 include!("app/fan.rs");
 include!("app/support.rs");

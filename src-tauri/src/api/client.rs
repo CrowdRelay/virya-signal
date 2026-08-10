@@ -18,7 +18,10 @@ use uuid::Uuid;
 
 use crate::{
     AppError,
-    models::{CitySignal, FanHomeData, FanProfile, MerchCatalog, OperatorProfile, PublicEvent},
+    models::{
+        CitySignal, EcosystemMeta, FanHomeData, FanProfile, MerchCatalog, OperatorProfile,
+        PublicEvent,
+    },
 };
 
 use super::{
@@ -75,6 +78,7 @@ pub struct CrowdRelayClient {
     cities_fetch: Arc<Mutex<()>>,
     merch_fetch: Arc<Mutex<()>>,
     merch_cache: Arc<RwLock<HashMap<String, CacheEntry<MerchCatalog>>>>,
+    meta_cache: Arc<RwLock<HashMap<String, EcosystemMeta>>>,
     pub(super) fan_home_fetch: Arc<Mutex<()>>,
     pub(super) fan_home_cache: Arc<RwLock<HashMap<String, CacheEntry<FanHomeData>>>>,
     pub(super) cache_file: Arc<PathBuf>,
@@ -106,6 +110,7 @@ impl CrowdRelayClient {
             cities_fetch: Arc::new(Mutex::new(())),
             merch_fetch: Arc::new(Mutex::new(())),
             merch_cache: Arc::new(RwLock::new(HashMap::new())),
+            meta_cache: Arc::new(RwLock::new(HashMap::new())),
             fan_home_fetch: Arc::new(Mutex::new(())),
             fan_home_cache: Arc::new(RwLock::new(HashMap::new())),
             cache_file: Arc::new(cache_file),
@@ -113,6 +118,48 @@ impl CrowdRelayClient {
             cache_persisting: Arc::new(AtomicBool::new(false)),
             cache_dirty: Arc::new(AtomicBool::new(false)),
         })
+    }
+
+    pub async fn ecosystem_meta(&self, api_base_url: &str) -> Result<EcosystemMeta, AppError> {
+        let key = cache::cache_key(api_base_url)?;
+        if let Some(meta) = self.meta_cache.read().await.get(&key).cloned() {
+            return Ok(meta);
+        }
+        let response = self
+            .http
+            .get(endpoint(api_base_url, "meta")?)
+            .header(ACCEPT, "application/json")
+            .timeout(Duration::from_secs(3))
+            .send()
+            .await?;
+        let meta: EcosystemMeta = decode(response).await?;
+        if meta.api_version != "1"
+            || meta.schema_version < 36
+            || meta.minimum_postgres_server_version_num < 180_000
+        {
+            return Err(AppError::Remote {
+                status: 426,
+                detail: crate::i18n::tr("native_backend_update_required").into(),
+            });
+        }
+        self.meta_cache.write().await.insert(key, meta.clone());
+        Ok(meta)
+    }
+
+    pub async fn require_capability(
+        &self,
+        api_base_url: &str,
+        capability: &str,
+    ) -> Result<(), AppError> {
+        let meta = self.ecosystem_meta(api_base_url).await?;
+        if meta.capabilities.get(capability).copied().unwrap_or(false) {
+            Ok(())
+        } else {
+            Err(AppError::Remote {
+                status: 426,
+                detail: crate::i18n::tr("native_backend_update_required").into(),
+            })
+        }
     }
 
     pub async fn public_events(&self, api_base_url: &str) -> Result<Vec<PublicEvent>, AppError> {

@@ -729,7 +729,27 @@ pub struct DatabaseRuntimeSummary {
     #[serde(default)]
     pub maintenance_io_concurrency: Option<i32>,
     #[serde(default)]
+    pub io_combine_limit_bytes: Option<i64>,
+    #[serde(default)]
+    pub io_max_combine_limit_bytes: Option<i64>,
+    #[serde(default)]
     pub async_io_active: bool,
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct AreaRuntimeSummary {
+    #[serde(default)]
+    pub credits_total: i64,
+    #[serde(default)]
+    pub vouchers_issued: i64,
+    #[serde(default)]
+    pub stale_voucher_reservations: i64,
+    #[serde(default)]
+    pub ticket_rewards_issued: i64,
+    #[serde(default)]
+    pub stale_ticket_reward_reservations: i64,
+    #[serde(default)]
+    pub legacy_imported_players: i64,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -742,6 +762,10 @@ pub struct OpsSummary {
     pub http: HttpRequestSummary,
     #[serde(default)]
     pub database: DatabaseRuntimeSummary,
+    #[serde(default)]
+    pub area: AreaRuntimeSummary,
+    #[serde(default)]
+    pub schema_version: u32,
     #[serde(default)]
     pub release: String,
 }

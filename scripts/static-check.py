@@ -518,8 +518,8 @@ if 'invoke_latest::<WalletBatch' not in ui or 'viryaInvokeLatest' not in bridge:
     raise SystemExit('refresh requests must suppress superseded responses')
 if 'isMinifyEnabled = true' not in (root / 'scripts/prepare-android.py').read_text() or 'isShrinkResources = true' not in (root / 'scripts/prepare-android.py').read_text():
     raise SystemExit('release Android builds must enable R8 and resource shrinking')
-if 'gradle/actions/setup-gradle@v4' in workflows or 'gradle/actions/setup-gradle@v6' not in workflows:
-    raise SystemExit('Android workflows must use the current Gradle cache action')
+if 'gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb' not in workflows:
+    raise SystemExit('Android workflows must use the SHA-pinned Gradle v6.3.0 cache action')
 if 'Result<TicketWalletApi, AppError>' not in api or 'Vec<serde_json::Value>' in (root / 'src-tauri/src/models.rs').read_text():
     raise SystemExit('wallet IPC must use a narrow typed payload')
 if 'qr_token: Option<String>' in ui_models or 'wallet_qr_tokens:' not in native:
@@ -553,7 +553,7 @@ for workflow in android_workflows:
     text = workflow.read_text()
     if 'shared-key: android-arm64' not in text or 'path: ~/.cache/trunk' not in text:
         raise SystemExit(f'{workflow.name} does not share Android/Trunk caches')
-    if 'mozilla-actions/sccache-action@v0.0.11' not in text or 'cache-targets: false' not in text:
+    if 'mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba' not in text or 'cache-targets: false' not in text:
         raise SystemExit(f'{workflow.name} does not use the shared compiler cache')
     if '--signing' in text and 'scripts/configure-android-signing.py' not in text:
         raise SystemExit(f'{workflow.name} bypasses validated signing configuration')

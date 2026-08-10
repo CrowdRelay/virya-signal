@@ -218,6 +218,22 @@ class RuntimePerformanceContract(unittest.TestCase):
         self.assertNotIn("token", ticket_block)
         self.assertIn('tr("wallet_cached_offline")', ui)
 
+    def test_ops_surfaces_postgres18_async_io_runtime_evidence(self):
+        native_models = (ROOT / "src-tauri/src/models.rs").read_text()
+        web_models = (ROOT / "src/models.rs").read_text()
+        ui = (ROOT / "src/app/operator.rs").read_text()
+        for models in (native_models, web_models):
+            for fragment in (
+                "io_combine_limit_bytes: Option<i64>",
+                "io_max_combine_limit_bytes: Option<i64>",
+            ):
+                self.assertIn(fragment, models)
+        for fragment in (
+            'label="io_combine"',
+            'label="io_max_combine"',
+        ):
+            self.assertIn(fragment, ui)
+
     def test_feedback_outbox_promotes_new_payload_without_deleting_the_old_queue_first(self):
         queue = (ROOT / "src-tauri/src/feedback_queue.rs").read_text()
         app_state = (ROOT / "src-tauri/src/lib.rs").read_text()

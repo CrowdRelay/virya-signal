@@ -272,6 +272,8 @@ impl CrowdRelayClient {
         api_base_url: &str,
         event_slug: &str,
     ) -> Result<TicketSaleOffer, AppError> {
+        self.require_capability(api_base_url, "ticketing_v1")
+            .await?;
         let event_slug = segment(event_slug)?;
         let response = self
             .http

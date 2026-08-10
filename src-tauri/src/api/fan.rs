@@ -48,6 +48,8 @@ fn fan_home_key(profile: &FanProfile) -> String {
 
 impl super::CrowdRelayClient {
     pub async fn fan_home(&self, profile: &FanProfile) -> Result<FanHomeData, AppError> {
+        self.require_capability(&profile.api_base_url, "signal_fan_context_v1")
+            .await?;
         let key = fan_home_key(profile);
         if let Some(home) = self.cached_fan_home(&key, FAN_HOME_CACHE_TTL).await {
             return Ok(home);

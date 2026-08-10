@@ -123,6 +123,18 @@ fn FanHomeOverview(
                             <Metric value=referral.qualified.to_string() label=tr("confirmed_referrals")/>
                             <Metric value=referral.pending.to_string() label=tr("pending_referrals")/>
                         </div>
+                        <section class="participation-history" aria-label=tr("your_participation")>
+                            <div class="participation-history-heading">
+                                <div><p class="eyebrow">{tr("your_participation")}</p><strong>{tr("participation_history_title")}</strong></div>
+                                <small>{tr("participation_history_hint")}</small>
+                            </div>
+                            <div class="participation-history-grid">
+                                <article class:active=synesthesia.started><strong>{if synesthesia.completed { "✓".to_owned() } else { format!("{}/11", synesthesia.rooms_completed.clamp(0, 11)) }}</strong><span>{tr("synesthesia_journey")}</span></article>
+                                <article class:active={counts.area_claims > 0}><strong>{counts.area_claims.max(0)}</strong><span>{tr("area_discoveries")}</span></article>
+                                <article class:active={counts.paid_orders > 0}><strong>{counts.paid_orders.max(0)}</strong><span>{tr("concert_orders")}</span></article>
+                                <article class:active={counts.active_passes > 0}><strong>{counts.active_passes.max(0)}</strong><span>{tr("concert_passes")}</span></article>
+                            </div>
+                        </section>
                     }.into_any()
                 }).value_or_else(|| view! {
                     <div class="empty-state"><strong>{tr("signal_home_unavailable")}</strong><p>{tr("signal_home_fallback_hint")}</p></div>

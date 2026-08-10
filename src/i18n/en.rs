@@ -62,6 +62,13 @@ pub(super) fn text(key: &'static str) -> &'static str {
         }
         "enter_synesthesia" => "ENTER SYNESTHESIA",
         "your_signal_now" => "YOUR SIGNAL NOW",
+        "your_participation" => "YOUR TRACE",
+        "participation_history_title" => "What you have been part of",
+        "participation_history_hint" => "Participation history, not points or levels.",
+        "synesthesia_journey" => "Synesthesia journey",
+        "area_discoveries" => "AREA discoveries",
+        "concert_orders" => "ticket orders",
+        "concert_passes" => "admission passes",
         "signal_city_context" => "Nearest context: {}.",
         "signal_home_context" => "One place for shows, tickets, AREA and album progress.",
         "cached_data" => "CACHED DATA",
@@ -542,6 +549,11 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "virya_area" => "VIRYA AREA",
         "virya_tickets" => "VIRYA // TICKETS",
         "tickets_pending_conflicts" => "{} tickets · {} pending · {} conflicts",
+        "offline_show_mode_status" => "Offline show mode status",
+        "eligible_tickets" => "eligible",
+        "pending_scans" => "pending",
+        "synced_scans" => "synced",
+        "scan_conflicts" => "conflicts",
         "check_ins_2" => "{} check-ins",
         "attempt_2" => "{} · attempt {}/{}",
         "my_signal" => "My Signal",
@@ -640,6 +652,9 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "native_pin_min_4" => "The PIN must contain at least 4 characters",
         "native_api_must_use_https" => "The API must use HTTPS",
         "native_invalid_api_base_url" => "Invalid API base URL",
+        "native_backend_update_required" => {
+            "The server needs an update before this feature can be used."
+        }
         "native_invalid_label" => "Invalid {label}",
         "native_public_cache_too_large" => "The local public-data cache is too large",
         "native_missing_events_cache" => "The backend confirmed a non-existent event cache",
@@ -955,6 +970,13 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "autopilot_invalid_action" => "Invalid Autopilot action",
         "database_runtime" => "PostgreSQL runtime",
         "async_io" => "async I/O",
+        "area_runtime" => "AREA authority",
+        "area_credits" => "credits",
+        "area_vouchers" => "vouchers",
+        "area_ticket_rewards" => "ticket rewards",
+        "area_legacy_imported" => "legacy imported",
+        "stale_voucher_leases" => "stale voucher leases",
+        "stale_ticket_leases" => "stale ticket leases",
         _ => key,
     }
 }

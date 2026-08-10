@@ -60,6 +60,13 @@ pub(super) fn text(key: &'static str) -> &'static str {
         }
         "enter_synesthesia" => "WEJDŹ DO SYNESTHESII",
         "your_signal_now" => "TWÓJ SYGNAŁ TERAZ",
+        "your_participation" => "TWÓJ ŚLAD",
+        "participation_history_title" => "W czym byłeś częścią",
+        "participation_history_hint" => "Historia uczestnictwa, bez punktów i leveli.",
+        "synesthesia_journey" => "podróż Synesthesia",
+        "area_discoveries" => "odkrycia AREA",
+        "concert_orders" => "zamówienia biletów",
+        "concert_passes" => "wejściówki koncertowe",
         "signal_city_context" => "Najbliższy kontekst: {}.",
         "signal_home_context" => "Jedno miejsce na koncerty, bilety, AREA i postęp albumu.",
         "cached_data" => "DANE Z CACHE",
@@ -542,6 +549,11 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "virya_area" => "VIRYA AREA",
         "virya_tickets" => "VIRYA // BILETY",
         "tickets_pending_conflicts" => "{} biletów · {} oczekuje · {} konfliktów",
+        "offline_show_mode_status" => "Status trybu koncertowego offline",
+        "eligible_tickets" => "dostępne",
+        "pending_scans" => "oczekujące",
+        "synced_scans" => "zsynchronizowane",
+        "scan_conflicts" => "konflikty",
         "check_ins_2" => "{} check-inów",
         "attempt_2" => "{} · próba {}/{}",
         "my_signal" => "Mój Sygnał",
@@ -638,6 +650,9 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "native_pin_min_4" => "PIN musi mieć co najmniej 4 znaki",
         "native_api_must_use_https" => "API musi używać HTTPS",
         "native_invalid_api_base_url" => "Nieprawidłowy bazowy URL API",
+        "native_backend_update_required" => {
+            "Serwer wymaga aktualizacji, zanim ta funkcja będzie dostępna."
+        }
         "native_invalid_label" => "Nieprawidłowy {label}",
         "native_public_cache_too_large" => "Lokalny cache danych publicznych jest zbyt duży",
         "native_missing_events_cache" => "Backend potwierdził nieistniejący cache koncertów",
@@ -957,6 +972,13 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "autopilot_invalid_action" => "Nieprawidłowa akcja Autopilota",
         "database_runtime" => "PostgreSQL runtime",
         "async_io" => "async I/O",
+        "area_runtime" => "AREA — źródło stanu",
+        "area_credits" => "kredyty",
+        "area_vouchers" => "vouchery",
+        "area_ticket_rewards" => "nagrody biletowe",
+        "area_legacy_imported" => "zaimportowane legacy",
+        "stale_voucher_leases" => "stare lease voucherów",
+        "stale_ticket_leases" => "stare lease biletów",
         _ => key,
     }
 }

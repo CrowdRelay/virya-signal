@@ -60,6 +60,8 @@ fn area_error_detail(body: &serde_json::Value) -> Option<String> {
 
 impl super::CrowdRelayClient {
     pub async fn fan_area_wallet(&self, profile: &FanProfile) -> Result<AreaWallet, AppError> {
+        self.require_capability(&profile.api_base_url, "area_wallet_postgres_v2")
+            .await?;
         let cookie = fan_cookie(profile)?;
         let response = self
             .http
@@ -77,6 +79,8 @@ impl super::CrowdRelayClient {
         profile: &FanProfile,
         drop_id: &str,
     ) -> Result<AreaChallenge, AppError> {
+        self.require_capability(&profile.api_base_url, "area_wallet_postgres_v2")
+            .await?;
         let drop_id = segment(drop_id)?;
         let cookie = fan_cookie(profile)?;
         let response = self
@@ -100,6 +104,8 @@ impl super::CrowdRelayClient {
         challenge: &str,
         samples: &[AreaPositionSample],
     ) -> Result<AreaClaimResult, AppError> {
+        self.require_capability(&profile.api_base_url, "area_wallet_postgres_v2")
+            .await?;
         let drop_id = segment(drop_id)?;
         let cookie = fan_cookie(profile)?;
         let response = self
