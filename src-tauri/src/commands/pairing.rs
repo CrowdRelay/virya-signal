@@ -1,5 +1,6 @@
-//! Staff pairing QR/deep-link payload parsing and the command that turns a
-//! scanned pairing code into a configured operator session.
+//! Staff pairing QR/deep-link parsing and one-time broker exchange.
+//! The QR never contains the durable operator bearer: CrowdRelay mints a
+//! revocable per-device session only after the short-lived code is exchanged.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -9,7 +10,7 @@ use tauri::State;
 use crate::{
     AppError, AppState,
     commands::operator::configure,
-    models::{OperatorProfile, SessionStatus, StaffPairingPayload},
+    models::{OperatorProfile, OperatorRole, SessionStatus, StaffPairingPayload},
 };
 
 #[tauri::command]
@@ -22,19 +23,39 @@ pub(crate) async fn configure_from_pairing(
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |value| value.as_secs());
-    if pairing.version != 1 || pairing.expires_at < now || pairing.expires_at > now + 1800 {
+    if pairing.version != 2
+        || pairing.role != OperatorRole::Staff
+        || pairing.expires_at < now
+        || pairing.expires_at > now + 1800
+    {
         return Err(AppError::InvalidInput(
             crate::i18n::tr("native_pairing_code_expired").into(),
         ));
     }
+
+    let exchange = state
+        .api
+        .exchange_staff_pairing(&pairing.api_base_url, &pairing.pairing_code)
+        .await?;
+    if exchange.version != 2
+        || exchange.role != OperatorRole::Staff
+        || exchange.display_name.trim() != pairing.display_name.trim()
+        || exchange.expires_at <= now
+        || exchange.session_id.trim().is_empty()
+    {
+        return Err(AppError::InvalidInput(
+            crate::i18n::tr("native_pairing_code_invalid").into(),
+        ));
+    }
+
     configure(
         state,
         pin,
         OperatorProfile {
-            display_name: pairing.display_name,
+            display_name: exchange.display_name,
             api_base_url: pairing.api_base_url,
-            role: pairing.role,
-            bearer_token: pairing.bearer_token,
+            role: exchange.role,
+            bearer_token: exchange.bearer_token,
         },
     )
     .await

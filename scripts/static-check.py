@@ -411,17 +411,20 @@ if not page_size_ok:
     raise SystemExit('Android Rust libraries must be linked for 16 KiB pages')
 
 smoke = (root / '.github/workflows/mobile-smoke.yml').read_text()
+android_builder = (root / '.github/workflows/_android-build.yml').read_text()
 for trigger_path in ['index.html', 'boot.js', 'boot-initializer.mjs', 'Trunk.toml', 'styles.css', 'rust-toolchain.toml']:
     if f'- "{trigger_path}"' not in smoke:
         raise SystemExit(f'Android smoke workflow does not watch {trigger_path}')
-if '--target aarch64' not in smoke or '--max-size-mib' not in smoke:
-    raise SystemExit('Android smoke must build a bounded ARM64 APK')
-if 'virya-signal-debug.apk' not in smoke:
-    raise SystemExit('Android smoke artifact must be named Virya Signal')
+if "uses: ./.github/workflows/_android-build.yml" not in smoke or "build_kind: debug-apk" not in smoke:
+    raise SystemExit('Android smoke must use the canonical reusable Android builder')
+if '--target aarch64' not in android_builder or '--max-size-mib' not in android_builder:
+    raise SystemExit('Reusable Android builder must create bounded ARM64 packages')
+if 'package="artifacts/virya-signal-${VERSION}.${ext}"' not in android_builder:
+    raise SystemExit('Reusable Android builder must produce canonical Virya Signal artifact names')
 
 signed_apk = (root / '.github/workflows/android-release-apk.yml').read_text()
-if '--target aarch64' not in signed_apk or '--max-size-mib 100' not in signed_apk:
-    raise SystemExit('Signed Android APK must be a bounded ARM64 build')
+if "uses: ./.github/workflows/_android-build.yml" not in signed_apk or "build_kind: release-apk" not in signed_apk or "signed: true" not in signed_apk:
+    raise SystemExit('Signed Android APK must use the canonical signed release builder')
 
 workflows = '\n'.join(path.read_text() for path in (root / '.github/workflows').glob('*.yml'))
 if 'cargo install trunk' in workflows or 'cargo install tauri-cli' in workflows:
@@ -543,25 +546,29 @@ for source_name, source in [('native models', native_models), ('WASM models', ui
 if 'summary.http.errors_4xx.to_string()' not in ui:
     raise SystemExit('staff Ops UI must surface CrowdRelay 4xx telemetry separately from 5xx')
 
-android_workflows = [
-    root / '.github/workflows/mobile-smoke.yml',
-    root / '.github/workflows/android-release-apk.yml',
-    root / '.github/workflows/android-play.yml',
-    root / '.github/workflows/mobile-release.yml',
-]
-for workflow in android_workflows:
-    text = workflow.read_text()
-    if 'shared-key: android-arm64' not in text or 'path: ~/.cache/trunk' not in text:
-        raise SystemExit(f'{workflow.name} does not share Android/Trunk caches')
-    if 'mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba' not in text or 'cache-targets: false' not in text:
-        raise SystemExit(f'{workflow.name} does not use the shared compiler cache')
-    if '--signing' in text and 'scripts/configure-android-signing.py' not in text:
-        raise SystemExit(f'{workflow.name} bypasses validated signing configuration')
-    if 'scripts/analyze-android-package.py' not in text or '--require-abi arm64-v8a' not in text:
-        raise SystemExit(f'{workflow.name} does not validate Android package contents')
-    if '--require-page-size 16384' not in text:
-        raise SystemExit(f'{workflow.name} does not verify 16 KiB native libraries')
-if '--aab --target aarch64' not in (root / '.github/workflows/android-play.yml').read_text():
-    raise SystemExit('Google Play AAB must use the bounded ARM64 target')
+for cache_contract in [
+    'shared-key: android-arm64',
+    'path: ~/.cache/trunk',
+    'mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba',
+    'cache-targets: false',
+    'scripts/configure-android-signing.py',
+    'scripts/analyze-android-package.py',
+    '--require-abi arm64-v8a',
+    '--require-page-size 16384',
+    '--aab --target aarch64',
+    'artifact_manifest.py create artifacts android-artifact-manifest.json',
+]:
+    if cache_contract not in android_builder:
+        raise SystemExit(f'reusable Android builder lost contract: {cache_contract}')
+for wrapper_name in ['mobile-smoke.yml', 'android-release-apk.yml', 'android-play.yml', 'mobile-release.yml']:
+    wrapper = (root / '.github/workflows' / wrapper_name).read_text()
+    if 'uses: ./.github/workflows/_android-build.yml' not in wrapper:
+        raise SystemExit(f'{wrapper_name} bypasses the canonical reusable Android builder')
+if 'target:' not in (root / '.github/workflows/mobile-release.yml').read_text() or "github.event_name == 'workflow_dispatch'" not in (root / '.github/workflows/mobile-release.yml').read_text():
+    raise SystemExit('mobile store release must gate iOS behind an explicit manual target')
+for promotion_name in ['android-play.yml', 'android-release-apk.yml', 'mobile-release.yml']:
+    promotion = (root / '.github/workflows' / promotion_name).read_text()
+    if 'promoted/scripts/artifact_manifest.py verify' not in promotion:
+        raise SystemExit(f'{promotion_name} must verify the exact downloaded artifact from its preserved scripts/ path')
 
 print(f'static configuration and IPC contract check: OK ({len(invoked)} active / {len(registered)} registered commands; {len(unreferenced)} compat-only)')

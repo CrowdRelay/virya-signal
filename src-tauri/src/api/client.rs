@@ -20,7 +20,7 @@ use crate::{
     AppError,
     models::{
         CitySignal, EcosystemMeta, FanHomeData, FanProfile, MerchCatalog, OperatorProfile,
-        PublicEvent,
+        PublicEvent, StaffPairingExchange,
     },
 };
 
@@ -118,6 +118,32 @@ impl CrowdRelayClient {
             cache_persisting: Arc::new(AtomicBool::new(false)),
             cache_dirty: Arc::new(AtomicBool::new(false)),
         })
+    }
+
+    pub async fn exchange_staff_pairing(
+        &self,
+        api_base_url: &str,
+        pairing_code: &str,
+    ) -> Result<StaffPairingExchange, AppError> {
+        let pairing_code = pairing_code.trim();
+        if !(24..=128).contains(&pairing_code.len())
+            || !pairing_code
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        {
+            return Err(AppError::InvalidInput(
+                crate::i18n::tr("native_pairing_code_invalid").into(),
+            ));
+        }
+        let response = self
+            .http
+            .post(endpoint(api_base_url, "staff-pairing/exchange")?)
+            .header(ACCEPT, "application/json")
+            .json(&serde_json::json!({"pairingCode": pairing_code}))
+            .timeout(Duration::from_secs(10))
+            .send()
+            .await?;
+        decode(response).await
     }
 
     pub async fn ecosystem_meta(&self, api_base_url: &str) -> Result<EcosystemMeta, AppError> {

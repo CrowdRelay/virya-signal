@@ -239,6 +239,9 @@ pub enum OperatorRole {
     Staff,
 }
 
+mod staff_pairing;
+pub use staff_pairing::{StaffPairingExchange, StaffPairingPayload};
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Zeroize)]
 #[zeroize(drop)]
 pub struct OperatorProfile {
@@ -1401,17 +1404,6 @@ pub struct RequestedCityResult {
     pub city_slug: String,
     pub display_name: String,
     pub status: String,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct StaffPairingPayload {
-    pub version: u8,
-    pub api_base_url: String,
-    pub display_name: String,
-    pub role: OperatorRole,
-    pub bearer_token: String,
-    pub expires_at: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
