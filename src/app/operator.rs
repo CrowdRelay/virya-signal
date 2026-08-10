@@ -1295,7 +1295,7 @@ fn OpsPanel(
                     let healthy_view = healthy.then(|| view! { <p class="ops-healthy">{tr("no_dead_entries_the_delivery_pipeline_is")}</p> });
                     view! {
                         <div class="ops-metrics"><Metric value=summary.outbox.pending.to_string() label="outbox pending"/><Metric value=summary.outbox.dead.to_string() label="outbox dead"/><Metric value=summary.deliveries.pending.to_string() label="delivery pending"/><Metric value=summary.deliveries.dead.to_string() label="delivery dead"/></div>
-                        <div class="ops-metrics http-ops-metrics"><Metric value=summary.http.requests.to_string() label="http requests"/><Metric value=format!("{} ms", summary.http.average_ms) label="avg"/><Metric value=format!("≤{} ms", summary.http.p50_ms) label="p50"/><Metric value=format!("≤{} ms", summary.http.p95_ms) label="p95"/><Metric value=summary.http.errors_5xx.to_string() label="5xx"/><Metric value=if summary.release.is_empty() { "—".to_owned() } else { summary.release.clone() } label="release"/></div>
+                        <div class="ops-metrics http-ops-metrics"><Metric value=summary.http.requests.to_string() label="http requests"/><Metric value=format!("{} ms", summary.http.average_ms) label="avg"/><Metric value=format!("≤{} ms", summary.http.p50_ms) label="p50"/><Metric value=format!("≤{} ms", summary.http.p95_ms) label="p95"/><Metric value=summary.http.errors_4xx.to_string() label="4xx"/><Metric value=summary.http.errors_5xx.to_string() label="5xx"/><Metric value=if summary.release.is_empty() { "—".to_owned() } else { summary.release.clone() } label="release"/></div>
                         {degraded_view}
                         {deliveries_view}
                         {outbox_view}

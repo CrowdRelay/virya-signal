@@ -731,6 +731,8 @@ pub struct HttpRequestSummary {
     #[serde(default)]
     pub requests: u64,
     #[serde(default)]
+    pub errors_4xx: u64,
+    #[serde(default)]
     pub errors_5xx: u64,
     #[serde(default)]
     pub average_ms: u64,

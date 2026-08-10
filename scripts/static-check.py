@@ -139,13 +139,29 @@ invoked = set(re.findall(
 invoked.update(re.findall(
     r'bridge::invoke_unit\(\s*"([a-z_]+)"', ui, re.S
 ))
+# Some native commands are intentionally hidden behind bridge helpers or the
+# boot-time JS crash reporter. Count those literal calls too so the audit
+# reflects the real IPC surface instead of under-reporting it.
+invoked.update(re.findall(
+    r'invoke(?:_timeout|_latest|_unit)?(?:::<[^>]+>)?\(\s*"([a-z_]+)"', bridge, re.S
+))
+invoked.update(re.findall(
+    r"core\.invoke\(['\"]([a-z_]+)['\"]", bridge
+))
 registered_match = re.search(r'tauri::generate_handler!\[(.*?)\]', native, re.S)
 if not registered_match:
     raise SystemExit('missing Tauri invoke handler')
-registered = {x.strip() for x in registered_match.group(1).split(',') if x.strip()}
+registered = {x.strip().rsplit('::', 1)[-1] for x in registered_match.group(1).split(',') if x.strip()}
 missing = invoked - registered
 if missing:
     raise SystemExit(f'UI invokes unregistered commands: {sorted(missing)}')
+compat_only_commands = {'session_status', 'public_events', 'public_cities'}
+unreferenced = registered - invoked
+if unreferenced != compat_only_commands:
+    raise SystemExit(
+        'Tauri IPC surface changed without an explicit compatibility decision: '
+        f'unreferenced={sorted(unreferenced)} expected={sorted(compat_only_commands)}'
+    )
 
 required_paths = [
     'public/events?limit=50', 'public/merch/catalog', 'staff/admission/redeem', 'staff/coupons/redeem',
@@ -520,6 +536,13 @@ for typed_contract in [
 if 'pub city: Option<serde_json::Value>' in (root / 'src-tauri/src/models.rs').read_text():
     raise SystemExit('public event city must stay typed across the native/WebView boundary')
 
+native_models = (root / 'src-tauri/src/models.rs').read_text()
+for source_name, source in [('native models', native_models), ('WASM models', ui_models)]:
+    if '#[serde(default)]\n    pub errors_4xx: u64' not in source:
+        raise SystemExit(f'{source_name} must decode CrowdRelay errors_4xx telemetry compatibly')
+if 'summary.http.errors_4xx.to_string()' not in ui:
+    raise SystemExit('staff Ops UI must surface CrowdRelay 4xx telemetry separately from 5xx')
+
 android_workflows = [
     root / '.github/workflows/mobile-smoke.yml',
     root / '.github/workflows/android-release-apk.yml',
@@ -541,4 +564,4 @@ for workflow in android_workflows:
 if '--aab --target aarch64' not in (root / '.github/workflows/android-play.yml').read_text():
     raise SystemExit('Google Play AAB must use the bounded ARM64 target')
 
-print(f'static configuration and IPC contract check: OK ({len(invoked)} used / {len(registered)} registered commands)')
+print(f'static configuration and IPC contract check: OK ({len(invoked)} active / {len(registered)} registered commands; {len(unreferenced)} compat-only)')
