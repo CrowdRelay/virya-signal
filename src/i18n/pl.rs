@@ -970,6 +970,8 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "autopilot_opportunities" => "Najlepsze okazje",
         "autopilot_show_tasks" => "Rzeczy koncertowe do dopięcia",
         "autopilot_invalid_action" => "Nieprawidłowa akcja Autopilota",
+        "autopilot_funding_package_detail" => "Przygotowanie pakietu wniosku",
+        "autopilot_funding_submit_detail" => "Złożenie gotowego wniosku",
         "database_runtime" => "PostgreSQL runtime",
         "async_io" => "async I/O",
         "area_runtime" => "AREA — źródło stanu",

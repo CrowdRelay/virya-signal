@@ -369,7 +369,10 @@ impl super::CrowdRelayClient {
             | "content_supply"
             | "promotion_budget"
             | "experimentation"
-            | "show_operations" => context,
+            | "show_operations"
+            | "release"
+            | "live_opportunity"
+            | "funding" => context,
             _ => return Err(AppError::InvalidInput("Invalid Autopilot context".into())),
         };
         let autonomy_level = match body.autonomy_level.trim() {

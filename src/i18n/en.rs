@@ -968,6 +968,8 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "autopilot_opportunities" => "Top opportunities",
         "autopilot_show_tasks" => "Show tasks to close",
         "autopilot_invalid_action" => "Invalid Autopilot action",
+        "autopilot_funding_package_detail" => "Prepare funding application package",
+        "autopilot_funding_submit_detail" => "Submit prepared funding application",
         "database_runtime" => "PostgreSQL runtime",
         "async_io" => "async I/O",
         "area_runtime" => "AREA authority",

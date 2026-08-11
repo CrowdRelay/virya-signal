@@ -1308,6 +1308,9 @@ fn autopilot_context_label(context: &str) -> &'static str {
         "promotion_budget" => "Promotion Yield",
         "experimentation" => "Experiments",
         "show_operations" => "Show Operations",
+        "release" => "Release Autopilot",
+        "live_opportunity" => "Festival & Opportunity",
+        "funding" => "Funding Autopilot",
         _ => "Autopilot",
     }
 }
@@ -1315,6 +1318,7 @@ fn autopilot_context_label(context: &str) -> &'static str {
 fn autopilot_action_kind_label(kind: &str) -> &'static str {
     match kind {
         "ticket.price.change" => "Ticket price changed",
+        "ticket.capacity.change" => "Ticket pool expanded",
         "fan.lifecycle.message.request" => "Fan lifecycle message",
         "audience.campaign.request" => "Audience campaign",
         "merch.reorder.request" => "Merch reorder request",
@@ -1328,6 +1332,10 @@ fn autopilot_action_kind_label(kind: &str) -> &'static str {
         "show.task.complete" => "Show task completed",
         "show.task.escalate" => "Show task needs human",
         "promotion.budget_change.request" => "Promotion budget change",
+        "release.milestone.execute" => "Release milestone",
+        "opportunity.live.apply" => "Festival / opportunity application",
+        "funding.package.prepare" => "Funding package prepared",
+        "funding.application.submit" => "Funding application",
         _ => "Autopilot action",
     }
 }
@@ -1354,6 +1362,9 @@ fn autopilot_payload_detail(payload: &AutopilotActionPayload) -> String {
     match payload {
         AutopilotActionPayload::ChangeTicketPrice { from_minor, to_minor, .. } => {
             format!("{:.2} → {:.2} PLN", *from_minor as f64 / 100.0, *to_minor as f64 / 100.0)
+        }
+        AutopilotActionPayload::ChangeTicketCapacity { from_capacity, to_capacity, .. } => {
+            format!("ticket pool {from_capacity} → {to_capacity}")
         }
         AutopilotActionPayload::RequestFanLifecycleMessage { template_key, .. } => template_key.clone(),
         AutopilotActionPayload::RequestMerchReorder { quantity, .. } => format!("Reorder ×{quantity}"),
@@ -1387,6 +1398,14 @@ fn autopilot_payload_detail(payload: &AutopilotActionPayload) -> String {
             *to_minor as f64 / 100.0,
             *roas_basis_points as f64 / 10_000.0,
         ),
+        AutopilotActionPayload::ExecuteReleaseMilestone { title, milestone, .. } => {
+            format!("{title} · {milestone}")
+        }
+        AutopilotActionPayload::ApplyLiveOpportunity { opportunity_kind, score, .. } => {
+            format!("{opportunity_kind} · score {score}/100")
+        }
+        AutopilotActionPayload::PrepareFundingPackage { .. } => tr("autopilot_funding_package_detail").to_owned(),
+        AutopilotActionPayload::SubmitFundingApplication { .. } => tr("autopilot_funding_submit_detail").to_owned(),
     }
 }
 

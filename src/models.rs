@@ -867,6 +867,12 @@ pub enum AutopilotActionPayload {
         from_minor: i64,
         to_minor: i64,
     },
+    ChangeTicketCapacity {
+        ticket_type_id: String,
+        from_capacity: u32,
+        to_capacity: u32,
+        guardrail_version: i64,
+    },
     RequestFanLifecycleMessage {
         fan_id: String,
         template_key: String,
@@ -934,6 +940,23 @@ pub enum AutopilotActionPayload {
         from_minor: i64,
         to_minor: i64,
         roas_basis_points: u32,
+    },
+    ExecuteReleaseMilestone {
+        release_id: String,
+        title: String,
+        release_at: String,
+        milestone: String,
+    },
+    ApplyLiveOpportunity {
+        opportunity_id: String,
+        opportunity_kind: String,
+        score: u16,
+    },
+    PrepareFundingPackage {
+        opportunity_id: String,
+    },
+    SubmitFundingApplication {
+        opportunity_id: String,
     },
 }
 
