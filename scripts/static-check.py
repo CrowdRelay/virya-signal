@@ -62,6 +62,8 @@ required = [
     'scripts/install-android-sdk.sh', 'scripts/quality-fix.sh',
     'src-tauri/icons/icon.png', 'src-tauri/icons/icon.ico', 'src-tauri/icons/icon.icns',
     'src-tauri/icons/virya-signal.svg',
+    'src-tauri/icons/virya-signal-brand-full.png',
+    'src-tauri/icons/virya-signal-brand-foreground.png',
     'src-tauri/launcher-assets/android/ic_launcher_foreground.png',
     'src-tauri/launcher-assets/android/play-store-512.png',
 ]
