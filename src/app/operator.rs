@@ -1124,6 +1124,41 @@ fn AutopilotPanel(
                     let recent_actions = data.recent_actions.into_iter().take(10).collect::<Vec<_>>();
                     let recent_effects = data.recent_effects.into_iter().take(6).collect::<Vec<_>>();
                     let queue = data.queued_actions.saturating_add(data.processing_actions);
+                    let release_ledger = data.release_ledger;
+                    let rum_metrics = data.rum_metrics_24h;
+                    let release_drift = release_ledger.backend_sha_drift
+                        || !release_ledger.missing_components.is_empty()
+                        || release_ledger.active_executor_count == 0
+                        || release_ledger.guarded_executor_count > 0
+                        || release_ledger.active_executor_manifest_shas.len() > 1
+                        || release_ledger.components.iter().any(|component| component.stale);
+                    let release_components = release_ledger.components.clone();
+                    let release_missing = release_ledger.missing_components.join(", ");
+                    let release_view = view! {
+                        <div class="section-head"><h3>{tr("autopilot_release_ledger")}</h3><span>{if release_drift { tr("autopilot_release_drift") } else { tr("autopilot_release_sync") }}</span></div>
+                        <div class="ops-metrics">
+                            <Metric value=release_ledger.active_executor_count.to_string() label=tr("autopilot_n8n_executors") />
+                            <Metric value=release_ledger.guarded_executor_count.to_string() label=tr("autopilot_executor_guards") />
+                            <Metric value=release_missing.clone() label=tr("autopilot_release_missing") />
+                        </div>
+                        <div class="ops-list"><For each=move || release_components.clone() key=|component| component.component_key.clone() children=move |component| view! {
+                            <article class="ops-item"><div>
+                                <strong>{component.component_key}</strong>
+                                <p>{component.version.unwrap_or_else(|| component.source_sha.chars().take(12).collect())}</p>
+                                <small>{if component.stale { tr("autopilot_release_stale") } else { tr("autopilot_release_production") }}</small>
+                            </div></article>
+                        } /></div>
+                    };
+                    let rum_view = (!rum_metrics.is_empty()).then(|| view! {
+                        <div class="section-head"><h3>{tr("autopilot_rum_24h")}</h3><span>{rum_metrics.len()}</span></div>
+                        <div class="ops-list"><For each=move || rum_metrics.clone() key=|metric| format!("{}:{}", metric.surface, metric.metric_key) children=move |metric| view! {
+                            <article class="ops-item"><div>
+                                <strong>{autopilot_rum_metric_label(&metric.surface, &metric.metric_key)}</strong>
+                                <p>{autopilot_rum_value(&metric.metric_key, metric.p75, metric.p95)}</p>
+                                <small>{format!("{} {}", metric.samples_24h, tr("autopilot_samples"))}</small>
+                            </div></article>
+                        } /></div>
+                    });
                     let runtime_view = (!runtime_enabled).then(|| view! {
                         <p class="security-note warning">{tr("autopilot_runtime_disabled")}</p>
                     });
@@ -1155,7 +1190,7 @@ fn AutopilotPanel(
                     let recent_view = (!recent_actions.is_empty()).then(|| view! {
                         <div class="section-head"><h3>{tr("autopilot_recent_actions")}</h3></div>
                         <div class="ops-list"><For each=move || recent_actions.clone() key=|action| action.id.clone() children=move |action| view! {
-                            <article class="ops-item"><div><strong>{autopilot_context_label(&action.context)}</strong><p>{autopilot_action_kind_label(&action.action_kind)}</p><small>{format!("{} · #{}", action.status, action.attempt_count)}</small></div></article>
+                            <article class="ops-item"><div><strong>{autopilot_context_label(&action.context)}</strong><p>{autopilot_action_kind_label(&action.action_kind)}</p><small>{format!("{} · #{} · executor:{}", action.status, action.attempt_count, action.executor_status.as_deref().unwrap_or("pending"))}</small></div></article>
                         } /></div>
                     });
                     let guardrails_view = (!promotion_budget_guardrails.is_empty()).then(|| view! {
@@ -1168,6 +1203,8 @@ fn AutopilotPanel(
                         <div class="ops-metrics">
                             <Metric value=data.succeeded_24h.to_string() label=tr("autopilot_actions_24h") />
                             <Metric value=queue.to_string() label=tr("autopilot_queue") />
+                            <Metric value=data.executor_confirmed_24h.to_string() label=tr("autopilot_executor_confirmed") />
+                            <Metric value=data.executor_failed_24h.to_string() label=tr("autopilot_executor_failed") />
                             <Metric value=data.failed_24h.to_string() label=tr("autopilot_failed_24h") />
                             <Metric value=if runtime_enabled { "ON".to_owned() } else { "OFF".to_owned() } label="runtime" />
                         </div>
@@ -1177,6 +1214,8 @@ fn AutopilotPanel(
                             <AutopilotPolicyCard policy=policy overview=overview loading=loading error=error />
                         } /></div>
                         {guardrails_view}
+                        {release_view}
+                        {rum_view}
                         {needs_view}
                         {effects_view}
                         {recent_view}
@@ -1196,6 +1235,7 @@ fn AutopilotPolicyCard(
 ) -> impl IntoView {
     let current = if policy.enabled { policy.autonomy_level.as_str() } else { "off" };
     let observe_policy = policy.clone();
+    let recommend_policy = policy.clone();
     let approval_policy = policy.clone();
     let auto_policy = policy.clone();
     let off_policy = policy.clone();
@@ -1204,10 +1244,14 @@ fn AutopilotPolicyCard(
             <div>
                 <strong>{autopilot_context_label(&policy.context)}</strong>
                 <p>{format!("{} · {}% · ≤{}/24h · v{}", current, policy.minimum_confidence / 100, policy.max_actions_24h, policy.version)}</p>
+                {policy.guarded_until.as_ref().map(|until| view! {
+                    <small class="warning">{format!("{} · {}", tr("autopilot_guarded"), until)}</small>
+                })}
             </div>
             <div class="autopilot-policy-actions" role="group" aria-label=tr("autopilot_authority")>
                 <button class="text-button" class:active=current == "off" on:click=move |_| set_autopilot_policy(off_policy.clone(), false, "observe", overview, loading, error)>{tr("autopilot_off")}</button>
                 <button class="text-button" class:active=current == "observe" on:click=move |_| set_autopilot_policy(observe_policy.clone(), true, "observe", overview, loading, error)>{tr("autopilot_observe")}</button>
+                <button class="text-button" class:active=current == "recommend" on:click=move |_| set_autopilot_policy(recommend_policy.clone(), true, "recommend", overview, loading, error)>{tr("autopilot_recommend")}</button>
                 <button class="text-button" class:active=current == "require_approval" on:click=move |_| set_autopilot_policy(approval_policy.clone(), true, "require_approval", overview, loading, error)>{tr("autopilot_approval")}</button>
                 <button class="text-button" class:active=current == "bounded_auto" on:click=move |_| set_autopilot_policy(auto_policy.clone(), true, "bounded_auto", overview, loading, error)>{tr("autopilot_auto")}</button>
             </div>
@@ -1227,7 +1271,7 @@ fn AutopilotPendingCard(
     let detail = autopilot_payload_detail(&action.payload);
     view! {
         <article class="ops-item autopilot-pending-card">
-            <div><strong>{autopilot_context_label(&action.context)}</strong><p>{detail}</p><small>{action.action_kind}</small></div>
+            <div><strong>{autopilot_context_label(&action.context)}</strong><p>{detail}</p><small>{action.approval_expires_at.as_ref().map(|value| format!("{}: {value}", tr("autopilot_expires"))).unwrap_or(action.action_kind.clone())}</small></div>
             <div class="autopilot-policy-actions">
                 <button class="primary" on:click=move |_| mutate_autopilot_action("operator_autopilot_approve", approve_id.clone(), overview, loading, error) disabled=move || loading.get()>{tr("autopilot_approve")}</button>
                 <button class="danger ghost" on:click=move |_| mutate_autopilot_action("operator_autopilot_cancel", cancel_id.clone(), overview, loading, error) disabled=move || loading.get()>{tr("autopilot_cancel")}</button>
@@ -1294,136 +1338,7 @@ fn mutate_autopilot_action(
     });
 }
 
-fn autopilot_context_label(context: &str) -> &'static str {
-    match context {
-        "ticket_yield" => "Ticket Yield",
-        "fan_lifecycle" => "Fan Lifecycle",
-        "campaign_lifecycle" => "Campaign Lifecycle",
-        "merchandising" => "Merch Stock",
-        "merch_pricing" => "Merch Yield",
-        "merch_bundle" => "Merch Bundles",
-        "booking_opportunity" => "Gig Opportunity",
-        "outreach" => "Relationship Outreach",
-        "content_supply" => "Content Supply",
-        "promotion_budget" => "Promotion Yield",
-        "experimentation" => "Experiments",
-        "show_operations" => "Show Operations",
-        "release" => "Release Autopilot",
-        "live_opportunity" => "Festival & Opportunity",
-        "funding" => "Funding Autopilot",
-        _ => "Autopilot",
-    }
-}
-
-fn autopilot_action_kind_label(kind: &str) -> &'static str {
-    match kind {
-        "ticket.price.change" => "Ticket price changed",
-        "ticket.capacity.change" => "Ticket pool expanded",
-        "fan.lifecycle.message.request" => "Fan lifecycle message",
-        "audience.campaign.request" => "Audience campaign",
-        "merch.reorder.request" => "Merch reorder request",
-        "merch.price.change" => "Merch price changed",
-        "merch.bundle.request" => "Merch bundle request",
-        "booking.outreach.request" => "Booking outreach",
-        "outreach.request" => "Relationship outreach",
-        "content.artifact.request" => "Content artifact",
-        "experiment.allocation.change" => "Experiment reallocation",
-        "experiment.complete" => "Experiment winner",
-        "show.task.complete" => "Show task completed",
-        "show.task.escalate" => "Show task needs human",
-        "promotion.budget_change.request" => "Promotion budget change",
-        "release.milestone.execute" => "Release milestone",
-        "opportunity.live.apply" => "Festival / opportunity application",
-        "funding.package.prepare" => "Funding package prepared",
-        "funding.application.submit" => "Funding application",
-        _ => "Autopilot action",
-    }
-}
-
-fn autopilot_measurement_kind_label(kind: &str) -> &'static str {
-    match kind {
-        "ticket_revenue_72h" => "Ticket revenue · 72h",
-        "merch_gross_proxy_7d" => "Merch gross proxy · 7d",
-        "promotion_roas_7d" => "Promotion ROAS · 7d",
-        _ => "Measured effect",
-    }
-}
-
-fn autopilot_effect_label(assessment: &str) -> String {
-    match assessment {
-        "improved" => tr("autopilot_effect_improved").to_owned(),
-        "neutral" => tr("autopilot_effect_neutral").to_owned(),
-        "worsened" => tr("autopilot_effect_worsened").to_owned(),
-        _ => assessment.to_owned(),
-    }
-}
-
-fn autopilot_payload_detail(payload: &AutopilotActionPayload) -> String {
-    match payload {
-        AutopilotActionPayload::ChangeTicketPrice { from_minor, to_minor, .. } => {
-            format!("{:.2} → {:.2} PLN", *from_minor as f64 / 100.0, *to_minor as f64 / 100.0)
-        }
-        AutopilotActionPayload::ChangeTicketCapacity { from_capacity, to_capacity, .. } => {
-            format!("ticket pool {from_capacity} → {to_capacity}")
-        }
-        AutopilotActionPayload::RequestFanLifecycleMessage { template_key, .. } => template_key.clone(),
-        AutopilotActionPayload::RequestMerchReorder { quantity, .. } => format!("Reorder ×{quantity}"),
-        AutopilotActionPayload::ChangeMerchPrice { from_minor, to_minor, .. } => {
-            format!("{:.2} → {:.2} PLN", *from_minor as f64 / 100.0, *to_minor as f64 / 100.0)
-        }
-        AutopilotActionPayload::RequestBookingOutreach { target_name, score, phase, .. } => {
-            format!("{target_name} · {phase} · opportunity {score}/100")
-        }
-        AutopilotActionPayload::RequestAudienceCampaign { phase, template_key, .. } => {
-            format!("{phase} · {template_key}")
-        }
-        AutopilotActionPayload::RequestMerchBundle { bundle_price_minor, affinity_basis_points, .. } => {
-            format!("{:.2} PLN · affinity {:.1}%", *bundle_price_minor as f64 / 100.0, *affinity_basis_points as f64 / 100.0)
-        }
-        AutopilotActionPayload::RequestOutreach { target_name, phase, template_key, .. } => {
-            format!("{target_name} · {phase} · {template_key}")
-        }
-        AutopilotActionPayload::RequestContentArtifact { artifact, template_key, .. } => {
-            format!("{artifact} · {template_key}")
-        }
-        AutopilotActionPayload::AdjustExperiment { complete, allocations, .. } => {
-            let state = if *complete { "winner" } else { "reallocate" };
-            format!("{state} · {} variants", allocations.len())
-        }
-        AutopilotActionPayload::CompleteShowTask { task, .. } => format!("✓ {}", autopilot_show_task_label(task)),
-        AutopilotActionPayload::EscalateShowTask { task, .. } => format!("⚠ {}", autopilot_show_task_label(task)),
-        AutopilotActionPayload::RequestPromotionBudgetChange { from_minor, to_minor, roas_basis_points, .. } => format!(
-            "{:.2} → {:.2} PLN/day · ROAS {:.2}×",
-            *from_minor as f64 / 100.0,
-            *to_minor as f64 / 100.0,
-            *roas_basis_points as f64 / 10_000.0,
-        ),
-        AutopilotActionPayload::ExecuteReleaseMilestone { title, milestone, .. } => {
-            format!("{title} · {milestone}")
-        }
-        AutopilotActionPayload::ApplyLiveOpportunity { opportunity_kind, score, .. } => {
-            format!("{opportunity_kind} · score {score}/100")
-        }
-        AutopilotActionPayload::PrepareFundingPackage { .. } => tr("autopilot_funding_package_detail").to_owned(),
-        AutopilotActionPayload::SubmitFundingApplication { .. } => tr("autopilot_funding_submit_detail").to_owned(),
-    }
-}
-
-fn autopilot_show_task_label(task: &str) -> &'static str {
-    match task {
-        "announcement_published" => "Announcement published",
-        "ticketing_verified" => "Ticketing verified",
-        "staff_assigned" => "Staff assigned",
-        "offline_snapshot_ready" => "Offline snapshot ready",
-        "gate_device_charged" => "Gate device charged",
-        "backup_device_ready" => "Backup device ready",
-        "network_tested" => "Network tested",
-        "guestlist_checked" => "Guest list checked",
-        "post_show_reconciliation" => "Post-show reconciliation",
-        "post_show_report" => "Post-show report",
-        _ => "Show task",
-    }
-}
+include!("operator/autopilot_labels.rs");
 
 #[component]
 fn OpsPanel(

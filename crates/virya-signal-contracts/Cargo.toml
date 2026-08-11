@@ -1,0 +1,11 @@
+[package]
+name = "virya-signal-contracts"
+version = "0.4.2"
+edition = "2024"
+rust-version = "1.97"
+description = "Shared Virya Signal IPC/control-plane contracts"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }

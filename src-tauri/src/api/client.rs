@@ -13,6 +13,7 @@ use reqwest::{
     header::{ACCEPT, COOKIE, IF_MODIFIED_SINCE, IF_NONE_MATCH, ORIGIN},
 };
 use serde::{Serialize, de::DeserializeOwned};
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
@@ -85,6 +86,12 @@ pub struct CrowdRelayClient {
     cache_write: Arc<Mutex<()>>,
     cache_persisting: Arc<AtomicBool>,
     cache_dirty: Arc<AtomicBool>,
+    started_at: Instant,
+    rum_sampled: bool,
+}
+
+fn should_sample_rum() -> bool {
+    Uuid::new_v4().as_bytes()[0] < 13
 }
 
 impl CrowdRelayClient {
@@ -117,7 +124,45 @@ impl CrowdRelayClient {
             cache_write: Arc::new(Mutex::new(())),
             cache_persisting: Arc::new(AtomicBool::new(false)),
             cache_dirty: Arc::new(AtomicBool::new(false)),
+            started_at: Instant::now(),
+            rum_sampled: should_sample_rum(),
         })
+    }
+
+    fn report_rum_background(
+        &self,
+        api_base_url: &str,
+        metric_key: &'static str,
+        value: f64,
+        route: &'static str,
+    ) {
+        if !self.rum_sampled || !value.is_finite() || value < 0.0 {
+            return;
+        }
+        let Ok(url) = endpoint(api_base_url, "public/telemetry/rum") else {
+            return;
+        };
+        let Ok(observed_at) = OffsetDateTime::now_utc().format(&Rfc3339) else {
+            return;
+        };
+        let http = self.http.clone();
+        tokio::spawn(async move {
+            let _ = http
+                .post(url)
+                .json(&serde_json::json!({
+                    "surface": "virya_signal",
+                    "metric_key": metric_key,
+                    "value": value,
+                    "route": route,
+                    "device_class": "native",
+                    "release": env!("CARGO_PKG_VERSION"),
+                    "metadata": {},
+                    "observed_at": observed_at,
+                }))
+                .timeout(Duration::from_secs(3))
+                .send()
+                .await;
+        });
     }
 
     pub async fn exchange_staff_pairing(
@@ -151,6 +196,7 @@ impl CrowdRelayClient {
         if let Some(meta) = self.meta_cache.read().await.get(&key).cloned() {
             return Ok(meta);
         }
+        let started = Instant::now();
         let response = self
             .http
             .get(endpoint(api_base_url, "meta")?)
@@ -159,6 +205,10 @@ impl CrowdRelayClient {
             .send()
             .await?;
         let meta: EcosystemMeta = decode(response).await?;
+        let latency_ms = started.elapsed().as_secs_f64() * 1_000.0;
+        let cold_start_ms = self.started_at.elapsed().as_secs_f64() * 1_000.0;
+        self.report_rum_background(api_base_url, "api_latency_ms", latency_ms, "meta");
+        self.report_rum_background(api_base_url, "cold_start_ms", cold_start_ms, "meta");
         if meta.api_version != "1"
             || meta.schema_version < 36
             || meta.minimum_postgres_server_version_num < 180_000

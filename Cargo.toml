@@ -7,6 +7,7 @@ description = "Virya Signal mobile operator and fan application UI"
 license = "Apache-2.0"
 
 [dependencies]
+virya-signal-contracts = { path = "crates/virya-signal-contracts" }
 console_error_panic_hook = "0.1.7"
 js-sys = "0.3"
 leptos = { version = "0.8.20", default-features = false, features = ["csr"] }
@@ -16,7 +17,7 @@ wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 
 [workspace]
-members = ["src-tauri"]
+members = ["crates/virya-signal-contracts", "src-tauri"]
 resolver = "2"
 
 [profile.dev]

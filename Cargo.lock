@@ -6075,8 +6075,16 @@ dependencies = [
  "tokio",
  "url",
  "uuid",
+ "virya-signal-contracts",
  "webpki-roots",
  "zeroize",
+]
+
+[[package]]
+name = "virya-signal-contracts"
+version = "0.4.2"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -6088,6 +6096,7 @@ dependencies = [
  "leptos",
  "serde",
  "serde-wasm-bindgen",
+ "virya-signal-contracts",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]
