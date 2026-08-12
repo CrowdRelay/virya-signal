@@ -7,8 +7,8 @@ mod types;
 
 use area::AreaGameScreen;
 use formatters::{
-    day, elapsed_time, event_location, event_time_location, human_time, local_to_rfc3339, money,
-    month, optional,
+    day, event_location, event_time_location, human_time, local_to_rfc3339, money, month, optional,
+    synesthesia_best_summary,
 };
 use leptos::prelude::*;
 use types::*;

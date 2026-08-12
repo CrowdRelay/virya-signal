@@ -3,7 +3,7 @@
   "reviewThresholdLines": 1200,
   "maxLines": {
     "src-tauri/src/models.rs": 1708,
-    "src/app/fan.rs": 1789,
+    "src/app/fan.rs": 1811,
     "src/app/operator.rs": 1515,
     "src/models.rs": 1270
   }

@@ -75,6 +75,28 @@ pub(super) fn elapsed_time(elapsed_ms: i64) -> String {
     format!("{}:{:02}", total_seconds / 60, total_seconds % 60)
 }
 
+pub(super) fn synesthesia_best_summary(
+    synesthesia: &crate::models::FanHomeSynesthesia,
+) -> Option<String> {
+    let elapsed_ms = synesthesia.best_elapsed_ms?;
+    let mut parts = vec![i18n::format(
+        "synesthesia_best_time",
+        &[elapsed_time(elapsed_ms)],
+    )];
+    if synesthesia.leaderboard_published
+        && let Some(rank) = synesthesia.leaderboard_rank
+    {
+        parts.push(i18n::format("synesthesia_rank", &[rank.to_string()]));
+    }
+    if synesthesia.completed_runs > 1 {
+        parts.push(i18n::format(
+            "synesthesia_runs_count",
+            &[synesthesia.completed_runs.to_string()],
+        ));
+    }
+    Some(parts.join(" · "))
+}
+
 pub(super) fn day(value: &str) -> String {
     let date = js_sys::Date::new(&JsValue::from_str(value));
     if date.get_time().is_nan() {
