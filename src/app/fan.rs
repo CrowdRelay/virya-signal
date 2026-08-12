@@ -653,16 +653,7 @@ fn FanSignal(
                     }).collect_view()}</div>
                 });
                 view! {
-                    <article class="draw-card synesthesia-entry-card">
-                        <div>
-                            <p class="eyebrow">{tr("album_experience")}</p>
-                            <strong>"SYNESTHESIA"</strong>
-                            <span>{tr("synesthesia_five_album_draw")}</span>
-                        </div>
-                        <div class="draw-actions">
-                            <ExternalLink url="https://synesthesia.virya.music/?source=signal-app".to_owned() label=tr("enter_synesthesia") error=error />
-                        </div>
-                    </article>
+                    <FanSynesthesiaCard home=home error=error />
                     <div class="stats-grid"><Metric value=referral.pending_referrals.to_string() label=tr("pending_2")/><Metric value=entries_total.to_string() label=tr("entries")/><Metric value=coupon_count.to_string() label=tr("coupons")/></div>
                     <div class="section-head"><h3>{tr("active_draws")}</h3><span>{draw_count}</span></div>
                     <div class="card-list">{draws.into_iter().map(|draw| {
@@ -686,6 +677,51 @@ fn FanSignal(
             }).value_or_else(|| view! { <Skeleton /> }.into_any())}
             </Show>
         </section>
+    }
+}
+
+#[component]
+fn FanSynesthesiaCard(
+    home: RwSignal<Option<FanHomeData>>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    view! {
+        {move || home.get().map(|snapshot| {
+            let synesthesia = snapshot.synesthesia;
+            let status = if synesthesia.completed {
+                i18n::format("synesthesia_rooms_done", &[synesthesia.rooms_completed.to_string()])
+            } else {
+                i18n::format("synesthesia_rooms_progress", &[synesthesia.rooms_completed.to_string()])
+            };
+            let best = synesthesia.best_elapsed_ms.map(|elapsed_ms| {
+                let mut parts = vec![i18n::format("synesthesia_best_time", &[elapsed_time(elapsed_ms)])];
+                if synesthesia.leaderboard_published
+                    && let Some(rank) = synesthesia.leaderboard_rank
+                {
+                    parts.push(i18n::format("synesthesia_rank", &[rank.to_string()]));
+                }
+                if synesthesia.completed_runs > 1 {
+                    parts.push(i18n::format(
+                        "synesthesia_runs_count",
+                        &[synesthesia.completed_runs.to_string()],
+                    ));
+                }
+                parts.join(" · ")
+            });
+            view! {
+                <article class="draw-card synesthesia-entry-card">
+                    <div>
+                        <p class="eyebrow">{tr("album_experience")}</p>
+                        <strong>"SYNESTHESIA"</strong>
+                        <span>{status}</span>
+                        {best.map(|best| view! { <small>{best}</small> })}
+                    </div>
+                    <div class="draw-actions">
+                        <ExternalLink url="https://synesthesia.virya.music/?source=signal-app".to_owned() label=tr("enter_synesthesia") error=error />
+                    </div>
+                </article>
+            }
+        })}
     }
 }
 

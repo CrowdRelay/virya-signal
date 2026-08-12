@@ -59,6 +59,11 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "Przejdź wszystkie 11 pokojów. Ukończenie daje 1 los w osobnej puli 5 płyt."
         }
         "enter_synesthesia" => "WEJDŹ DO SYNESTHESII",
+        "synesthesia_best_time" => "Najlepszy czas {}",
+        "synesthesia_rank" => "miejsce #{}",
+        "synesthesia_rooms_progress" => "{}/11 pokojów",
+        "synesthesia_rooms_done" => "{}/11 pokojów · ukończono",
+        "synesthesia_runs_count" => "{} przebiegów",
         "your_signal_now" => "TWÓJ SYGNAŁ TERAZ",
         "your_participation" => "TWÓJ ŚLAD",
         "participation_history_title" => "W czym byłeś częścią",

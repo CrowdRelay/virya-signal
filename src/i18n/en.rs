@@ -61,6 +61,11 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "Walk through all 11 rooms. One completion gives 1 entry in a separate five-album draw."
         }
         "enter_synesthesia" => "ENTER SYNESTHESIA",
+        "synesthesia_best_time" => "Best time {}",
+        "synesthesia_rank" => "rank #{}",
+        "synesthesia_rooms_progress" => "{}/11 rooms",
+        "synesthesia_rooms_done" => "{}/11 rooms · completed",
+        "synesthesia_runs_count" => "{} attempts",
         "your_signal_now" => "YOUR SIGNAL NOW",
         "your_participation" => "YOUR TRACE",
         "participation_history_title" => "What you have been part of",

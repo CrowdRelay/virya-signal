@@ -70,6 +70,11 @@ pub(super) fn event_time_location(starts_at: &str, venue: Option<&str>) -> Strin
     )
 }
 
+pub(super) fn elapsed_time(elapsed_ms: i64) -> String {
+    let total_seconds = elapsed_ms.max(0) / 1_000;
+    format!("{}:{:02}", total_seconds / 60, total_seconds % 60)
+}
+
 pub(super) fn day(value: &str) -> String {
     let date = js_sys::Date::new(&JsValue::from_str(value));
     if date.get_time().is_nan() {

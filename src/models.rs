@@ -114,6 +114,10 @@ pub struct FanHomeSynesthesia {
     pub completed: bool,
     pub rooms_completed: i16,
     pub client_total_elapsed_ms: Option<i64>,
+    pub best_elapsed_ms: Option<i64>,
+    pub completed_runs: i64,
+    pub leaderboard_published: bool,
+    pub leaderboard_rank: Option<i64>,
     pub linked_at: Option<String>,
     pub reward_entered: bool,
 }
