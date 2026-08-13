@@ -8,6 +8,8 @@ fn autopilot_context_label(context: &str) -> &'static str {
         "merch_bundle" => "Merch Bundles",
         "booking_opportunity" => "Gig Opportunity",
         "outreach" => "Relationship Outreach",
+        "beacon" => "Local Beacon",
+        "show_growth" => "Attendance Growth",
         "content_supply" => "Content Supply",
         "promotion_budget" => "Promotion Yield",
         "experimentation" => "Experiments",
@@ -30,6 +32,8 @@ fn autopilot_action_kind_label(kind: &str) -> &'static str {
         "merch.bundle.request" => "Merch bundle request",
         "booking.outreach.request" => "Booking outreach",
         "outreach.request" => "Relationship outreach",
+        "beacon.outreach.request" => "Local beacon outreach",
+        "show.growth.request" => "Attendance / merch growth lever",
         "content.artifact.request" => "Content artifact",
         "experiment.allocation.change" => "Experiment reallocation",
         "experiment.complete" => "Experiment winner",
@@ -52,6 +56,7 @@ fn autopilot_measurement_kind_label(kind: &str) -> &'static str {
         "booking_reply_7d" => "Booking reply · 7d",
         "outreach_reply_7d" => "Outreach reply · 7d",
         "audience_ticket_revenue_72h" => "Audience ticket revenue · 72h",
+        "show_ticket_revenue_7d" => "Show ticket revenue · 7d",
         _ => "Measured effect",
     }
 }
@@ -89,6 +94,15 @@ fn autopilot_payload_detail(payload: &AutopilotActionPayload) -> String {
         }
         AutopilotActionPayload::RequestOutreach { target_name, phase, template_key, .. } => {
             format!("{target_name} · {phase} · {template_key}")
+        }
+        AutopilotActionPayload::RequestBeaconDiscovery { target_count, .. } => {
+            i18n::format("autopilot_beacon_discovery_detail", &[target_count.to_string()])
+        }
+        AutopilotActionPayload::RequestBeaconOutreach { phase, template_key, .. } => {
+            format!("Beacon · {phase} · {template_key}")
+        }
+        AutopilotActionPayload::RequestShowGrowth { lever, template_key, .. } => {
+            format!("Wzrost koncertu · {} · {template_key}", lever.replace('_', " "))
         }
         AutopilotActionPayload::RequestContentArtifact { artifact, template_key, .. } => {
             format!("{artifact} · {template_key}")

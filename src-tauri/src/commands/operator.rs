@@ -294,6 +294,19 @@ pub(crate) async fn operator_autopilot_set_authority(
 }
 
 #[tauri::command]
+pub(crate) async fn operator_autopilot_assign(
+    state: State<'_, AppState>,
+    action_id: String,
+    member_key: String,
+) -> Result<AutopilotMutation, AppError> {
+    let profile = operator_profile(&state).await?;
+    state
+        .api
+        .operator_autopilot_assign(&profile, action_id.trim(), member_key.trim())
+        .await
+}
+
+#[tauri::command]
 pub(crate) async fn operator_autopilot_approve(
     state: State<'_, AppState>,
     action_id: String,

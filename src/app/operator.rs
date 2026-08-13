@@ -1132,6 +1132,7 @@ fn AutopilotPanel(
                     let policies = data.policies;
                     let promotion_budget_guardrails = data.promotion_budget_guardrails;
                     let needs_you = data.needs_you;
+                    let available_assignees = data.available_assignees;
                     let recent_actions = data.recent_actions.into_iter().take(10).collect::<Vec<_>>();
                     let recent_effects = data.recent_effects.into_iter().take(6).collect::<Vec<_>>();
                     let queue = data.queued_actions.saturating_add(data.processing_actions);
@@ -1179,8 +1180,11 @@ fn AutopilotPanel(
                         view! {
                             <div class="section-head"><h3>{tr("autopilot_needs_you")}</h3><span>{needs_you.len()}</span></div>
                             <div class="ops-list">
-                                <For each=move || needs_you.clone() key=|action| action.id.clone() children=move |action| view! {
-                                    <AutopilotPendingCard action=action overview=overview loading=loading error=error />
+                                <For each=move || needs_you.clone() key=|action| action.id.clone() children={
+                                    let available_assignees = available_assignees.clone();
+                                    move |action| view! {
+                                        <AutopilotPendingCard action=action available_assignees=available_assignees.clone() overview=overview loading=loading error=error />
+                                    }
                                 } />
                             </div>
                         }.into_any()
@@ -1200,8 +1204,19 @@ fn AutopilotPanel(
                     });
                     let recent_view = (!recent_actions.is_empty()).then(|| view! {
                         <div class="section-head"><h3>{tr("autopilot_recent_actions")}</h3></div>
-                        <div class="ops-list"><For each=move || recent_actions.clone() key=|action| action.id.clone() children=move |action| view! {
-                            <article class="ops-item"><div><strong>{autopilot_context_label(&action.context)}</strong><p>{autopilot_action_kind_label(&action.action_kind)}</p><small>{format!("{} · #{} · executor:{}", action.status, action.attempt_count, action.executor_status.as_deref().unwrap_or("pending"))}</small></div></article>
+                        <div class="ops-list"><For each=move || recent_actions.clone() key=|action| action.id.clone() children=move |action| {
+                            let manual = action.manual_steps.iter().take(3)
+                                .map(|step| format!("{}: {}", step.destination, step.what_to_do))
+                                .collect::<Vec<_>>()
+                                .join(" · ");
+                            view! {
+                                <article class="ops-item"><div>
+                                    <strong>{autopilot_context_label(&action.context)}</strong>
+                                    <p>{autopilot_action_kind_label(&action.action_kind)}</p>
+                                    <small>{format!("{} · #{} · executor:{}", action.status, action.attempt_count, action.executor_status.as_deref().unwrap_or("pending"))}</small>
+                                    {(!manual.is_empty()).then(|| view! { <small class="ops-note">{i18n::format("autopilot_manual_steps", std::slice::from_ref(&manual))}</small> })}
+                                </div></article>
+                            }
                         } /></div>
                     });
                     let guardrails_view = (!promotion_budget_guardrails.is_empty()).then(|| view! {
@@ -1270,26 +1285,7 @@ fn AutopilotPolicyCard(
     }
 }
 
-#[component]
-fn AutopilotPendingCard(
-    action: crate::models::PendingAutopilotAction,
-    overview: RwSignal<Option<OperatorAutopilotOverview>>,
-    loading: RwSignal<bool>,
-    error: RwSignal<Option<String>>,
-) -> impl IntoView {
-    let approve_id = action.id.clone();
-    let cancel_id = action.id.clone();
-    let detail = autopilot_payload_detail(&action.payload);
-    view! {
-        <article class="ops-item autopilot-pending-card">
-            <div><strong>{autopilot_context_label(&action.context)}</strong><p>{detail}</p><small>{action.approval_expires_at.as_ref().map(|value| format!("{}: {value}", tr("autopilot_expires"))).unwrap_or(action.action_kind.clone())}</small></div>
-            <div class="autopilot-policy-actions">
-                <button class="primary" on:click=move |_| mutate_autopilot_action("operator_autopilot_approve", approve_id.clone(), overview, loading, error) disabled=move || loading.get()>{tr("autopilot_approve")}</button>
-                <button class="danger ghost" on:click=move |_| mutate_autopilot_action("operator_autopilot_cancel", cancel_id.clone(), overview, loading, error) disabled=move || loading.get()>{tr("autopilot_cancel")}</button>
-            </div>
-        </article>
-    }
-}
+include!("operator/autopilot_cards.rs");
 
 fn set_autopilot_policy(
     policy: AutopilotPolicySummary,
@@ -1318,6 +1314,27 @@ fn set_autopilot_policy(
                 loading.set(false);
                 refresh_operator_autopilot(overview, loading, error);
             }
+            Err(message) => { loading.set(false); error.set(Some(message)); }
+        }
+    });
+}
+
+fn assign_autopilot_action(
+    action_id: String,
+    member_key: String,
+    overview: RwSignal<Option<OperatorAutopilotOverview>>,
+    loading: RwSignal<bool>,
+    error: RwSignal<Option<String>>,
+) {
+    if loading.get_untracked() || member_key.is_empty() { return; }
+    loading.set(true);
+    spawn_local(async move {
+        let result = bridge::invoke::<AutopilotMutation, _>(
+            "operator_autopilot_assign",
+            &AutopilotAssignArgs { action_id: &action_id, member_key: &member_key },
+        ).await;
+        match result {
+            Ok(_) => { loading.set(false); refresh_operator_autopilot(overview, loading, error); }
             Err(message) => { loading.set(false); error.set(Some(message)); }
         }
     });

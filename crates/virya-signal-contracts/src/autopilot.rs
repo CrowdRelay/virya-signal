@@ -88,6 +88,22 @@ pub enum AutopilotActionPayload {
         phase: String,
         template_key: String,
     },
+    RequestBeaconDiscovery {
+        event_id: String,
+        target_count: u16,
+    },
+    RequestBeaconOutreach {
+        beacon_id: String,
+        event_id: String,
+        beacon_version: i64,
+        phase: String,
+        template_key: String,
+    },
+    RequestShowGrowth {
+        event_id: String,
+        lever: String,
+        template_key: String,
+    },
     RequestContentArtifact {
         source_id: String,
         source_version: i64,
@@ -135,6 +151,13 @@ pub enum AutopilotActionPayload {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct TeamAssigneeSummary {
+    pub member_id: String,
+    pub member_key: String,
+    pub display_name: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PendingAutopilotAction {
     pub id: String,
     pub context: String,
@@ -145,6 +168,10 @@ pub struct PendingAutopilotAction {
     pub created_at: String,
     #[serde(default)]
     pub approval_expires_at: Option<String>,
+    #[serde(default)]
+    pub assignee: Option<TeamAssigneeSummary>,
+    #[serde(default)]
+    pub assignment_due_at: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -156,6 +183,14 @@ pub struct RecentAutopilotDecision {
     pub disposition: String,
     pub reason: String,
     pub evaluated_at: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct AutopilotManualStep {
+    pub destination: String,
+    pub url: String,
+    pub what_to_do: String,
+    pub why_it_matters: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -178,6 +213,8 @@ pub struct RecentAutopilotAction {
     pub provider_reference: Option<String>,
     #[serde(default)]
     pub executor_reported_at: Option<String>,
+    #[serde(default)]
+    pub manual_steps: Vec<AutopilotManualStep>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -255,6 +292,8 @@ pub struct OperatorAutopilotOverview {
     pub promotion_budget_guardrails: Vec<PromotionBudgetGuardrailSummary>,
     #[serde(default)]
     pub needs_you: Vec<PendingAutopilotAction>,
+    #[serde(default)]
+    pub available_assignees: Vec<TeamAssigneeSummary>,
     #[serde(default)]
     pub recent_decisions: Vec<RecentAutopilotDecision>,
     #[serde(default)]
@@ -358,4 +397,9 @@ pub struct AutopilotAuthorityRequest {
     pub minimum_confidence_basis_points: u16,
     pub max_actions_24h: u32,
     pub expected_version: i64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct AutopilotAssignRequest {
+    pub member_key: String,
 }

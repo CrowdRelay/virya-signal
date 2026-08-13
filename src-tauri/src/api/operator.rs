@@ -3,11 +3,11 @@ use reqwest::Method;
 use crate::{
     AppError,
     models::{
-        AudienceRevenueSummary, AudienceSummary, AutopilotAuthorityRequest, AutopilotChiefOfStaff,
-        AutopilotMutation, ConcertQrOverview, CreateQrCampaignInput, IssuePassInput,
-        OperatorAutopilotOverview, OperatorOpsOverview, OperatorProfile, OperatorRole,
-        OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem, OpsRetryResult, OpsSummary,
-        PublicEvent, ShowModeSnapshot, StaffEventDashboard, TicketingOverview,
+        AudienceRevenueSummary, AudienceSummary, AutopilotAssignRequest, AutopilotAuthorityRequest,
+        AutopilotChiefOfStaff, AutopilotMutation, ConcertQrOverview, CreateQrCampaignInput,
+        IssuePassInput, OperatorAutopilotOverview, OperatorOpsOverview, OperatorProfile,
+        OperatorRole, OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem, OpsRetryResult,
+        OpsSummary, PublicEvent, ShowModeSnapshot, StaffEventDashboard, TicketingOverview,
     },
 };
 
@@ -393,6 +393,26 @@ impl super::CrowdRelayClient {
             Method::POST,
             &format!("admin/autopilot/policies/{context}"),
             Some(&body),
+        )
+        .await
+    }
+
+    pub async fn operator_autopilot_assign(
+        &self,
+        profile: &OperatorProfile,
+        action_id: &str,
+        member_key: &str,
+    ) -> Result<AutopilotMutation, AppError> {
+        require_owner(profile)?;
+        let action_id = uuid_segment(action_id)?;
+        let member_key = super::http::bounded_required(member_key, "member key", 48)?;
+        self.auth_json(
+            profile,
+            Method::POST,
+            &format!("admin/autopilot/actions/{action_id}/assign"),
+            Some(&AutopilotAssignRequest {
+                member_key: member_key.to_owned(),
+            }),
         )
         .await
     }

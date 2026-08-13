@@ -280,3 +280,10 @@ pub(super) struct AutopilotAuthorityArgs<'a> {
 pub(super) struct AutopilotActionArgs<'a> {
     pub action_id: &'a str,
 }
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct AutopilotAssignArgs<'a> {
+    pub action_id: &'a str,
+    pub member_key: &'a str,
+}
