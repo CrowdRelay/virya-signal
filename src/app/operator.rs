@@ -1086,8 +1086,18 @@ fn AutopilotPanel(
             </div>
             <Show when=move || !chief_loading.get() fallback=move || view! { <Skeleton rows=2 /> }>
                 {move || chief.get().map(|brief| {
+                    let attention = brief.attention_items.into_iter().take(6).collect::<Vec<_>>();
                     let opportunities = brief.top_opportunities.into_iter().take(5).collect::<Vec<_>>();
                     let show_tasks = brief.show_tasks.into_iter().take(5).collect::<Vec<_>>();
+                    let attention_view = (!attention.is_empty()).then(|| view! {
+                        <div class="section-head"><h3>{tr("autopilot_deadline_radar")}</h3></div>
+                        <div class="ops-list"><For each=move || attention.clone() key=|item| format!("{}:{}:{}", item.kind, item.subject_kind, item.subject_id) children=move |item| {
+                            let title = if item.kind == "approval" { autopilot_action_kind_label(&item.title).to_string() } else { item.title.clone() };
+                            let detail = if item.kind == "approval" { autopilot_context_label(&item.detail).to_string() } else { item.detail.clone() };
+                            let due_at = human_time(&item.due_at);
+                            view! { <article class=format!("ops-item autopilot-attention attention-{}", item.urgency)><div><strong>{title}</strong><p>{detail}</p><small>{format!("{} · {} · {}", autopilot_attention_label(&item.kind), autopilot_urgency_label(&item.urgency), due_at)}</small></div></article> }
+                        } /></div>
+                    });
                     let opportunities_view = (!opportunities.is_empty()).then(|| view! {
                         <div class="section-head"><h3>{tr("autopilot_opportunities")}</h3></div>
                         <div class="ops-list"><For each=move || opportunities.clone() key=|item| format!("{}:{}:{}", item.context, item.subject_kind, item.subject_id) children=move |item| view! {
@@ -1109,6 +1119,7 @@ fn AutopilotPanel(
                                 <Metric value=brief.measured_improved_7d.to_string() label=tr("autopilot_improved_7d") />
                                 <Metric value=brief.needs_you.to_string() label=tr("autopilot_needs_you") />
                             </div>
+                            {attention_view}
                             {opportunities_view}
                             {show_tasks_view}
                         </div>

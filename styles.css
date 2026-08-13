@@ -996,6 +996,13 @@ html[data-virya-scanner-active] .app-shell {
   .home-action-card { min-height: 150px; }
 }
 
+.autopilot-attention { position: relative; overflow: hidden; }
+.autopilot-attention::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--line); }
+.autopilot-attention.attention-overdue::before,
+.autopilot-attention.attention-critical::before { background: var(--danger); }
+.autopilot-attention.attention-today::before,
+.autopilot-attention.attention-soon::before { background: var(--yellow); }
+
 .autopilot-policies { gap: 10px; }
 .autopilot-policy-card { grid-template-columns: minmax(0, 1fr); }
 .autopilot-policy-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }

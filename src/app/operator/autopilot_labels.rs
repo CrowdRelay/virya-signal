@@ -116,6 +116,27 @@ fn autopilot_payload_detail(payload: &AutopilotActionPayload) -> String {
     }
 }
 
+
+fn autopilot_attention_label(kind: &str) -> String {
+    match kind {
+        "approval" => tr("autopilot_attention_approval").to_owned(),
+        "opportunity_deadline" => tr("autopilot_attention_opportunity").to_owned(),
+        "funding_deadline" => tr("autopilot_attention_funding").to_owned(),
+        _ => kind.to_owned(),
+    }
+}
+
+fn autopilot_urgency_label(urgency: &str) -> String {
+    match urgency {
+        "overdue" => tr("autopilot_urgency_overdue").to_owned(),
+        "critical" => tr("autopilot_urgency_critical").to_owned(),
+        "today" => tr("autopilot_urgency_today").to_owned(),
+        "soon" => tr("autopilot_urgency_soon").to_owned(),
+        "upcoming" => tr("autopilot_urgency_upcoming").to_owned(),
+        _ => urgency.to_owned(),
+    }
+}
+
 fn autopilot_show_task_label(task: &str) -> &'static str {
     match task {
         "announcement_published" => "Announcement published",

@@ -302,6 +302,17 @@ pub struct ChiefOfStaffShowTask {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct ChiefOfStaffAttentionItem {
+    pub kind: String,
+    pub subject_kind: String,
+    pub subject_id: String,
+    pub title: String,
+    pub detail: String,
+    pub due_at: String,
+    pub urgency: String,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct AutopilotChiefOfStaff {
     #[serde(default)]
     pub executed_24h: i64,
@@ -323,6 +334,8 @@ pub struct AutopilotChiefOfStaff {
     pub executor_confirmed_24h: i64,
     #[serde(default)]
     pub executor_failed_24h: i64,
+    #[serde(default)]
+    pub attention_items: Vec<ChiefOfStaffAttentionItem>,
     #[serde(default)]
     pub top_opportunities: Vec<ChiefOfStaffOpportunity>,
     #[serde(default)]
