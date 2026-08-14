@@ -1,3 +1,5 @@
+const STAGE_PACK_PREVIEW_URL: &str = "bundle-stage-pack.webp";
+
 #[component]
 fn FanMerch(
     merch: RwSignal<Option<MerchCatalog>>,
@@ -56,6 +58,11 @@ fn FanMerch(
                                             };
                                             let available = bundle.available;
                                             let product_url = bundle.product_url.clone();
+                                            let image_url = if bundle.slug == "bundle-stage-pack" {
+                                                Some(STAGE_PACK_PREVIEW_URL.to_owned())
+                                            } else {
+                                                bundle.image_url
+                                            };
                                             let bundle_name = bundle.name;
                                             let image_alt = i18n::format(
                                                 "value_zestaw_merchu_virya",
@@ -80,7 +87,7 @@ fn FanMerch(
                                             view! {
                                                 <article class="fan-merch-card fan-merch-bundle">
                                                     <div class="bundle-badge">"BUNDLE"</div>
-                                                    {bundle.image_url.map(|url| view! {
+                                                    {image_url.map(|url| view! {
                                                         <img src=url alt=image_alt width="720" height="720" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
                                                     })}
                                                     <div class="fan-merch-body">

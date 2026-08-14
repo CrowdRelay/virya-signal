@@ -55,7 +55,7 @@ required = [
     'src/app.rs', 'src/app/area.rs', 'src/bridge.rs', 'src-tauri/capabilities/mobile.json',
     '.github/workflows/check.yml', '.github/workflows/mobile-smoke.yml',
     'rust-toolchain.toml', '.cargo/config.toml', 'scripts/collect-mobile-artifact.py', 'boot.js', 'boot-i18n.js', 'runtime-i18n.js',
-    'boot-initializer.mjs', 'scripts/generate-boot-i18n.py',
+    'boot-initializer.mjs', 'bundle-stage-pack.webp', 'scripts/generate-boot-i18n.py',
     'scripts/test-boot.mjs', 'scripts/check-web-dist.py',
     'scripts/configure-android-signing.py',
     'scripts/analyze-android-package.py',
@@ -82,6 +82,11 @@ api = '\n'.join(
 bridge = read_rust_module(root, 'src/bridge.rs')
 boot = (root / 'boot.js').read_text()
 index = (root / 'index.html').read_text()
+
+if 'data-trunk rel="copy-file" href="bundle-stage-pack.webp"' not in index:
+    raise SystemExit('stage-pack preview must be copied into the web/mobile dist')
+if 'STAGE_PACK_PREVIEW_URL' not in ui or 'bundle.slug == "bundle-stage-pack"' not in ui:
+    raise SystemExit('stage-pack merch card must have a bundled local preview fallback')
 pl_catalog, en_catalog = load_catalog_pair(root)
 i18n_keys = set(pl_catalog)
 invalid_i18n_keys = sorted(
