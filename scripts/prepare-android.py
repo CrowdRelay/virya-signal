@@ -15,10 +15,20 @@ parser.add_argument("--signing", action="store_true")
 args = parser.parse_args()
 
 root = Path(__file__).resolve().parents[1]
-android = root / "src-tauri" / "gen" / "android"
+android_parent = root / "src-tauri" / "gen" / "android"
+android_candidates = (
+    android_parent / "virya_signal",
+    android_parent,
+)
+android = next(
+    (candidate for candidate in android_candidates if (candidate / "app" / "build.gradle.kts").is_file()),
+    None,
+)
+if android is None:
+    expected = ", ".join(str(candidate / "app" / "build.gradle.kts") for candidate in android_candidates)
+    raise SystemExit(f"missing generated Android project; checked: {expected}")
+
 gradle = android / "app" / "build.gradle.kts"
-if not gradle.is_file():
-    raise SystemExit(f"missing generated Android project: {gradle}")
 
 text = gradle.read_text(encoding="utf-8")
 text, compile_count = re.subn(r"\bcompileSdk\s*=\s*\d+", "compileSdk = 36", text)
@@ -190,6 +200,10 @@ for line_number, line in enumerate(text.splitlines(), start=1):
 
 if args.signing:
     properties = android / "keystore.properties"
+    legacy_properties = android_parent / "keystore.properties"
+    if not properties.is_file() and legacy_properties.is_file():
+        properties.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(legacy_properties, properties)
     if not properties.is_file():
         raise SystemExit("keystore.properties is required for a signed release")
     imports = []
