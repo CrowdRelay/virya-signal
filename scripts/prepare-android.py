@@ -15,20 +15,13 @@ parser.add_argument("--signing", action="store_true")
 args = parser.parse_args()
 
 root = Path(__file__).resolve().parents[1]
-android_parent = root / "src-tauri" / "gen" / "android"
-android_candidates = (
-    android_parent / "virya_signal",
-    android_parent,
-)
-android = next(
-    (candidate for candidate in android_candidates if (candidate / "app" / "build.gradle.kts").is_file()),
-    None,
-)
-if android is None:
-    expected = ", ".join(str(candidate / "app" / "build.gradle.kts") for candidate in android_candidates)
-    raise SystemExit(f"missing generated Android project; checked: {expected}")
-
+# Tauri's Android project root is src-tauri/gen/android. The app snake-case
+# directory mentioned by `tauri android init` is used for generated/native
+# paths, but it is not the Gradle project root.
+android = root / "src-tauri" / "gen" / "android"
 gradle = android / "app" / "build.gradle.kts"
+if not gradle.is_file():
+    raise SystemExit(f"missing generated Android project: {gradle}")
 
 text = gradle.read_text(encoding="utf-8")
 text, compile_count = re.subn(r"\bcompileSdk\s*=\s*\d+", "compileSdk = 36", text)
@@ -200,10 +193,6 @@ for line_number, line in enumerate(text.splitlines(), start=1):
 
 if args.signing:
     properties = android / "keystore.properties"
-    legacy_properties = android_parent / "keystore.properties"
-    if not properties.is_file() and legacy_properties.is_file():
-        properties.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(legacy_properties, properties)
     if not properties.is_file():
         raise SystemExit("keystore.properties is required for a signed release")
     imports = []
@@ -375,9 +364,16 @@ def _insert_in_gradle_block(source: str, marker: str, statement: str) -> str:
 
 def _ensure_google_plugin_repository() -> None:
     """Ensure Firebase's Gradle plugin can resolve from Google's Maven repo."""
-    settings = android / "settings.gradle.kts"
-    if not settings.is_file():
-        raise SystemExit(f"missing generated Android settings: {settings}")
+    # Tauri 2.x generates Groovy settings.gradle today. Keep Kotlin DSL support
+    # as a compatibility fallback, but never assume one extension.
+    settings_candidates = (
+        android / "settings.gradle",
+        android / "settings.gradle.kts",
+    )
+    settings = next((candidate for candidate in settings_candidates if candidate.is_file()), None)
+    if settings is None:
+        expected = ", ".join(str(candidate) for candidate in settings_candidates)
+        raise SystemExit(f"missing generated Android settings; checked: {expected}")
 
     settings_text = settings.read_text(encoding="utf-8")
     if not re.search(r"(?m)^[ \t]*pluginManagement[ \t]*\{", settings_text):

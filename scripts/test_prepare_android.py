@@ -137,8 +137,10 @@ dependencies {
             app.joinpath("build.gradle.kts").write_text(
                 'plugins {\n    id("com.android.application")\n}\n\nandroid {\n    compileSdk = 35\n    defaultConfig { targetSdk = 35 }\n    buildTypes {\n        getByName("release") {\n            isMinifyEnabled = false\n        }\n    }\n}\n\ndependencies {\n}\n'
             )
-            android.joinpath("settings.gradle.kts").write_text(
-                'pluginManagement {\n    repositories {\n        gradlePluginPortal()\n        mavenCentral()\n    }\n}\n\nrootProject.name = "ViryaSignal"\n'
+            # Match the real Tauri 2.11 Android template: Groovy settings at
+            # the Gradle root, with the Tauri settings script applied below it.
+            android.joinpath("settings.gradle").write_text(
+                "include ':app'\n\napply from: 'tauri.settings.gradle'\n"
             )
             manifest = app / "src" / "main" / "AndroidManifest.xml"
             manifest.parent.mkdir(parents=True, exist_ok=True)
@@ -156,10 +158,24 @@ dependencies {
             self.assertEqual(result.returncode, 0, result.stderr)
             gradle = app.joinpath("build.gradle.kts").read_text()
             self.assertIn('id("com.google.gms.google-services") version "4.5.0"', gradle)
-            settings = android.joinpath("settings.gradle.kts").read_text()
-            self.assertIn("pluginManagement", settings)
+            settings = android.joinpath("settings.gradle").read_text()
+            self.assertTrue(settings.startswith("pluginManagement {"))
             self.assertIn("google()", settings)
             self.assertLess(settings.index("google()"), settings.index("gradlePluginPortal()"))
+            self.assertIn("include ':app'", settings)
+            self.assertIn("apply from: 'tauri.settings.gradle'", settings)
+
+            # Reused workspaces must not accumulate duplicate Gradle blocks.
+            second = subprocess.run(
+                ["python3", str(scripts / SCRIPT.name)], cwd=root, env=environment, text=True, capture_output=True
+            )
+            self.assertEqual(second.returncode, 0, second.stderr)
+            settings = android.joinpath("settings.gradle").read_text()
+            gradle = app.joinpath("build.gradle.kts").read_text()
+            self.assertEqual(settings.count("pluginManagement {"), 1)
+            self.assertEqual(settings.count("google()"), 1)
+            self.assertEqual(gradle.count('id("com.google.gms.google-services") version "4.5.0"'), 1)
+
             receipt = json.loads((android / "push-build-config.json").read_text())
             self.assertTrue(receipt["firebaseConfigured"])
             self.assertRegex(receipt["firebaseConfigSha256"], r"^[0-9a-f]{64}$")
