@@ -8,6 +8,7 @@ mod error;
 mod feedback_queue;
 mod i18n;
 mod models;
+mod push_plugin;
 mod session;
 mod util;
 mod validation;
@@ -22,10 +23,10 @@ use commands::{
     fan::{
         fan_admission_pass, fan_admission_qr, fan_area_challenge, fan_area_claim, fan_area_wallet,
         fan_claim_pass, fan_confirm, fan_events, fan_forget, fan_home, fan_import_wallet,
-        fan_interests, fan_lock, fan_merch_bundles, fan_merch_catalog, fan_referral,
-        fan_register_interest, fan_request_access, fan_request_delivery, fan_signup,
-        fan_start_ticket_checkout, fan_status, fan_ticket_sale, fan_unlock, fan_wallets,
-        render_wallet_qr,
+        fan_interests, fan_lock, fan_merch_bundles, fan_merch_catalog, fan_push_disable,
+        fan_push_enable, fan_push_status, fan_referral, fan_register_interest, fan_request_access,
+        fan_request_delivery, fan_signup, fan_start_ticket_checkout, fan_status, fan_ticket_sale,
+        fan_unlock, fan_wallets, render_wallet_qr,
     },
     misc::{
         launcher_status, open_external_url, request_city, submit_anonymous_feedback,
@@ -62,6 +63,7 @@ pub struct AppState {
     fan_session: RwLock<Option<Arc<FanProfile>>>,
     fan_pin: RwLock<Option<Zeroizing<String>>>,
     fan_mutation: Mutex<()>,
+    native_push_available: bool,
     feedback_queue_mutation: Mutex<()>,
     wallet_qr_tokens: RwLock<HashMap<String, HashMap<String, Zeroizing<String>>>>,
     api: CrowdRelayClient,
@@ -99,6 +101,16 @@ pub fn run() {
                 if let Err(error) = app.handle().plugin(tauri_plugin_geolocation::init()) {
                     plugin_errors.push(format!("geolocation: {error}"));
                 }
+                #[cfg(target_os = "android")]
+                let native_push_available = match app.handle().plugin(push_plugin::init()) {
+                    Ok(()) => true,
+                    Err(error) => {
+                        plugin_errors.push(format!("signal-push: {error}"));
+                        false
+                    }
+                };
+                #[cfg(not(target_os = "android"))]
+                let native_push_available = false;
                 if !plugin_errors.is_empty() {
                     let report = format!(
                         "mobile plugin initialization degraded: {}",
@@ -109,6 +121,8 @@ pub fn run() {
                 }
             }
 
+            #[cfg(not(mobile))]
+            let native_push_available = false;
             let api = CrowdRelayClient::new(app_data_dir.join("public-cache-v1.json"))?;
             app.manage(AppState {
                 session: RwLock::new(None),
@@ -120,6 +134,7 @@ pub fn run() {
                 fan_session: RwLock::new(None),
                 fan_pin: RwLock::new(None),
                 fan_mutation: Mutex::new(()),
+                native_push_available,
                 feedback_queue_mutation: Mutex::new(()),
                 wallet_qr_tokens: RwLock::new(HashMap::new()),
                 api,
@@ -192,6 +207,9 @@ pub fn run() {
             fan_wallets,
             render_wallet_qr,
             fan_request_delivery,
+            fan_push_status,
+            fan_push_enable,
+            fan_push_disable,
             submit_anonymous_feedback,
         ])
         .run(tauri::generate_context!());

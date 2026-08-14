@@ -303,3 +303,64 @@ impl super::CrowdRelayClient {
         ))
     }
 }
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct FanPushConfigApi {
+    pub enabled: bool,
+    pub android_fcm: bool,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct FanPushMutationApi {
+    pub registered: bool,
+}
+
+impl super::CrowdRelayClient {
+    pub async fn fan_push_config(
+        &self,
+        profile: &FanProfile,
+    ) -> Result<FanPushConfigApi, AppError> {
+        let response = self
+            .http
+            .get(endpoint(&profile.api_base_url, "public/push/config")?)
+            .header(ACCEPT, "application/json")
+            .send()
+            .await?;
+        decode(response).await
+    }
+
+    pub async fn fan_register_android_push(
+        &self,
+        profile: &FanProfile,
+        installation_id: &str,
+        fcm_token: &str,
+    ) -> Result<FanPushMutationApi, AppError> {
+        let body = serde_json::json!({
+            "installation_id": installation_id,
+            "transport": "android_fcm",
+            "endpoint": fcm_token,
+            "p256dh": null,
+            "auth": null,
+        });
+        self.fan_json(profile, Method::POST, "me/push/endpoints", Some(&body))
+            .await
+    }
+
+    pub async fn fan_disable_android_push(
+        &self,
+        profile: &FanProfile,
+        installation_id: &str,
+    ) -> Result<FanPushMutationApi, AppError> {
+        let body = serde_json::json!({
+            "installation_id": installation_id,
+            "transport": "android_fcm",
+        });
+        self.fan_json(
+            profile,
+            Method::POST,
+            "me/push/endpoints/disable",
+            Some(&body),
+        )
+        .await
+    }
+}

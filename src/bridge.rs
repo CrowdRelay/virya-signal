@@ -59,6 +59,8 @@ function viryaPersistOperation(operation) {
   });
 }
 
+export function viryaNativeBridgeAvailable() { return Boolean(window.__TAURI__?.core?.invoke); }
+
 export async function viryaInvoke(command, args, timeoutMs) {
   const timeout = Math.max(1_000, Math.min(Number(timeoutMs) || 30_000, 60_000));
   const startedAt = Date.now();
@@ -805,6 +807,8 @@ export function viryaInstallRuntimeGuards() {
 
 "#)]
 extern "C" {
+    #[wasm_bindgen(js_name = viryaNativeBridgeAvailable)]
+    fn native_bridge_available_js() -> bool;
     #[wasm_bindgen(catch, js_name = viryaInvoke)]
     async fn invoke_js(command: &str, args: JsValue, timeout_ms: u32) -> Result<JsValue, JsValue>;
 
@@ -876,6 +880,10 @@ struct RuntimeTranslations {
 
 const DEFAULT_IPC_TIMEOUT_MS: u32 = 30_000;
 const MIN_IPC_TIMEOUT_MS: u32 = 2_000;
+
+pub fn native_available() -> bool {
+    native_bridge_available_js()
+}
 
 pub async fn invoke<T, A>(command: &str, args: &A) -> Result<T, String>
 where

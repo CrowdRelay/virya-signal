@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+import json
+import os
 import shutil
 import subprocess
 import tempfile
@@ -8,6 +11,7 @@ from pathlib import Path
 
 
 SCRIPT = Path(__file__).with_name("prepare-android.py")
+PUSH_TEMPLATES = SCRIPT.parent.parent / "src-tauri" / "android-push"
 
 
 class PrepareAndroidTests(unittest.TestCase):
@@ -20,6 +24,8 @@ class PrepareAndroidTests(unittest.TestCase):
             scripts.mkdir()
             app.mkdir(parents=True)
             shutil.copy2(SCRIPT, scripts / SCRIPT.name)
+            push_templates = root / "src-tauri" / "android-push"
+            shutil.copytree(PUSH_TEMPLATES, push_templates)
 
             # In CI, `cargo tauri icon` runs before prepare-android.py.
             # Model its generated adaptive resources instead of the obsolete
@@ -44,6 +50,10 @@ class PrepareAndroidTests(unittest.TestCase):
             gradle = app / "build.gradle.kts"
             gradle.write_text(
                 """
+plugins {
+    id("com.android.application")
+}
+
 android {
     compileSdk = 35
     defaultConfig { targetSdk = 35 }
@@ -54,7 +64,17 @@ android {
         }
     }
 }
+
+dependencies {
+    implementation("androidx.core:core-ktx:1.9.0")
+}
 """.strip()
+            )
+
+            manifest = app / "src" / "main" / "AndroidManifest.xml"
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:label="Virya Signal" /></manifest>'
             )
 
             result = subprocess.run(
@@ -85,6 +105,58 @@ android {
                 self.assertIn("<foreground", generated)
 
             self.assertFalse((root / "src-tauri" / "launcher-assets").exists())
+            self.assertIn('com.google.firebase:firebase-messaging:25.1.1', output)
+            staged = app / "src" / "main" / "java" / "music" / "virya" / "signal" / "push"
+            self.assertTrue((staged / "SignalPushPlugin.kt").is_file())
+            self.assertTrue((staged / "ViryaFirebaseMessagingService.kt").is_file())
+            manifest_text = manifest.read_text()
+            self.assertIn("android.permission.POST_NOTIFICATIONS", manifest_text)
+            self.assertIn("ViryaFirebaseMessagingService", manifest_text)
+            push_receipt = json.loads((android / "push-build-config.json").read_text())
+            self.assertFalse(push_receipt["firebaseConfigured"])
+            self.assertEqual(push_receipt["firebaseMessagingVersion"], "25.1.1")
+            self.assertFalse(push_receipt["analyticsIncluded"])
+            self.assertFalse(push_receipt["crashlyticsIncluded"])
+            self.assertFalse((app / "google-services.json").exists())
+
+    def test_configures_firebase_only_with_valid_secret(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            scripts = root / "scripts"
+            android = root / "src-tauri" / "gen" / "android"
+            app = android / "app"
+            scripts.mkdir()
+            app.mkdir(parents=True)
+            shutil.copy2(SCRIPT, scripts / SCRIPT.name)
+            shutil.copytree(PUSH_TEMPLATES, root / "src-tauri" / "android-push")
+            res = app / "src" / "main" / "res" / "mipmap-anydpi-v26"
+            res.mkdir(parents=True)
+            res.joinpath("ic_launcher.xml").write_text(
+                '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"><background android:drawable="@color/x"/><foreground android:drawable="@mipmap/ic_launcher_foreground"/></adaptive-icon>'
+            )
+            app.joinpath("build.gradle.kts").write_text(
+                'plugins {\n    id("com.android.application")\n}\n\nandroid {\n    compileSdk = 35\n    defaultConfig { targetSdk = 35 }\n    buildTypes {\n        getByName("release") {\n            isMinifyEnabled = false\n        }\n    }\n}\n\ndependencies {\n}\n'
+            )
+            manifest = app / "src" / "main" / "AndroidManifest.xml"
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text('<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application /></manifest>')
+            document = {
+                "project_info": {"project_id": "virya-signal"},
+                "client": [{"client_info": {"android_client_info": {"package_name": "music.virya.control"}}}],
+            }
+            encoded = base64.b64encode(json.dumps(document).encode()).decode()
+            environment = os.environ.copy()
+            environment["VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64"] = encoded
+            result = subprocess.run(
+                ["python3", str(scripts / SCRIPT.name)], cwd=root, env=environment, text=True, capture_output=True
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            gradle = app.joinpath("build.gradle.kts").read_text()
+            self.assertIn('id("com.google.gms.google-services") version "4.5.0"', gradle)
+            receipt = json.loads((android / "push-build-config.json").read_text())
+            self.assertTrue(receipt["firebaseConfigured"])
+            self.assertRegex(receipt["firebaseConfigSha256"], r"^[0-9a-f]{64}$")
+            self.assertEqual(json.loads((app / "google-services.json").read_text()), document)
 
 
 if __name__ == "__main__":

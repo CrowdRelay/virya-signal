@@ -90,6 +90,9 @@ jobs:
           set -euo pipefail
           python3 promoted/scripts/artifact_manifest.py verify promoted/artifacts promoted/android-artifact-manifest.json --source-sha "$GITHUB_SHA"
           test -f "promoted/artifacts/virya-signal-${{ needs.meta.outputs.version }}.aab"
+          if [[ "${{ inputs.play_track || 'internal' }}" == "production" ]]; then
+            jq -e '.firebaseConfigured == true and .analyticsIncluded == false and .crashlyticsIncluded == false' promoted/artifacts/push-build-config.json >/dev/null
+          fi
       - name: Upload exact AAB to Google Play
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1
         with:

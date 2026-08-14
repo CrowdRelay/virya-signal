@@ -362,6 +362,10 @@ pub struct FanProfile {
     pub display_name: Option<String>,
     #[serde(deserialize_with = "deserialize_string_or_bytes")]
     pub fan_session_token: String,
+    #[serde(default)]
+    pub push_enabled: bool,
+    #[serde(default)]
+    pub push_last_sync_ok: bool,
     #[serde(default, deserialize_with = "deserialize_optional_string_or_bytes")]
     pub pass_session_token: Option<String>,
     #[serde(default)]
@@ -1389,3 +1393,5 @@ mod compat_string_shape_tests {
         assert!(referral.referral_code.is_empty());
     }
 }
+
+pub use virya_signal_contracts::push::*;

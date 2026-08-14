@@ -1014,6 +1014,24 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "area_legacy_imported" => "zaimportowane legacy",
         "stale_voucher_leases" => "stare lease voucherów",
         "stale_ticket_leases" => "stare lease biletów",
+        "push_notifications" => "Powiadomienia push",
+        "push_notifications_hint" => {
+            "Koncerty w pobliżu, bilety i ważne wiadomości Signal mogą pojawić się bezpośrednio na tym telefonie."
+        }
+        "push_notifications_on" => "Powiadomienia są aktywne na tym urządzeniu.",
+        "push_notifications_off" => "Powiadomienia są wyłączone na tym urządzeniu.",
+        "push_notifications_blocked" => {
+            "Android blokuje powiadomienia. Włącz je dla Virya Signal w ustawieniach telefonu."
+        }
+        "push_notifications_waiting_backend" => {
+            "Kanał push nie jest jeszcze aktywny po stronie VIRYA OS."
+        }
+        "push_notifications_degraded" => {
+            "Nie udało się potwierdzić synchronizacji push. Spróbuj ponownie bez zmiany ustawienia."
+        }
+        "enable_push_notifications" => "WŁĄCZ POWIADOMIENIA",
+        "disable_push_notifications" => "WYŁĄCZ POWIADOMIENIA",
+        "syncing_push_notifications" => "SYNCHRONIZUJĘ…",
         _ => key,
     }
 }

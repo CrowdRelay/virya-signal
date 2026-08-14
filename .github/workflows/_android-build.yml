@@ -101,6 +101,7 @@ jobs:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64: ${{ secrets.VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64 }}
           SIGNED: ${{ inputs.signed }}
         shell: bash
         run: |
@@ -147,6 +148,7 @@ jobs:
           python3 scripts/collect-mobile-artifact.py "${ext}" "${package}" --max-size-mib "${max_size}"
           src-tauri/gen/android/gradlew -p src-tauri/gen/android :app:dependencies --configuration "${configuration}" > artifacts/android-dependencies.txt
           python3 scripts/analyze-android-package.py "${package}" --require-abi arm64-v8a --require-page-size 16384
+          cp src-tauri/gen/android/push-build-config.json artifacts/push-build-config.json
           if [[ "${ext}" == "apk" ]]; then
             zipalign -c -P 16 -v 4 "${package}"
           fi

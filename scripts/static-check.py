@@ -141,6 +141,9 @@ invoked = set(re.findall(
 invoked.update(re.findall(
     r'bridge::invoke_unit\(\s*"([a-z_]+)"', ui, re.S
 ))
+# Push enable/disable share one dynamic bridge call; the literal command names are
+# still audited as active IPC rather than being silently treated as compatibility-only.
+invoked.update(re.findall(r'"(fan_push_(?:enable|disable))"', ui))
 # Some native commands are intentionally hidden behind bridge helpers or the
 # boot-time JS crash reporter. Count those literal calls too so the audit
 # reflects the real IPC surface instead of under-reporting it.
@@ -587,5 +590,7 @@ for promotion_name in ['android-play.yml', 'android-release-apk.yml', 'mobile-re
     promotion = (root / '.github/workflows' / promotion_name).read_text()
     if 'promoted/scripts/artifact_manifest.py verify' not in promotion:
         raise SystemExit(f'{promotion_name} must verify the exact downloaded artifact from its preserved scripts/ path')
+    if 'push-build-config.json' not in promotion or '.firebaseConfigured == true' not in promotion:
+        raise SystemExit(f'{promotion_name} must reject production artifacts without Firebase push configuration')
 
 print(f'static configuration and IPC contract check: OK ({len(invoked)} active / {len(registered)} registered commands; {len(unreferenced)} compat-only)')

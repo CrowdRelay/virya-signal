@@ -2,7 +2,12 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import json
+import os
 import re
+import shutil
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 parser = argparse.ArgumentParser()
@@ -298,7 +303,174 @@ for key, value in managed_properties.items():
         properties_text += f"\n{replacement}"
 gradle_properties.write_text(properties_text.lstrip(), encoding="utf-8")
 
+
+
+# Stage the minimal Android FCM transport into the freshly generated Tauri app.
+# Firebase Messaging is the only Firebase runtime dependency: analytics,
+# Crashlytics and other SDKs are intentionally absent from Virya Signal.
+PUSH_TEMPLATE_DIR = root / "src-tauri" / "android-push"
+PUSH_PACKAGE = "music.virya.signal.push"
+PUSH_PACKAGE_PATH = Path(*PUSH_PACKAGE.split("."))
+FIREBASE_MESSAGING_VERSION = "25.1.1"
+GOOGLE_SERVICES_PLUGIN_VERSION = "4.5.0"
+ANDROID_NS = "http://schemas.android.com/apk/res/android"
+ET.register_namespace("android", ANDROID_NS)
+
+
+def _find_balanced_block(source: str, marker: str) -> tuple[int, int, str]:
+    pattern = r"(?m)^(?P<indent>[ \t]*)" + re.escape(marker) + r"[ \t]*\{"
+    match = re.search(pattern, source)
+    if match is None:
+        raise SystemExit(f"could not locate {marker} block in generated Android Gradle file")
+    opening = source.find("{", match.start(), match.end())
+    depth = 0
+    quote: str | None = None
+    escaped = False
+    index = opening
+    while index < len(source):
+        char = source[index]
+        if quote is not None:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+            index += 1
+            continue
+        if char in ('"', "'"):
+            quote = char
+            index += 1
+            continue
+        if char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                return opening, index, match.group("indent")
+        index += 1
+    raise SystemExit(f"unterminated {marker} block in generated Android Gradle file")
+
+
+def _insert_in_gradle_block(source: str, marker: str, statement: str) -> str:
+    if statement in source:
+        return source
+    opening, _closing, indent = _find_balanced_block(source, marker)
+    return source[: opening + 1] + f"\n{indent}    {statement}" + source[opening + 1 :]
+
+
+def _stage_android_push() -> bool:
+    if not PUSH_TEMPLATE_DIR.is_dir():
+        raise SystemExit(f"missing Android push templates: {PUSH_TEMPLATE_DIR}")
+    java_dir = android / "app" / "src" / "main" / "java" / PUSH_PACKAGE_PATH
+    java_dir.mkdir(parents=True, exist_ok=True)
+    for filename in ("SignalPushPlugin.kt", "ViryaFirebaseMessagingService.kt"):
+        source = PUSH_TEMPLATE_DIR / filename
+        if not source.is_file():
+            raise SystemExit(f"missing Android push source: {source}")
+        shutil.copy2(source, java_dir / filename)
+
+    manifest = android / "app" / "src" / "main" / "AndroidManifest.xml"
+    tree = ET.parse(manifest)
+    manifest_root = tree.getroot()
+    permission_name = f"{{{ANDROID_NS}}}name"
+    if not any(
+        node.tag == "uses-permission" and node.attrib.get(permission_name) == "android.permission.POST_NOTIFICATIONS"
+        for node in manifest_root
+    ):
+        ET.SubElement(
+            manifest_root,
+            "uses-permission",
+            {permission_name: "android.permission.POST_NOTIFICATIONS"},
+        )
+    application = manifest_root.find("application")
+    if application is None:
+        raise SystemExit("generated Android manifest is missing <application>")
+    service_name = f"{PUSH_PACKAGE}.ViryaFirebaseMessagingService"
+    existing_service = next(
+        (node for node in application.findall("service") if node.attrib.get(permission_name) == service_name),
+        None,
+    )
+    if existing_service is None:
+        service = ET.SubElement(
+            application,
+            "service",
+            {
+                permission_name: service_name,
+                f"{{{ANDROID_NS}}}exported": "false",
+            },
+        )
+        intent_filter = ET.SubElement(service, "intent-filter")
+        ET.SubElement(
+            intent_filter,
+            "action",
+            {permission_name: "com.google.firebase.MESSAGING_EVENT"},
+        )
+    tree.write(manifest, encoding="utf-8", xml_declaration=True)
+
+    gradle_text = gradle.read_text(encoding="utf-8")
+    gradle_text = _insert_in_gradle_block(
+        gradle_text,
+        "dependencies",
+        f'implementation("com.google.firebase:firebase-messaging:{FIREBASE_MESSAGING_VERSION}")',
+    )
+
+    firebase_b64 = os.environ.get("VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64", "").strip()
+    google_services = android / "app" / "google-services.json"
+    configured = False
+    config_sha = None
+    if firebase_b64:
+        try:
+            raw = base64.b64decode(firebase_b64, validate=True)
+        except Exception as error:
+            raise SystemExit(f"invalid VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64: {error}") from error
+        if not (64 <= len(raw) <= 128 * 1024):
+            raise SystemExit("google-services.json has an invalid size")
+        try:
+            document = json.loads(raw)
+        except json.JSONDecodeError as error:
+            raise SystemExit(f"invalid google-services.json: {error}") from error
+        project_id = str(document.get("project_info", {}).get("project_id", "")).strip()
+        packages = {
+            str(client.get("client_info", {}).get("android_client_info", {}).get("package_name", "")).strip()
+            for client in document.get("client", [])
+            if isinstance(client, dict)
+        }
+        if not project_id or "music.virya.control" not in packages:
+            raise SystemExit("google-services.json does not target music.virya.control")
+        google_services.write_bytes(raw)
+        gradle_text = _insert_in_gradle_block(
+            gradle_text,
+            "plugins",
+            f'id("com.google.gms.google-services") version "{GOOGLE_SERVICES_PLUGIN_VERSION}"',
+        )
+        import hashlib
+        config_sha = hashlib.sha256(raw).hexdigest()
+        configured = True
+    else:
+        google_services.unlink(missing_ok=True)
+
+    gradle.write_text(gradle_text, encoding="utf-8")
+    receipt = {
+        "schemaVersion": 1,
+        "firebaseConfigured": configured,
+        "firebaseConfigSha256": config_sha,
+        "firebaseMessagingVersion": FIREBASE_MESSAGING_VERSION,
+        "googleServicesPluginVersion": GOOGLE_SERVICES_PLUGIN_VERSION if configured else None,
+        "analyticsIncluded": False,
+        "crashlyticsIncluded": False,
+    }
+    (android / "push-build-config.json").write_text(
+        json.dumps(receipt, sort_keys=True, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return configured
+
+
+push_configured = _stage_android_push()
+
 print(
     f"Android project prepared: API 36, R8/resource shrinking=on, "
-    f"signing={'on' if args.signing else 'off'}, tauri-icons=on, debug-r8=off"
+    f"signing={'on' if args.signing else 'off'}, tauri-icons=on, debug-r8=off, "
+    f"push-firebase={'on' if push_configured else 'degraded-no-config'}"
 )

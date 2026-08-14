@@ -10,7 +10,6 @@ fn FanPortal(
     // Entering the fan zone must be a local-only transition. City data is
     // fetched only when the user explicitly asks for the canonical list.
     let public = RwSignal::new(Some(PublicHomeData::default()));
-
     view! {
         <Show when=move || !status.get().unlocked>
             <StaffEntryButton mode=mode />
@@ -26,7 +25,6 @@ fn FanPortal(
         }}
     }
 }
-
 #[component]
 fn StatusFailure(
     mode: RwSignal<RootMode>,
@@ -1720,6 +1718,7 @@ fn FanProfileScreen(
                 <div class="stats-grid"><Metric value=profile.wallet_count.to_string() label=tr("orders")/><Metric value=if profile.has_admission_pass { "1".to_owned() } else { "0".to_owned() } label=tr("admission_passes")/><Metric value=dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned()) label=tr("referrals")/></div>
             })}
             <div class="settings-list">
+                <NativePushControl error=error />
                 <LanguageSwitch />
                 <button on:click=refresh disabled=move || { let state = loading.get(); state.events || state.referral || state.interests || state.admission_pass || state.wallets }>{move || { let state = loading.get(); if state.events || state.referral || state.interests || state.admission_pass || state.wallets { tr("refreshing_2") } else { tr("refresh_data") } }}</button>
                 <button on:click=lock>{tr("lock_app")}</button>

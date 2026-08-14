@@ -944,3 +944,5 @@ pub struct WalletTicket {
     pub qr_available: bool,
     pub qr_expires_at: String,
 }
+
+pub use virya_signal_contracts::push::*;

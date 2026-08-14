@@ -143,3 +143,91 @@ fn FanHomeOverview(
         </section>
     }
 }
+
+#[component]
+fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
+    let status = RwSignal::new(None::<FanPushStatus>);
+    let busy = RwSignal::new(false);
+    let loaded = RwSignal::new(false);
+
+    Effect::new(move |_| {
+        if loaded.get_untracked() || !bridge::native_available() {
+            return;
+        }
+        loaded.set(true);
+        spawn_local(async move {
+            match bridge::invoke::<FanPushStatus, _>("fan_push_status", &EmptyArgs {}).await {
+                Ok(value) => status.set(Some(value)),
+                Err(message) => error.set(Some(message)),
+            }
+        });
+    });
+
+    let toggle = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        let command = if status
+            .get_untracked()
+            .as_ref()
+            .is_some_and(|value| value.enabled)
+        {
+            "fan_push_disable"
+        } else {
+            "fan_push_enable"
+        };
+        busy.set(true);
+        spawn_local(async move {
+            match bridge::invoke::<FanPushStatus, _>(command, &EmptyArgs {}).await {
+                Ok(value) => status.set(Some(value)),
+                Err(message) => error.set(Some(message)),
+            }
+            busy.set(false);
+        });
+    };
+
+    view! {
+        <Show when=move || bridge::native_available()>
+            <article class="push-setting-card">
+                <div class="push-setting-copy">
+                    <div class="push-setting-heading">
+                        <span class="push-setting-icon" aria-hidden="true">"◉"</span>
+                        <div><strong>{tr("push_notifications")}</strong><p>{tr("push_notifications_hint")}</p></div>
+                    </div>
+                    {move || status.get().map(|current| {
+                        let message = if !current.supported {
+                            tr("push_notifications_degraded")
+                        } else if !current.backend_enabled {
+                            tr("push_notifications_waiting_backend")
+                        } else if current.permission == "denied" {
+                            tr("push_notifications_blocked")
+                        } else if current.enabled {
+                            tr("push_notifications_on")
+                        } else if current.detail.is_some() {
+                            tr("push_notifications_degraded")
+                        } else {
+                            tr("push_notifications_off")
+                        };
+                        view! { <small class:success=current.enabled class:warning=!current.enabled>{message}</small> }
+                    })}
+                </div>
+                <Show when=move || status.get().is_some_and(|value| value.supported)>
+                    <button
+                        type="button"
+                        class="ghost push-setting-action"
+                        disabled=move || busy.get()
+                        on:click=toggle
+                    >
+                        {move || if busy.get() {
+                            tr("syncing_push_notifications")
+                        } else if status.get().is_some_and(|value| value.enabled) {
+                            tr("disable_push_notifications")
+                        } else {
+                            tr("enable_push_notifications")
+                        }}
+                    </button>
+                </Show>
+            </article>
+        </Show>
+    }
+}

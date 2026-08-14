@@ -1012,6 +1012,22 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "area_legacy_imported" => "legacy imported",
         "stale_voucher_leases" => "stale voucher leases",
         "stale_ticket_leases" => "stale ticket leases",
+        "push_notifications" => "Push notifications",
+        "push_notifications_hint" => {
+            "Nearby shows, tickets and important Signal messages can appear directly on this phone."
+        }
+        "push_notifications_on" => "Notifications are active on this device.",
+        "push_notifications_off" => "Notifications are disabled on this device.",
+        "push_notifications_blocked" => {
+            "Android is blocking notifications. Enable them for Virya Signal in your phone settings."
+        }
+        "push_notifications_waiting_backend" => "The push channel is not live in VIRYA OS yet.",
+        "push_notifications_degraded" => {
+            "Push synchronization could not be confirmed. Retry without changing the setting."
+        }
+        "enable_push_notifications" => "ENABLE NOTIFICATIONS",
+        "disable_push_notifications" => "DISABLE NOTIFICATIONS",
+        "syncing_push_notifications" => "SYNCING…",
         _ => key,
     }
 }
