@@ -542,9 +542,12 @@ if 'pub city: Option<serde_json::Value>' in (root / 'src-tauri/src/models.rs').r
     raise SystemExit('public event city must stay typed across the native/WebView boundary')
 
 native_models = (root / 'src-tauri/src/models.rs').read_text()
+shared_ops = (root / 'crates/virya-signal-contracts/src/ops.rs').read_text()
 for source_name, source in [('native models', native_models), ('WASM models', ui_models)]:
-    if '#[serde(default)]\n    pub errors_4xx: u64' not in source:
-        raise SystemExit(f'{source_name} must decode CrowdRelay errors_4xx telemetry compatibly')
+    if 'pub use virya_signal_contracts::ops::*;' not in source:
+        raise SystemExit(f'{source_name} must consume the shared ops telemetry contract')
+if '#[serde(default)]\n    pub errors_4xx: u64' not in shared_ops:
+    raise SystemExit('shared ops models must decode CrowdRelay errors_4xx telemetry compatibly')
 if 'summary.http.errors_4xx.to_string()' not in ui:
     raise SystemExit('staff Ops UI must surface CrowdRelay 4xx telemetry separately from 5xx')
 

@@ -218,16 +218,24 @@ class RuntimePerformanceContract(unittest.TestCase):
         self.assertNotIn("token", ticket_block)
         self.assertIn('tr("wallet_cached_offline")', ui)
 
+    def test_native_error_log_preserves_full_crowdrelay_git_sha(self):
+        http = (ROOT / "src-tauri/src/api/http.rs").read_text()
+        models = (ROOT / "src-tauri/src/models.rs").read_text()
+        self.assertIn("value.chars().take(40).collect::<String>()", http)
+        self.assertIn("pub git_sha: Option<String>", models)
+
     def test_ops_surfaces_postgres18_async_io_runtime_evidence(self):
         native_models = (ROOT / "src-tauri/src/models.rs").read_text()
         web_models = (ROOT / "src/models.rs").read_text()
+        shared_ops = (ROOT / "crates/virya-signal-contracts/src/ops.rs").read_text()
         ui = (ROOT / "src/app/operator.rs").read_text()
-        for models in (native_models, web_models):
-            for fragment in (
-                "io_combine_limit_bytes: Option<i64>",
-                "io_max_combine_limit_bytes: Option<i64>",
-            ):
-                self.assertIn(fragment, models)
+        self.assertIn("pub use virya_signal_contracts::ops::*;", native_models)
+        self.assertIn("pub use virya_signal_contracts::ops::*;", web_models)
+        for fragment in (
+            "io_combine_limit_bytes: Option<i64>",
+            "io_max_combine_limit_bytes: Option<i64>",
+        ):
+            self.assertIn(fragment, shared_ops)
         for fragment in (
             'label="io_combine"',
             'label="io_max_combine"',

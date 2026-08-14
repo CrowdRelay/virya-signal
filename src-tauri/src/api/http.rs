@@ -29,7 +29,7 @@ pub(super) async fn decode_with_error_mapper<T: DeserializeOwned>(
         .headers()
         .get("x-crowdrelay-release")
         .and_then(|value| value.to_str().ok())
-        .map(|value| value.chars().take(32).collect::<String>());
+        .map(|value| value.chars().take(40).collect::<String>());
     let server_timing = response
         .headers()
         .get("server-timing")

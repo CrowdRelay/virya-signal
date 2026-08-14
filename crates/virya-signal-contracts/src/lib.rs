@@ -5,3 +5,4 @@
 //! the two sides cannot silently drift while external wire quirks remain isolated.
 
 pub mod autopilot;
+pub mod ops;

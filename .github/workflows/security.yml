@@ -18,8 +18,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: taiki-e/install-action@7f4eb899022d8fe70b20c4f3de697aa85c309026 # v2
-        with:
-          tool: cargo-audit
+      - name: Verify repository-pinned Rust toolchain
+        run: rustc --version --verbose
+      - name: Install pinned cargo-audit
+        run: cargo install cargo-audit --locked --version 0.22.2
       - name: Audit Cargo.lock
         run: cargo audit --file Cargo.lock
