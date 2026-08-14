@@ -1,3 +1,4 @@
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AdmissionPass {
     pub event_title: String,
     pub venue: Option<String>,

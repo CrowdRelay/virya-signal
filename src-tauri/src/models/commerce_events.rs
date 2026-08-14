@@ -1,3 +1,4 @@
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct StaffEventDashboard {
     pub schema_version: i32,
     pub slug: String,
@@ -209,5 +210,3 @@ pub struct PhysicalRewardGrant {
 pub struct FanEventInterest {
     pub event: PublicEvent,
 }
-
-#[derive(Clone, Debug, Deserialize, Serialize)]

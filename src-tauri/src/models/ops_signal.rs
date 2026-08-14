@@ -142,5 +142,3 @@ pub struct OpsRetryResult {
     pub status: String,
     pub replayed: bool,
 }
-
-#[derive(Clone, Debug, Deserialize, Serialize)]

@@ -1,3 +1,4 @@
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ShowModeSnapshot {
     pub schema_version: u32,
     pub snapshot_id: String,

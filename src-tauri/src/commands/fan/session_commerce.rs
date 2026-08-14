@@ -425,5 +425,3 @@ pub(crate) async fn fan_import_wallet(
         .insert(order_id, wallet_tokens);
     Ok(wallet)
 }
-
-#[tauri::command]

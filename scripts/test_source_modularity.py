@@ -50,6 +50,19 @@ def main() -> None:
                 if not target.is_file():
                     fail(f"broken-include={path.relative_to(ROOT)}:{rel}")
 
+    # A physical split must never strand an outer attribute at EOF. Rust does
+    # not carry attributes across include! boundaries: an attribute belongs to
+    # the next item in the *same included token stream*. A dangling derive or
+    # command attribute therefore turns a harmless-looking split into a compile
+    # error (or silently removes the attribute from the intended item).
+    for source_root in (ROOT / "src", ROOT / "src-tauri/src"):
+        for path in source_root.rglob("*.rs"):
+            lines = path.read_text(encoding="utf-8").splitlines()
+            while lines and not lines[-1].strip():
+                lines.pop()
+            if lines and lines[-1].lstrip().startswith("#["):
+                fail(f"dangling-attribute={path.relative_to(ROOT)}:{lines[-1].strip()}")
+
     oversized = []
     for source_root in (ROOT / "src", ROOT / "src-tauri/src"):
         for path in source_root.rglob("*.rs"):

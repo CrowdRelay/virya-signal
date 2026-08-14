@@ -1,3 +1,4 @@
+#[tauri::command]
 pub(crate) async fn fan_wallets(state: State<'_, AppState>) -> Result<WalletBatch, AppError> {
     let profile = fan_profile(&state).await?;
     let api = state.api.clone();

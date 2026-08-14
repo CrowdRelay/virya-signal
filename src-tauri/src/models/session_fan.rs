@@ -236,5 +236,3 @@ pub struct FanHomeCounts {
     pub paid_orders: i64,
     pub area_claims: i64,
 }
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
