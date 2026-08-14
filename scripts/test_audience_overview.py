@@ -1,3 +1,4 @@
+from rust_source_tree import read_rust_module
 from pathlib import Path
 import unittest
 
@@ -6,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class AudienceOverviewContract(unittest.TestCase):
     def test_models_keep_native_ipc_parity(self):
         web = (ROOT / "src/models.rs").read_text()
-        native = (ROOT / "src-tauri/src/models.rs").read_text()
+        native = read_rust_module(ROOT, "src-tauri/src/models.rs")
         for marker in ["pub struct AudienceSummary", "pub struct AudienceRevenueSummary", "pub ticket_revenue: Vec<AudienceRevenueSummary>"]:
             self.assertIn(marker, web)
             self.assertIn(marker, native)
@@ -21,7 +22,7 @@ class AudienceOverviewContract(unittest.TestCase):
         self.assertIn("let mut overview = signal_result?;", api)
 
     def test_staff_signal_renders_aggregate_only_audience_metrics(self):
-        ui = (ROOT / "src/app/operator.rs").read_text()
+        ui = read_rust_module(ROOT, "src/app/operator.rs")
         for marker in ["audience.ticket_buyers", "audience.attendees", "audience.synesthesia_participants", "audience.qualified_referrals", "ticket_revenue"]:
             self.assertIn(marker, ui)
         self.assertNotIn("AudienceFanDetail", ui)

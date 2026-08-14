@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+MAX_LOC = 1000
+CONTRACT = {
+    "src/bridge.rs": ["bridge/ffi.rs", "bridge/client.rs"],
+    "src/app/fan.rs": ["fan/shell.rs", "fan/merch.rs", "fan/events.rs", "fan/wallet.rs"],
+    "src/app/operator.rs": [
+        "operator/shell.rs", "operator/signal.rs", "operator/commerce_settings.rs",
+        "operator/autopilot.rs", "operator/ops.rs",
+    ],
+    "src-tauri/src/models.rs": [
+        "models/session_fan.rs", "models/commerce_events.rs", "models/area.rs",
+        "models/ops_signal.rs", "models/showmode_inputs.rs", "models/tests.rs",
+    ],
+    "src-tauri/src/commands/fan.rs": [
+        "fan/push.rs", "fan/session_commerce.rs", "fan/wallet.rs", "fan/tests.rs",
+    ],
+}
+DATA_EXCEPTIONS = {"src/i18n/pl.rs", "src/i18n/en.rs"}
+
+def loc(path: Path) -> int:
+    return len(path.read_text(encoding="utf-8").splitlines())
+
+def fail(reason: str) -> None:
+    raise SystemExit(f"SIGNAL_MODULARITY=FAIL {reason}")
+
+def main() -> None:
+    chunks = 0
+    for parent_rel, child_rels in CONTRACT.items():
+        parent = ROOT / parent_rel
+        if not parent.is_file(): fail(f"missing-parent={parent_rel}")
+        if loc(parent) > MAX_LOC: fail(f"parent-too-large={parent_rel} loc={loc(parent)}")
+        source = parent.read_text(encoding="utf-8")
+        for child_rel in child_rels:
+            child = parent.parent / child_rel
+            if not child.is_file(): fail(f"missing-chunk={child.relative_to(ROOT)}")
+            if loc(child) > MAX_LOC: fail(f"chunk-too-large={child.relative_to(ROOT)} loc={loc(child)}")
+            if f'include!("{child_rel}");' not in source:
+                fail(f"missing-include={parent_rel}:{child_rel}")
+            chunks += 1
+    # Every nested include must resolve relative to the file that contains it.
+    import re
+    include_re = re.compile(r'include!\("([^"]+)"\);')
+    for source_root in (ROOT / "src", ROOT / "src-tauri/src"):
+        for path in source_root.rglob("*.rs"):
+            for rel in include_re.findall(path.read_text(encoding="utf-8")):
+                target = path.parent / rel
+                if not target.is_file():
+                    fail(f"broken-include={path.relative_to(ROOT)}:{rel}")
+
+    oversized = []
+    for source_root in (ROOT / "src", ROOT / "src-tauri/src"):
+        for path in source_root.rglob("*.rs"):
+            rel = path.relative_to(ROOT).as_posix()
+            if rel in DATA_EXCEPTIONS: continue
+            if loc(path) > MAX_LOC: oversized.append((rel, loc(path)))
+    if oversized: fail(f"oversized-production={oversized}")
+    print(f"SIGNAL_MODULARITY=PASS parents={len(CONTRACT)} chunks={chunks} max={MAX_LOC} data_exceptions={len(DATA_EXCEPTIONS)}")
+
+if __name__ == "__main__": main()

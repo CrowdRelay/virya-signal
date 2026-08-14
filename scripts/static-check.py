@@ -6,6 +6,7 @@ import re
 
 from i18n_catalog import load_catalog_pair
 from source_tree import read_app_source
+from rust_source_tree import read_rust_module
 
 try:
     if os.environ.get('VIRYA_FORCE_TOML_FALLBACK'):
@@ -78,7 +79,7 @@ api = '\n'.join(
     path.read_text(encoding='utf-8')
     for path in sorted((root / 'src-tauri/src/api').rglob('*.rs'))
 )
-bridge = (root / 'src/bridge.rs').read_text()
+bridge = read_rust_module(root, 'src/bridge.rs')
 boot = (root / 'boot.js').read_text()
 index = (root / 'index.html').read_text()
 pl_catalog, en_catalog = load_catalog_pair(root)
@@ -196,7 +197,7 @@ for contract in (
         raise SystemExit(f'fan commerce UX contract is missing: {contract}')
 
 ticketing = (root / 'src-tauri/src/api/ticketing.rs').read_text()
-native_fan = (root / 'src-tauri/src/commands/fan.rs').read_text()
+native_fan = read_rust_module(root, 'src-tauri/src/commands/fan.rs')
 frontend_models = (root / 'src/models.rs').read_text()
 for contract in (
     'https://virya.music/api/ticket-checkout',
@@ -373,7 +374,7 @@ for contract in (
 if 'Zeroizing::new(password)' not in native_misc:
     raise SystemExit('staff password must be zeroized immediately in the native command')
 
-native_models = (root / 'src-tauri/src/models.rs').read_text()
+native_models = read_rust_module(root, 'src-tauri/src/models.rs')
 for contract in (
     'fn normalize_compat_string',
     'deserialize_string_or_bytes',
@@ -540,7 +541,7 @@ if 'isMinifyEnabled = true' not in (root / 'scripts/prepare-android.py').read_te
     raise SystemExit('release Android builds must enable R8 and resource shrinking')
 if 'gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb' not in workflows:
     raise SystemExit('Android workflows must use the SHA-pinned Gradle v6.3.0 cache action')
-if 'Result<TicketWalletApi, AppError>' not in api or 'Vec<serde_json::Value>' in (root / 'src-tauri/src/models.rs').read_text():
+if 'Result<TicketWalletApi, AppError>' not in api or 'Vec<serde_json::Value>' in read_rust_module(root, 'src-tauri/src/models.rs'):
     raise SystemExit('wallet IPC must use a narrow typed payload')
 if 'qr_token: Option<String>' in ui_models or 'wallet_qr_tokens:' not in native:
     raise SystemExit('wallet QR secrets must stay outside the WebView payload')
@@ -553,10 +554,10 @@ for typed_contract in [
 ]:
     if typed_contract not in api:
         raise SystemExit(f'heavy IPC response lost its typed DTO: {typed_contract}')
-if 'pub city: Option<serde_json::Value>' in (root / 'src-tauri/src/models.rs').read_text():
+if 'pub city: Option<serde_json::Value>' in read_rust_module(root, 'src-tauri/src/models.rs'):
     raise SystemExit('public event city must stay typed across the native/WebView boundary')
 
-native_models = (root / 'src-tauri/src/models.rs').read_text()
+native_models = read_rust_module(root, 'src-tauri/src/models.rs')
 shared_ops = (root / 'crates/virya-signal-contracts/src/ops.rs').read_text()
 for source_name, source in [('native models', native_models), ('WASM models', ui_models)]:
     if 'pub use virya_signal_contracts::ops::*;' not in source:

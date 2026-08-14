@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
+from rust_source_tree import read_rust_module
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 contract = (ROOT / "crates/virya-signal-contracts/src/autopilot.rs").read_text()
-ui = (ROOT / "src/app/operator.rs").read_text()
+ui = read_rust_module(ROOT, "src/app/operator.rs")
 labels = (ROOT / "src/app/operator/autopilot_labels.rs").read_text()
 pl = (ROOT / "src/i18n/pl.rs").read_text()
 en = (ROOT / "src/i18n/en.rs").read_text()

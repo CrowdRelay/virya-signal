@@ -1,3 +1,4 @@
+from rust_source_tree import read_rust_module
 import hashlib
 import unittest
 from pathlib import Path
@@ -11,7 +12,7 @@ PROTECTED_COMPAT_PREFIX_SHA256 = "aab72bd3b0d6389069f2723f663d0b2995b52f4458681c
 
 class TicketCommerceContracts(unittest.TestCase):
     def test_string_or_bytes_compatibility_layer_remains_byte_identical(self):
-        source = (ROOT / "src-tauri/src/models.rs").read_text().splitlines(keepends=True)
+        source = read_rust_module(ROOT, "src-tauri/src/models.rs").splitlines(keepends=True)
         payload = "".join(source[:234]).encode()
         self.assertEqual(
             hashlib.sha256(payload).hexdigest(),
@@ -26,7 +27,7 @@ class TicketCommerceContracts(unittest.TestCase):
         self.assertIn("checkout_token.len() != 64", ticketing)
 
     def test_wallet_credential_is_saved_before_checkout_returns(self):
-        commands = (ROOT / "src-tauri/src/commands/fan.rs").read_text()
+        commands = read_rust_module(ROOT, "src-tauri/src/commands/fan.rs")
         function = commands.split("pub(crate) async fn fan_start_ticket_checkout", 1)[1]
         function = function.split("#[tauri::command]", 1)[0]
         self.assertLess(

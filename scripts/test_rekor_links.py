@@ -1,3 +1,4 @@
+from rust_source_tree import read_rust_module
 import pathlib
 import unittest
 
@@ -9,7 +10,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 class RekorLinkTests(unittest.TestCase):
     def test_draw_models_accept_slug_without_breaking_legacy_payloads(self):
         web = (ROOT / "src/models.rs").read_text()
-        native = (ROOT / "src-tauri/src/models.rs").read_text()
+        native = read_rust_module(ROOT, "src-tauri/src/models.rs")
         self.assertIn("pub slug: String", web)
         self.assertIn("#[serde(default)]", web)
         self.assertIn('default, deserialize_with = "deserialize_string_or_bytes"', native)

@@ -1,3 +1,4 @@
+from rust_source_tree import read_rust_module
 import re
 import subprocess
 import unittest
@@ -60,7 +61,7 @@ class I18nContracts(unittest.TestCase):
         self.assertIn("__VIRYA_RUNTIME_I18N__", source)
 
     def test_selected_language_crosses_the_first_native_ipc(self):
-        bridge = (ROOT / "src/bridge.rs").read_text()
+        bridge = read_rust_module(ROOT, "src/bridge.rs")
         launcher = (ROOT / "src-tauri/src/commands/misc.rs").read_text()
         self.assertIn('locale: i18n::current().code()', bridge)
         self.assertIn('i18n::set_language(&locale)', launcher)

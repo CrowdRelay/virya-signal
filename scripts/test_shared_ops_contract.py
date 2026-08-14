@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from rust_source_tree import read_rust_module
 import unittest
 from pathlib import Path
 
@@ -9,7 +10,7 @@ class SharedOpsContract(unittest.TestCase):
     def test_ops_runtime_summaries_are_shared_between_web_and_native(self):
         shared = (ROOT / "crates/virya-signal-contracts/src/ops.rs").read_text()
         web = (ROOT / "src/models.rs").read_text()
-        native = (ROOT / "src-tauri/src/models.rs").read_text()
+        native = read_rust_module(ROOT, "src-tauri/src/models.rs")
         for name in (
             "QueueSummary",
             "DatabaseRuntimeSummary",

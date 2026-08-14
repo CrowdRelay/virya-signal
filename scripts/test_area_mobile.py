@@ -1,3 +1,4 @@
+from rust_source_tree import read_rust_module
 import re
 import unittest
 from pathlib import Path
@@ -21,8 +22,8 @@ class MobileAreaContracts(unittest.TestCase):
         self.assertIn('"geolocation:allow-clear-watch"', capability)
 
     def test_area_claim_stays_native_and_bounded(self):
-        bridge = (ROOT / "src/bridge.rs").read_text()
-        commands = (ROOT / "src-tauri/src/commands/fan.rs").read_text()
+        bridge = read_rust_module(ROOT, "src/bridge.rs")
+        commands = read_rust_module(ROOT, "src-tauri/src/commands/fan.rs")
         api = (ROOT / "src-tauri/src/api/public.rs").read_text()
         self.assertIn("plugin:geolocation|get_current_position", bridge)
         self.assertIn("viryaCollectLocationSamples", bridge)
@@ -90,7 +91,7 @@ class MobileAreaContracts(unittest.TestCase):
         self.assertIn(".ticket-pool-status", styles)
 
     def test_nearest_location_has_android_fallback_but_claim_stays_strict(self):
-        bridge = (ROOT / "src/bridge.rs").read_text()
+        bridge = read_rust_module(ROOT, "src/bridge.rs")
         self.assertIn("coarseLocation", bridge)
         self.assertIn("maximumAge: 300000", bridge)
         self.assertIn("enableHighAccuracy: false", bridge)

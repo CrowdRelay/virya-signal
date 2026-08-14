@@ -1,3 +1,4 @@
+from rust_source_tree import read_rust_module
 from pathlib import Path
 import unittest
 
@@ -7,7 +8,7 @@ class RumContract(unittest.TestCase):
     def test_native_rum_is_sampled_bounded_and_identity_free(self):
         client = (ROOT / "src-tauri/src/api/client.rs").read_text()
         shared = (ROOT / "crates/virya-signal-contracts/src/autopilot.rs").read_text()
-        operator = (ROOT / "src/app/operator.rs").read_text()
+        operator = read_rust_module(ROOT, "src/app/operator.rs")
         self.assertIn("Uuid::new_v4().as_bytes()[0] < 13", client)
         self.assertIn("rum_sampled: should_sample_rum()", client)
         self.assertIn("if !self.rum_sampled", client)

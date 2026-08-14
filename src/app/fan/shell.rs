@@ -1,0 +1,277 @@
+#[component]
+fn FanApp(
+    mode: RwSignal<RootMode>,
+    status: RwSignal<FanSessionStatus>,
+    public: RwSignal<Option<PublicHomeData>>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let tab = RwSignal::new(FanTab::Signal);
+    let home = RwSignal::new(None::<FanHomeData>);
+    let dashboard = RwSignal::new(None::<FanDashboardData>);
+    let merch = RwSignal::new(None::<MerchCatalog>);
+    let merch_bundles = RwSignal::new(None::<FanMerchBundleCatalog>);
+    let wallets = RwSignal::new(Vec::<TicketWallet>::new());
+    let checkout_event = RwSignal::new(None::<PublicEvent>);
+    let admission_qr = RwSignal::new(None::<AdmissionQr>);
+    let area = RwSignal::new(None::<AreaWallet>);
+    let loading = RwSignal::new(FanLoadingState::all());
+
+    let loaded = RwSignal::new(FanLoadedState::default());
+    let menu_open = RwSignal::new(false);
+
+    Effect::new(move |_| {
+        if !status.get().unlocked {
+            return;
+        }
+        if dashboard.get_untracked().is_none() {
+            dashboard.set(Some(FanDashboardData::default()));
+        }
+
+        match tab.get() {
+            FanTab::Signal => {
+                if !loaded.get_untracked().home {
+                    loaded.update(|state| state.home = true);
+                    refresh_fan_home(home, loading, error);
+                }
+                if !loaded.get_untracked().referral {
+                    loaded.update(|state| state.referral = true);
+                    refresh_fan_referral(dashboard, loading, error);
+                }
+            }
+            FanTab::Events => {
+                let state = loaded.get_untracked();
+                if !state.events {
+                    loaded.update(|value| value.events = true);
+                    refresh_fan_events(dashboard, loading, error);
+                }
+                if !state.interests {
+                    loaded.update(|value| value.interests = true);
+                    refresh_fan_interests(dashboard, loading, error);
+                }
+            }
+            FanTab::Merch => {
+                if !loaded.get_untracked().merch {
+                    loaded.update(|state| state.merch = true);
+                    refresh_fan_merch(merch, loading, error);
+                    refresh_fan_merch_bundles(merch_bundles);
+                }
+            }
+            FanTab::Game => {
+                if !loaded.get_untracked().area {
+                    loaded.update(|state| state.area = true);
+                    refresh_fan_area(area, loading, error);
+                }
+            }
+            FanTab::Wallet => {
+                let state = loaded.get_untracked();
+                if !state.admission_pass {
+                    loaded.update(|value| value.admission_pass = true);
+                    refresh_fan_admission_pass(dashboard, loading, error);
+                }
+                if !state.wallets {
+                    loaded.update(|value| value.wallets = true);
+                    refresh_wallets(wallets, Some(loading), error);
+                }
+            }
+            FanTab::Profile => {
+                let state = loaded.get_untracked();
+                if !state.referral {
+                    loaded.update(|value| value.referral = true);
+                    refresh_fan_referral(dashboard, loading, error);
+                }
+                if !state.events {
+                    loaded.update(|value| value.events = true);
+                    refresh_fan_events(dashboard, loading, error);
+                }
+                if !state.interests {
+                    loaded.update(|value| value.interests = true);
+                    refresh_fan_interests(dashboard, loading, error);
+                }
+                if !state.admission_pass {
+                    loaded.update(|value| value.admission_pass = true);
+                    refresh_fan_admission_pass(dashboard, loading, error);
+                }
+                if !state.wallets {
+                    loaded.update(|value| value.wallets = true);
+                    refresh_wallets(wallets, Some(loading), error);
+                }
+                if !state.area {
+                    loaded.update(|value| value.area = true);
+                    refresh_fan_area(area, loading, error);
+                }
+            }
+        }
+    });
+    Effect::new(move |_| {
+        if tab.get() != FanTab::Events && checkout_event.get_untracked().is_some() {
+            checkout_event.set(None);
+        }
+    });
+    on_cleanup(move || bridge::invalidate_latest("fan:"));
+
+    let close = move |_| {
+        bridge::invalidate_latest("fan:");
+        spawn_local(async move {
+            match bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
+                Ok(value) => {
+                    home.set(None);
+                    dashboard.set(None);
+                    merch.set(None);
+                    merch_bundles.set(None);
+                    wallets.set(Vec::new());
+                    checkout_event.set(None);
+                    admission_qr.set(None);
+                    area.set(None);
+                    loading.set(FanLoadingState::all());
+                    status.set(value);
+                    mode.set(RootMode::Fan);
+                }
+                Err(message) => error.set(Some(message)),
+            }
+        });
+    };
+
+    view! {
+        <section class="authenticated fan-authenticated">
+            <header class="topbar fan-topbar">
+                <div on:dblclick=move |_| { loaded.set(FanLoadedState::default()); refresh_fan_home(home, loading, error); refresh_fan_parts(dashboard, loading, error); refresh_fan_merch(merch, loading, error); refresh_fan_merch_bundles(merch_bundles); refresh_wallets(wallets, Some(loading), error); refresh_fan_area(area, loading, error); } style="cursor:pointer"><p class="eyebrow">{tr("virya_signal")}</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| tr("my_signal").to_owned())}</strong></div>
+                <div class="topbar-actions"><span class="live-dot"></span><button class="menu-trigger" aria-label=tr("open_menu") aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|value| *value = !*value)><i></i><i></i><i></i></button><button aria-label=tr("close_and_lock_signal") on:click=close>"×"</button></div>
+            </header>
+            <Show when=move || menu_open.get()>
+                <div class="overflow-backdrop" on:click=move |_| menu_open.set(false)></div>
+                <nav class="overflow-menu">
+                    <button class:active=move || tab.get() == FanTab::Game on:click=move |_| { tab.set(FanTab::Game); menu_open.set(false); }><span>"◇"</span>{tr("area_game_tab")}</button>
+                    <button class:active=move || tab.get() == FanTab::Profile on:click=move |_| { tab.set(FanTab::Profile); menu_open.set(false); }><span>"◎"</span>{tr("profile_tab")}</button>
+                    <button on:click=move |_| { menu_open.set(false); mode.set(RootMode::StaffGate); }><span>"⌁"</span>{tr("staff_zone")}</button>
+                </nav>
+            </Show>
+            <div class="content">{move || match tab.get() {
+                FanTab::Signal => view! { <FanSignal home=home dashboard=dashboard tab=tab loading=loading error=error /> }.into_any(),
+                FanTab::Events => checkout_event.get().map(|event| view! {
+                    <FanTicketCheckout
+                        event=event
+                        status=status
+                        tab=tab
+                        checkout_event=checkout_event
+                        wallets=wallets
+                        loading=loading
+                        error=error
+                    />
+                }.into_any()).value_or_else(|| view! {
+                    <FanEvents dashboard=dashboard public=public checkout_event=checkout_event loading=loading error=error />
+                }.into_any()),
+                FanTab::Merch => view! { <FanMerch merch=merch bundles=merch_bundles loading=loading error=error /> }.into_any(),
+                FanTab::Game => view! { <AreaGameScreen area=area loading=loading error=error /> }.into_any(),
+                FanTab::Wallet => view! { <FanWallet dashboard=dashboard wallets=wallets admission_qr=admission_qr loading=loading error=error /> }.into_any(),
+                FanTab::Profile => view! { <FanProfileScreen status=status dashboard=dashboard wallets=wallets area=area loading=loading error=error /> }.into_any(),
+            }}</div>
+            <nav class="bottom-nav four primary-four"><FanNavButton tab=tab own=FanTab::Signal icon="signal" label=tr("signal_tab")/><FanNavButton tab=tab own=FanTab::Events icon="events" label=tr("shows_tab")/><FanNavButton tab=tab own=FanTab::Merch icon="shop" label=tr("store_tab")/><FanNavButton tab=tab own=FanTab::Wallet icon="ticket" label=tr("tickets_tab")/></nav>
+        </section>
+    }
+}
+
+#[component]
+fn FanNavButton(
+    tab: RwSignal<FanTab>,
+    own: FanTab,
+    icon: &'static str,
+    label: &'static str,
+) -> impl IntoView {
+    view! { <button class:active=move || tab.get() == own on:click=move |_| tab.set(own)><NavGlyph icon=icon/><small>{label}</small></button> }
+}
+
+#[component]
+fn FanSignal(
+    home: RwSignal<Option<FanHomeData>>,
+    dashboard: RwSignal<Option<FanDashboardData>>,
+    tab: RwSignal<FanTab>,
+    loading: RwSignal<FanLoadingState>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    view! {
+        <section class="screen fan-screen">
+            <FanHomeOverview home=home loading=loading tab=tab error=error />
+            <header class="signal-dashboard-hero compact-referral-hero">
+                <p class="eyebrow">{tr("your_impact")}</p>
+                <h2>{move || dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned())}</h2>
+                <strong>{tr("confirmed_referrals")}</strong>
+                <p>{move || dashboard.with(|state| state.as_ref().map(|d| i18n::format("code", std::slice::from_ref(&d.referral.referral_code)))).value_or_else(|| tr("loading_signal").to_owned())}</p>
+            </header>
+            <Show when=move || !loading.get().referral fallback=move || view! { <Skeleton /> }>
+            {move || dashboard.with(|state| state.as_ref().map(|data| data.referral.clone())).map(|referral| {
+                let entries_total = referral.draw_entries.iter().map(|draw| draw.total_entries).sum::<u32>();
+                let draw_count = referral.draw_entries.len();
+                let coupon_count = referral.coupons.len();
+                let draws = referral.draw_entries;
+                let coupons = referral.coupons;
+                let rewards = referral.physical_rewards;
+                let coupons_view = (!coupons.is_empty()).then(|| view! {
+                    <div class="section-head"><h3>{tr("your_coupons")}</h3></div>
+                    <div class="card-list">{coupons.into_iter().map(|coupon| view! {
+                        <article class="fan-coupon"><div><span>{format!("-{}%", coupon.discount_percent)}</span><strong>{coupon.code}</strong></div><small>{coupon.status}</small></article>
+                    }).collect_view()}</div>
+                });
+                let rewards_view = (!rewards.is_empty()).then(|| view! {
+                    <div class="section-head"><h3>{tr("rewards")}</h3></div>
+                    <div class="card-list">{rewards.into_iter().map(|reward| view! {
+                        <article class="reward-card"><div><strong>{reward.item_name}</strong><p>{reward.sku}</p></div><span>{reward.status}</span></article>
+                    }).collect_view()}</div>
+                });
+                view! {
+                    <FanSynesthesiaCard home=home error=error />
+                    <div class="stats-grid"><Metric value=referral.pending_referrals.to_string() label=tr("pending_2")/><Metric value=entries_total.to_string() label=tr("entries")/><Metric value=coupon_count.to_string() label=tr("coupons")/></div>
+                    <div class="section-head"><h3>{tr("active_draws")}</h3><span>{draw_count}</span></div>
+                    <div class="card-list">{draws.into_iter().map(|draw| {
+                        let proof_url = (!draw.slug.is_empty()).then(|| format!(
+                            "https://virya.music/pl/dowody/losowania/{}/?source=signal-app",
+                            draw.slug,
+                        ));
+                        view! {
+                            <article class="draw-card">
+                                <div><p class="eyebrow">{draw.prize_kind}</p><strong>{draw.name}</strong><span>{i18n::format("draw", &[human_time(&draw.draw_at).to_string()])}</span></div>
+                                <div class="draw-actions">
+                                    <div class="entry-count"><b>{draw.total_entries}</b><small>{tr("entries_2")}</small></div>
+                                    {proof_url.map(|url| view! { <ExternalLink url=url label=tr("proof") error=error /> })}
+                                </div>
+                            </article>
+                        }
+                    }).collect_view()}</div>
+                    {coupons_view}
+                    {rewards_view}
+                }.into_any()
+            }).value_or_else(|| view! { <Skeleton /> }.into_any())}
+            </Show>
+        </section>
+    }
+}
+
+#[component]
+fn FanSynesthesiaCard(
+    home: RwSignal<Option<FanHomeData>>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    view! {
+        {move || home.get().map(|snapshot| {
+            let synesthesia = snapshot.synesthesia;
+            let status = if synesthesia.completed {
+                i18n::format("synesthesia_rooms_done", &[synesthesia.rooms_completed.to_string()])
+            } else {
+                i18n::format("synesthesia_rooms_progress", &[synesthesia.rooms_completed.to_string()])
+            };
+            let best = synesthesia_best_summary(&synesthesia);
+            view! {
+                <article class="draw-card synesthesia-entry-card">
+                    <div>
+                        <p class="eyebrow">{tr("album_experience")}</p>
+                        <strong>"SYNESTHESIA"</strong>
+                        <span>{status}</span>
+                        {best.map(|best| view! { <small>{best}</small> })}
+                    </div>
+                    <div class="draw-actions">
+                        <ExternalLink url="https://synesthesia.virya.music/?source=signal-app".to_owned() label=tr("enter_synesthesia") error=error />
+                    </div>
+                </article>
+            }
+        })}
+    }
+}

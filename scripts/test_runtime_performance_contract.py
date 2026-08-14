@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from rust_source_tree import read_rust_module
 import re
 import unittest
 from pathlib import Path
@@ -103,7 +104,7 @@ class RuntimePerformanceContract(unittest.TestCase):
         )
 
     def test_wallet_loading_concurrency_is_bounded(self):
-        source = (ROOT / "src-tauri/src/commands/fan.rs").read_text()
+        source = read_rust_module(ROOT, "src-tauri/src/commands/fan.rs")
         self.assertIn("const WALLET_FETCH_CONCURRENCY: usize = 8;", source)
         self.assertRegex(source, r"\.buffered\(WALLET_FETCH_CONCURRENCY\)")
         self.assertNotRegex(source, r"\.buffered\((?:9|[1-9]\d+)\)")
@@ -198,9 +199,9 @@ class RuntimePerformanceContract(unittest.TestCase):
             self.assertIn(status, retry)
 
     def test_wallet_offline_fallback_is_encrypted_expiry_checked_and_webview_safe(self):
-        models = (ROOT / "src-tauri/src/models.rs").read_text()
-        commands = (ROOT / "src-tauri/src/commands/fan.rs").read_text()
-        ui = (ROOT / "src/app/fan.rs").read_text()
+        models = read_rust_module(ROOT, "src-tauri/src/models.rs")
+        commands = read_rust_module(ROOT, "src-tauri/src/commands/fan.rs")
+        ui = read_rust_module(ROOT, "src/app/fan.rs")
         self.assertIn("pub cached_wallets: Vec<TicketWallet>", models)
         self.assertIn("pub cached_wallet_qr: Vec<WalletQrCredential>", models)
         self.assertIn("#[zeroize(drop)]\npub struct WalletQrCredential", models)
@@ -220,15 +221,15 @@ class RuntimePerformanceContract(unittest.TestCase):
 
     def test_native_error_log_preserves_full_crowdrelay_git_sha(self):
         http = (ROOT / "src-tauri/src/api/http.rs").read_text()
-        models = (ROOT / "src-tauri/src/models.rs").read_text()
+        models = read_rust_module(ROOT, "src-tauri/src/models.rs")
         self.assertIn("value.chars().take(40).collect::<String>()", http)
         self.assertIn("pub git_sha: Option<String>", models)
 
     def test_ops_surfaces_postgres18_async_io_runtime_evidence(self):
-        native_models = (ROOT / "src-tauri/src/models.rs").read_text()
+        native_models = read_rust_module(ROOT, "src-tauri/src/models.rs")
         web_models = (ROOT / "src/models.rs").read_text()
         shared_ops = (ROOT / "crates/virya-signal-contracts/src/ops.rs").read_text()
-        ui = (ROOT / "src/app/operator.rs").read_text()
+        ui = read_rust_module(ROOT, "src/app/operator.rs")
         self.assertIn("pub use virya_signal_contracts::ops::*;", native_models)
         self.assertIn("pub use virya_signal_contracts::ops::*;", web_models)
         for fragment in (
