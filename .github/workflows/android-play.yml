@@ -51,6 +51,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 promoted/scripts/artifact_manifest.py verify promoted/artifacts promoted/android-artifact-manifest.json --source-sha "$GITHUB_SHA"
+          test -s promoted/release-provenance.json
           test -f "promoted/artifacts/virya-signal-${{ inputs.version }}.aab"
       - name: Upload exact AAB to Google Play
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1
@@ -60,3 +61,27 @@ jobs:
           releaseFiles: promoted/artifacts/virya-signal-${{ inputs.version }}.aab
           track: ${{ inputs.play_track }}
           status: completed
+      - name: Report production Virya Signal release to CrowdRelay ledger
+        if: inputs.play_track == 'production'
+        continue-on-error: true
+        env:
+          CROWDRELAY_BASE_URL: ${{ vars.CROWDRELAY_PRODUCTION_BASE_URL }}
+          CROWDRELAY_COMMERCE_API_KEY: ${{ secrets.CROWDRELAY_COMMERCE_API_KEY }}
+          COMPONENT_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${CROWDRELAY_BASE_URL:-}" || -z "${CROWDRELAY_COMMERCE_API_KEY:-}" ]]; then
+            echo "VIRYA_SIGNAL_RELEASE_LEDGER=SKIP reason=not-configured"
+            exit 0
+          fi
+          lock_sha="$(jq -r '.dependencyLockSha256' promoted/release-provenance.json)"
+          manifest_sha="$(jq -r '.artifactManifestSha256' promoted/release-provenance.json)"
+          [[ "${lock_sha}" =~ ^[0-9a-f]{64}$ ]]
+          [[ "${manifest_sha}" =~ ^[0-9a-f]{64}$ ]]
+          jq -n --arg sha "${GITHUB_SHA}" --arg ref "${GITHUB_RUN_ID}" --arg version "${COMPONENT_VERSION}" --arg lock "${lock_sha}" --arg artifact_manifest "${manifest_sha}" '{component_key:"virya-signal",environment:"production",source_sha:$sha,artifact_digest:("sha256:"+$artifact_manifest),deploy_ref:$ref,version:$version,manifest_sha:null,metadata:{reporter:"github-actions",channel:"google-play-production",dependency_lock_sha256:$lock,artifact_manifest_sha256:$artifact_manifest},observed_at:(now|todateiso8601)}' | \
+            curl --fail-with-body --silent --show-error --max-time 15 \
+              -H 'content-type: application/json' \
+              -H "Authorization: Bearer ${CROWDRELAY_COMMERCE_API_KEY}" \
+              --data-binary @- "${CROWDRELAY_BASE_URL%/}/v1/internal/autopilot/release-components"
+          echo "VIRYA_SIGNAL_RELEASE_LEDGER=PASS sha=${GITHUB_SHA} version=${COMPONENT_VERSION} channel=google-play-production"

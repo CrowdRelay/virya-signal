@@ -42,6 +42,23 @@ class I18nContracts(unittest.TestCase):
         self.assertIn('AtomicU8', source)
         self.assertNotIn('HashMap', source)
 
+    def test_wasm_runtime_copy_is_externalized_from_the_binary(self):
+        source = (ROOT / "src/i18n.rs").read_text()
+        self.assertNotIn("mod pl;", source)
+        self.assertNotIn("mod en;", source)
+        self.assertIn("viryaRuntimeText", source)
+        self.assertIn("TRANSLATION_CACHE", source)
+        self.assertIn("Box::leak", source)
+        self.assertIn("HashMap<(&'static str, &'static str), &'static str>", source)
+        self.assertNotIn("cache.borrow_mut().clear()", source)
+        boot = (ROOT / "boot-i18n.js").read_text()
+        runtime = (ROOT / "runtime-i18n.js").read_text()
+        self.assertIn('"boot_initial_status"', boot)
+        self.assertNotIn('"back_signal"', boot)
+        for key in ("back_signal", "stale_ticket_leases", "boot_initial_status"):
+            self.assertIn(f'"{key}"', runtime)
+        self.assertIn("__VIRYA_RUNTIME_I18N__", source)
+
     def test_selected_language_crosses_the_first_native_ipc(self):
         bridge = (ROOT / "src/bridge.rs").read_text()
         launcher = (ROOT / "src-tauri/src/commands/misc.rs").read_text()
@@ -50,13 +67,27 @@ class I18nContracts(unittest.TestCase):
 
     def test_boot_catalog_is_generated_and_valid_javascript(self):
         before = (ROOT / "boot-i18n.js").read_text()
+        runtime_before = (ROOT / "runtime-i18n.js").read_text()
         subprocess.run(
             ["python3", str(ROOT / "scripts/generate-boot-i18n.py")],
             check=True,
             cwd=ROOT,
         )
         self.assertEqual((ROOT / "boot-i18n.js").read_text(), before)
+        self.assertEqual((ROOT / "runtime-i18n.js").read_text(), runtime_before)
         subprocess.run(["node", "--check", "boot-i18n.js"], check=True, cwd=ROOT)
+        subprocess.run(["node", "--check", "runtime-i18n.js"], check=True, cwd=ROOT)
+
+    def test_runtime_catalog_does_not_delay_wasm_discovery(self):
+        index = (ROOT / "index.html").read_text()
+        rust_entry = index.index('data-trunk rel="rust"')
+        runtime_catalog = index.index('<script src="runtime-i18n.js')
+        self.assertLess(rust_entry, runtime_catalog)
+        self.assertLess(index.index('<script src="boot-i18n.js'), rust_entry)
+
+    def test_i18n_payloads_keep_boot_small_and_runtime_bounded(self):
+        self.assertLessEqual((ROOT / "boot-i18n.js").stat().st_size, 4 * 1024)
+        self.assertLessEqual((ROOT / "runtime-i18n.js").stat().st_size, 128 * 1024)
 
     def test_runtime_copy_is_not_hardcoded_in_polish(self):
         for relative in ("src/app.rs", "src/app/area.rs", "src/bridge.rs", "boot.js", "index.html"):

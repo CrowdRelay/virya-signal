@@ -1,6 +1,26 @@
 name: Security Audit
 
 on:
+  push:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/**/Cargo.toml"
+      - "src-tauri/Cargo.toml"
+      - "security/future-incompat-budget.json"
+      - "scripts/check-future-incompat.py"
+      - ".github/workflows/security.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/**/Cargo.toml"
+      - "src-tauri/Cargo.toml"
+      - "security/future-incompat-budget.json"
+      - "scripts/check-future-incompat.py"
+      - ".github/workflows/security.yml"
   workflow_dispatch:
   schedule:
     - cron: "17 5 * * 1"
@@ -9,7 +29,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: security-audit
+  group: security-audit-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -20,6 +40,18 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Verify repository-pinned Rust toolchain
         run: rustc --version --verbose
+      - name: Enforce bounded future-incompatibility debt
+        run: python3 scripts/check-future-incompat.py
+      - name: Generate deterministic lock SBOM
+        run: python3 scripts/generate_lock_sbom.py Cargo.lock artifacts/virya-signal-sbom.cdx.json
+      - name: Upload dependency SBOM
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: virya-signal-sbom-${{ github.sha }}
+          path: artifacts/virya-signal-sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 90
       - name: Install pinned cargo-audit
         run: cargo install cargo-audit --locked --version 0.22.2
       - name: Audit Cargo.lock

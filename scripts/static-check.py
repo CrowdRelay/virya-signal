@@ -53,7 +53,7 @@ required = [
     'src-tauri/src/lib.rs', 'src-tauri/src/api.rs', 'src-tauri/src/api/ticketing.rs', 'src-tauri/src/vault.rs',
     'src/app.rs', 'src/app/area.rs', 'src/bridge.rs', 'src-tauri/capabilities/mobile.json',
     '.github/workflows/check.yml', '.github/workflows/mobile-smoke.yml',
-    'rust-toolchain.toml', '.cargo/config.toml', 'scripts/collect-mobile-artifact.py', 'boot.js', 'boot-i18n.js',
+    'rust-toolchain.toml', '.cargo/config.toml', 'scripts/collect-mobile-artifact.py', 'boot.js', 'boot-i18n.js', 'runtime-i18n.js',
     'boot-initializer.mjs', 'scripts/generate-boot-i18n.py',
     'scripts/test-boot.mjs', 'scripts/check-web-dist.py',
     'scripts/configure-android-signing.py',
@@ -289,12 +289,15 @@ if 'class="boot-signal"' not in index or '@keyframes boot-pulse' not in index:
     raise SystemExit('Virya Signal splash LED is missing or not animated')
 if '<script src="boot.js" defer>' in index:
     raise SystemExit('boot listener must execute before the deferred WASM module')
-boot_i18n_tag = '<script src="boot-i18n.js?v=0.4.2-i18n-v1"></script>'
+boot_i18n_tag = '<script src="boot-i18n.js?v=0.4.2-boot-i18n-v2"></script>'
+runtime_i18n_tag = '<script src="runtime-i18n.js?v=0.4.2-runtime-i18n-v1"></script>'
 boot_tag = '<script src="boot.js?v=0.4.2-startup-v8"></script>'
 if boot_i18n_tag not in index or index.find(boot_i18n_tag) > index.find(boot_tag):
     raise SystemExit('boot translations must load before the boot listener')
 if boot_tag not in index or index.find(boot_tag) > index.find('data-trunk rel="rust"'):
     raise SystemExit('boot listener must be declared before the WASM entrypoint')
+if runtime_i18n_tag not in index or index.find(runtime_i18n_tag) < index.find('data-trunk rel="rust"'):
+    raise SystemExit('full runtime translations must be declared after the WASM entrypoint for early module discovery')
 for contract in ['window.__VIRYA_BOOT__', 'data-virya-ready', '.app-shell .launcher', 'unhandledrejection', 'retry-blocked']:
     if contract not in boot:
         raise SystemExit(f'boot recovery contract is missing: {contract}')
@@ -398,11 +401,20 @@ for wasm_feature in ['--enable-bulk-memory', '--enable-bulk-memory-opt', '--enab
 
 toolchain_text = (root / 'rust-toolchain.toml').read_text()
 if tomllib is not None:
-    toolchain_ok = tomllib.loads(toolchain_text).get('toolchain', {}).get('channel') == '1.97.0'
+    toolchain_ok = tomllib.loads(toolchain_text).get('toolchain', {}).get('channel') == '1.97.1'
 else:
-    toolchain_ok = re.search(r'^channel\s*=\s*["\']1\.97\.0["\']\s*$', toolchain_text, re.M) is not None
+    toolchain_ok = re.search(r'^channel\s*=\s*["\']1\.97\.1["\']\s*$', toolchain_text, re.M) is not None
 if not toolchain_ok:
-    raise SystemExit('rust-toolchain.toml must pin Rust 1.97.0')
+    raise SystemExit('rust-toolchain.toml must pin Rust 1.97.1')
+workflow_texts = {
+    path.name: path.read_text() for path in (root / '.github/workflows').glob('*.yml')
+}
+for workflow_name, workflow_text in workflow_texts.items():
+    explicit_versions = re.findall(r'^\s*toolchain:\s*([0-9]+\.[0-9]+\.[0-9]+)\s*$', workflow_text, re.M)
+    if any(version != '1.97.1' for version in explicit_versions):
+        raise SystemExit(
+            f'{workflow_name} pins a Rust toolchain different from rust-toolchain.toml: {explicit_versions}'
+        )
 android_config_text = (root / '.cargo/config.toml').read_text()
 if tomllib is not None:
     android_rustflags = tomllib.loads(android_config_text).get('target', {}).get('aarch64-linux-android', {}).get('rustflags', [])

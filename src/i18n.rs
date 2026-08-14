@@ -1,12 +1,23 @@
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    sync::atomic::{AtomicU8, Ordering},
+};
 
 use wasm_bindgen::prelude::*;
 
-mod en;
-mod pl;
-
 const LANGUAGE_STORAGE_KEY: &str = "virya:language:v1";
 static LANGUAGE: AtomicU8 = AtomicU8::new(0);
+
+thread_local! {
+    // Web copy lives in boot-i18n.js rather than the WASM data section. We leak
+    // each language/key pair once for the lifetime of the page so the rest of
+    // the Leptos UI can keep the existing &'static str API without repeated JS
+    // crossings or per-render allocations. We deliberately do not clear this map
+    // on language changes: that keeps Box::leak bounded to at most both catalogs.
+    static TRANSLATION_CACHE: RefCell<HashMap<(&'static str, &'static str), &'static str>> =
+        RefCell::new(HashMap::new());
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Language {
@@ -39,12 +50,19 @@ export function viryaSetLanguageAndReload(key, value) {
   try { window.localStorage?.setItem(key, value); } catch {}
   window.location.reload();
 }
+export function viryaRuntimeText(language, key) {
+  const catalogs = globalThis.__VIRYA_RUNTIME_I18N__;
+  const value = catalogs?.[language]?.[key] ?? catalogs?.pl?.[key];
+  return typeof value === 'string' ? value : key;
+}
 "#)]
 extern "C" {
     #[wasm_bindgen(js_name = viryaStoredLanguage)]
     fn stored_language_js(key: &str) -> String;
     #[wasm_bindgen(js_name = viryaSetLanguageAndReload)]
     fn set_language_and_reload_js(key: &str, value: &str);
+    #[wasm_bindgen(js_name = viryaRuntimeText)]
+    fn runtime_text_js(language: &str, key: &str) -> String;
 }
 
 pub fn initialize() {
@@ -76,10 +94,18 @@ pub fn select(language: Language) {
 }
 
 pub fn tr(key: &'static str) -> &'static str {
-    match current() {
-        Language::Pl => pl::text(key),
-        Language::En => en::text(key),
+    let language = current().code();
+    let cache_key = (language, key);
+    if let Some(value) = TRANSLATION_CACHE.with(|cache| cache.borrow().get(&cache_key).copied()) {
+        return value;
     }
+
+    let value = runtime_text_js(language, key);
+    let value: &'static str = Box::leak(value.into_boxed_str());
+    TRANSLATION_CACHE.with(|cache| {
+        cache.borrow_mut().insert(cache_key, value);
+    });
+    value
 }
 
 pub fn format(key: &'static str, values: &[String]) -> String {

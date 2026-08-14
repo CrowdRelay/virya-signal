@@ -247,6 +247,14 @@ pub struct ReleaseComponentSummary {
     #[serde(default)]
     pub manifest_sha: Option<String>,
     #[serde(default)]
+    pub dependency_lock_sha256: Option<String>,
+    #[serde(default)]
+    pub artifact_manifest_sha256: Option<String>,
+    #[serde(default)]
+    pub workflow_attestation_sha: Option<String>,
+    #[serde(default)]
+    pub workflow_attested_at: Option<String>,
+    #[serde(default)]
     pub observed_at: String,
     #[serde(default)]
     pub stale: bool,
@@ -261,11 +269,19 @@ pub struct ReleaseLedgerOverview {
     #[serde(default)]
     pub backend_sha_drift: bool,
     #[serde(default)]
+    pub executor_manifest_drift: bool,
+    #[serde(default)]
     pub active_executor_count: i64,
     #[serde(default)]
     pub guarded_executor_count: i64,
     #[serde(default)]
     pub active_executor_manifest_shas: Vec<String>,
+    #[serde(default)]
+    pub active_team_email_executor_count: i64,
+    #[serde(default)]
+    pub n8n_attestation_ready: bool,
+    #[serde(default)]
+    pub team_email_live: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

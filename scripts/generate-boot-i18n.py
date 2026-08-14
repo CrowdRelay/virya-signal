@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+"""Generate boot-critical and runtime web translation catalogs.
+
+Native Tauri keeps compiling the canonical Rust PL/EN catalogs directly. The web
+build keeps only the tiny splash/recovery vocabulary on the parser-blocking path;
+the full catalog lives in a separate runtime asset declared after the Trunk Rust
+entrypoint so WASM discovery is not delayed by translation payload download.
+"""
 from __future__ import annotations
 
 import json
@@ -7,7 +14,7 @@ from pathlib import Path
 from i18n_catalog import load_catalog_pair
 
 ROOT = Path(__file__).resolve().parents[1]
-KEYS = [
+BOOT_KEYS = [
     "boot_previous_terminated",
     "boot_phase_wasm_loading",
     "boot_phase_wasm_entered",
@@ -29,16 +36,35 @@ KEYS = [
 ]
 
 
+def compact(value: object) -> str:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
+def frozen_object(value: dict[str, str]) -> str:
+    return "Object.freeze(" + compact(value) + ")"
+
+
 def main() -> None:
     pl, en = load_catalog_pair(ROOT)
-    payload = {
-        "pl": {key: pl[key] for key in KEYS},
-        "en": {key: en[key] for key in KEYS},
+    boot = {
+        "pl": {key: pl[key] for key in BOOT_KEYS},
+        "en": {key: en[key] for key in BOOT_KEYS},
     }
-    output = "window.__VIRYA_BOOT_I18N__ = Object.freeze(" + json.dumps(
-        payload, ensure_ascii=False, separators=(",", ":")
-    ) + ");\n"
-    (ROOT / "boot-i18n.js").write_text(output, encoding="utf-8")
+    (ROOT / "boot-i18n.js").write_text(
+        "window.__VIRYA_BOOT_I18N__ = Object.freeze(" + compact(boot) + ");\n",
+        encoding="utf-8",
+    )
+    runtime = (
+        "window.__VIRYA_RUNTIME_I18N__ = Object.freeze({"
+        f'"pl":{frozen_object(pl)},"en":{frozen_object(en)}'
+        "});\n"
+    )
+    (ROOT / "runtime-i18n.js").write_text(runtime, encoding="utf-8")
 
 
 if __name__ == "__main__":

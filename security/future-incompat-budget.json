@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "package": "proc-macro-error2",
+  "version": "2.0.1",
+  "allowedParents": [
+    "leptos_macro@0.8.17",
+    "reactive_stores_macro@0.4.3",
+    "syn_derive@0.2.0"
+  ],
+  "reviewBy": "2026-09-30",
+  "failBeforeDays": 21,
+  "reason": "Transitive Leptos macro dependency currently emits Rust future-incompatibility warnings; no direct Virya Signal code depends on it."
+}
