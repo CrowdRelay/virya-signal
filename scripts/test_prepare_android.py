@@ -137,6 +137,9 @@ dependencies {
             app.joinpath("build.gradle.kts").write_text(
                 'plugins {\n    id("com.android.application")\n}\n\nandroid {\n    compileSdk = 35\n    defaultConfig { targetSdk = 35 }\n    buildTypes {\n        getByName("release") {\n            isMinifyEnabled = false\n        }\n    }\n}\n\ndependencies {\n}\n'
             )
+            android.joinpath("settings.gradle.kts").write_text(
+                'pluginManagement {\n    repositories {\n        gradlePluginPortal()\n        mavenCentral()\n    }\n}\n\nrootProject.name = "ViryaSignal"\n'
+            )
             manifest = app / "src" / "main" / "AndroidManifest.xml"
             manifest.parent.mkdir(parents=True, exist_ok=True)
             manifest.write_text('<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application /></manifest>')
@@ -153,6 +156,10 @@ dependencies {
             self.assertEqual(result.returncode, 0, result.stderr)
             gradle = app.joinpath("build.gradle.kts").read_text()
             self.assertIn('id("com.google.gms.google-services") version "4.5.0"', gradle)
+            settings = android.joinpath("settings.gradle.kts").read_text()
+            self.assertIn("pluginManagement", settings)
+            self.assertIn("google()", settings)
+            self.assertLess(settings.index("google()"), settings.index("gradlePluginPortal()"))
             receipt = json.loads((android / "push-build-config.json").read_text())
             self.assertTrue(receipt["firebaseConfigured"])
             self.assertRegex(receipt["firebaseConfigSha256"], r"^[0-9a-f]{64}$")

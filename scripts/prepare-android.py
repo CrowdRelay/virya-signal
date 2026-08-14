@@ -359,6 +359,56 @@ def _insert_in_gradle_block(source: str, marker: str, statement: str) -> str:
     return source[: opening + 1] + f"\n{indent}    {statement}" + source[opening + 1 :]
 
 
+def _ensure_google_plugin_repository() -> None:
+    """Ensure Firebase's Gradle plugin can resolve from Google's Maven repo."""
+    settings = android / "settings.gradle.kts"
+    if not settings.is_file():
+        raise SystemExit(f"missing generated Android settings: {settings}")
+
+    settings_text = settings.read_text(encoding="utf-8")
+    if not re.search(r"(?m)^[ \t]*pluginManagement[ \t]*\{", settings_text):
+        settings_text = (
+            "pluginManagement {\n"
+            "    repositories {\n"
+            "        google()\n"
+            "        gradlePluginPortal()\n"
+            "        mavenCentral()\n"
+            "    }\n"
+            "}\n\n"
+            + settings_text
+        )
+    else:
+        pm_open, pm_close, pm_indent = _find_balanced_block(settings_text, "pluginManagement")
+        pm_body = settings_text[pm_open + 1 : pm_close]
+        if not re.search(r"(?m)^[ \t]*google\(\)[ \t]*$", pm_body):
+            try:
+                repo_open_rel, _repo_close_rel, repo_indent = _find_balanced_block(
+                    pm_body, "repositories"
+                )
+            except SystemExit:
+                repository_block = (
+                    f"\n{pm_indent}    repositories {{\n"
+                    f"{pm_indent}        google()\n"
+                    f"{pm_indent}        gradlePluginPortal()\n"
+                    f"{pm_indent}        mavenCentral()\n"
+                    f"{pm_indent}    }}"
+                )
+                settings_text = (
+                    settings_text[: pm_open + 1]
+                    + repository_block
+                    + settings_text[pm_open + 1 :]
+                )
+            else:
+                repo_open = pm_open + 1 + repo_open_rel
+                settings_text = (
+                    settings_text[: repo_open + 1]
+                    + f"\n{repo_indent}    google()"
+                    + settings_text[repo_open + 1 :]
+                )
+
+    settings.write_text(settings_text, encoding="utf-8")
+
+
 def _stage_android_push() -> bool:
     if not PUSH_TEMPLATE_DIR.is_dir():
         raise SystemExit(f"missing Android push templates: {PUSH_TEMPLATE_DIR}")
@@ -439,6 +489,7 @@ def _stage_android_push() -> bool:
         if not project_id or "music.virya.control" not in packages:
             raise SystemExit("google-services.json does not target music.virya.control")
         google_services.write_bytes(raw)
+        _ensure_google_plugin_repository()
         gradle_text = _insert_in_gradle_block(
             gradle_text,
             "plugins",
