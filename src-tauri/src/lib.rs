@@ -93,7 +93,7 @@ pub fn run() {
             let _ = crash::NATIVE_CRASH_REPORT_PATH.set(crash_report_path);
 
             #[cfg(mobile)]
-            {
+            let native_push_available = {
                 let mut plugin_errors = Vec::new();
                 if let Err(error) = app.handle().plugin(tauri_plugin_barcode_scanner::init()) {
                     plugin_errors.push(format!("barcode-scanner: {error}"));
@@ -102,7 +102,7 @@ pub fn run() {
                     plugin_errors.push(format!("geolocation: {error}"));
                 }
                 #[cfg(target_os = "android")]
-                let native_push_available = match app.handle().plugin(push_plugin::init()) {
+                let push_available = match app.handle().plugin(push_plugin::init()) {
                     Ok(()) => true,
                     Err(error) => {
                         plugin_errors.push(format!("signal-push: {error}"));
@@ -110,7 +110,7 @@ pub fn run() {
                     }
                 };
                 #[cfg(not(target_os = "android"))]
-                let native_push_available = false;
+                let push_available = false;
                 if !plugin_errors.is_empty() {
                     let report = format!(
                         "mobile plugin initialization degraded: {}",
@@ -119,7 +119,8 @@ pub fn run() {
                     eprintln!("[virya:mobile-plugin] {report}");
                     crash::write_native_crash_report(&report);
                 }
-            }
+                push_available
+            };
 
             #[cfg(not(mobile))]
             let native_push_available = false;
