@@ -29,7 +29,7 @@
     <!-- Must execute before Trunk's WASM module so the ready event cannot race the listener. -->
     <script src="boot-i18n.js?v=0.4.2-boot-i18n-v2"></script>
     <script src="boot.js?v=0.4.2-startup-v8"></script>
-    <link data-trunk rel="rust" data-initializer="boot-initializer.mjs" data-wasm-opt="z" data-wasm-opt-params="--enable-bulk-memory --enable-bulk-memory-opt --enable-nontrapping-float-to-int" />
+    <link data-trunk rel="rust" data-wasm-opt="z" data-wasm-opt-params="--enable-bulk-memory --enable-bulk-memory-opt --enable-nontrapping-float-to-int" />
     <!-- The Rust module is discovered first; this classic script still executes before the deferred module. -->
     <script src="runtime-i18n.js?v=0.4.2-runtime-i18n-v1"></script>
   </head>

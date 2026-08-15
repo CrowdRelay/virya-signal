@@ -1,5 +1,10 @@
 pub(super) fn text(key: &'static str) -> &'static str {
     match key {
+        "latarnik_zone" => "BEACON ZONE",
+        "latarnik_short_pitch" => {
+            "Media, radio, photographers and local partners: shows in your radius and press materials without digging through email."
+        }
+        "open_latarnik" => "OPEN BEACON",
         "back_signal" => "← SIGNAL",
         "are_you_on_the_staff" => "ARE YOU ON THE STAFF?",
         "enter_the_staff_password_used_in_the" => {

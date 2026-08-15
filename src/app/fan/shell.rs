@@ -155,6 +155,20 @@ fn FanApp(
         });
     };
 
+    let open_latarnik = move |_| {
+        menu_open.set(false);
+        let url = if i18n::current().code() == "pl" {
+            "https://virya.music/pl/latarnik/"
+        } else {
+            "https://virya.music/latarnik/"
+        };
+        spawn_local(async move {
+            if let Err(message) = bridge::invoke_unit("open_external_url", &UrlArgs { url }).await {
+                error.set(Some(message));
+            }
+        });
+    };
+
     let refresh_all = move |_| {
         loaded.set(FanLoadedState::default());
         refresh_fan_home(home, loading, error);
@@ -178,6 +192,7 @@ fn FanApp(
                     <button class:active=move || tab.get() == FanTab::Game on:click=move |_| { tab.set(FanTab::Game); menu_open.set(false); }><span>"◇"</span>{tr("area_game_tab")}</button>
                     <button class:active=move || tab.get() == FanTab::Profile on:click=move |_| { tab.set(FanTab::Profile); menu_open.set(false); }><span>"◎"</span>{tr("profile_tab")}</button>
                     <button on:click=refresh_all><span>"↻"</span>{tr("refresh_all_data")}</button>
+                    <button on:click=open_latarnik><span>"◉"</span>{tr("latarnik_zone")}</button>
                     <button on:click=move |_| { menu_open.set(false); mode.set(RootMode::StaffGate); }><span>"⌁"</span>{tr("staff_zone")}</button>
                 </nav>
             </Show>

@@ -1,5 +1,10 @@
 pub(super) fn text(key: &'static str) -> &'static str {
     match key {
+        "latarnik_zone" => "STREFA LATARNIKA",
+        "latarnik_short_pitch" => {
+            "Media, radio, fotografowie i lokalni partnerzy: koncerty w Twoim promieniu i materiały prasowe bez szukania po mailach."
+        }
+        "open_latarnik" => "OTWÓRZ LATARNIKA",
         "back_signal" => "← SYGNAŁ",
         "are_you_on_the_staff" => "JESTEŚ W STAFFIE?",
         "enter_the_staff_password_used_in_the" => "Podaj hasło staff używane w panelu Virya.",

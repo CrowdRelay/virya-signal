@@ -4,7 +4,7 @@ import vm from "node:vm";
 
 const i18nSource = fs.readFileSync(new URL("../boot-i18n.js", import.meta.url), "utf8");
 const source = fs.readFileSync(new URL("../boot.js", import.meta.url), "utf8");
-const initializer = fs.readFileSync(new URL("../boot-initializer.mjs", import.meta.url), "utf8");
+const indexSource = fs.readFileSync(new URL("../index.html", import.meta.url), "utf8");
 
 function runtime({ ready = false, mounted = false, retryCount = 0, language = "pl" } = {}) {
   let now = 0;
@@ -233,9 +233,9 @@ function runtime({ ready = false, mounted = false, retryCount = 0, language = "p
   assert.equal(resumes, 2, "later page restoration must also refresh native state");
 }
 
-for (const contract of ["onStart", "onProgress", "onSuccess", "onFailure", "onComplete"]) {
-  assert.ok(initializer.includes(contract), `initializer hook missing: ${contract}`);
-}
-assert.ok(initializer.includes('boot()?.fail?.(error)'));
+assert.ok(!indexSource.includes("data-initializer="), "Android/WebView boot must use Trunk's native module loader");
+assert.ok(!indexSource.includes("boot-initializer.mjs"), "legacy custom initializer must not ship in the boot path");
+assert.ok(source.includes('window.addEventListener("error"'), "classic/module load failures must reach boot recovery UI");
+assert.ok(source.includes('window.addEventListener("unhandledrejection"'), "WASM module promise failures must reach boot recovery UI");
 
 console.log("boot runtime contract: OK");

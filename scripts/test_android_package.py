@@ -5,6 +5,7 @@ import zipfile
 from pathlib import Path
 
 
+ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = Path(__file__).with_name("analyze-android-package.py")
 SPEC = importlib.util.spec_from_file_location("analyze_android_package", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
@@ -61,6 +62,13 @@ class AndroidPackageTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "below 16384"):
                 MODULE.analyze(path, "arm64-v8a", 16384)
 
+
+    def test_signed_android_build_requires_and_verifies_firebase(self):
+        workflow = (ROOT / ".github" / "workflows" / "_android-build.yml").read_text()
+        self.assertIn("FIREBASE_CONFIG: ${{ secrets.VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64 }}", workflow)
+        self.assertIn("Missing VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64 for signed push-capable build", workflow)
+        self.assertIn('receipt.get("firebaseConfigured") is not True', workflow)
+        self.assertIn("SIGNAL_ANDROID_PUSH_BUILD_GATE=PASS", workflow)
 
 if __name__ == "__main__":
     unittest.main()

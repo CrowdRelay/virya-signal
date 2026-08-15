@@ -55,7 +55,7 @@ required = [
     'src/app.rs', 'src/app/area.rs', 'src/bridge.rs', 'src-tauri/capabilities/mobile.json',
     '.github/workflows/check.yml', '.github/workflows/mobile-smoke.yml',
     'rust-toolchain.toml', '.cargo/config.toml', 'scripts/collect-mobile-artifact.py', 'boot.js', 'boot-i18n.js', 'runtime-i18n.js',
-    'boot-initializer.mjs', 'bundle-stage-pack.webp', 'scripts/generate-boot-i18n.py',
+    'bundle-stage-pack.webp', 'scripts/generate-boot-i18n.py',
     'scripts/test-boot.mjs', 'scripts/check-web-dist.py',
     'scripts/configure-android-signing.py',
     'scripts/analyze-android-package.py',
@@ -291,7 +291,6 @@ for contract in (
 
 index = (root / 'index.html').read_text()
 boot = (root / 'boot.js').read_text()
-boot_initializer = (root / 'boot-initializer.mjs').read_text()
 main = (root / 'src/main.rs').read_text()
 if 'data-trunk rel="copy-dir" href="public"' in index:
     raise SystemExit('index.html references the optional public directory')
@@ -317,8 +316,10 @@ if main.find('mount_to_body') > main.rfind('virya_app_mounted();'):
     raise SystemExit('WASM must publish readiness only after mounting the app')
 if '#[wasm_bindgen(inline_js' in main or 'js_sys::Reflect' not in main:
     raise SystemExit('startup must not depend on a generated inline-js snippet module')
-if 'data-initializer="boot-initializer.mjs"' not in index or 'boot()?.fail?.(error)' not in boot_initializer:
-    raise SystemExit('Trunk WASM failures must be routed into the visible boot recovery UI')
+if 'data-initializer=' in index or 'boot-initializer.mjs' in index:
+    raise SystemExit('custom Trunk initializer must not enter Android/WebView boot path')
+if 'window.addEventListener("error"' not in boot or 'window.addEventListener("unhandledrejection"' not in boot:
+    raise SystemExit('Trunk/WASM failures must be routed into the visible boot recovery UI')
 
 # Bundled Trunk WASM is loaded through same-origin fetch().
 tauri_config = json.loads((root / 'src-tauri/tauri.conf.json').read_text())
@@ -436,7 +437,7 @@ if not page_size_ok:
 
 smoke = (root / '.github/workflows/mobile-smoke.yml').read_text()
 android_builder = (root / '.github/workflows/_android-build.yml').read_text()
-for trigger_path in ['index.html', 'boot.js', 'boot-initializer.mjs', 'Trunk.toml', 'styles.css', 'rust-toolchain.toml']:
+for trigger_path in ['index.html', 'boot.js', 'Trunk.toml', 'styles.css', 'rust-toolchain.toml']:
     if f'- "{trigger_path}"' not in smoke:
         raise SystemExit(f'Android smoke workflow does not watch {trigger_path}')
 if "uses: ./.github/workflows/_android-build.yml" not in smoke or "build_kind: debug-apk" not in smoke:

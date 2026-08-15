@@ -143,6 +143,19 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
     let busy = RwSignal::new(false);
     let recovery_open = RwSignal::new(false);
 
+    let open_latarnik = move |_| {
+        let url = if i18n::current().code() == "pl" {
+            "https://virya.music/pl/latarnik/"
+        } else {
+            "https://virya.music/latarnik/"
+        };
+        spawn_local(async move {
+            if let Err(message) = bridge::invoke_unit("open_external_url", &UrlArgs { url }).await {
+                error.set(Some(message));
+            }
+        });
+    };
+
     let unlock = move |_| {
         let current_pin = pin.get();
         busy.set(true);
@@ -335,6 +348,11 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
                     <span><b aria-hidden="true">"⌁"</b>{tr("shows_near_you")}</span>
                     <span><b aria-hidden="true">"▣"</b>{tr("tickets_and_qr_codes_on_your_phone")}</span>
                     <span><b aria-hidden="true">"✦"</b>{tr("rewards_for_simple_actions")}</span>
+                </div>
+                <div class="latarnik-entry">
+                    <p class="eyebrow">{tr("latarnik_zone")}</p>
+                    <p>{tr("latarnik_short_pitch")}</p>
+                    <button type="button" class="text-button" on:click=open_latarnik>{tr("open_latarnik")}</button>
                 </div>
             </header>
             <Show when=move || status.get().configured fallback=move || view! {
