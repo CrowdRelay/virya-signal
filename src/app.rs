@@ -98,7 +98,6 @@ pub fn App() -> impl IntoView {
         fan_status_failed.set(false);
         spawn_local(async move {
             let result = bridge::launcher_status().await;
-            let completed = latest_request_completed(&result);
             match result {
                 Ok(Some(status)) => {
                     operator_status.set(status.operator);
@@ -106,17 +105,18 @@ pub fn App() -> impl IntoView {
                     fan_status.set(status.fan);
                     fan_status_failed.set(false);
                 }
-                Ok(None) => {}
+                Ok(None) => {
+                    operator_status_failed.set(true);
+                    fan_status_failed.set(true);
+                }
                 Err(message) => {
                     operator_status_failed.set(true);
                     fan_status_failed.set(true);
                     error.set(Some(message));
                 }
             }
-            if completed {
-                operator_status_loading.set(false);
-                fan_status_loading.set(false);
-            }
+            operator_status_loading.set(false);
+            fan_status_loading.set(false);
         });
     });
 
