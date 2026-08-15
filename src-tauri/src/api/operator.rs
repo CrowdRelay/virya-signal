@@ -7,7 +7,8 @@ use crate::{
         AutopilotChiefOfStaff, AutopilotMutation, ConcertQrOverview, CreateQrCampaignInput,
         IssuePassInput, OperatorAutopilotOverview, OperatorOpsOverview, OperatorProfile,
         OperatorRole, OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem, OpsRetryResult,
-        OpsSummary, PublicEvent, ShowChecklist, ShowModeSnapshot, StaffEventDashboard, TicketingOverview,
+        OpsSummary, PublicEvent, ShowChecklist, ShowModeSnapshot, StaffEventDashboard,
+        TicketingOverview,
     },
 };
 
@@ -126,7 +127,8 @@ impl super::CrowdRelayClient {
             segment(item_key)?
         );
         let body = serde_json::json!({ "status": status, "note": null });
-        self.auth_json(profile, Method::POST, &path, Some(&body)).await
+        self.auth_json(profile, Method::POST, &path, Some(&body))
+            .await
     }
 
     pub async fn operator_push_config(
@@ -135,7 +137,10 @@ impl super::CrowdRelayClient {
     ) -> Result<super::fan::FanPushConfigApi, AppError> {
         let response = self
             .http
-            .get(super::http::endpoint(&profile.api_base_url, "public/push/config")?)
+            .get(super::http::endpoint(
+                &profile.api_base_url,
+                "public/push/config",
+            )?)
             .header(reqwest::header::ACCEPT, "application/json")
             .send()
             .await?;
@@ -622,7 +627,6 @@ impl super::CrowdRelayClient {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::{
@@ -694,14 +698,7 @@ mod tests {
             }]
         });
         let decoded: AutopilotChiefOfStaff = decode_autopilot_wire(value).expect("legacy payload");
-        assert_eq!(
-            decoded.attention_items[0].due_at,
-            "2026-08-15T06:45:12Z"
-        );
-        assert_eq!(
-            decoded.show_tasks[0].starts_at,
-            "2026-08-16T18:30:00Z"
-        );
+        assert_eq!(decoded.attention_items[0].due_at, "2026-08-15T06:45:12Z");
+        assert_eq!(decoded.show_tasks[0].starts_at, "2026-08-16T18:30:00Z");
     }
 }
-

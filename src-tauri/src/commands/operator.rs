@@ -133,7 +133,10 @@ pub(crate) async fn operator_show_checklist(
     event_slug: String,
 ) -> Result<ShowChecklist, AppError> {
     let profile = operator_profile(&state).await?;
-    state.api.operator_show_checklist(&profile, &event_slug).await
+    state
+        .api
+        .operator_show_checklist(&profile, &event_slug)
+        .await
 }
 
 #[tauri::command]
@@ -144,7 +147,9 @@ pub(crate) async fn operator_update_show_checklist(
     status: String,
 ) -> Result<ShowChecklist, AppError> {
     if !matches!(status.as_str(), "pending" | "done" | "blocked" | "skipped") {
-        return Err(AppError::InvalidInput("invalid checklist status".to_owned()));
+        return Err(AppError::InvalidInput(
+            "invalid checklist status".to_owned(),
+        ));
     }
     let profile = operator_profile(&state).await?;
     state

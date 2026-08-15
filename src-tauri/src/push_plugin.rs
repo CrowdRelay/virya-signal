@@ -77,7 +77,6 @@ mod android {
             .map_err(|error| error.to_string())
     }
 
-
     pub fn take_launch_target<R: Runtime>(app: &AppHandle<R>) -> Result<Option<String>, String> {
         let response = handle(app)
             .0

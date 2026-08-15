@@ -162,7 +162,6 @@ pub enum AutopilotActionPayload {
     },
 }
 
-
 impl AutopilotActionPayload {
     /// Stable CrowdRelay wire action kind. Kept in the Signal contract crate so
     /// standalone virya-signal CI never depends on a sibling repository checkout.
@@ -182,7 +181,9 @@ impl AutopilotActionPayload {
             Self::RequestBeaconOutreach { .. } => "beacon.outreach.request",
             Self::RequestShowGrowth { .. } => "show.growth.request",
             Self::RequestContentArtifact { .. } => "content.artifact.request",
-            Self::AdjustExperiment { complete: false, .. } => "experiment.allocation.change",
+            Self::AdjustExperiment {
+                complete: false, ..
+            } => "experiment.allocation.change",
             Self::AdjustExperiment { complete: true, .. } => "experiment.complete",
             Self::CompleteShowTask { .. } => "show.task.complete",
             Self::EscalateShowTask { .. } => "show.task.escalate",

@@ -26,9 +26,8 @@ use crate::{
         OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem, OpsRetryResult, PublicEvent,
         PublicHomeData, QrCampaign, ReferralProgress, RequestedCityInput, RequestedCityResult,
         SessionStatus, ShowChecklist, ShowModeScanResult, ShowModeStatus, ShowModeSyncResult,
-        StaffEventDashboard,
-        TicketCheckoutInput, TicketCheckoutItemInput, TicketCheckoutStart, TicketSaleOffer,
-        TicketWallet, TicketingOverview, WalletBatch, WalletTicket,
+        StaffEventDashboard, TicketCheckoutInput, TicketCheckoutItemInput, TicketCheckoutStart,
+        TicketSaleOffer, TicketWallet, TicketingOverview, WalletBatch, WalletTicket,
     },
 };
 

@@ -1031,18 +1031,28 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "syncing_push_notifications" => "SYNCING…",
         "carry_the_signal" => "CARRY THE SIGNAL",
         "invite_real_metalheads" => "Activate people who might genuinely care",
-        "invite_one_to_three_people_you_really_think_would_care" => "Invite 1–3 people who actually listen to heavy music or are part of the scene. No spam — trust is the point.",
-        "virya_signal_share_copy" => "VIRYA is building Signal for people in the scene. If this feels like your thing, or someone in your circle would care, enter here:",
+        "invite_one_to_three_people_you_really_think_would_care" => {
+            "Invite 1–3 people who actually listen to heavy music or are part of the scene. No spam — trust is the point."
+        }
+        "virya_signal_share_copy" => {
+            "VIRYA is building Signal for people in the scene. If this feels like your thing, or someone in your circle would care, enter here:"
+        }
         "share_signal" => "SHARE SIGNAL",
         "signal_shared" => "Signal carried forward.",
         "signal_link_copied" => "Signal link copied.",
         "show_operations" => "Show operations",
         "gig_checklist" => "GIG CHECKLIST",
-        "gig_checklist_hint" => "One shared checklist for the whole staff. Ticking an item here immediately syncs with the staff panel on virya.music.",
+        "gig_checklist_hint" => {
+            "One shared checklist for the whole staff. Ticking an item here immediately syncs with the staff panel on virya.music."
+        }
         "team_push_notifications" => "Staff reminders",
-        "team_push_notifications_hint" => "Signal will remind the team 7 and 2 days before the show.",
+        "team_push_notifications_hint" => {
+            "Signal will remind the team 7 and 2 days before the show."
+        }
         "team_push_active" => "Checklist notifications are active on this device.",
-        "team_push_inactive" => "Enable notifications to get reminders 7 and 2 days before the show.",
+        "team_push_inactive" => {
+            "Enable notifications to get reminders 7 and 2 days before the show."
+        }
         "team_push_status_unknown" => "Notification status is not available yet.",
         "enable_notifications" => "ENABLE NOTIFICATIONS",
         "checklist_progress" => "Done: {0}/{1}",
@@ -1054,16 +1064,28 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "checklist_section_post_show" => "POST-SHOW",
         "checklist_laptop_charged_packed" => "Charge and pack the laptop",
         "checklist_setlist_ready" => "Prepare and verify the setlist",
-        "checklist_show_files_backup_ready" => "Make an offline backup of the set / playback / show files",
+        "checklist_show_files_backup_ready" => {
+            "Make an offline backup of the set / playback / show files"
+        }
         "checklist_merch_packed" => "Pack merch and everything needed for sales",
-        "checklist_rack_cables_instruments_packed" => "Pack the rack, personal cables and instruments",
+        "checklist_rack_cables_instruments_packed" => {
+            "Pack the rack, personal cables and instruments"
+        }
         "checklist_instrument_spares_packed" => "Pack spare strings, picks and required batteries",
         "checklist_stage_outfit_packed" => "Pack the stage outfit",
         "checklist_wireless_checked" => "Check wireless systems, frequencies and batteries",
-        "checklist_power_and_chargers_packed" => "Pack power supplies, chargers and required extension leads",
-        "checklist_camera_handoff_ready" => "Give Madzia a working, charged high-quality camera + storage media",
-        "checklist_venue_schedule_confirmed" => "Confirm address, parking, load-in, soundcheck and set time",
-        "checklist_tech_rider_confirmed" => "Confirm rider / backline / technical requirements with the organizer",
+        "checklist_power_and_chargers_packed" => {
+            "Pack power supplies, chargers and required extension leads"
+        }
+        "checklist_camera_handoff_ready" => {
+            "Give Madzia a working, charged high-quality camera + storage media"
+        }
+        "checklist_venue_schedule_confirmed" => {
+            "Confirm address, parking, load-in, soundcheck and set time"
+        }
+        "checklist_tech_rider_confirmed" => {
+            "Confirm rider / backline / technical requirements with the organizer"
+        }
         "checklist_staff_assigned" => "Confirm show staff and responsibilities",
         "checklist_guestlist_checked" => "Check guest list / passes / organizer contacts",
         "checklist_offline_snapshot_ready" => "Prepare an offline snapshot of gate-critical data",

@@ -1035,18 +1035,28 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "syncing_push_notifications" => "SYNCHRONIZUJĘ…",
         "carry_the_signal" => "NIEŚ SYGNAŁ",
         "invite_real_metalheads" => "Uruchom ludzi, którym naprawdę może zależeć",
-        "invite_one_to_three_people_you_really_think_would_care" => "Zaproś 1–3 osoby, które faktycznie słuchają ciężkiej muzyki albo są częścią sceny. Bez spamu — liczy się zaufanie.",
-        "virya_signal_share_copy" => "VIRYA gra i buduje Signal dla ludzi sceny. Jeśli czujesz, że to dla Ciebie albo kogoś z Twoich ludzi, wejdź tutaj:",
+        "invite_one_to_three_people_you_really_think_would_care" => {
+            "Zaproś 1–3 osoby, które faktycznie słuchają ciężkiej muzyki albo są częścią sceny. Bez spamu — liczy się zaufanie."
+        }
+        "virya_signal_share_copy" => {
+            "VIRYA gra i buduje Signal dla ludzi sceny. Jeśli czujesz, że to dla Ciebie albo kogoś z Twoich ludzi, wejdź tutaj:"
+        }
         "share_signal" => "UDOSTĘPNIJ SYGNAŁ",
         "signal_shared" => "Sygnał poszedł dalej.",
         "signal_link_copied" => "Link do Signal skopiowany.",
         "show_operations" => "Obsługa koncertu",
         "gig_checklist" => "CHECKLISTA KONCERTOWA",
-        "gig_checklist_hint" => "Jedna wspólna checklista dla całego staffu. Odhaczenie tutaj od razu synchronizuje się z panelem staff na virya.music.",
+        "gig_checklist_hint" => {
+            "Jedna wspólna checklista dla całego staffu. Odhaczenie tutaj od razu synchronizuje się z panelem staff na virya.music."
+        }
         "team_push_notifications" => "Przypomnienia dla staffu",
-        "team_push_notifications_hint" => "Signal przypomni o przygotowaniu 7 i 2 dni przed koncertem.",
+        "team_push_notifications_hint" => {
+            "Signal przypomni o przygotowaniu 7 i 2 dni przed koncertem."
+        }
         "team_push_active" => "Powiadomienia checklisty są aktywne na tym urządzeniu.",
-        "team_push_inactive" => "Włącz powiadomienia, żeby dostać przypomnienie 7 i 2 dni przed koncertem.",
+        "team_push_inactive" => {
+            "Włącz powiadomienia, żeby dostać przypomnienie 7 i 2 dni przed koncertem."
+        }
         "team_push_status_unknown" => "Nie udało się jeszcze odczytać stanu powiadomień.",
         "enable_notifications" => "WŁĄCZ POWIADOMIENIA",
         "checklist_progress" => "Gotowe: {0}/{1}",
@@ -1058,19 +1068,33 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "checklist_section_post_show" => "PO KONCERCIE",
         "checklist_laptop_charged_packed" => "Podładować i wziąć laptop",
         "checklist_setlist_ready" => "Przygotować i sprawdzić setlistę",
-        "checklist_show_files_backup_ready" => "Zrobić offline backup setu / playbacków / plików koncertowych",
+        "checklist_show_files_backup_ready" => {
+            "Zrobić offline backup setu / playbacków / plików koncertowych"
+        }
         "checklist_merch_packed" => "Spakować merch i rzeczy potrzebne do sprzedaży",
         "checklist_rack_cables_instruments_packed" => "Wziąć rack, swoje kable i instrumenty",
         "checklist_instrument_spares_packed" => "Wziąć zapas strun, kostek i potrzebnych baterii",
         "checklist_stage_outfit_packed" => "Wziąć strój koncertowy",
         "checklist_wireless_checked" => "Sprawdzić systemy bezprzewodowe, częstotliwości i baterie",
-        "checklist_power_and_chargers_packed" => "Wziąć zasilacze, ładowarki i potrzebne przedłużacze",
-        "checklist_camera_handoff_ready" => "Dać Madzi sprawną, naładowaną kamerę dobrej jakości + nośnik",
-        "checklist_venue_schedule_confirmed" => "Potwierdzić adres, parking, load-in, soundcheck i godzinę seta",
-        "checklist_tech_rider_confirmed" => "Potwierdzić rider / backline / wymagania techniczne z organizatorem",
+        "checklist_power_and_chargers_packed" => {
+            "Wziąć zasilacze, ładowarki i potrzebne przedłużacze"
+        }
+        "checklist_camera_handoff_ready" => {
+            "Dać Madzi sprawną, naładowaną kamerę dobrej jakości + nośnik"
+        }
+        "checklist_venue_schedule_confirmed" => {
+            "Potwierdzić adres, parking, load-in, soundcheck i godzinę seta"
+        }
+        "checklist_tech_rider_confirmed" => {
+            "Potwierdzić rider / backline / wymagania techniczne z organizatorem"
+        }
         "checklist_staff_assigned" => "Potwierdzić skład i odpowiedzialności staffu na koncert",
-        "checklist_guestlist_checked" => "Sprawdzić guestlistę / wejściówki / kontakty organizatora",
-        "checklist_offline_snapshot_ready" => "Przygotować offline snapshot danych potrzebnych na bramce",
+        "checklist_guestlist_checked" => {
+            "Sprawdzić guestlistę / wejściówki / kontakty organizatora"
+        }
+        "checklist_offline_snapshot_ready" => {
+            "Przygotować offline snapshot danych potrzebnych na bramce"
+        }
         "checklist_gate_device_charged" => "Naładować urządzenie używane na bramce / merchu",
         "checklist_backup_device_ready" => "Przygotować zapasowe urządzenie na wypadek awarii",
         "checklist_network_tested" => "Sprawdzić plan internetu / hotspotu i tryb offline",
