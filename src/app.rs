@@ -8,7 +8,6 @@ mod types;
 use area::AreaGameScreen;
 use formatters::{
     day, event_location, event_time_location, human_time, local_to_rfc3339, money, month, optional,
-    synesthesia_best_summary,
 };
 use leptos::prelude::*;
 use types::*;
@@ -40,18 +39,14 @@ fn install_resume_refresh(status_refresh: RwSignal<u32>) {
     let Ok(listener) = listener.dyn_into::<js_sys::Function>() else {
         return;
     };
-    
     let callback = Closure::<dyn FnMut(JsValue)>::new(move |_| {
         status_refresh.update(|value| *value = value.wrapping_add(1));
     });
-    
-    let callback_ref = callback.as_ref().unchecked_ref();
-    
     if listener
         .call2(
             &global,
             &JsValue::from_str("virya:resume"),
-            callback_ref,
+            callback.as_ref().unchecked_ref(),
         )
         .is_err()
     {
@@ -74,8 +69,26 @@ pub fn App() -> impl IntoView {
     let operator_status_failed = RwSignal::new(false);
     let fan_status_failed = RwSignal::new(false);
     let status_refresh = RwSignal::new(0_u32);
+    let push_target = RwSignal::new(None::<String>);
     let error = RwSignal::new(None::<String>);
     install_resume_refresh(status_refresh);
+
+    Effect::new(move |_| {
+        status_refresh.get();
+        if !bridge::native_available() {
+            return;
+        }
+        spawn_local(async move {
+            match bridge::invoke::<Option<String>, _>("fan_push_take_target", &EmptyArgs {}).await {
+                Ok(Some(target)) => {
+                    push_target.set(Some(target));
+                    mode.set(RootMode::Fan);
+                }
+                Ok(None) => {}
+                Err(message) => error.set(Some(message)),
+            }
+        });
+    });
 
     Effect::new(move |_| {
         status_refresh.get();
@@ -84,21 +97,26 @@ pub fn App() -> impl IntoView {
         operator_status_failed.set(false);
         fan_status_failed.set(false);
         spawn_local(async move {
-            match bridge::launcher_status().await {
-                Ok(status) => {
+            let result = bridge::launcher_status().await;
+            let completed = latest_request_completed(&result);
+            match result {
+                Ok(Some(status)) => {
                     operator_status.set(status.operator);
                     operator_status_failed.set(false);
                     fan_status.set(status.fan);
                     fan_status_failed.set(false);
                 }
+                Ok(None) => {}
                 Err(message) => {
                     operator_status_failed.set(true);
                     fan_status_failed.set(true);
                     error.set(Some(message));
                 }
             }
-            operator_status_loading.set(false);
-            fan_status_loading.set(false);
+            if completed {
+                operator_status_loading.set(false);
+                fan_status_loading.set(false);
+            }
         });
     });
 
@@ -112,6 +130,7 @@ pub fn App() -> impl IntoView {
                         status_loading=fan_status_loading
                         status_failed=fan_status_failed
                         status_refresh=status_refresh
+                        push_target=push_target
                         error=error
                     />
                 }.into_any(),
