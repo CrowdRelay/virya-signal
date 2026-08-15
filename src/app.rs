@@ -40,19 +40,28 @@ fn install_resume_refresh(status_refresh: RwSignal<u32>) {
     let Ok(listener) = listener.dyn_into::<js_sys::Function>() else {
         return;
     };
+    
     let callback = Closure::<dyn FnMut(JsValue)>::new(move |_| {
         status_refresh.update(|value| *value = value.wrapping_add(1));
     });
+    
+    let callback_ref = callback.as_ref().unchecked_ref();
+    
     if listener
         .call2(
             &global,
             &JsValue::from_str("virya:resume"),
-            callback.as_ref().unchecked_ref(),
+            callback_ref,
         )
-        .is_ok()
+        .is_err()
     {
-        callback.forget();
+        return;
     }
+
+    // Note: We intentionally leak the closure here because wasm-bindgen closures
+    // are not Send + Sync, so they can't be stored in Leptos signals or cleaned up
+    // with on_cleanup. This is a known limitation and acceptable for this use case.
+    std::mem::forget(callback);
 }
 
 #[component]
