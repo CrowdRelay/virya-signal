@@ -5,13 +5,13 @@ fn valid_native_push_installation_id(value: &str) -> bool {
     uuid::Uuid::parse_str(raw).is_ok() && value.len() <= 160
 }
 
-fn read_native_push_installation_id(app_data_dir: &Path) -> Option<String> {
+pub(crate) fn read_native_push_installation_id(app_data_dir: &Path) -> Option<String> {
     let value = std::fs::read_to_string(app_data_dir.join(NATIVE_PUSH_INSTALLATION_FILE)).ok()?;
     let value = value.trim();
     valid_native_push_installation_id(value).then(|| value.to_owned())
 }
 
-fn ensure_native_push_installation_id(app_data_dir: &Path) -> Result<String, AppError> {
+pub(crate) fn ensure_native_push_installation_id(app_data_dir: &Path) -> Result<String, AppError> {
     if let Some(value) = read_native_push_installation_id(app_data_dir) {
         return Ok(value);
     }
@@ -24,32 +24,32 @@ fn ensure_native_push_installation_id(app_data_dir: &Path) -> Result<String, App
 }
 
 #[cfg(target_os = "android")]
-fn native_push_permission(app: &AppHandle) -> Result<String, String> {
+pub(crate) fn native_push_permission(app: &AppHandle) -> Result<String, String> {
     crate::push_plugin::permission(app)
 }
 
 #[cfg(not(target_os = "android"))]
-fn native_push_permission(_app: &AppHandle) -> Result<String, String> {
+pub(crate) fn native_push_permission(_app: &AppHandle) -> Result<String, String> {
     Err("android_push_unavailable".to_owned())
 }
 
 #[cfg(target_os = "android")]
-fn request_native_push_permission(app: &AppHandle) -> Result<String, String> {
+pub(crate) fn request_native_push_permission(app: &AppHandle) -> Result<String, String> {
     crate::push_plugin::request_permission(app)
 }
 
 #[cfg(not(target_os = "android"))]
-fn request_native_push_permission(_app: &AppHandle) -> Result<String, String> {
+pub(crate) fn request_native_push_permission(_app: &AppHandle) -> Result<String, String> {
     Err("android_push_unavailable".to_owned())
 }
 
 #[cfg(target_os = "android")]
-fn native_push_token(app: &AppHandle) -> Result<String, String> {
+pub(crate) fn native_push_token(app: &AppHandle) -> Result<String, String> {
     crate::push_plugin::token(app)
 }
 
 #[cfg(not(target_os = "android"))]
-fn native_push_token(_app: &AppHandle) -> Result<String, String> {
+pub(crate) fn native_push_token(_app: &AppHandle) -> Result<String, String> {
     Err("android_push_unavailable".to_owned())
 }
 

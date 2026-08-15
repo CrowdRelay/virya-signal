@@ -7,7 +7,7 @@ use crate::{
         AutopilotChiefOfStaff, AutopilotMutation, ConcertQrOverview, CreateQrCampaignInput,
         IssuePassInput, OperatorAutopilotOverview, OperatorOpsOverview, OperatorProfile,
         OperatorRole, OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem, OpsRetryResult,
-        OpsSummary, PublicEvent, ShowModeSnapshot, StaffEventDashboard, TicketingOverview,
+        OpsSummary, PublicEvent, ShowChecklist, ShowModeSnapshot, StaffEventDashboard, TicketingOverview,
     },
 };
 
@@ -101,6 +101,62 @@ impl super::CrowdRelayClient {
         profile: &OperatorProfile,
     ) -> Result<Vec<PublicEvent>, AppError> {
         self.public_events(&profile.api_base_url).await
+    }
+
+    pub async fn operator_show_checklist(
+        &self,
+        profile: &OperatorProfile,
+        event_slug: &str,
+    ) -> Result<ShowChecklist, AppError> {
+        let path = format!("staff/ecosystem/checklists/{}", segment(event_slug)?);
+        self.auth_json::<ShowChecklist, ()>(profile, Method::GET, &path, None)
+            .await
+    }
+
+    pub async fn operator_update_show_checklist(
+        &self,
+        profile: &OperatorProfile,
+        event_slug: &str,
+        item_key: &str,
+        status: &str,
+    ) -> Result<ShowChecklist, AppError> {
+        let path = format!(
+            "staff/ecosystem/checklists/{}/{}",
+            segment(event_slug)?,
+            segment(item_key)?
+        );
+        let body = serde_json::json!({ "status": status, "note": null });
+        self.auth_json(profile, Method::POST, &path, Some(&body)).await
+    }
+
+    pub async fn operator_push_config(
+        &self,
+        profile: &OperatorProfile,
+    ) -> Result<super::fan::FanPushConfigApi, AppError> {
+        let response = self
+            .http
+            .get(super::http::endpoint(&profile.api_base_url, "public/push/config")?)
+            .header(reqwest::header::ACCEPT, "application/json")
+            .send()
+            .await?;
+        super::http::decode(response).await
+    }
+
+    pub async fn operator_register_android_push(
+        &self,
+        profile: &OperatorProfile,
+        installation_id: &str,
+        fcm_token: &str,
+    ) -> Result<super::fan::FanPushMutationApi, AppError> {
+        let body = serde_json::json!({
+            "installation_id": installation_id,
+            "transport": "android_fcm",
+            "endpoint": fcm_token,
+            "p256dh": null,
+            "auth": null,
+        });
+        self.auth_json(profile, Method::POST, "staff/push/endpoints", Some(&body))
+            .await
     }
 
     pub async fn operator_qr(

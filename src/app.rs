@@ -25,7 +25,8 @@ use crate::{
         OperatorAutopilotOverview, OperatorOpsOverview, OperatorProfileInput, OperatorRole,
         OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem, OpsRetryResult, PublicEvent,
         PublicHomeData, QrCampaign, ReferralProgress, RequestedCityInput, RequestedCityResult,
-        SessionStatus, ShowModeScanResult, ShowModeStatus, ShowModeSyncResult, StaffEventDashboard,
+        SessionStatus, ShowChecklist, ShowModeScanResult, ShowModeStatus, ShowModeSyncResult,
+        StaffEventDashboard,
         TicketCheckoutInput, TicketCheckoutItemInput, TicketCheckoutStart, TicketSaleOffer,
         TicketWallet, TicketingOverview, WalletBatch, WalletTicket,
     },
@@ -70,6 +71,7 @@ pub fn App() -> impl IntoView {
     let fan_status_failed = RwSignal::new(false);
     let status_refresh = RwSignal::new(0_u32);
     let push_target = RwSignal::new(None::<String>);
+    let operator_push_target = RwSignal::new(None::<String>);
     let error = RwSignal::new(None::<String>);
     install_resume_refresh(status_refresh);
 
@@ -81,8 +83,13 @@ pub fn App() -> impl IntoView {
         spawn_local(async move {
             match bridge::invoke::<Option<String>, _>("fan_push_take_target", &EmptyArgs {}).await {
                 Ok(Some(target)) => {
-                    push_target.set(Some(target));
-                    mode.set(RootMode::Fan);
+                    if target.starts_with("/staff/") {
+                        operator_push_target.set(Some(target));
+                        mode.set(RootMode::StaffGate);
+                    } else {
+                        push_target.set(Some(target));
+                        mode.set(RootMode::Fan);
+                    }
                 }
                 Ok(None) => {}
                 Err(message) => error.set(Some(message)),
@@ -98,6 +105,7 @@ pub fn App() -> impl IntoView {
         fan_status_failed.set(false);
         spawn_local(async move {
             let result = bridge::launcher_status().await;
+            let completed = latest_request_completed(&result);
             match result {
                 Ok(Some(status)) => {
                     operator_status.set(status.operator);
@@ -105,18 +113,17 @@ pub fn App() -> impl IntoView {
                     fan_status.set(status.fan);
                     fan_status_failed.set(false);
                 }
-                Ok(None) => {
-                    operator_status_failed.set(true);
-                    fan_status_failed.set(true);
-                }
+                Ok(None) => {}
                 Err(message) => {
                     operator_status_failed.set(true);
                     fan_status_failed.set(true);
                     error.set(Some(message));
                 }
             }
-            operator_status_loading.set(false);
-            fan_status_loading.set(false);
+            if completed {
+                operator_status_loading.set(false);
+                fan_status_loading.set(false);
+            }
         });
     });
 
@@ -144,6 +151,7 @@ pub fn App() -> impl IntoView {
                         status_loading=operator_status_loading
                         status_failed=operator_status_failed
                         status_refresh=status_refresh
+                        push_target=operator_push_target
                         error=error
                     />
                 }.into_any(),

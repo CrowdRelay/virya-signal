@@ -3,16 +3,16 @@
 
 use std::sync::Arc;
 
-use tauri::State;
+use tauri::{AppHandle, State};
 use zeroize::Zeroizing;
 
 use crate::{
     AppError, AppState,
     models::{
         AutopilotAuthorityRequest, AutopilotChiefOfStaff, AutopilotMutation, ConcertQrOverview,
-        CreateQrCampaignInput, IssuePassInput, OperatorAutopilotOverview, OperatorOpsOverview,
-        OperatorProfile, OperatorSignalOverview, OpsRetryResult, PublicEvent, SessionStatus,
-        StaffEventDashboard, TicketingOverview,
+        CreateQrCampaignInput, FanPushStatus, IssuePassInput, OperatorAutopilotOverview,
+        OperatorOpsOverview, OperatorProfile, OperatorSignalOverview, OpsRetryResult, PublicEvent,
+        SessionStatus, ShowChecklist, StaffEventDashboard, TicketingOverview,
     },
     session::{operator_profile, run_blocking},
     validation::{
@@ -125,6 +125,108 @@ pub(crate) async fn operator_events(
 ) -> Result<Vec<PublicEvent>, AppError> {
     let profile = operator_profile(&state).await?;
     state.api.operator_events(&profile).await
+}
+
+#[tauri::command]
+pub(crate) async fn operator_show_checklist(
+    state: State<'_, AppState>,
+    event_slug: String,
+) -> Result<ShowChecklist, AppError> {
+    let profile = operator_profile(&state).await?;
+    state.api.operator_show_checklist(&profile, &event_slug).await
+}
+
+#[tauri::command]
+pub(crate) async fn operator_update_show_checklist(
+    state: State<'_, AppState>,
+    event_slug: String,
+    item_key: String,
+    status: String,
+) -> Result<ShowChecklist, AppError> {
+    if !matches!(status.as_str(), "pending" | "done" | "blocked" | "skipped") {
+        return Err(AppError::InvalidInput("invalid checklist status".to_owned()));
+    }
+    let profile = operator_profile(&state).await?;
+    state
+        .api
+        .operator_update_show_checklist(&profile, &event_slug, &item_key, &status)
+        .await
+}
+
+async fn sync_operator_push(
+    state: &State<'_, AppState>,
+    app: &AppHandle,
+    request_permission: bool,
+) -> Result<FanPushStatus, AppError> {
+    let profile = operator_profile(state).await?;
+    let supported = cfg!(target_os = "android") && state.native_push_available;
+    if !supported {
+        return Ok(FanPushStatus {
+            supported: false,
+            permission: "unsupported".to_owned(),
+            detail: Some("android_push_unavailable".to_owned()),
+            ..FanPushStatus::default()
+        });
+    }
+    let config = state.api.operator_push_config(&profile).await?;
+    let backend_enabled = config.enabled && config.android_fcm;
+    if !backend_enabled {
+        return Ok(FanPushStatus {
+            supported,
+            backend_enabled: false,
+            permission: super::fan::native_push_permission(app)
+                .unwrap_or_else(|_| "unknown".to_owned()),
+            transport: Some("android_fcm".to_owned()),
+            detail: Some("push_delivery_not_live".to_owned()),
+            ..FanPushStatus::default()
+        });
+    }
+    let permission = if request_permission {
+        super::fan::request_native_push_permission(app)
+    } else {
+        super::fan::native_push_permission(app)
+    }
+    .map_err(AppError::InvalidInput)?;
+    if permission != "granted" {
+        return Ok(FanPushStatus {
+            supported,
+            backend_enabled,
+            enabled: false,
+            permission,
+            transport: Some("android_fcm".to_owned()),
+            detail: Some("notification_permission_denied".to_owned()),
+        });
+    }
+    let token = super::fan::native_push_token(app).map_err(AppError::InvalidInput)?;
+    let installation_id = super::fan::ensure_native_push_installation_id(&state.app_data_dir)?;
+    let response = state
+        .api
+        .operator_register_android_push(&profile, &installation_id, &token)
+        .await?;
+    Ok(FanPushStatus {
+        supported,
+        backend_enabled,
+        enabled: response.registered,
+        permission,
+        transport: Some("android_fcm".to_owned()),
+        detail: (!response.registered).then(|| "push_registration_not_confirmed".to_owned()),
+    })
+}
+
+#[tauri::command]
+pub(crate) async fn operator_push_sync(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<FanPushStatus, AppError> {
+    sync_operator_push(&state, &app, false).await
+}
+
+#[tauri::command]
+pub(crate) async fn operator_push_enable(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<FanPushStatus, AppError> {
+    sync_operator_push(&state, &app, true).await
 }
 
 #[tauri::command]

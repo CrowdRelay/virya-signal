@@ -46,12 +46,21 @@ class AutopilotWireContract(unittest.TestCase):
         handled = set(re.findall(r"AutopilotActionPayload::([A-Z][A-Za-z0-9]+)", detail_body))
         self.assertEqual(handled, variants)
 
-        backend_model = (ROOT.parent / "crowdrelay/crates/crowdrelay-application/src/autopilot/model.rs").read_text()
-        action_kind_body = backend_model.split("pub const fn action_kind", 1)[1].split("/// Action-ready", 1)[0]
-        backend_action_kinds = set(re.findall(r'=> "([a-z0-9_.]+)"', action_kind_body))
+        action_kind_body = contract.split("pub const fn action_kind", 1)[1].split("pub struct TeamAssigneeSummary", 1)[0]
+        contract_action_kinds = set(re.findall(r'=> \"([a-z0-9_.]+)\"', action_kind_body))
         label_body = labels.split("fn autopilot_action_kind_label", 1)[1].split("fn autopilot_measurement_kind_label", 1)[0]
         labelled_action_kinds = set(re.findall(r'"([a-z0-9_.]+)" =>', label_body))
-        self.assertEqual(labelled_action_kinds, backend_action_kinds)
+        self.assertEqual(labelled_action_kinds, contract_action_kinds)
+
+        # Ecosystem worktrees may include CrowdRelay next to Signal; standalone
+        # Signal CI intentionally does not require it. When present, keep the
+        # local wire snapshot honest against the backend authority.
+        backend_path = ROOT.parent / "crowdrelay/crates/crowdrelay-application/src/autopilot/model.rs"
+        if backend_path.exists():
+            backend_model = backend_path.read_text()
+            backend_body = backend_model.split("pub const fn action_kind", 1)[1].split("/// Action-ready", 1)[0]
+            backend_action_kinds = set(re.findall(r'=> "([a-z0-9_.]+)"', backend_body))
+            self.assertEqual(contract_action_kinds, backend_action_kinds)
 
 
 if __name__ == "__main__":

@@ -151,6 +151,26 @@ pub struct StaffEventDashboard {
     pub passes_redeemed: i64,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+pub struct ShowChecklistItem {
+    pub item_key: String,
+    pub section: String,
+    pub sort_order: i32,
+    pub status: String,
+    pub note: Option<String>,
+    pub updated_at: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ShowChecklist {
+    pub event_id: String,
+    pub event_slug: String,
+    pub event_title: String,
+    pub starts_at: String,
+    #[serde(default)]
+    pub items: Vec<ShowChecklistItem>,
+}
+
 impl StaffEventDashboard {
     pub const SCHEMA_VERSION: i32 = 1;
 

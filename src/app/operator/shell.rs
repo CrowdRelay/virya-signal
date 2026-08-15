@@ -4,6 +4,7 @@ fn OperatorApp(
     status: RwSignal<SessionStatus>,
     dashboard: RwSignal<Option<DashboardData>>,
     tab: RwSignal<OperatorTab>,
+    push_target: RwSignal<Option<String>>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let loading = RwSignal::new(OperatorLoadingState::all());
@@ -11,11 +12,24 @@ fn OperatorApp(
     let signal_overview = RwSignal::new(None::<OperatorSignalOverview>);
     let signal_loading = RwSignal::new(false);
     let signal_requested = RwSignal::new(false);
+    let staff_push_bootstrapped = RwSignal::new(false);
     let menu_open = RwSignal::new(false);
     Effect::new(move |_| {
         if status.get().unlocked && dashboard.get().is_none() {
             dashboard.set(Some(DashboardData::default()));
             refresh_operator_parts(dashboard, loading, error);
+        }
+    });
+
+    Effect::new(move |_| {
+        if status.get().unlocked && !staff_push_bootstrapped.get_untracked() {
+            staff_push_bootstrapped.set(true);
+            spawn_local(async move {
+                // Silent bootstrap only: if Android permission is already granted,
+                // bind this authenticated staff session to FCM. Permission prompting
+                // stays explicit in the checklist screen.
+                let _ = bridge::invoke::<FanPushStatus, _>("operator_push_sync", &EmptyArgs {}).await;
+            });
         }
     });
 
@@ -26,6 +40,12 @@ fn OperatorApp(
             .map(|s| s.role)
             .value_or(OperatorRole::Staff)
     };
+
+    Effect::new(move |_| {
+        if push_target.get().as_deref().is_some_and(|target| target.starts_with("/staff/checklist")) {
+            tab.set(OperatorTab::Checklist);
+        }
+    });
 
     let owner = Signal::derive(move || {
         status
@@ -90,6 +110,7 @@ fn OperatorApp(
                 <nav class="overflow-menu">
                     <button class:active=move || tab.get() == OperatorTab::Discounts on:click=move |_| { tab.set(OperatorTab::Discounts); menu_open.set(false); }><span>"%"</span>{tr("discounts")}</button>
                     <button class:active=move || tab.get() == OperatorTab::Campaigns on:click=move |_| { tab.set(OperatorTab::Campaigns); menu_open.set(false); }><span>"◫"</span>{tr("qr_codes")}</button>
+                    <button class:active=move || tab.get() == OperatorTab::Checklist on:click=move |_| { tab.set(OperatorTab::Checklist); menu_open.set(false); }><span>"✓"</span>{tr("gig_checklist")}</button>
                     <button class:active=move || tab.get() == OperatorTab::Settings on:click=move |_| { tab.set(OperatorTab::Settings); menu_open.set(false); }><span>"⚙"</span>{tr("settings")}</button>
                     <button on:click=refresh_all><span>"↻"</span>{tr("refresh_all_data")}</button>
                 </nav>
@@ -102,6 +123,7 @@ fn OperatorApp(
                     OperatorTab::Tickets => view! { <Tickets dashboard=dashboard loading=loading error=error owner=owner /> }.into_any(),
                     OperatorTab::Discounts => view! { <Discounts error=error /> }.into_any(),
                     OperatorTab::Campaigns => view! { <Campaigns dashboard=dashboard loading=loading error=error /> }.into_any(),
+                    OperatorTab::Checklist => view! { <OperatorChecklist dashboard=dashboard loading=loading push_target=push_target error=error /> }.into_any(),
                     OperatorTab::Settings => view! { <OperatorSettings status=status dashboard=dashboard loading=loading error=error /> }.into_any(),
                 }}
             </div>

@@ -100,6 +100,7 @@ fn OperatorPortal(
     status_loading: RwSignal<bool>,
     status_failed: RwSignal<bool>,
     status_refresh: RwSignal<u32>,
+    push_target: RwSignal<Option<String>>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let dashboard = RwSignal::new(None::<DashboardData>);
@@ -111,7 +112,7 @@ fn OperatorPortal(
         } else if status_loading.get() {
             view! { <AccessLoader mode=mode label=tr("checking_the_secure_vault") show_back=true /> }.into_any()
         } else if status.get().unlocked {
-            view! { <OperatorApp mode=mode status=status dashboard=dashboard tab=tab error=error /> }.into_any()
+            view! { <OperatorApp mode=mode status=status dashboard=dashboard tab=tab push_target=push_target error=error /> }.into_any()
         } else {
             view! { <OperatorAccess mode=mode status=status error=error /> }.into_any()
         }}
@@ -308,5 +309,6 @@ fn OperatorAccess(
 include!("operator/shell.rs");
 include!("operator/signal.rs");
 include!("operator/commerce_settings.rs");
+include!("operator/checklist.rs");
 include!("operator/autopilot.rs");
 include!("operator/ops.rs");

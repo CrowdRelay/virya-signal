@@ -23,6 +23,7 @@ pub(super) enum OperatorTab {
     Tickets,
     Discounts,
     Campaigns,
+    Checklist,
     Settings,
 }
 
@@ -123,6 +124,14 @@ pub(super) struct ConfigureArgs<'a> {
 #[serde(rename_all = "camelCase")]
 pub(super) struct EventArgs<'a> {
     pub event_slug: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ChecklistUpdateArgs<'a> {
+    pub event_slug: &'a str,
+    pub item_key: &'a str,
+    pub status: &'a str,
 }
 
 #[derive(Serialize)]

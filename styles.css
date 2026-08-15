@@ -1052,3 +1052,19 @@ html[data-virya-scanner-active] .app-shell {
 .push-setting-copy small.success { color: #9bd5ab; }
 .push-setting-copy small.warning { color: #e8c986; }
 .push-setting-action { width: 100%; min-height: 44px; }
+
+/* Staff pre-gig checklist */
+.checklist-row {
+  width: 100%;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  text-align: left;
+  cursor: pointer;
+}
+.checklist-row:disabled { cursor: progress; opacity: .72; }
+.checklist-row.checklist-done { opacity: .66; }
+.checklist-mark { font-size: 1.35rem; line-height: 1; }
+.checklist-copy { display: grid; gap: 3px; min-width: 0; }
+.checklist-copy small { color: var(--muted); font-size: var(--type-micro); letter-spacing: .08em; }
+.checklist-done .checklist-copy strong { text-decoration: line-through; }
+.success-note { margin: 0; }

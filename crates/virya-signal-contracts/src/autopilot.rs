@@ -162,6 +162,40 @@ pub enum AutopilotActionPayload {
     },
 }
 
+
+impl AutopilotActionPayload {
+    /// Stable CrowdRelay wire action kind. Kept in the Signal contract crate so
+    /// standalone virya-signal CI never depends on a sibling repository checkout.
+    #[must_use]
+    pub const fn action_kind(&self) -> &'static str {
+        match self {
+            Self::ChangeTicketPrice { .. } => "ticket.price.change",
+            Self::ChangeTicketCapacity { .. } => "ticket.capacity.change",
+            Self::RequestFanLifecycleMessage { .. } => "fan.lifecycle.message.request",
+            Self::RequestMerchReorder { .. } => "merch.reorder.request",
+            Self::ChangeMerchPrice { .. } => "merch.price.change",
+            Self::RequestBookingOutreach { .. } => "booking.outreach.request",
+            Self::RequestAudienceCampaign { .. } => "audience.campaign.request",
+            Self::RequestMerchBundle { .. } => "merch.bundle.request",
+            Self::RequestOutreach { .. } => "outreach.request",
+            Self::RequestBeaconDiscovery { .. } => "beacon.discovery.request",
+            Self::RequestBeaconOutreach { .. } => "beacon.outreach.request",
+            Self::RequestShowGrowth { .. } => "show.growth.request",
+            Self::RequestContentArtifact { .. } => "content.artifact.request",
+            Self::AdjustExperiment { complete: false, .. } => "experiment.allocation.change",
+            Self::AdjustExperiment { complete: true, .. } => "experiment.complete",
+            Self::CompleteShowTask { .. } => "show.task.complete",
+            Self::EscalateShowTask { .. } => "show.task.escalate",
+            Self::RequestPromotionBudgetChange { .. } => "promotion.budget_change.request",
+            Self::ExecuteReleaseMilestone { .. } => "release.milestone.execute",
+            Self::ApplyLiveOpportunity { .. } => "opportunity.live.apply",
+            Self::PrepareFundingPackage { .. } => "funding.package.prepare",
+            Self::SubmitFundingApplication { .. } => "funding.application.submit",
+            Self::SendTeamAssignmentEmail { .. } => "team.assignment.email",
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct TeamAssigneeSummary {
     pub member_id: String,
