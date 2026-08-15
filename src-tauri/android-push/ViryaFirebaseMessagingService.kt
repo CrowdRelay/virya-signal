@@ -44,9 +44,13 @@ class ViryaFirebaseMessagingService : FirebaseMessagingService() {
             launchIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val icon = applicationInfo.icon.takeIf { it != 0 } ?: android.R.drawable.ic_dialog_info
+        val notificationIcon = resources
+            .getIdentifier("virya_signal_notification", "drawable", packageName)
+            .takeIf { it != 0 }
+            ?: applicationInfo.icon.takeIf { it != 0 }
+            ?: android.R.drawable.ic_dialog_info
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(icon)
+            .setSmallIcon(notificationIcon)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))

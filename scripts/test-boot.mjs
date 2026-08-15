@@ -13,6 +13,7 @@ function runtime({ ready = false, mounted = false, retryCount = 0, language = "p
   let reloads = 0;
   const timers = new Map();
   const windowListeners = new Map();
+  const documentListeners = new Map();
   const storage = new Map(retryCount ? [["virya-signal-boot-retry-v1", String(retryCount)]] : []);
   const localStorage = new Map([["virya:language:v1", language]]);
   const attributes = new Map(ready ? [["data-virya-ready", "true"]] : []);
@@ -37,12 +38,17 @@ function runtime({ ready = false, mounted = false, retryCount = 0, language = "p
   };
   const document = {
     readyState: "complete",
+    visibilityState: "visible",
     body: {},
     documentElement: {
       getAttribute: (name) => attributes.get(name) ?? null,
       setAttribute: (name, value) => attributes.set(name, value),
     },
-    addEventListener() {},
+    addEventListener(type, listener) {
+      const listeners = documentListeners.get(type) ?? [];
+      listeners.push(listener);
+      documentListeners.set(type, listeners);
+    },
     getElementById(id) {
       return {
         "boot-splash": splash,
@@ -89,6 +95,10 @@ function runtime({ ready = false, mounted = false, retryCount = 0, language = "p
       listeners.push(listener);
       windowListeners.set(type, listeners);
     },
+    dispatchEvent(event) {
+      for (const listener of windowListeners.get(event.type) ?? []) listener(event);
+      return true;
+    },
   };
   class MutationObserver {
     constructor(callback) {
@@ -100,7 +110,13 @@ function runtime({ ready = false, mounted = false, retryCount = 0, language = "p
     }
   }
 
-  const context = { window, document, MutationObserver, Object, String, Number };
+  class Event {
+    constructor(type) {
+      this.type = type;
+    }
+  }
+
+  const context = { window, document, MutationObserver, Event, Object, String, Number };
   vm.runInNewContext(i18nSource, context);
   vm.runInNewContext(source, context);
 
@@ -113,6 +129,15 @@ function runtime({ ready = false, mounted = false, retryCount = 0, language = "p
     reloads: () => reloads,
     dispatch(type, payload = {}) {
       for (const listener of windowListeners.get(type) ?? []) listener(payload);
+    },
+    listen(type, listener) {
+      const listeners = windowListeners.get(type) ?? [];
+      listeners.push(listener);
+      windowListeners.set(type, listeners);
+    },
+    setVisibility(state) {
+      document.visibilityState = state;
+      for (const listener of documentListeners.get("visibilitychange") ?? []) listener();
     },
     mount() {
       mounted = true;
@@ -191,6 +216,21 @@ function runtime({ ready = false, mounted = false, retryCount = 0, language = "p
   assert.equal(app.status.textContent, "ALMOST READY — FINISHING STARTUP");
   app.boot.fail(new Error("WebAssembly module failed"));
   assert.equal(app.status.textContent, "APP STARTUP STOPPED");
+}
+
+
+{
+  const app = runtime();
+  let resumes = 0;
+  app.listen("virya:resume", () => { resumes += 1; });
+  app.dispatch("pageshow");
+  assert.equal(resumes, 0, "cold-start pageshow must not duplicate status fetches");
+  app.setVisibility("hidden");
+  assert.equal(resumes, 0, "backgrounding must not be treated as a resume");
+  app.setVisibility("visible");
+  assert.equal(resumes, 1, "returning from Android settings must refresh native state");
+  app.dispatch("pageshow");
+  assert.equal(resumes, 2, "later page restoration must also refresh native state");
 }
 
 for (const contract of ["onStart", "onProgress", "onSuccess", "onFailure", "onComplete"]) {

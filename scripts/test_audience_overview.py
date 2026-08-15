@@ -34,6 +34,21 @@ class AudienceOverviewContract(unittest.TestCase):
             self.assertIn(f'"{key}"', pl)
             self.assertIn(f'"{key}"', en)
 
+    def test_fan_grassroots_relay_prefills_referral_and_uses_native_share_with_clipboard_fallback(self):
+        fan = (ROOT / "src/app/fan.rs").read_text()
+        shell = read_rust_module(ROOT, "src/app/fan.rs")
+        bridge = read_rust_module(ROOT, "src/bridge.rs")
+        ffi = (ROOT / "src/bridge/ffi.rs").read_text()
+        self.assertIn("bridge::referral_code_from_location().unwrap_or_default()", fan)
+        self.assertIn("https://www.virya.music/r/{referral_code}", shell)
+        self.assertIn("bridge::share_text", shell)
+        self.assertIn("window.navigator?.share", ffi)
+        self.assertIn("window.navigator?.clipboard?.writeText", ffi)
+        self.assertIn("referral_code_from_location", bridge)
+        for key in ("carry_the_signal", "invite_real_metalheads", "share_signal", "signal_link_copied"):
+            self.assertIn(f'"{key}"', (ROOT / "src/i18n/pl.rs").read_text())
+            self.assertIn(f'"{key}"', (ROOT / "src/i18n/en.rs").read_text())
+
     def test_revenue_rows_require_internal_accounting_invariants(self):
         source = (ROOT / "src-tauri/src/api/operator.rs").read_text()
         self.assertIn("row.refunded_minor <= row.gross_paid_minor", source)

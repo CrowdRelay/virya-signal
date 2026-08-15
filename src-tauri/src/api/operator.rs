@@ -13,6 +13,77 @@ use crate::{
 
 use super::http::{require_owner, segment, uuid_segment};
 
+const AUTOPILOT_DATE_FIELDS: &[&str] = &[
+    "guarded_until",
+    "created_at",
+    "approval_expires_at",
+    "assignment_due_at",
+    "evaluated_at",
+    "finished_at",
+    "executor_reported_at",
+    "observed_at",
+    "synced_at",
+    "occurred_at",
+    "expires_at",
+    "workflow_attested_at",
+    "starts_at",
+    "due_at",
+    "release_at",
+];
+
+fn legacy_offset_datetime_tuple(value: &serde_json::Value) -> Option<String> {
+    let parts = value.as_array()?;
+    if parts.len() != 9 {
+        return None;
+    }
+    let year = i32::try_from(parts[0].as_i64()?).ok()?;
+    let ordinal = u16::try_from(parts[1].as_u64()?).ok()?;
+    let hour = u8::try_from(parts[2].as_u64()?).ok()?;
+    let minute = u8::try_from(parts[3].as_u64()?).ok()?;
+    let second = u8::try_from(parts[4].as_u64()?).ok()?;
+    let nanosecond = u32::try_from(parts[5].as_u64()?).ok()?;
+    let offset_hour = i8::try_from(parts[6].as_i64()?).ok()?;
+    let offset_minute = i8::try_from(parts[7].as_i64()?).ok()?;
+    let offset_second = i8::try_from(parts[8].as_i64()?).ok()?;
+
+    let date = time::Date::from_ordinal_date(year, ordinal).ok()?;
+    let local = date.with_hms_nano(hour, minute, second, nanosecond).ok()?;
+    let offset = time::UtcOffset::from_hms(offset_hour, offset_minute, offset_second).ok()?;
+    local
+        .assume_offset(offset)
+        .format(&time::format_description::well_known::Rfc3339)
+        .ok()
+}
+
+fn normalize_legacy_autopilot_dates(value: &mut serde_json::Value) {
+    match value {
+        serde_json::Value::Object(object) => {
+            for (key, nested) in object.iter_mut() {
+                if AUTOPILOT_DATE_FIELDS.contains(&key.as_str())
+                    && let Some(timestamp) = legacy_offset_datetime_tuple(nested)
+                {
+                    *nested = serde_json::Value::String(timestamp);
+                    continue;
+                }
+                normalize_legacy_autopilot_dates(nested);
+            }
+        }
+        serde_json::Value::Array(values) => {
+            for nested in values {
+                normalize_legacy_autopilot_dates(nested);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn decode_autopilot_wire<T: serde::de::DeserializeOwned>(
+    mut value: serde_json::Value,
+) -> Result<T, AppError> {
+    normalize_legacy_autopilot_dates(&mut value);
+    serde_json::from_value(value).map_err(AppError::from)
+}
+
 impl super::CrowdRelayClient {
     pub async fn validate(&self, profile: &OperatorProfile) -> Result<(), AppError> {
         let path = match profile.role {
@@ -327,13 +398,15 @@ impl super::CrowdRelayClient {
         profile: &OperatorProfile,
     ) -> Result<OperatorAutopilotOverview, AppError> {
         require_owner(profile)?;
-        self.auth_json::<OperatorAutopilotOverview, ()>(
-            profile,
-            Method::GET,
-            "admin/autopilot/overview",
-            None,
-        )
-        .await
+        let value = self
+            .auth_json::<serde_json::Value, ()>(
+                profile,
+                Method::GET,
+                "admin/autopilot/overview",
+                None,
+            )
+            .await?;
+        decode_autopilot_wire(value)
     }
 
     pub async fn operator_autopilot_chief_of_staff(
@@ -341,13 +414,15 @@ impl super::CrowdRelayClient {
         profile: &OperatorProfile,
     ) -> Result<AutopilotChiefOfStaff, AppError> {
         require_owner(profile)?;
-        self.auth_json::<AutopilotChiefOfStaff, ()>(
-            profile,
-            Method::GET,
-            "admin/autopilot/chief-of-staff",
-            None,
-        )
-        .await
+        let value = self
+            .auth_json::<serde_json::Value, ()>(
+                profile,
+                Method::GET,
+                "admin/autopilot/chief-of-staff",
+                None,
+            )
+            .await?;
+        decode_autopilot_wire(value)
     }
 
     pub async fn operator_autopilot_set_authority(
@@ -372,7 +447,9 @@ impl super::CrowdRelayClient {
             | "show_operations"
             | "release"
             | "live_opportunity"
-            | "funding" => context,
+            | "funding"
+            | "beacon"
+            | "show_growth" => context,
             _ => return Err(AppError::InvalidInput("Invalid Autopilot context".into())),
         };
         let autonomy_level = match body.autonomy_level.trim() {
@@ -488,3 +565,87 @@ impl super::CrowdRelayClient {
         .await
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        decode_autopilot_wire, legacy_offset_datetime_tuple, normalize_legacy_autopilot_dates,
+    };
+    use crate::models::AutopilotChiefOfStaff;
+
+    #[test]
+    fn legacy_time_tuple_is_normalized_to_rfc3339() {
+        let value = serde_json::json!([2026, 227, 6, 45, 12, 123_400_000, 0, 0, 0]);
+        assert_eq!(
+            legacy_offset_datetime_tuple(&value).as_deref(),
+            Some("2026-08-15T06:45:12.1234Z")
+        );
+    }
+
+    #[test]
+    fn legacy_time_tuple_preserves_non_utc_offset() {
+        let value = serde_json::json!([2026, 227, 8, 45, 12, 0, 2, 0, 0]);
+        assert_eq!(
+            legacy_offset_datetime_tuple(&value).as_deref(),
+            Some("2026-08-15T08:45:12+02:00")
+        );
+    }
+
+    #[test]
+    fn nested_autopilot_dates_are_normalized_without_touching_other_arrays() {
+        let mut value = serde_json::json!({
+            "created_at": [2026, 227, 6, 45, 12, 0, 0, 0, 0],
+            "payload": {
+                "kind": "adjust_experiment",
+                "allocations": [1000, 9000]
+            }
+        });
+        normalize_legacy_autopilot_dates(&mut value);
+        assert_eq!(value["created_at"].as_str(), Some("2026-08-15T06:45:12Z"));
+        assert_eq!(
+            value["payload"]["allocations"],
+            serde_json::json!([1000, 9000])
+        );
+    }
+
+    #[test]
+    fn chief_of_staff_accepts_legacy_backend_time_sequences() {
+        let value = serde_json::json!({
+            "executed_24h": 1,
+            "failed_24h": 0,
+            "needs_you": 1,
+            "estimated_minutes_saved_24h": 12,
+            "measured_improved_7d": 1,
+            "measured_neutral_7d": 0,
+            "measured_worsened_7d": 0,
+            "attention_items": [{
+                "kind": "opportunity_deadline",
+                "subject_kind": "team_opportunity",
+                "subject_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Deadline",
+                "detail": "Submit",
+                "due_at": [2026, 227, 6, 45, 12, 0, 0, 0, 0],
+                "urgency": "today"
+            }],
+            "top_opportunities": [],
+            "show_tasks": [{
+                "event_id": "00000000-0000-0000-0000-000000000002",
+                "event_title": "Show",
+                "task_key": "network_tested",
+                "status": "pending",
+                "starts_at": [2026, 228, 18, 30, 0, 0, 0, 0, 0]
+            }]
+        });
+        let decoded: AutopilotChiefOfStaff = decode_autopilot_wire(value).expect("legacy payload");
+        assert_eq!(
+            decoded.attention_items[0].due_at,
+            "2026-08-15T06:45:12Z"
+        );
+        assert_eq!(
+            decoded.show_tasks[0].starts_at,
+            "2026-08-16T18:30:00Z"
+        );
+    }
+}
+

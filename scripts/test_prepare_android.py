@@ -12,6 +12,7 @@ from pathlib import Path
 
 SCRIPT = Path(__file__).with_name("prepare-android.py")
 PUSH_TEMPLATES = SCRIPT.parent.parent / "src-tauri" / "android-push"
+ANDROID_ICONS = SCRIPT.parent.parent / "src-tauri" / "icons" / "android"
 
 
 class PrepareAndroidTests(unittest.TestCase):
@@ -26,10 +27,11 @@ class PrepareAndroidTests(unittest.TestCase):
             shutil.copy2(SCRIPT, scripts / SCRIPT.name)
             push_templates = root / "src-tauri" / "android-push"
             shutil.copytree(PUSH_TEMPLATES, push_templates)
+            shutil.copytree(ANDROID_ICONS, root / "src-tauri" / "icons" / "android")
 
-            # In CI, `cargo tauri icon` runs before prepare-android.py.
-            # Model its generated adaptive resources instead of the obsolete
-            # hand-copied launcher-assets directory.
+            # Android CI keeps audited launcher resources under src-tauri/icons/android.
+            # Model the generated Gradle tree here; prepare-android.py copies the
+            # canonical launcher assets into it after `tauri android init`.
             res = app / "src" / "main" / "res"
             adaptive_v26 = res / "mipmap-anydpi-v26"
             adaptive_v26.mkdir(parents=True)
@@ -104,11 +106,17 @@ dependencies {
                 self.assertIn("<background", generated)
                 self.assertIn("<foreground", generated)
 
+            generated_foreground = res / "mipmap-xxxhdpi" / "ic_launcher_foreground.png"
+            canonical_foreground = ANDROID_ICONS / "mipmap-xxxhdpi" / "ic_launcher_foreground.png"
+            self.assertEqual(generated_foreground.read_bytes(), canonical_foreground.read_bytes())
             self.assertFalse((root / "src-tauri" / "launcher-assets").exists())
             self.assertIn('com.google.firebase:firebase-messaging:25.1.1', output)
             staged = app / "src" / "main" / "java" / "music" / "virya" / "signal" / "push"
             self.assertTrue((staged / "SignalPushPlugin.kt").is_file())
             self.assertTrue((staged / "ViryaFirebaseMessagingService.kt").is_file())
+            notification_icon = res / "drawable" / "virya_signal_notification.xml"
+            self.assertTrue(notification_icon.is_file())
+            self.assertIn('fillColor="#FFFFFFFF"', notification_icon.read_text())
             manifest_text = manifest.read_text()
             self.assertIn("android.permission.POST_NOTIFICATIONS", manifest_text)
             self.assertIn("ViryaFirebaseMessagingService", manifest_text)
@@ -129,6 +137,7 @@ dependencies {
             app.mkdir(parents=True)
             shutil.copy2(SCRIPT, scripts / SCRIPT.name)
             shutil.copytree(PUSH_TEMPLATES, root / "src-tauri" / "android-push")
+            shutil.copytree(ANDROID_ICONS, root / "src-tauri" / "icons" / "android")
             res = app / "src" / "main" / "res" / "mipmap-anydpi-v26"
             res.mkdir(parents=True)
             res.joinpath("ic_launcher.xml").write_text(

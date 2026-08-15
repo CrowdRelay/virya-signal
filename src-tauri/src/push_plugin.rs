@@ -27,6 +27,12 @@ mod android {
         permission_state: String,
     }
 
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct LaunchTargetResponse {
+        target_path: String,
+    }
+
     pub struct SignalPush<R: Runtime>(PluginHandle<R>);
 
     pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -58,7 +64,7 @@ mod android {
     pub fn permission<R: Runtime>(app: &AppHandle<R>) -> Result<String, String> {
         handle(app)
             .0
-            .run_mobile_plugin::<PermissionResponse>("checkPermissions", ())
+            .run_mobile_plugin::<PermissionResponse>("getNotificationPermissionState", ())
             .map(|response| response.permission_state)
             .map_err(|error| error.to_string())
     }
@@ -66,8 +72,32 @@ mod android {
     pub fn request_permission<R: Runtime>(app: &AppHandle<R>) -> Result<String, String> {
         handle(app)
             .0
-            .run_mobile_plugin::<PermissionResponse>("requestPermissions", ())
+            .run_mobile_plugin::<PermissionResponse>("requestNotificationPermission", ())
             .map(|response| response.permission_state)
+            .map_err(|error| error.to_string())
+    }
+
+
+    pub fn take_launch_target<R: Runtime>(app: &AppHandle<R>) -> Result<Option<String>, String> {
+        let response = handle(app)
+            .0
+            .run_mobile_plugin::<LaunchTargetResponse>("takeLaunchTarget", ())
+            .map_err(|error| error.to_string())?;
+        let target = response.target_path.trim();
+        if target.is_empty() {
+            return Ok(None);
+        }
+        if target.len() > 512 || !target.starts_with('/') || target.starts_with("//") {
+            return Err("invalid push launch target returned by Android".to_owned());
+        }
+        Ok(Some(target.to_owned()))
+    }
+
+    pub fn open_notification_settings<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+        handle(app)
+            .0
+            .run_mobile_plugin::<serde_json::Value>("openNotificationSettings", ())
+            .map(|_| ())
             .map_err(|error| error.to_string())
     }
 

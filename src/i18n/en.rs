@@ -1027,7 +1027,15 @@ pub(super) fn text(key: &'static str) -> &'static str {
         }
         "enable_push_notifications" => "ENABLE NOTIFICATIONS",
         "disable_push_notifications" => "DISABLE NOTIFICATIONS",
+        "open_notification_settings" => "OPEN SETTINGS",
         "syncing_push_notifications" => "SYNCING…",
+        "carry_the_signal" => "CARRY THE SIGNAL",
+        "invite_real_metalheads" => "Activate people who might genuinely care",
+        "invite_one_to_three_people_you_really_think_would_care" => "Invite 1–3 people who actually listen to heavy music or are part of the scene. No spam — trust is the point.",
+        "virya_signal_share_copy" => "VIRYA is building Signal for people in the scene. If this feels like your thing, or someone in your circle would care, enter here:",
+        "share_signal" => "SHARE SIGNAL",
+        "signal_shared" => "Signal carried forward.",
+        "signal_link_copied" => "Signal link copied.",
         _ => key,
     }
 }

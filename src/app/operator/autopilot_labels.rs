@@ -32,6 +32,7 @@ fn autopilot_action_kind_label(kind: &str) -> &'static str {
         "merch.bundle.request" => "Merch bundle request",
         "booking.outreach.request" => "Booking outreach",
         "outreach.request" => "Relationship outreach",
+        "beacon.discovery.request" => "Local beacon discovery",
         "beacon.outreach.request" => "Local beacon outreach",
         "show.growth.request" => "Attendance / merch growth lever",
         "content.artifact.request" => "Content artifact",
@@ -44,6 +45,7 @@ fn autopilot_action_kind_label(kind: &str) -> &'static str {
         "opportunity.live.apply" => "Festival / opportunity application",
         "funding.package.prepare" => "Funding package prepared",
         "funding.application.submit" => "Funding application",
+        "team.assignment.email" => "Team assignment email",
         _ => "Autopilot action",
     }
 }
@@ -57,6 +59,9 @@ fn autopilot_measurement_kind_label(kind: &str) -> &'static str {
         "outreach_reply_7d" => "Outreach reply · 7d",
         "audience_ticket_revenue_72h" => "Audience ticket revenue · 72h",
         "show_ticket_revenue_7d" => "Show ticket revenue · 7d",
+        "show_growth_surface_clicks_7d" => "Free distribution clicks · 7d",
+        "show_growth_attributed_ticket_orders_7d" => "Attributed ticket orders · 7d",
+        "grassroots_activation_replies_14d" => "Grassroots replies · 14d",
         _ => "Measured effect",
     }
 }
@@ -127,6 +132,12 @@ fn autopilot_payload_detail(payload: &AutopilotActionPayload) -> String {
         }
         AutopilotActionPayload::PrepareFundingPackage { .. } => tr("autopilot_funding_package_detail").to_owned(),
         AutopilotActionPayload::SubmitFundingApplication { .. } => tr("autopilot_funding_submit_detail").to_owned(),
+        AutopilotActionPayload::SendTeamAssignmentEmail {
+            recipient_name,
+            task_title,
+            reminder_number,
+            ..
+        } => format!("{recipient_name} · {task_title} · reminder {reminder_number}"),
     }
 }
 

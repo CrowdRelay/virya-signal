@@ -63,6 +63,27 @@ fn delete_native_push_token(_app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(target_os = "android")]
+fn take_native_push_target(app: &AppHandle) -> Result<Option<String>, String> {
+    crate::push_plugin::take_launch_target(app)
+}
+
+#[cfg(not(target_os = "android"))]
+fn take_native_push_target(_app: &AppHandle) -> Result<Option<String>, String> {
+    Ok(None)
+}
+
+#[cfg(target_os = "android")]
+fn open_native_push_settings(app: &AppHandle) -> Result<(), String> {
+    crate::push_plugin::open_notification_settings(app)
+}
+
+#[cfg(not(target_os = "android"))]
+fn open_native_push_settings(_app: &AppHandle) -> Result<(), String> {
+    Err("android_push_unavailable".to_owned())
+}
+
+
 async fn persist_push_state(
     state: &State<'_, AppState>,
     profile: &FanProfile,
@@ -256,3 +277,35 @@ pub(crate) async fn fan_push_disable(
     Ok(current_native_push_status(&state, &app, detail).await)
 }
 
+#[tauri::command]
+pub(crate) async fn fan_push_take_target(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Option<String>, AppError> {
+    if !state.native_push_available || !cfg!(target_os = "android") {
+        return Ok(None);
+    }
+    take_native_push_target(&app).map_err(AppError::InvalidInput)
+}
+
+#[tauri::command]
+pub(crate) async fn fan_push_open_settings(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<FanPushStatus, AppError> {
+    if !state.native_push_available || !cfg!(target_os = "android") {
+        return Ok(current_native_push_status(
+            &state,
+            &app,
+            Some("android_push_unavailable".to_owned()),
+        )
+        .await);
+    }
+    open_native_push_settings(&app).map_err(AppError::InvalidInput)?;
+    Ok(current_native_push_status(
+        &state,
+        &app,
+        Some("notification_settings_opened".to_owned()),
+    )
+    .await)
+}

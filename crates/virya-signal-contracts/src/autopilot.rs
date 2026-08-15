@@ -148,6 +148,18 @@ pub enum AutopilotActionPayload {
     SubmitFundingApplication {
         opportunity_id: String,
     },
+    // Internal executor actions can appear in historical/control-plane payloads.
+    // Keep recipient_email intentionally absent: unknown provider-only fields are
+    // ignored by Serde and must never be surfaced into the Signal UI contract.
+    SendTeamAssignmentEmail {
+        assignment_id: String,
+        recipient_name: String,
+        task_title: String,
+        task_detail: String,
+        due_at: Option<String>,
+        action_url_path: String,
+        reminder_number: u8,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

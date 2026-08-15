@@ -1031,7 +1031,15 @@ pub(super) fn text(key: &'static str) -> &'static str {
         }
         "enable_push_notifications" => "WŁĄCZ POWIADOMIENIA",
         "disable_push_notifications" => "WYŁĄCZ POWIADOMIENIA",
+        "open_notification_settings" => "OTWÓRZ USTAWIENIA",
         "syncing_push_notifications" => "SYNCHRONIZUJĘ…",
+        "carry_the_signal" => "NIEŚ SYGNAŁ",
+        "invite_real_metalheads" => "Uruchom ludzi, którym naprawdę może zależeć",
+        "invite_one_to_three_people_you_really_think_would_care" => "Zaproś 1–3 osoby, które faktycznie słuchają ciężkiej muzyki albo są częścią sceny. Bez spamu — liczy się zaufanie.",
+        "virya_signal_share_copy" => "VIRYA gra i buduje Signal dla ludzi sceny. Jeśli czujesz, że to dla Ciebie albo kogoś z Twoich ludzi, wejdź tutaj:",
+        "share_signal" => "UDOSTĘPNIJ SYGNAŁ",
+        "signal_shared" => "Sygnał poszedł dalej.",
+        "signal_link_copied" => "Link do Signal skopiowany.",
         _ => key,
     }
 }

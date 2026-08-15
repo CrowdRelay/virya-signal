@@ -158,7 +158,7 @@ jobs:
       - name: Generate iOS project
         run: cargo tauri ios init --ci --skip-targets-install
       - name: Generate mobile icons
-        run: cargo tauri icon src-tauri/icons/icon.png --ios-color "#080808"
+        run: cargo tauri icon src-tauri/icons/virya-signal-brand-full.png --ios-color "#080808"
       - name: Build signed IPA
         env:
           IOS_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}

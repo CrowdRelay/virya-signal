@@ -24,7 +24,7 @@ use commands::{
         fan_admission_pass, fan_admission_qr, fan_area_challenge, fan_area_claim, fan_area_wallet,
         fan_claim_pass, fan_confirm, fan_events, fan_forget, fan_home, fan_import_wallet,
         fan_interests, fan_lock, fan_merch_bundles, fan_merch_catalog, fan_push_disable,
-        fan_push_enable, fan_push_status, fan_referral, fan_register_interest, fan_request_access,
+        fan_push_enable, fan_push_open_settings, fan_push_status, fan_push_take_target, fan_referral, fan_register_interest, fan_request_access,
         fan_request_delivery, fan_signup, fan_start_ticket_checkout, fan_status, fan_ticket_sale,
         fan_unlock, fan_wallets, render_wallet_qr,
     },
@@ -211,6 +211,8 @@ pub fn run() {
             fan_push_status,
             fan_push_enable,
             fan_push_disable,
+            fan_push_open_settings,
+            fan_push_take_target,
             submit_anonymous_feedback,
         ])
         .run(tauri::generate_context!());

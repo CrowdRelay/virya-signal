@@ -61,12 +61,13 @@ required = [
     'scripts/analyze-android-package.py',
     'scripts/profile-android.sh',
     'scripts/install-android-sdk.sh', 'scripts/quality-fix.sh',
-    'src-tauri/icons/icon.png', 'src-tauri/icons/icon.ico', 'src-tauri/icons/icon.icns',
+    'src-tauri/icons/icon.ico', 'src-tauri/icons/icon.icns',
     'src-tauri/icons/virya-signal.svg',
     'src-tauri/icons/virya-signal-brand-full.png',
     'src-tauri/icons/virya-signal-brand-foreground.png',
-    'src-tauri/launcher-assets/android/ic_launcher_foreground.png',
-    'src-tauri/launcher-assets/android/play-store-512.png',
+    'src-tauri/icons/android/mipmap-xxxhdpi/ic_launcher_foreground.png',
+    'src-tauri/icons/android/mipmap-anydpi-v26/ic_launcher.xml',
+    'src-tauri/icons/android/values/ic_launcher_background.xml',
 ]
 for item in required:
     if not (root / item).is_file():
@@ -149,7 +150,7 @@ invoked.update(re.findall(
 ))
 # Push enable/disable share one dynamic bridge call; the literal command names are
 # still audited as active IPC rather than being silently treated as compatibility-only.
-invoked.update(re.findall(r'"(fan_push_(?:enable|disable))"', ui))
+invoked.update(re.findall(r'"(fan_push_(?:enable|disable|open_settings))"', ui))
 # Some native commands are intentionally hidden behind bridge helpers or the
 # boot-time JS crash reporter. Count those literal calls too so the audit
 # reflects the real IPC surface instead of under-reporting it.

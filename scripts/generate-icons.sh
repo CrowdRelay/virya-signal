@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$SCRIPT_DIR/.."
 ICONS_DIR="$ROOT/src-tauri/icons"
-LAUNCHER_DIR="$ROOT/src-tauri/launcher-assets/android"
+ANDROID_DIR="$ICONS_DIR/android"
 FULL="$ICONS_DIR/virya-signal-brand-full.png"
 FOREGROUND="$ICONS_DIR/virya-signal-brand-foreground.png"
 
@@ -28,12 +28,21 @@ resize() {
   if command -v oxipng >/dev/null 2>&1; then
     oxipng -o 4 --strip all --nc "$output" >/dev/null
   fi
+  python3 - "$output" <<'PY_RGBA'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+data = p.read_bytes()[:26]
+if len(data) < 26 or data[:8] != b"\x89PNG\r\n\x1a\n" or data[12:16] != b"IHDR":
+    raise SystemExit(f"not a PNG: {p}")
+if data[25] != 6:
+    raise SystemExit(f"generated PNG is not RGBA: {p} (color_type={data[25]})")
+PY_RGBA
 }
 
 echo "=== Generating Virya Signal icons ==="
 
 echo "[1/4] Master + desktop variants..."
-resize "$FULL" "$ICONS_DIR/icon.png" 1024
 for SIZE in 32 64 128 256 512; do
   resize "$FULL" "$ICONS_DIR/${SIZE}x${SIZE}.png" "$SIZE"
 done
@@ -46,15 +55,27 @@ for SPEC in 30:Square30x30Logo.png 44:Square44x44Logo.png 71:Square71x71Logo.png
 done
 
 echo "[3/4] Android launcher assets..."
-resize "$FULL" "$LAUNCHER_DIR/play-store-512.png" 512
-resize "$FOREGROUND" "$LAUNCHER_DIR/ic_launcher_foreground.png" 432
 for SPEC in "mdpi:48:108" "hdpi:72:162" "xhdpi:96:216" "xxhdpi:144:324" "xxxhdpi:192:432"; do
   IFS=: read -r DENSITY LEGACY ADAPTIVE <<<"$SPEC"
-  DIR="$LAUNCHER_DIR/mipmap-$DENSITY"
+  DIR="$ANDROID_DIR/mipmap-$DENSITY"
   resize "$FULL" "$DIR/ic_launcher.png" "$LEGACY"
   resize "$FULL" "$DIR/ic_launcher_round.png" "$LEGACY"
   resize "$FOREGROUND" "$DIR/ic_launcher_foreground.png" "$ADAPTIVE"
 done
+mkdir -p "$ANDROID_DIR/mipmap-anydpi-v26" "$ANDROID_DIR/values"
+cat > "$ANDROID_DIR/mipmap-anydpi-v26/ic_launcher.xml" <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+  <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+  <background android:drawable="@color/ic_launcher_background"/>
+</adaptive-icon>
+XML
+cat > "$ANDROID_DIR/values/ic_launcher_background.xml" <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <color name="ic_launcher_background">#080808</color>
+</resources>
+XML
 
 echo "[4/4] Desktop containers..."
 if command -v magick >/dev/null 2>&1; then

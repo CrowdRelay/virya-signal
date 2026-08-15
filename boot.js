@@ -224,14 +224,25 @@
   });
   window.addEventListener("virya:ready", finish);
   window.addEventListener("TrunkApplicationStarted", () => phase("wasm-initialized"));
-  window.addEventListener("pageshow", reconcile);
+  const emitResume = () => window.dispatchEvent(new Event("virya:resume"));
+  let pageShown = false;
+  window.addEventListener("pageshow", () => {
+    reconcile();
+    persistRuntimeSession("foreground");
+    // The initial pageshow is part of boot, not a resume. Suppressing that
+    // first event avoids a duplicate launcher/push status fetch on cold start;
+    // later bfcache/page restores still refresh normally.
+    if (pageShown) emitResume();
+    pageShown = true;
+  });
   document.addEventListener("visibilitychange", () => {
-    persistRuntimeSession(document.visibilityState === "hidden" ? "background" : "foreground");
+    const foreground = document.visibilityState !== "hidden";
+    persistRuntimeSession(foreground ? "foreground" : "background");
+    if (foreground) emitResume();
   });
   window.addEventListener("pagehide", () => {
     persistRuntimeSession("background");
   });
-  window.addEventListener("pageshow", () => persistRuntimeSession("foreground"));
   window.addEventListener("error", (event) => showFailure(event.error || event.message));
   window.addEventListener("unhandledrejection", (event) => showFailure(event.reason));
   trace("script-ready");

@@ -5,6 +5,7 @@ fn FanPortal(
     status_loading: RwSignal<bool>,
     status_failed: RwSignal<bool>,
     status_refresh: RwSignal<u32>,
+    push_target: RwSignal<Option<String>>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     // Entering the fan zone must be a local-only transition. City data is
@@ -19,7 +20,7 @@ fn FanPortal(
         } else if status_loading.get() {
             view! { <AccessLoader mode=mode label=tr("checking_your_signal") show_back=false /> }.into_any()
         } else if status.get().unlocked {
-            view! { <FanApp mode=mode status=status public=public error=error /> }.into_any()
+            view! { <FanApp mode=mode status=status public=public push_target=push_target error=error /> }.into_any()
         } else {
             view! { <FanAccess status=status error=error /> }.into_any()
         }}
@@ -133,7 +134,7 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
     // Android WebView/WASM path while preserving full signup functionality.
     let custom_city_name = RwSignal::new(String::new());
     let custom_region = RwSignal::new(String::new());
-    let referral = RwSignal::new(String::new());
+    let referral = RwSignal::new(bridge::referral_code_from_location().unwrap_or_default());
     let token = RwSignal::new(String::new());
     let pin = RwSignal::new(String::new());
     let consent = RwSignal::new(false);

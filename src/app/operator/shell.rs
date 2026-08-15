@@ -46,6 +46,17 @@ fn OperatorApp(
         }
     });
 
+    let refresh_all = move |_| {
+        bridge::invalidate_latest("operator:");
+        refresh_operator_parts(dashboard, loading, error);
+        signal_requested.set(false);
+        signal_overview.set(None);
+        signal_loading.set(false);
+        menu_open.set(false);
+    };
+
+    on_cleanup(move || bridge::invalidate_latest("operator:"));
+
     let close = move |_| {
         bridge::invalidate_latest("operator:");
         spawn_local(async move {
@@ -67,7 +78,7 @@ fn OperatorApp(
     view! {
         <section class="authenticated">
             <header class="topbar">
-                <div on:dblclick=move |_| refresh_operator_parts(dashboard, loading, error) style="cursor:pointer"><p class="eyebrow">{tr("virya_control")}</p><strong>{move || status.get().session.map(|s| s.display_name).value_or_else(Default::default)}</strong></div>
+                <div><p class="eyebrow">{tr("virya_control")}</p><strong>{move || status.get().session.map(|s| s.display_name).value_or_else(Default::default)}</strong></div>
                 <div class="topbar-actions">
                     <span class="role-pill">{move || role().label()}</span>
                     <button class="menu-trigger" aria-label=tr("open_menu") aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|v| *v = !*v)><i></i><i></i><i></i></button>
@@ -80,6 +91,7 @@ fn OperatorApp(
                     <button class:active=move || tab.get() == OperatorTab::Discounts on:click=move |_| { tab.set(OperatorTab::Discounts); menu_open.set(false); }><span>"%"</span>{tr("discounts")}</button>
                     <button class:active=move || tab.get() == OperatorTab::Campaigns on:click=move |_| { tab.set(OperatorTab::Campaigns); menu_open.set(false); }><span>"◫"</span>{tr("qr_codes")}</button>
                     <button class:active=move || tab.get() == OperatorTab::Settings on:click=move |_| { tab.set(OperatorTab::Settings); menu_open.set(false); }><span>"⚙"</span>{tr("settings")}</button>
+                    <button on:click=refresh_all><span>"↻"</span>{tr("refresh_all_data")}</button>
                 </nav>
             </Show>
             <div class="content">

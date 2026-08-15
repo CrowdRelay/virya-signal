@@ -92,10 +92,8 @@ jobs:
       - name: Set release version
         if: inputs.build_kind != 'debug-apk'
         run: python3 scripts/set-release-version.py "${{ inputs.version }}" --android-version-code auto
-      - name: Generate Android project and icons
-        run: |
-          cargo tauri android init --ci --skip-targets-install
-          cargo tauri icon src-tauri/icons/icon.png --ios-color "#080808"
+      - name: Generate Android project
+        run: cargo tauri android init --ci --skip-targets-install
       - name: Prepare Android project
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}

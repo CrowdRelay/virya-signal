@@ -304,6 +304,10 @@ fn OperatorSettings(
     let autopilot_chief_loading = RwSignal::new(false);
     let ops = RwSignal::new(None::<OperatorOpsOverview>);
     let ops_loading = RwSignal::new(false);
+    // Initial owner control-plane reads are one-shot per Settings mount.
+    // A failed request must not retrigger itself through the loading signals and
+    // spam the shared error toast; explicit Refresh remains the retry path.
+    let owner_control_plane_requested = RwSignal::new(false);
     let owner = Signal::derive(move || {
         status
             .get()
@@ -311,17 +315,18 @@ fn OperatorSettings(
             .is_some_and(|session| session.role == OperatorRole::Owner)
     });
     Effect::new(move |_| {
-        if owner.get() {
-            if autopilot.get().is_none() && !autopilot_loading.get() {
-                refresh_operator_autopilot(autopilot, autopilot_loading, error);
-            }
-            if autopilot_chief.get().is_none() && !autopilot_chief_loading.get() {
-                refresh_operator_chief(autopilot_chief, autopilot_chief_loading, error);
-            }
-            if ops.get().is_none() && !ops_loading.get() {
-                refresh_operator_ops(ops, ops_loading, error);
-            }
+        let is_owner = owner.get();
+        if !is_owner {
+            owner_control_plane_requested.set(false);
+            return;
         }
+        if owner_control_plane_requested.get_untracked() {
+            return;
+        }
+        owner_control_plane_requested.set(true);
+        refresh_operator_autopilot(autopilot, autopilot_loading, error);
+        refresh_operator_chief(autopilot_chief, autopilot_chief_loading, error);
+        refresh_operator_ops(ops, ops_loading, error);
     });
     let refresh = move |_| {
         refresh_operator_parts(dashboard, loading, error);

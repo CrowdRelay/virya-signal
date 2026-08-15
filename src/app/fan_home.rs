@@ -148,16 +148,46 @@ fn FanHomeOverview(
 fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
     let status = RwSignal::new(None::<FanPushStatus>);
     let busy = RwSignal::new(false);
-    let loaded = RwSignal::new(false);
+    let resume_refresh = RwSignal::new(0_u32);
+    let enable_after_settings = RwSignal::new(false);
+    install_resume_refresh(resume_refresh);
 
     Effect::new(move |_| {
-        if loaded.get_untracked() || !bridge::native_available() {
+        resume_refresh.get();
+        if !bridge::native_available() || busy.get() {
             return;
         }
-        loaded.set(true);
+
+        // A permanently denied Android permission must be changed in system
+        // Settings. Treat returning from that screen as continuation of the
+        // original enable intent: if permission is now granted, finish FCM +
+        // CrowdRelay registration automatically instead of requiring a second
+        // tap. Clearing the flag before spawning also makes duplicate resume
+        // events harmless.
+        if enable_after_settings.get_untracked() {
+            enable_after_settings.set(false);
+            busy.set(true);
+            spawn_local(async move {
+                match bridge::invoke::<FanPushStatus, _>("fan_push_enable", &EmptyArgs {}).await {
+                    Ok(value) => status.set(Some(value)),
+                    Err(message) => error.set(Some(message)),
+                }
+                busy.set(false);
+            });
+            return;
+        }
+
         spawn_local(async move {
-            match bridge::invoke::<FanPushStatus, _>("fan_push_status", &EmptyArgs {}).await {
-                Ok(value) => status.set(Some(value)),
+            match bridge::invoke_latest::<FanPushStatus, _>(
+                "fan_push_status",
+                &EmptyArgs {},
+                10_000,
+                "fan:push-status",
+            )
+            .await
+            {
+                Ok(Some(value)) => status.set(Some(value)),
+                Ok(None) => {}
                 Err(message) => error.set(Some(message)),
             }
         });
@@ -167,20 +197,30 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
         if busy.get_untracked() {
             return;
         }
-        let command = if status
-            .get_untracked()
+        let current = status.get_untracked();
+        let opens_settings = current
             .as_ref()
-            .is_some_and(|value| value.enabled)
-        {
+            .is_some_and(|value| !value.enabled && value.permission == "denied");
+        let command = if current.as_ref().is_some_and(|value| value.enabled) {
             "fan_push_disable"
+        } else if opens_settings {
+            "fan_push_open_settings"
         } else {
             "fan_push_enable"
         };
+        if opens_settings {
+            enable_after_settings.set(true);
+        }
         busy.set(true);
         spawn_local(async move {
             match bridge::invoke::<FanPushStatus, _>(command, &EmptyArgs {}).await {
                 Ok(value) => status.set(Some(value)),
-                Err(message) => error.set(Some(message)),
+                Err(message) => {
+                    if opens_settings {
+                        enable_after_settings.set(false);
+                    }
+                    error.set(Some(message));
+                }
             }
             busy.set(false);
         });
@@ -222,6 +262,8 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
                             tr("syncing_push_notifications")
                         } else if status.get().is_some_and(|value| value.enabled) {
                             tr("disable_push_notifications")
+                        } else if status.get().as_ref().is_some_and(|value| value.permission == "denied") {
+                            tr("open_notification_settings")
                         } else {
                             tr("enable_push_notifications")
                         }}

@@ -242,10 +242,33 @@ if args.signing:
 
 gradle.write_text(text, encoding="utf-8")
 
-# Android 13+ themed icons require a v33 adaptive-icon resource with an
-# explicit monochrome layer. Reuse the foreground generated immediately before
-# this script by `cargo tauri icon`; never replace it with stale launcher assets.
+# Tauri's generic icon generator uses the full app tile as the adaptive
+# foreground, which makes the Android foreground fully opaque. Keep one audited
+# platform-specific source of truth instead: legacy launchers use the full tile,
+# while adaptive foregrounds use the transparent Signal Core artwork.
+ANDROID_ICON_SOURCE_DIR = root / "src-tauri" / "icons" / "android"
 MONOCHROME_ADAPTIVE_ICON_DIR = "mipmap-anydpi-v33"
+
+
+def _install_android_launcher_assets() -> None:
+    resources = android / "app" / "src" / "main" / "res"
+    required = (
+        ANDROID_ICON_SOURCE_DIR / "mipmap-anydpi-v26" / "ic_launcher.xml",
+        ANDROID_ICON_SOURCE_DIR / "values" / "ic_launcher_background.xml",
+        ANDROID_ICON_SOURCE_DIR / "mipmap-xxxhdpi" / "ic_launcher.png",
+        ANDROID_ICON_SOURCE_DIR / "mipmap-xxxhdpi" / "ic_launcher_round.png",
+        ANDROID_ICON_SOURCE_DIR / "mipmap-xxxhdpi" / "ic_launcher_foreground.png",
+    )
+    missing = [str(path) for path in required if not path.is_file()]
+    if missing:
+        raise SystemExit(f"missing canonical Android launcher assets: {', '.join(missing)}")
+
+    for source_dir in sorted(path for path in ANDROID_ICON_SOURCE_DIR.iterdir() if path.is_dir()):
+        target_dir = resources / source_dir.name
+        target_dir.mkdir(parents=True, exist_ok=True)
+        for source in sorted(source_dir.iterdir()):
+            if source.is_file():
+                shutil.copy2(source, target_dir / source.name)
 
 
 def _install_monochrome_adaptive_icons() -> None:
@@ -256,17 +279,14 @@ def _install_monochrome_adaptive_icons() -> None:
 
     default_source = source_dir / "ic_launcher.xml"
     if not default_source.is_file():
-        raise SystemExit(f"missing Tauri-generated adaptive icon: {default_source}")
+        raise SystemExit(f"missing canonical adaptive icon: {default_source}")
 
     for filename in ("ic_launcher.xml", "ic_launcher_round.xml"):
         source = source_dir / filename
-        # Tauri may generate only the canonical adaptive icon. Android accepts
-        # the same adaptive layers for round launchers, so derive that alias
-        # instead of failing the whole APK build.
         if not source.is_file() and filename == "ic_launcher_round.xml":
             source = default_source
         if not source.is_file():
-            raise SystemExit(f"missing Tauri-generated adaptive icon: {source}")
+            raise SystemExit(f"missing canonical adaptive icon: {source}")
 
         xml = source.read_text(encoding="utf-8")
         if "<adaptive-icon" not in xml or "</adaptive-icon>" not in xml:
@@ -275,7 +295,6 @@ def _install_monochrome_adaptive_icons() -> None:
         monochrome = (
             '    <monochrome android:drawable="@mipmap/ic_launcher_foreground" />\n'
         )
-        # Keep the operation idempotent in reused local or CI workspaces.
         if "<monochrome" not in xml:
             xml = xml.replace("</adaptive-icon>", monochrome + "</adaptive-icon>", 1)
         if xml.count("<monochrome") != 1:
@@ -284,10 +303,10 @@ def _install_monochrome_adaptive_icons() -> None:
         target = target_dir / filename
         target.write_text(xml, encoding="utf-8")
 
+
+_install_android_launcher_assets()
 _install_monochrome_adaptive_icons()
 
-# Launcher resources are owned by the preceding `cargo tauri icon` step.
-# Never overwrite them here with stale hand-copied Android assets.
 gradle_properties = android / "gradle.properties"
 properties_text = gradle_properties.read_text(encoding="utf-8") if gradle_properties.exists() else ""
 managed_properties = {
@@ -430,6 +449,13 @@ def _stage_android_push() -> bool:
             raise SystemExit(f"missing Android push source: {source}")
         shutil.copy2(source, java_dir / filename)
 
+    notification_icon = PUSH_TEMPLATE_DIR / "virya_signal_notification.xml"
+    if not notification_icon.is_file():
+        raise SystemExit(f"missing Android notification icon: {notification_icon}")
+    drawable_dir = android / "app" / "src" / "main" / "res" / "drawable"
+    drawable_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(notification_icon, drawable_dir / notification_icon.name)
+
     manifest = android / "app" / "src" / "main" / "AndroidManifest.xml"
     tree = ET.parse(manifest)
     manifest_root = tree.getroot()
@@ -532,6 +558,6 @@ push_configured = _stage_android_push()
 
 print(
     f"Android project prepared: API 36, R8/resource shrinking=on, "
-    f"signing={'on' if args.signing else 'off'}, tauri-icons=on, debug-r8=off, "
+    f"signing={'on' if args.signing else 'off'}, canonical-icons=on, debug-r8=off, "
     f"push-firebase={'on' if push_configured else 'degraded-no-config'}"
 )

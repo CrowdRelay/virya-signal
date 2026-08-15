@@ -170,7 +170,7 @@ fn FanTicketCheckout(
         sale_loading.set(true);
         let event_slug = load_slug.clone();
         spawn_local(async move {
-            match bridge::invoke_latest::<Option<TicketSaleOffer>, _>(
+            let result = bridge::invoke_latest::<Option<TicketSaleOffer>, _>(
                 "fan_ticket_sale",
                 &EventArgs {
                     event_slug: &event_slug,
@@ -178,8 +178,9 @@ fn FanTicketCheckout(
                 15_000,
                 "fan:ticket-sale",
             )
-            .await
-            {
+            .await;
+            let completed = latest_request_completed(&result);
+            match result {
                 Ok(Some(Some(value))) => {
                     sale.set(Some(value));
                     sale_failed.set(false);
@@ -188,14 +189,16 @@ fn FanTicketCheckout(
                     sale.set(None);
                     sale_failed.set(false);
                 }
-                Ok(None) => return,
+                Ok(None) => {}
                 Err(message) => {
                     sale.set(None);
                     sale_failed.set(true);
                     error.set(Some(message));
                 }
             }
-            sale_loading.set(false);
+            if completed {
+                sale_loading.set(false);
+            }
         });
     });
     on_cleanup(move || bridge::invalidate_latest("fan:ticket-sale"));

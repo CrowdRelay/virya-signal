@@ -5,9 +5,21 @@ pub fn Skeleton(#[prop(default = 3)] rows: usize) -> impl IntoView {
 
 #[component]
 fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
+    // Each toast owns its dismissal generation. An older timeout must never
+    // clear a newer message that replaced it before the five-second window.
+    let dismiss_generation = RwSignal::new(0_u64);
     Effect::new(move |_| {
         if error.get().is_some() {
-            set_timeout(move || error.set(None), std::time::Duration::from_secs(5));
+            let generation = dismiss_generation.get_untracked().wrapping_add(1);
+            dismiss_generation.set(generation);
+            set_timeout(
+                move || {
+                    if dismiss_generation.get_untracked() == generation {
+                        error.set(None);
+                    }
+                },
+                std::time::Duration::from_secs(5),
+            );
         }
     });
     let is_success = move || {
@@ -31,6 +43,13 @@ fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
     view! { <Show when=move || error.get().is_some()><button class="toast" class:toast-success=is_success on:click=move |_| error.set(None)>{move || error.get().value_or_else(Default::default)}</button></Show> }
 }
 
+fn latest_request_completed<T>(result: &Result<Option<T>, String>) -> bool {
+    // `invoke_latest` maps an invalidated/stale invocation to `Ok(None)`. The
+    // newer invocation owns the loading flag, so the stale completion must not
+    // clear it while the replacement request is still in flight.
+    !matches!(result, Ok(None))
+}
+
 fn refresh_operator_parts(
     dashboard: RwSignal<Option<DashboardData>>,
     loading: RwSignal<OperatorLoadingState>,
@@ -47,21 +66,24 @@ fn refresh_operator_events(
 ) {
     loading.update(|state| state.events = true);
     spawn_local(async move {
-        match bridge::invoke_latest::<Vec<PublicEvent>, _>(
+        let result = bridge::invoke_latest::<Vec<PublicEvent>, _>(
             "operator_events",
             &EmptyArgs {},
             15_000,
             "operator:events",
         )
-        .await
-        {
+        .await;
+        let completed = latest_request_completed(&result);
+        match result {
             Ok(Some(value)) => dashboard.update(|state| {
                 state.get_or_insert_with(DashboardData::default).events = value;
             }),
-            Ok(None) => return,
+            Ok(None) => {}
             Err(message) => error.set(Some(message)),
         }
-        loading.update(|state| state.events = false);
+        if completed {
+            loading.update(|state| state.events = false);
+        }
     });
 }
 
@@ -72,21 +94,24 @@ fn refresh_operator_qr(
 ) {
     loading.update(|state| state.qr = true);
     spawn_local(async move {
-        match bridge::invoke_latest::<crate::models::ConcertQrOverview, _>(
+        let result = bridge::invoke_latest::<crate::models::ConcertQrOverview, _>(
             "operator_qr",
             &EmptyArgs {},
             15_000,
             "operator:qr",
         )
-        .await
-        {
+        .await;
+        let completed = latest_request_completed(&result);
+        match result {
             Ok(Some(value)) => dashboard.update(|state| {
                 state.get_or_insert_with(DashboardData::default).qr = Some(value);
             }),
-            Ok(None) => return,
+            Ok(None) => {}
             Err(message) => error.set(Some(message)),
         }
-        loading.update(|state| state.qr = false);
+        if completed {
+            loading.update(|state| state.qr = false);
+        }
     });
 }
 
@@ -107,12 +132,15 @@ fn refresh_operator_signal(
             "operator:signal",
         )
         .await;
+        let completed = latest_request_completed(&result);
         match result {
             Ok(Some(value)) => overview.set(Some(value)),
             Ok(None) => {}
             Err(message) => error.set(Some(message)),
         }
-        loading.set(false);
+        if completed {
+            loading.set(false);
+        }
     });
 }
 
@@ -127,19 +155,22 @@ fn refresh_operator_autopilot(
     }
     loading.set(true);
     spawn_local(async move {
-        match bridge::invoke_latest::<OperatorAutopilotOverview, _>(
+        let result = bridge::invoke_latest::<OperatorAutopilotOverview, _>(
             "operator_autopilot_overview",
             &EmptyArgs {},
             20_000,
             "operator:autopilot",
         )
-        .await
-        {
+        .await;
+        let completed = latest_request_completed(&result);
+        match result {
             Ok(Some(value)) => overview.set(Some(value)),
-            Ok(None) => return,
+            Ok(None) => {}
             Err(message) => error.set(Some(message)),
         }
-        loading.set(false);
+        if completed {
+            loading.set(false);
+        }
     });
 }
 
@@ -153,19 +184,22 @@ fn refresh_operator_chief(
     }
     loading.set(true);
     spawn_local(async move {
-        match bridge::invoke_latest::<AutopilotChiefOfStaff, _>(
+        let result = bridge::invoke_latest::<AutopilotChiefOfStaff, _>(
             "operator_autopilot_chief_of_staff",
             &EmptyArgs {},
             20_000,
             "operator:autopilot:chief",
         )
-        .await
-        {
+        .await;
+        let completed = latest_request_completed(&result);
+        match result {
             Ok(Some(value)) => brief.set(Some(value)),
             Ok(None) => {}
             Err(message) => error.set(Some(message)),
         }
-        loading.set(false);
+        if completed {
+            loading.set(false);
+        }
     });
 }
 
@@ -174,21 +208,27 @@ fn refresh_operator_ops(
     loading: RwSignal<bool>,
     error: RwSignal<Option<String>>,
 ) {
+    if loading.get_untracked() {
+        return;
+    }
     loading.set(true);
     spawn_local(async move {
-        match bridge::invoke_latest::<OperatorOpsOverview, _>(
+        let result = bridge::invoke_latest::<OperatorOpsOverview, _>(
             "operator_ops_overview",
             &EmptyArgs {},
             20_000,
             "operator:ops",
         )
-        .await
-        {
+        .await;
+        let completed = latest_request_completed(&result);
+        match result {
             Ok(Some(value)) => overview.set(Some(value)),
-            Ok(None) => return,
+            Ok(None) => {}
             Err(message) => error.set(Some(message)),
         }
-        loading.set(false);
+        if completed {
+            loading.set(false);
+        }
     });
 }
 
@@ -208,23 +248,26 @@ fn refresh_fan_home(
 ) {
     loading.update(|state| state.home = true);
     spawn_local(async move {
-        match bridge::invoke_latest::<FanHomeData, _>(
+        let result = bridge::invoke_latest::<FanHomeData, _>(
             "fan_home",
             &EmptyArgs {},
             12_000,
             "fan:home",
         )
-        .await
-        {
+        .await;
+        let completed = latest_request_completed(&result);
+        match result {
             Ok(Some(value)) if value.has_supported_schema() => home.set(Some(value)),
             Ok(Some(value)) => error.set(Some(i18n::format(
                 "unsupported_signal_snapshot_version",
                 &[value.schema_version.to_string()],
             ))),
-            Ok(None) => return,
+            Ok(None) => {}
             Err(message) => error.set(Some(message)),
         }
-        loading.update(|state| state.home = false);
+        if completed {
+            loading.update(|state| state.home = false);
+        }
     });
 }
 
@@ -247,22 +290,25 @@ fn refresh_fan_events(
 ) {
     loading.update(|state| state.events = true);
     spawn_local(async move {
-        match bridge::invoke_latest::<Vec<PublicEvent>, _>(
+        let result = bridge::invoke_latest::<Vec<PublicEvent>, _>(
             "fan_events",
             &EmptyArgs {},
             15_000,
             "fan:events",
         )
-        .await
-        {
+        .await;
+        let completed = latest_request_completed(&result);
+        match result {
             Ok(Some(value)) => dashboard.update(|state| {
                 state.get_or_insert_with(FanDashboardData::default).events =
                     stable_fan_events(value);
             }),
-            Ok(None) => return,
+            Ok(None) => {}
             Err(message) => error.set(Some(message)),
         }
-        loading.update(|state| state.events = false);
+        if completed {
+            loading.update(|state| state.events = false);
+        }
     });
 }
 
@@ -273,22 +319,25 @@ fn refresh_fan_merch(
 ) {
     loading.update(|state| state.merch = true);
     spawn_local(async move {
-        match bridge::invoke_latest::<MerchCatalog, _>(
+        let result = bridge::invoke_latest::<MerchCatalog, _>(
             "fan_merch_catalog",
             &EmptyArgs {},
             15_000,
             "fan:merch",
         )
-        .await
-        {
+        .await;
+        let completed = latest_request_completed(&result);
+        match result {
             Ok(Some(value)) => merch.set(Some(value)),
-            Ok(None) => return,
+            Ok(None) => {}
             Err(message) => {
                 merch.set(None);
                 error.set(Some(message));
             }
         }
-        loading.update(|state| state.merch = false);
+        if completed {
+            loading.update(|state| state.merch = false);
+        }
     });
 }
 
@@ -316,21 +365,24 @@ fn refresh_fan_referral(
 ) {
     loading.update(|state| state.referral = true);
     spawn_local(async move {
-        match bridge::invoke_latest::<ReferralProgress, _>(
+        let result = bridge::invoke_latest::<ReferralProgress, _>(
             "fan_referral",
             &EmptyArgs {},
             15_000,
             "fan:referral",
         )
-        .await
-        {
+        .await;
+        let completed = latest_request_completed(&result);
+        match result {
             Ok(Some(value)) => dashboard.update(|state| {
                 state.get_or_insert_with(FanDashboardData::default).referral = value;
             }),
-            Ok(None) => return,
+            Ok(None) => {}
             Err(message) => error.set(Some(message)),
         }
-        loading.update(|state| state.referral = false);
+        if completed {
+            loading.update(|state| state.referral = false);
+        }
     });
 }
 
@@ -341,23 +393,26 @@ fn refresh_fan_interests(
 ) {
     loading.update(|state| state.interests = true);
     spawn_local(async move {
-        match bridge::invoke_latest::<Vec<FanEventInterest>, _>(
+        let result = bridge::invoke_latest::<Vec<FanEventInterest>, _>(
             "fan_interests",
             &EmptyArgs {},
             15_000,
             "fan:interests",
         )
-        .await
-        {
+        .await;
+        let completed = latest_request_completed(&result);
+        match result {
             Ok(Some(value)) => dashboard.update(|state| {
                 state
                     .get_or_insert_with(FanDashboardData::default)
                     .interests = stable_fan_interests(value);
             }),
-            Ok(None) => return,
+            Ok(None) => {}
             Err(message) => error.set(Some(message)),
         }
-        loading.update(|state| state.interests = false);
+        if completed {
+            loading.update(|state| state.interests = false);
+        }
     });
 }
 
@@ -368,23 +423,26 @@ fn refresh_fan_admission_pass(
 ) {
     loading.update(|state| state.admission_pass = true);
     spawn_local(async move {
-        match bridge::invoke_latest::<Option<AdmissionPass>, _>(
+        let result = bridge::invoke_latest::<Option<AdmissionPass>, _>(
             "fan_admission_pass",
             &EmptyArgs {},
             15_000,
             "fan:admission",
         )
-        .await
-        {
+        .await;
+        let completed = latest_request_completed(&result);
+        match result {
             Ok(Some(value)) => dashboard.update(|state| {
                 state
                     .get_or_insert_with(FanDashboardData::default)
                     .admission_pass = value;
             }),
-            Ok(None) => return,
+            Ok(None) => {}
             Err(message) => error.set(Some(message)),
         }
-        loading.update(|state| state.admission_pass = false);
+        if completed {
+            loading.update(|state| state.admission_pass = false);
+        }
     });
 }
 
@@ -395,19 +453,22 @@ fn refresh_fan_area(
 ) {
     loading.update(|state| state.area = true);
     spawn_local(async move {
-        match bridge::invoke_latest::<AreaWallet, _>(
+        let result = bridge::invoke_latest::<AreaWallet, _>(
             "fan_area_wallet",
             &EmptyArgs {},
             15_000,
             "fan:area",
         )
-        .await
-        {
+        .await;
+        let completed = latest_request_completed(&result);
+        match result {
             Ok(Some(value)) => area.set(Some(value)),
-            Ok(None) => return,
+            Ok(None) => {}
             Err(message) => error.set(Some(message)),
         }
-        loading.update(|state| state.area = false);
+        if completed {
+            loading.update(|state| state.area = false);
+        }
     });
 }
 
@@ -420,14 +481,15 @@ fn refresh_wallets(
         loading.update(|state| state.wallets = true);
     }
     spawn_local(async move {
-        match bridge::invoke_latest::<WalletBatch, _>(
+        let result = bridge::invoke_latest::<WalletBatch, _>(
             "fan_wallets",
             &EmptyArgs {},
             35_000,
             "fan:wallets",
         )
-        .await
-        {
+        .await;
+        let completed = latest_request_completed(&result);
+        match result {
             Ok(Some(value)) => {
                 wallets.set(stable_wallets(value.wallets));
                 if value.failed_count > 0 {
@@ -445,11 +507,13 @@ fn refresh_wallets(
                     )));
                 }
             }
-            Ok(None) => return,
+            Ok(None) => {}
             Err(message) => error.set(Some(message)),
         }
-        if let Some(loading) = loading {
-            loading.update(|state| state.wallets = false);
+        if completed {
+            if let Some(loading) = loading {
+                loading.update(|state| state.wallets = false);
+            }
         }
     });
 }
