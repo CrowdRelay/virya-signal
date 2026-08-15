@@ -64,18 +64,19 @@ where
 
 /// Fetches the launcher-time status for both operator and fan sessions in a
 /// single native round-trip, cutting startup IPC latency roughly in half.
-pub async fn launcher_status() -> Result<crate::models::LauncherStatus, String> {
+pub async fn launcher_status() -> Result<Option<crate::models::LauncherStatus>, String> {
     #[derive(Serialize)]
     struct LauncherStatusArgs {
         locale: &'static str,
     }
 
-    invoke_timeout::<crate::models::LauncherStatus, _>(
+    invoke_latest::<crate::models::LauncherStatus, _>(
         "launcher_status",
         &LauncherStatusArgs {
             locale: i18n::current().code(),
         },
         10_000,
+        "launcher:status",
     )
     .await
 }
@@ -108,6 +109,25 @@ where
 
 pub fn invalidate_latest(prefix: &str) {
     invalidate_latest_js(prefix);
+}
+
+pub fn referral_code_from_location() -> Option<String> {
+    let value = referral_code_from_location_js();
+    let value = value.trim();
+    (!value.is_empty()).then(|| value.to_owned())
+}
+
+pub async fn share_text(title: &str, text: &str, url: &str) -> Result<String, String> {
+    #[wasm_bindgen]
+    extern "C" {
+        #[wasm_bindgen(catch, js_name = viryaShareText)]
+        async fn share_text_js(title: &str, text: &str, url: &str) -> Result<JsValue, JsValue>;
+    }
+    share_text_js(title, text, url)
+        .await
+        .map_err(js_error)?
+        .as_string()
+        .ok_or_else(|| i18n::tr("server_response_has_an_unexpected_format").to_owned())
 }
 
 pub async fn invoke_unit<A>(command: &str, args: &A) -> Result<(), String>

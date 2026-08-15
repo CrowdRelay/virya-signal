@@ -57,6 +57,37 @@ function viryaPersistOperation(operation) {
 
 export function viryaNativeBridgeAvailable() { return Boolean(window.__TAURI__?.core?.invoke); }
 
+export function viryaReferralCodeFromLocation() {
+  try {
+    const value = new URL(window.location.href).searchParams.get('ref')?.trim() ?? '';
+    return /^[A-Za-z0-9_-]{2,64}$/.test(value) ? value : '';
+  } catch {
+    return '';
+  }
+}
+
+export async function viryaShareText(title, text, url) {
+  const safeTitle = String(title ?? '').slice(0, 160);
+  const safeText = String(text ?? '').slice(0, 500);
+  const safeUrl = String(url ?? '').slice(0, 2_048);
+  if (window.navigator?.share) {
+    try {
+      await window.navigator.share({ title: safeTitle, text: safeText, url: safeUrl });
+      return 'shared';
+    } catch (error) {
+      if (error?.name === 'AbortError') return 'cancelled';
+      window.console?.warn?.('[virya:share] native share failed, using clipboard fallback', error);
+    }
+  }
+  if (window.navigator?.clipboard?.writeText) {
+    await window.navigator.clipboard.writeText([safeText, safeUrl].filter(Boolean).join('\n'));
+    return 'copied';
+  }
+  throw new Error('share_unavailable');
+}
+
+export async function viryaCollectLocationSamples(minSamples, maxSamples, minDurationMs) {
+
 export async function viryaInvoke(command, args, timeoutMs) {
   const timeout = Math.max(1_000, Math.min(Number(timeoutMs) || 30_000, 60_000));
   const startedAt = Date.now();
@@ -805,6 +836,12 @@ export function viryaInstallRuntimeGuards() {
 extern "C" {
     #[wasm_bindgen(js_name = viryaNativeBridgeAvailable)]
     fn native_bridge_available_js() -> bool;
+
+    #[wasm_bindgen(js_name = viryaReferralCodeFromLocation)]
+    fn referral_code_from_location_js() -> String;
+
+    #[wasm_bindgen(catch, js_name = viryaShareText)]
+    async fn share_text_js(title: &str, text: &str, url: &str) -> Result<JsValue, JsValue>;
     #[wasm_bindgen(catch, js_name = viryaInvoke)]
     async fn invoke_js(command: &str, args: JsValue, timeout_ms: u32) -> Result<JsValue, JsValue>;
 
