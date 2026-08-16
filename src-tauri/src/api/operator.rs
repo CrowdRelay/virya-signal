@@ -164,6 +164,24 @@ impl super::CrowdRelayClient {
             .await
     }
 
+    pub async fn operator_disable_android_push(
+        &self,
+        profile: &OperatorProfile,
+        installation_id: &str,
+    ) -> Result<super::fan::FanPushMutationApi, AppError> {
+        let body = serde_json::json!({
+            "installation_id": installation_id,
+            "transport": "android_fcm",
+        });
+        self.auth_json(
+            profile,
+            Method::POST,
+            "staff/push/endpoints/disable",
+            Some(&body),
+        )
+        .await
+    }
+
     pub async fn operator_qr(
         &self,
         profile: &OperatorProfile,

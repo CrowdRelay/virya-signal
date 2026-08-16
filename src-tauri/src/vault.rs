@@ -496,6 +496,7 @@ mod tests {
             api_base_url: "https://signal-api.virya.music/v1/".to_owned(),
             role: OperatorRole::Staff,
             bearer_token: "staff-device-token-0123456789abcdef".to_owned(),
+            session_expires_at: None,
         }
     }
 

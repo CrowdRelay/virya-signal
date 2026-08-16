@@ -154,6 +154,17 @@ fn OperatorChecklist(
         });
     };
 
+    let disable_push = move |_| {
+        push_loading.set(true);
+        spawn_local(async move {
+            match bridge::invoke::<FanPushStatus, _>("operator_push_disable", &EmptyArgs {}).await {
+                Ok(value) => push_status.set(Some(value)),
+                Err(message) => error.set(Some(message)),
+            }
+            push_loading.set(false);
+        });
+    };
+
     let toggle = move |item_key: String, current_status: String| {
         let event_slug = selected_slug.get();
         if event_slug.is_empty() || busy_item.get_untracked().is_some() {
@@ -212,7 +223,12 @@ fn OperatorChecklist(
                         view! { <p>{tr("syncing_push_notifications")}</p> }.into_any()
                     } else if let Some(status) = push_status.get() {
                         if status.enabled {
-                            view! { <p class="success-note">{tr("team_push_active")}</p> }.into_any()
+                            view! {
+                                <div class="form-grid">
+                                    <p class="success-note">{tr("team_push_active")}</p>
+                                    <button class="ghost" type="button" on:click=disable_push>{tr("disable_push_notifications")}</button>
+                                </div>
+                            }.into_any()
                         } else {
                             view! {
                                 <div class="form-grid">

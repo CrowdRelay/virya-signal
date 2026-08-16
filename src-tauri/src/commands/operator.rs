@@ -1,7 +1,7 @@
 //! Operator (owner/staff) session lifecycle and every CrowdRelay command that
 //! requires an authenticated operator bearer token.
 
-use std::sync::Arc;
+use std::{path::Path, sync::Arc};
 
 use tauri::{AppHandle, State};
 use zeroize::Zeroizing;
@@ -21,6 +21,55 @@ use crate::{
     },
     vault,
 };
+
+const OPERATOR_PUSH_PREFERENCE_FILE: &str = "staff-push-preference-v1.json";
+
+#[derive(Clone, Copy, Debug, Default, serde::Deserialize, serde::Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct OperatorPushPreference {
+    desired: bool,
+    last_sync_ok: bool,
+}
+
+fn read_operator_push_preference(app_data_dir: &Path) -> OperatorPushPreference {
+    let path = app_data_dir.join(OPERATOR_PUSH_PREFERENCE_FILE);
+    let Ok(bytes) = std::fs::read(path) else {
+        return OperatorPushPreference::default();
+    };
+    if bytes.len() > 256 {
+        return OperatorPushPreference::default();
+    }
+    serde_json::from_slice(&bytes).unwrap_or_default()
+}
+
+fn persist_operator_push_preference(
+    app_data_dir: &Path,
+    preference: OperatorPushPreference,
+) -> Result<(), AppError> {
+    std::fs::create_dir_all(app_data_dir)?;
+    let path = app_data_dir.join(OPERATOR_PUSH_PREFERENCE_FILE);
+    let temporary = app_data_dir.join(format!(".{OPERATOR_PUSH_PREFERENCE_FILE}.tmp"));
+    std::fs::write(&temporary, serde_json::to_vec(&preference)?)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        std::fs::set_permissions(&temporary, std::fs::Permissions::from_mode(0o600))?;
+    }
+    if path.exists() {
+        std::fs::remove_file(&path)?;
+    }
+    std::fs::rename(temporary, path)?;
+    Ok(())
+}
+
+fn clear_operator_push_preference(app_data_dir: &Path) -> Result<(), AppError> {
+    let path = app_data_dir.join(OPERATOR_PUSH_PREFERENCE_FILE);
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error.into()),
+    }
+}
 
 #[tauri::command]
 pub(crate) async fn session_status(state: State<'_, AppState>) -> Result<SessionStatus, AppError> {
@@ -107,7 +156,28 @@ pub(crate) async fn lock(state: State<'_, AppState>) -> Result<SessionStatus, Ap
 #[tauri::command]
 pub(crate) async fn forget_device(state: State<'_, AppState>) -> Result<SessionStatus, AppError> {
     let _mutation = state.operator_mutation.lock().await;
+    let _push_mutation = state.operator_push_mutation.lock().await;
     let _show_mutation = state.show_mode_mutation.lock().await;
+
+    // A removed staff profile must not leave a live, authenticated push endpoint
+    // behind. Forget therefore requires the profile to be unlocked: without its
+    // bearer there is no safe way to prove remote endpoint cleanup. `lock` stays
+    // available for immediate local privacy without destroying that capability.
+    let profile = state.session.read().await.clone().ok_or(AppError::Locked)?;
+    if let Some(installation_id) = super::fan::read_native_push_installation_id(&state.app_data_dir)
+    {
+        let response = state
+            .api
+            .operator_disable_android_push(&profile, &installation_id)
+            .await?;
+        if response.registered {
+            return Err(AppError::Conflict(
+                "staff_push_disable_not_confirmed".to_owned(),
+            ));
+        }
+    }
+
+    clear_operator_push_preference(&state.app_data_dir)?;
     *state.session.write().await = None;
     *state.operator_pin.write().await = None;
     *state.operator_vault_password.write().await = None;
@@ -115,6 +185,7 @@ pub(crate) async fn forget_device(state: State<'_, AppState>) -> Result<SessionS
     let app_data_dir = state.app_data_dir.clone();
     run_blocking(move || vault::remove(&app_data_dir)).await?;
     drop(_show_mutation);
+    drop(_push_mutation);
     drop(_mutation);
     session_status(state).await
 }
@@ -165,6 +236,7 @@ async fn sync_operator_push(
 ) -> Result<FanPushStatus, AppError> {
     let profile = operator_profile(state).await?;
     let supported = cfg!(target_os = "android") && state.native_push_available;
+    let preference = read_operator_push_preference(&state.app_data_dir);
     if !supported {
         return Ok(FanPushStatus {
             supported: false,
@@ -173,26 +245,74 @@ async fn sync_operator_push(
             ..FanPushStatus::default()
         });
     }
-    let config = state.api.operator_push_config(&profile).await?;
-    let backend_enabled = config.enabled && config.android_fcm;
-    if !backend_enabled {
-        return Ok(FanPushStatus {
-            supported,
-            backend_enabled: false,
-            permission: super::fan::native_push_permission(app)
-                .unwrap_or_else(|_| "unknown".to_owned()),
-            transport: Some("android_fcm".to_owned()),
-            detail: Some("push_delivery_not_live".to_owned()),
-            ..FanPushStatus::default()
-        });
-    }
+
     let permission = if request_permission {
         super::fan::request_native_push_permission(app)
     } else {
         super::fan::native_push_permission(app)
     }
     .map_err(AppError::InvalidInput)?;
+
+    if !preference.desired {
+        if !preference.last_sync_ok {
+            if let Some(installation_id) =
+                super::fan::read_native_push_installation_id(&state.app_data_dir)
+            {
+                let response = state
+                    .api
+                    .operator_disable_android_push(&profile, &installation_id)
+                    .await?;
+                if response.registered {
+                    return Err(AppError::Conflict(
+                        "staff_push_disable_not_confirmed".to_owned(),
+                    ));
+                }
+            }
+            persist_operator_push_preference(
+                &state.app_data_dir,
+                OperatorPushPreference {
+                    desired: false,
+                    last_sync_ok: true,
+                },
+            )?;
+        }
+        return Ok(FanPushStatus {
+            supported,
+            backend_enabled: true,
+            enabled: false,
+            permission,
+            transport: Some("android_fcm".to_owned()),
+            detail: None,
+        });
+    }
+
+    let config = state.api.operator_push_config(&profile).await?;
+    let backend_enabled = config.enabled && config.android_fcm;
+    if !backend_enabled {
+        persist_operator_push_preference(
+            &state.app_data_dir,
+            OperatorPushPreference {
+                desired: true,
+                last_sync_ok: false,
+            },
+        )?;
+        return Ok(FanPushStatus {
+            supported,
+            backend_enabled: false,
+            permission,
+            transport: Some("android_fcm".to_owned()),
+            detail: Some("push_delivery_not_live".to_owned()),
+            ..FanPushStatus::default()
+        });
+    }
     if permission != "granted" {
+        persist_operator_push_preference(
+            &state.app_data_dir,
+            OperatorPushPreference {
+                desired: true,
+                last_sync_ok: false,
+            },
+        )?;
         return Ok(FanPushStatus {
             supported,
             backend_enabled,
@@ -208,6 +328,13 @@ async fn sync_operator_push(
         .api
         .operator_register_android_push(&profile, &installation_id, &token)
         .await?;
+    persist_operator_push_preference(
+        &state.app_data_dir,
+        OperatorPushPreference {
+            desired: true,
+            last_sync_ok: response.registered,
+        },
+    )?;
     Ok(FanPushStatus {
         supported,
         backend_enabled,
@@ -223,6 +350,7 @@ pub(crate) async fn operator_push_sync(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<FanPushStatus, AppError> {
+    let _push_mutation = state.operator_push_mutation.lock().await;
     sync_operator_push(&state, &app, false).await
 }
 
@@ -231,7 +359,71 @@ pub(crate) async fn operator_push_enable(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<FanPushStatus, AppError> {
+    let _push_mutation = state.operator_push_mutation.lock().await;
+    operator_profile(&state).await?;
+    persist_operator_push_preference(
+        &state.app_data_dir,
+        OperatorPushPreference {
+            desired: true,
+            last_sync_ok: false,
+        },
+    )?;
     sync_operator_push(&state, &app, true).await
+}
+
+#[tauri::command]
+pub(crate) async fn operator_push_disable(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<FanPushStatus, AppError> {
+    let _push_mutation = state.operator_push_mutation.lock().await;
+    let profile = operator_profile(&state).await?;
+    persist_operator_push_preference(
+        &state.app_data_dir,
+        OperatorPushPreference {
+            desired: false,
+            last_sync_ok: false,
+        },
+    )?;
+    let mut detail = None;
+    if let Some(installation_id) = super::fan::read_native_push_installation_id(&state.app_data_dir)
+    {
+        match state
+            .api
+            .operator_disable_android_push(&profile, &installation_id)
+            .await
+        {
+            Ok(response) if !response.registered => {
+                persist_operator_push_preference(
+                    &state.app_data_dir,
+                    OperatorPushPreference {
+                        desired: false,
+                        last_sync_ok: true,
+                    },
+                )?;
+            }
+            Ok(_) => detail = Some("staff_push_disable_not_confirmed".to_owned()),
+            Err(error) => detail = Some(format!("remote_disable_unconfirmed:{error}")),
+        }
+    } else {
+        persist_operator_push_preference(
+            &state.app_data_dir,
+            OperatorPushPreference {
+                desired: false,
+                last_sync_ok: true,
+            },
+        )?;
+    }
+    let permission =
+        super::fan::native_push_permission(&app).unwrap_or_else(|_| "unknown".to_owned());
+    Ok(FanPushStatus {
+        supported: cfg!(target_os = "android") && state.native_push_available,
+        backend_enabled: true,
+        enabled: false,
+        permission,
+        transport: Some("android_fcm".to_owned()),
+        detail,
+    })
 }
 
 #[tauri::command]

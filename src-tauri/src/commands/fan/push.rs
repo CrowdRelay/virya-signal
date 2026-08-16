@@ -54,16 +54,6 @@ pub(crate) fn native_push_token(_app: &AppHandle) -> Result<String, String> {
 }
 
 #[cfg(target_os = "android")]
-fn delete_native_push_token(app: &AppHandle) -> Result<(), String> {
-    crate::push_plugin::delete_token(app)
-}
-
-#[cfg(not(target_os = "android"))]
-fn delete_native_push_token(_app: &AppHandle) -> Result<(), String> {
-    Ok(())
-}
-
-#[cfg(target_os = "android")]
 fn take_native_push_target(app: &AppHandle) -> Result<Option<String>, String> {
     crate::push_plugin::take_launch_target(app)
 }
@@ -156,12 +146,19 @@ async fn sync_native_push_if_desired(
             return Ok(());
         }
         if let Some(installation_id) = read_native_push_installation_id(&state.app_data_dir) {
-            state
+            let response = state
                 .api
                 .fan_disable_android_push(&profile, &installation_id)
                 .await?;
+            if response.registered {
+                return Err(AppError::Conflict(
+                    "fan_push_disable_not_confirmed".to_owned(),
+                ));
+            }
         }
-        delete_native_push_token(app).map_err(AppError::InvalidInput)?;
+        // FCM tokens are device-scoped and shared by fan/staff audiences.
+        // Disabling the fan audience must never delete the provider token, or
+        // staff reminders on the same installation would silently break.
         persist_push_state(state, &profile, false, true).await?;
         return Ok(());
     }
@@ -258,22 +255,24 @@ pub(crate) async fn fan_push_disable(
     let _mutation = state.fan_mutation.lock().await;
     let profile = fan_profile(&state).await?;
     let profile = persist_push_state(&state, &profile, false, false).await?;
-    let token_delete_error = delete_native_push_token(&app).err();
-    let remote_error = match read_native_push_installation_id(&state.app_data_dir) {
-        Some(installation_id) => state
+    let detail = match read_native_push_installation_id(&state.app_data_dir) {
+        Some(installation_id) => match state
             .api
             .fan_disable_android_push(&profile, &installation_id)
             .await
-            .err()
-            .map(|error| error.to_string()),
-        None => None,
+        {
+            Ok(response) if !response.registered => {
+                persist_push_state(&state, &profile, false, true).await?;
+                None
+            }
+            Ok(_) => Some("fan_push_disable_not_confirmed".to_owned()),
+            Err(error) => Some(format!("remote_disable_unconfirmed:{error}")),
+        },
+        None => {
+            persist_push_state(&state, &profile, false, true).await?;
+            None
+        }
     };
-    if token_delete_error.is_none() && remote_error.is_none() {
-        persist_push_state(&state, &profile, false, true).await?;
-    }
-    let detail = token_delete_error
-        .map(|error| format!("token_delete_unconfirmed:{error}"))
-        .or_else(|| remote_error.map(|error| format!("remote_disable_unconfirmed:{error}")));
     Ok(current_native_push_status(&state, &app, detail).await)
 }
 

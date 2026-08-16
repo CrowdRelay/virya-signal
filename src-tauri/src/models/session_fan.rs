@@ -6,6 +6,9 @@ pub struct OperatorProfile {
     #[zeroize(skip)]
     pub role: OperatorRole,
     pub bearer_token: String,
+    #[serde(default)]
+    #[zeroize(skip)]
+    pub session_expires_at: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -13,6 +16,7 @@ pub struct SessionSummary {
     pub display_name: String,
     pub api_base_url: String,
     pub role: OperatorRole,
+    pub session_expires_at: Option<u64>,
 }
 
 impl From<&OperatorProfile> for SessionSummary {
@@ -21,6 +25,7 @@ impl From<&OperatorProfile> for SessionSummary {
             display_name: value.display_name.clone(),
             api_base_url: value.api_base_url.clone(),
             role: value.role.clone(),
+            session_expires_at: value.session_expires_at,
         }
     }
 }

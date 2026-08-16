@@ -29,6 +29,8 @@ pub struct SessionSummary {
     pub display_name: String,
     pub api_base_url: String,
     pub role: OperatorRole,
+    #[serde(default)]
+    pub session_expires_at: Option<u64>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]

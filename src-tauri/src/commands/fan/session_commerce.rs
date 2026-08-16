@@ -43,22 +43,29 @@ pub(crate) async fn fan_lock(state: State<'_, AppState>) -> Result<FanSessionSta
 #[tauri::command]
 pub(crate) async fn fan_forget(
     state: State<'_, AppState>,
-    app: AppHandle,
 ) -> Result<FanSessionStatus, AppError> {
     let _mutation = state.fan_mutation.lock().await;
-    if let Some(profile) = state.fan_session.read().await.clone() {
-        if let Some(installation_id) = read_native_push_installation_id(&state.app_data_dir)
-            && let Err(error) = state
-                .api
-                .fan_disable_android_push(&profile, &installation_id)
-                .await
-        {
-            eprintln!("[virya:push-disable] remote disable before forget degraded: {error}");
-        }
-        if let Err(error) = delete_native_push_token(&app) {
-            eprintln!("[virya:push-disable] local token delete before forget degraded: {error}");
+    let profile = state
+        .fan_session
+        .read()
+        .await
+        .clone()
+        .ok_or(AppError::Locked)?;
+    if let Some(installation_id) = read_native_push_installation_id(&state.app_data_dir) {
+        let response = state
+            .api
+            .fan_disable_android_push(&profile, &installation_id)
+            .await?;
+        if response.registered {
+            return Err(AppError::Conflict(
+                "fan_push_disable_not_confirmed".to_owned(),
+            ));
         }
     }
+    // Do not delete the device-scoped FCM token here: an unlocked staff
+    // profile may intentionally use the same installation for reminders.
+    // Requiring an unlocked fan session guarantees we still have the bearer
+    // needed to confirm remote audience cleanup before the vault is removed.
     *state.fan_session.write().await = None;
     *state.fan_pin.write().await = None;
     state.wallet_qr_tokens.write().await.clear();

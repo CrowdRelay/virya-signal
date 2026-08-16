@@ -551,6 +551,12 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "closed" => "CLOSED",
         "owner" => "OWNER",
         "staff" => "STAFF",
+        "staff_session_expired_pair_again" => {
+            "This staff device session has expired. Pair the device again before online staff operations."
+        }
+        "staff_session_expires_soon_pair_again" => {
+            "This staff device session expires within 24 hours. Pair the device again before the next show."
+        }
         "device_label" => "DEVICE",
         "mobile_wallet" => "MOBILE WALLET",
         "virya_control" => "VIRYA CONTROL",

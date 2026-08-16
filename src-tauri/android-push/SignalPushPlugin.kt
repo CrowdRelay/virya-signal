@@ -54,21 +54,6 @@ class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     @Command
-    fun deleteToken(invoke: Invoke) {
-        if (FirebaseApp.getApps(activity.applicationContext).isEmpty()) {
-            invoke.resolve()
-            return
-        }
-        FirebaseMessaging.getInstance().deleteToken().addOnCompleteListener { task ->
-            if (task.isSuccessful) invoke.resolve() else invoke.reject("fcm_token_delete_failed")
-        }
-    }
-
-    // Do not override Tauri's built-in checkPermissions/requestPermissions commands.
-    // PluginHandle indexes commands by method name across the whole class hierarchy,
-    // so an override can be shadowed by Plugin's inherited command and return Tauri's
-    // `{ notification: ... }` schema instead of our stable `{ permissionState: ... }`.
-    @Command
     fun getNotificationPermissionState(invoke: Invoke) {
         permissionState(invoke)
     }

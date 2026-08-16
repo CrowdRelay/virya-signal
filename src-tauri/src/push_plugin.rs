@@ -99,14 +99,6 @@ mod android {
             .map(|_| ())
             .map_err(|error| error.to_string())
     }
-
-    pub fn delete_token<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
-        handle(app)
-            .0
-            .run_mobile_plugin::<serde_json::Value>("deleteToken", ())
-            .map(|_| ())
-            .map_err(|error| error.to_string())
-    }
 }
 
 #[cfg(target_os = "android")]

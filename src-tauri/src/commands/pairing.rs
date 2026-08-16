@@ -56,6 +56,7 @@ pub(crate) async fn configure_from_pairing(
             api_base_url: pairing.api_base_url,
             role: exchange.role,
             bearer_token: exchange.bearer_token,
+            session_expires_at: Some(exchange.expires_at),
         },
     )
     .await

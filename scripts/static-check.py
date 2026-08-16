@@ -73,6 +73,10 @@ for item in required:
     if not (root / item).is_file():
         raise SystemExit(f'missing {item}')
 
+for retired in ('boot-initializer.mjs', 'src-tauri/launcher-assets'):
+    if (root / retired).exists():
+        raise SystemExit(f'retired source must stay deleted: {retired}')
+
 ui_main = read_app_source(root)
 ui = ui_main
 native = (root / 'src-tauri/src/lib.rs').read_text()

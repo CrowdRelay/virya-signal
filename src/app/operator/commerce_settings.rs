@@ -367,6 +367,18 @@ fn OperatorSettings(
                 <LanguageSwitch />
                 <article><div><strong>{tr("connection")}</strong><p>{move || status.get().session.map(|s| s.api_base_url).value_or_else(Default::default)}</p></div><span class:online=move || !loading.get().events && !loading.get().qr>{move || if loading.get().events || loading.get().qr { tr("connecting_2") } else { tr("online") }}</span></article>
                 <article><div><strong>{tr("permissions")}</strong><p>{move || status.get().session.map(|s| s.role.label().to_owned()).value_or_else(Default::default)}</p></div></article>
+                {move || status.get().session.and_then(|session| {
+                    let expires_at = session.session_expires_at?;
+                    let now = (js_sys::Date::now() / 1_000.0).max(0.0) as u64;
+                    let key = if expires_at <= now {
+                        Some("staff_session_expired_pair_again")
+                    } else if expires_at.saturating_sub(now) <= 86_400 {
+                        Some("staff_session_expires_soon_pair_again")
+                    } else {
+                        None
+                    };
+                    key.map(|key| view! { <p class="security-note warning">{tr(key)}</p> })
+                })}
                 <button on:click=refresh disabled=move || loading.get().events || loading.get().qr>{tr("refresh_all_data")}</button>
                 <button on:click=lock>{tr("lock_panel")}</button>
                 <button class="danger ghost" on:click=forget>{tr("remove_operator_profile")}</button>

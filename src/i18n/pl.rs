@@ -551,6 +551,12 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "closed" => "CLOSED",
         "owner" => "OWNER",
         "staff" => "STAFF",
+        "staff_session_expired_pair_again" => {
+            "Sesja staff tego urządzenia wygasła. Sparuj urządzenie ponownie przed operacjami online."
+        }
+        "staff_session_expires_soon_pair_again" => {
+            "Sesja staff tego urządzenia wygaśnie w ciągu 24 godzin. Sparuj je ponownie przed kolejnym koncertem."
+        }
         "device_label" => "DEVICE",
         "mobile_wallet" => "MOBILE WALLET",
         "virya_control" => "VIRYA CONTROL",
