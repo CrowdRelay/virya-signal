@@ -1,3 +1,5 @@
+use crate::app::formatters::synesthesia_best_summary;
+
 fn event_phase_label(phase: &str) -> &'static str {
     match phase {
         "live" => tr("signal_live_now"),
