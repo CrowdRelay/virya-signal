@@ -715,7 +715,10 @@ mod tests {
                 "starts_at": [2026, 228, 18, 30, 0, 0, 0, 0, 0]
             }]
         });
-        let decoded: AutopilotChiefOfStaff = decode_autopilot_wire(value).expect("legacy payload");
+        let decoded: AutopilotChiefOfStaff = match decode_autopilot_wire(value) {
+            Ok(decoded) => decoded,
+            Err(error) => panic!("legacy payload should decode: {error:?}"),
+        };
         assert_eq!(decoded.attention_items[0].due_at, "2026-08-15T06:45:12Z");
         assert_eq!(decoded.show_tasks[0].starts_at, "2026-08-16T18:30:00Z");
     }
