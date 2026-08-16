@@ -374,6 +374,26 @@ fn OperatorSettings(
             <header class="screen-title"><p class="eyebrow">{tr("device_label")}</p><h2>{tr("settings")}</h2></header>
             <div class="settings-list">
                 <LanguageSwitch />
+                <button type="button" on:click=move |_| {
+                    spawn_local(async move {
+                        if let Err(message) = bridge::invoke_unit(
+                            "open_external_url",
+                            &UrlArgs { url: "https://virya.music/?source=signal-staff-settings" },
+                        ).await {
+                            error.set(Some(message));
+                        }
+                    });
+                }>"Virya.music"</button>
+                <button type="button" on:click=move |_| {
+                    spawn_local(async move {
+                        if let Err(message) = bridge::invoke_unit(
+                            "open_external_url",
+                            &UrlArgs { url: "https://virya.music/staff/commerce/?source=signal-staff-latarnik" },
+                        ).await {
+                            error.set(Some(message));
+                        }
+                    });
+                }>"Latarnik · wydania i network"</button>
                 <article><div><strong>{tr("connection")}</strong><p>{move || status.get().session.map(|s| s.api_base_url).value_or_else(Default::default)}</p></div><span class:online=move || !loading.get().events && !loading.get().qr>{move || if loading.get().events || loading.get().qr { tr("connecting_2") } else { tr("online") }}</span></article>
                 <article><div><strong>{tr("permissions")}</strong><p>{move || status.get().session.map(|s| s.role.label().to_owned()).value_or_else(Default::default)}</p></div></article>
                 {move || status.get().session.and_then(|session| {

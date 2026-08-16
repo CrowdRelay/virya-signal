@@ -218,6 +218,7 @@ fn FanProfileScreen(
             <div class="settings-list">
                 <NativePushControl error=error />
                 <LanguageSwitch />
+                <ExternalLink url="https://virya.music/?source=signal-app-settings".to_owned() label="Virya.music" error=error />
                 <button on:click=refresh disabled=move || { let state = loading.get(); state.events || state.referral || state.interests || state.admission_pass || state.wallets }>{move || { let state = loading.get(); if state.events || state.referral || state.interests || state.admission_pass || state.wallets { tr("refreshing_2") } else { tr("refresh_data") } }}</button>
                 <button on:click=lock>{tr("lock_app")}</button>
                 <button class="danger ghost" on:click=forget>{tr("remove_profile_and_tickets_from_device")}</button>
