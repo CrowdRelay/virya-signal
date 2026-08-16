@@ -104,6 +104,9 @@ fn OperatorChecklist(
     let push_status = RwSignal::new(None::<FanPushStatus>);
     let push_loading = RwSignal::new(false);
     let push_sync_requested = RwSignal::new(false);
+    let push_enable_after_settings = RwSignal::new(false);
+    let push_resume_refresh = RwSignal::new(0_u32);
+    install_resume_refresh(push_resume_refresh);
 
     Effect::new(move |_| {
         if let Some(target) = push_target.get()
@@ -143,21 +146,73 @@ fn OperatorChecklist(
         });
     });
 
-    let enable_push = move |_| {
+    Effect::new(move |_| {
+        push_resume_refresh.get();
+        if !push_enable_after_settings.get_untracked() || push_loading.get_untracked() {
+            return;
+        }
+        push_enable_after_settings.set(false);
         push_loading.set(true);
         spawn_local(async move {
-            match bridge::invoke::<FanPushStatus, _>("operator_push_enable", &EmptyArgs {}).await {
+            match bridge::invoke_timeout::<FanPushStatus, _>(
+                "operator_push_enable",
+                &EmptyArgs {},
+                45_000,
+            )
+            .await
+            {
                 Ok(value) => push_status.set(Some(value)),
                 Err(message) => error.set(Some(message)),
+            }
+            push_loading.set(false);
+        });
+    });
+
+    let enable_push = move |_| {
+        if push_loading.get_untracked() {
+            return;
+        }
+        let opens_settings = push_status
+            .get_untracked()
+            .as_ref()
+            .is_some_and(|status| status.permission == "denied");
+        if opens_settings {
+            push_enable_after_settings.set(true);
+        }
+        push_loading.set(true);
+        spawn_local(async move {
+            let result = if opens_settings {
+                bridge::invoke_timeout::<FanPushStatus, _>(
+                    "operator_push_open_settings",
+                    &EmptyArgs {},
+                    45_000,
+                )
+                .await
+            } else {
+                bridge::invoke_timeout::<FanPushStatus, _>(
+                    "operator_push_enable",
+                    &EmptyArgs {},
+                    45_000,
+                )
+                .await
+            };
+            match result {
+                Ok(value) => push_status.set(Some(value)),
+                Err(message) => {
+                    push_enable_after_settings.set(false);
+                    error.set(Some(message));
+                }
             }
             push_loading.set(false);
         });
     };
 
     let disable_push = move |_| {
+        if push_loading.get_untracked() { return; }
+        push_enable_after_settings.set(false);
         push_loading.set(true);
         spawn_local(async move {
-            match bridge::invoke::<FanPushStatus, _>("operator_push_disable", &EmptyArgs {}).await {
+            match bridge::invoke_timeout::<FanPushStatus, _>("operator_push_disable", &EmptyArgs {}, 30_000).await {
                 Ok(value) => push_status.set(Some(value)),
                 Err(message) => error.set(Some(message)),
             }
@@ -233,7 +288,7 @@ fn OperatorChecklist(
                             view! {
                                 <div class="form-grid">
                                     <p>{tr("team_push_inactive")}</p>
-                                    <button class="primary" type="button" on:click=enable_push>{tr("enable_notifications")}</button>
+                                    <button class="primary" type="button" on:click=enable_push>{if status.permission == "denied" { tr("open_notification_settings") } else { tr("enable_notifications") }}</button>
                                 </div>
                             }.into_any()
                         }

@@ -34,6 +34,7 @@ fn FanHomeOverview(
     loading: RwSignal<FanLoadingState>,
     tab: RwSignal<FanTab>,
     focused_event_slug: RwSignal<Option<String>>,
+    focused_event_preview: RwSignal<Option<PublicEvent>>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     view! {
@@ -88,6 +89,17 @@ fn FanHomeOverview(
                                 let ticket_url = event.ticket_url.clone();
                                 let title = event.title.clone();
                                 let event_slug = event.slug.clone();
+                                let event_preview = PublicEvent {
+                                    slug: event.slug.clone(),
+                                    title: event.title.clone(),
+                                    description: None,
+                                    city: event.city.clone().map(|name| EventCity { name }),
+                                    venue: event.venue.clone(),
+                                    starts_at: event.starts_at.clone(),
+                                    ticket_url: event.ticket_url.clone(),
+                                    image_url: None,
+                                    image_thumbnail_url: None,
+                                };
                                 let is_live = event.phase == "live";
                                 let is_afterglow = event.phase == "afterglow";
                                 let is_upcoming = event.phase == "upcoming";
@@ -116,9 +128,11 @@ fn FanHomeOverview(
                                             <button class="ghost" on:click={
                                                 let action = snapshot.recommended_action.clone();
                                                 let event_slug = event_slug.clone();
+                                                let event_preview = event_preview.clone();
                                                 move |_| {
                                                     let target = recommended_tab(&action);
                                                     if target == FanTab::Events {
+                                                        focused_event_preview.set(Some(event_preview.clone()));
                                                         focused_event_slug.set(Some(event_slug.clone()));
                                                     }
                                                     tab.set(target);
@@ -183,7 +197,7 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
             enable_after_settings.set(false);
             busy.set(true);
             spawn_local(async move {
-                match bridge::invoke::<FanPushStatus, _>("fan_push_enable", &EmptyArgs {}).await {
+                match bridge::invoke_timeout::<FanPushStatus, _>("fan_push_enable", &EmptyArgs {}, 45_000).await {
                     Ok(value) => status.set(Some(value)),
                     Err(message) => error.set(Some(message)),
                 }
@@ -228,7 +242,7 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
         }
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<FanPushStatus, _>(command, &EmptyArgs {}).await {
+            match bridge::invoke_timeout::<FanPushStatus, _>(command, &EmptyArgs {}, 45_000).await {
                 Ok(value) => status.set(Some(value)),
                 Err(message) => {
                     if opens_settings {

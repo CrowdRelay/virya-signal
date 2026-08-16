@@ -39,9 +39,11 @@ fn OperatorApp(
             return;
         }
         refresh_operator_parts(dashboard, loading, error);
+        // Do not forcibly clear an in-flight request's loading bit. If one is
+        // active, let it finish; the `signal_requested=false` edge will then
+        // trigger exactly one fresh read from this stable OperatorApp owner.
         signal_requested.set(false);
         signal_overview.set(None);
-        signal_loading.set(false);
     });
 
     Effect::new(move |_| {

@@ -302,6 +302,7 @@ fn OperatorSettings(
     let autopilot_loading = RwSignal::new(false);
     let autopilot_chief = RwSignal::new(None::<AutopilotChiefOfStaff>);
     let autopilot_chief_loading = RwSignal::new(false);
+    let autopilot_refresh_requested = RwSignal::new(0_u32);
     let ops = RwSignal::new(None::<OperatorOpsOverview>);
     let ops_loading = RwSignal::new(false);
     // Initial owner control-plane reads are one-shot per Settings mount.
@@ -327,6 +328,14 @@ fn OperatorSettings(
         refresh_operator_autopilot(autopilot, autopilot_loading, error);
         refresh_operator_chief(autopilot_chief, autopilot_chief_loading, error);
         refresh_operator_ops(ops, ops_loading, error);
+    });
+    Effect::new(move |_| {
+        let generation = autopilot_refresh_requested.get();
+        if generation == 0 || !owner.get() {
+            return;
+        }
+        refresh_operator_autopilot(autopilot, autopilot_loading, error);
+        refresh_operator_chief(autopilot_chief, autopilot_chief_loading, error);
     });
     let refresh = move |_| {
         refresh_operator_parts(dashboard, loading, error);
@@ -384,7 +393,7 @@ fn OperatorSettings(
                 <button class="danger ghost" on:click=forget>{tr("remove_operator_profile")}</button>
             </div>
             <Show when=move || owner.get()>
-                <AutopilotPanel overview=autopilot loading=autopilot_loading chief=autopilot_chief chief_loading=autopilot_chief_loading error=error />
+                <AutopilotPanel overview=autopilot loading=autopilot_loading chief=autopilot_chief chief_loading=autopilot_chief_loading refresh_requested=autopilot_refresh_requested error=error />
                 <OpsPanel overview=ops loading=ops_loading error=error />
             </Show>
             <AnonymousFeedback error=error />

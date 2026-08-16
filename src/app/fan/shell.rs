@@ -29,6 +29,7 @@ fn FanApp(
     let wallets = RwSignal::new(Vec::<TicketWallet>::new());
     let checkout_event = RwSignal::new(None::<PublicEvent>);
     let focused_event_slug = RwSignal::new(None::<String>);
+    let focused_event_preview = RwSignal::new(None::<PublicEvent>);
     let admission_qr = RwSignal::new(None::<AdmissionQr>);
     let area = RwSignal::new(None::<AreaWallet>);
     let loading = RwSignal::new(FanLoadingState::all());
@@ -161,6 +162,7 @@ fn FanApp(
                     wallets.set(Vec::new());
                     checkout_event.set(None);
                     focused_event_slug.set(None);
+                    focused_event_preview.set(None);
                     admission_qr.set(None);
                     area.set(None);
                     loading.set(FanLoadingState::all());
@@ -211,7 +213,7 @@ fn FanApp(
                 </nav>
             </Show>
             <div class="content">{move || match tab.get() {
-                FanTab::Signal => view! { <FanSignal home=home dashboard=dashboard tab=tab focused_event_slug=focused_event_slug loading=loading error=error /> }.into_any(),
+                FanTab::Signal => view! { <FanSignal home=home dashboard=dashboard tab=tab focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview loading=loading error=error /> }.into_any(),
                 FanTab::Events => checkout_event.get().map(|event| view! {
                     <FanTicketCheckout
                         event=event
@@ -223,7 +225,7 @@ fn FanApp(
                         error=error
                     />
                 }.into_any()).value_or_else(|| view! {
-                    <FanEvents dashboard=dashboard public=public focused_event_slug=focused_event_slug checkout_event=checkout_event loading=loading error=error />
+                    <FanEvents dashboard=dashboard public=public focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview checkout_event=checkout_event loading=loading error=error />
                 }.into_any()),
                 FanTab::Merch => view! { <FanMerch merch=merch bundles=merch_bundles loading=loading error=error /> }.into_any(),
                 FanTab::Game => view! { <AreaGameScreen area=area loading=loading error=error /> }.into_any(),
@@ -251,6 +253,7 @@ fn FanSignal(
     dashboard: RwSignal<Option<FanDashboardData>>,
     tab: RwSignal<FanTab>,
     focused_event_slug: RwSignal<Option<String>>,
+    focused_event_preview: RwSignal<Option<PublicEvent>>,
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
@@ -276,7 +279,7 @@ fn FanSignal(
     };
     view! {
         <section class="screen fan-screen">
-            <FanHomeOverview home=home loading=loading tab=tab focused_event_slug=focused_event_slug error=error />
+            <FanHomeOverview home=home loading=loading tab=tab focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview error=error />
             <header class="signal-dashboard-hero compact-referral-hero">
                 <p class="eyebrow">{tr("your_impact")}</p>
                 <h2>{move || dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned())}</h2>

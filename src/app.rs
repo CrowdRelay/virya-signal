@@ -21,7 +21,7 @@ use crate::{
     models::{
         AdmissionPass, AdmissionQr, AdmissionRedemption, AreaWallet, AutopilotActionPayload,
         AutopilotChiefOfStaff, AutopilotMutation, AutopilotPolicySummary, CouponEnvelope,
-        CreateQrCampaignInput, DashboardData, FanAuthResult, FanConfirmationInput,
+        CreateQrCampaignInput, DashboardData, EventCity, FanAuthResult, FanConfirmationInput,
         FanDashboardData, FanEventInterest, FanHomeData, FanMerchBundleCatalog, FanPushStatus,
         FanSessionStatus, FanSignupInput, IssuePassInput, IssuedPass, MerchCatalog,
         OperatorAutopilotOverview, OperatorOpsOverview, OperatorProfileInput, OperatorRole,
@@ -159,6 +159,7 @@ pub fn App() -> impl IntoView {
     let operator_status_failed = RwSignal::new(false);
     let fan_status_failed = RwSignal::new(false);
     let status_refresh = RwSignal::new(0_u32);
+    let launcher_initialized = RwSignal::new(false);
     let push_target = RwSignal::new(None::<String>);
     let operator_push_target = RwSignal::new(None::<String>);
     let error = RwSignal::new(None::<String>);
@@ -188,10 +189,13 @@ pub fn App() -> impl IntoView {
 
     Effect::new(move |_| {
         status_refresh.get();
-        operator_status_loading.set(true);
-        fan_status_loading.set(true);
-        operator_status_failed.set(false);
-        fan_status_failed.set(false);
+        let initial_load = !launcher_initialized.get_untracked();
+        if initial_load {
+            operator_status_loading.set(true);
+            fan_status_loading.set(true);
+            operator_status_failed.set(false);
+            fan_status_failed.set(false);
+        }
         spawn_local(async move {
             let result = bridge::launcher_status().await;
             let completed = latest_request_completed(&result);
@@ -201,15 +205,21 @@ pub fn App() -> impl IntoView {
                     operator_status_failed.set(false);
                     fan_status.set(status.fan);
                     fan_status_failed.set(false);
+                    launcher_initialized.set(true);
                 }
                 Ok(None) => {}
                 Err(message) => {
-                    operator_status_failed.set(true);
-                    fan_status_failed.set(true);
+                    // A transient resume failure must never tear down an already
+                    // authenticated FanApp/OperatorApp and destroy its scoped async
+                    // owners. Only cold-start failure replaces the launcher surface.
+                    if initial_load {
+                        operator_status_failed.set(true);
+                        fan_status_failed.set(true);
+                    }
                     error.set(Some(message));
                 }
             }
-            if completed {
+            if completed && initial_load {
                 operator_status_loading.set(false);
                 fan_status_loading.set(false);
             }

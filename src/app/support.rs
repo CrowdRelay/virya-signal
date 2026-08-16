@@ -125,22 +125,17 @@ fn refresh_operator_signal(
     }
     loading.set(true);
     spawn_local(async move {
-        let result = bridge::invoke_latest::<OperatorSignalOverview, _>(
+        match bridge::invoke_timeout::<OperatorSignalOverview, _>(
             "operator_signal_overview",
             &EmptyArgs {},
             20_000,
-            "operator:signal",
         )
-        .await;
-        let completed = latest_request_completed(&result);
-        match result {
-            Ok(Some(value)) => overview.set(Some(value)),
-            Ok(None) => {}
+        .await
+        {
+            Ok(value) => overview.set(Some(value)),
             Err(message) => error.set(Some(message)),
         }
-        if completed {
-            loading.set(false);
-        }
+        loading.set(false);
     });
 }
 

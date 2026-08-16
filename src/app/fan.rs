@@ -68,22 +68,29 @@ fn AccessLoader(mode: RwSignal<RootMode>, label: &'static str, show_back: bool) 
     }
 }
 
-// VIRYA SIGNAL FAN CONFIRM UX V1
+#[derive(Clone, Copy)]
+struct FanConfirmationSession {
+    status: RwSignal<FanSessionStatus>,
+    status_refresh: RwSignal<u32>,
+}
+
 fn submit_fan_confirmation(
     email: RwSignal<String>,
     name: RwSignal<String>,
     token: RwSignal<String>,
     pin: RwSignal<String>,
     busy: RwSignal<bool>,
-    status_refresh: RwSignal<u32>,
+    session: FanConfirmationSession,
     error: RwSignal<Option<String>>,
 ) {
     if busy.get_untracked() {
         return;
     }
+
     let input_email = email.get_untracked().trim().to_owned();
     let current_token = token.get_untracked().trim().to_owned();
     let current_pin = pin.get_untracked();
+
     if input_email.is_empty() {
         error.set(Some(tr("enter_the_email_used_to_join_signal").to_owned()));
         return;
@@ -96,13 +103,16 @@ fn submit_fan_confirmation(
         error.set(Some(tr("enter_4_6_digits_for_this_fan_profile").to_owned()));
         return;
     }
+
     let input = FanConfirmationInput {
         api_base_url: API_BASE.to_owned(),
         email: input_email,
         display_name: optional(name.get_untracked().trim().to_owned()),
         token: current_token,
     };
+
     busy.set(true);
+
     spawn_local(async move {
         match bridge::invoke::<FanAuthResult, _>(
             "fan_confirm",
@@ -116,14 +126,27 @@ fn submit_fan_confirmation(
             Ok(_) => {
                 pin.set(String::new());
                 token.set(String::new());
-                // A scanner/resume launcher snapshot can still be in flight with
-                // the pre-auth "locked" state. Supersede it and let the single
-                // launcher-status path publish the newly committed native session.
+
                 bridge::invalidate_latest("launcher:");
-                status_refresh.update(|value| *value = value.wrapping_add(1));
+
+                match bridge::invoke_timeout::<FanSessionStatus, _>(
+                    "fan_status",
+                    &EmptyArgs {},
+                    5_000,
+                )
+                .await
+                {
+                    Ok(value) => session.status.set(value),
+                    Err(message) => error.set(Some(message)),
+                }
+
+                session
+                    .status_refresh
+                    .update(|value| *value = value.wrapping_add(1));
             }
             Err(message) => error.set(Some(message)),
         }
+
         busy.set(false);
     });
 }
@@ -251,6 +274,16 @@ fn FanAccess(
                     if result.session_created {
                         pin.set(String::new());
                         bridge::invalidate_latest("launcher:");
+                        match bridge::invoke_timeout::<FanSessionStatus, _>(
+                            "fan_status",
+                            &EmptyArgs {},
+                            5_000,
+                        )
+                        .await
+                        {
+                            Ok(value) => status.set(value),
+                            Err(message) => error.set(Some(message)),
+                        }
                         status_refresh.update(|value| *value = value.wrapping_add(1));
                     } else {
                         access_mode.set(FanAccessMode::Confirm);
@@ -283,8 +316,21 @@ fn FanAccess(
         });
     };
 
+    let confirmation_session = FanConfirmationSession {
+        status,
+        status_refresh,
+    };
+
     let confirm = move |_| {
-        submit_fan_confirmation(email, name, token, pin, busy, status_refresh, error);
+        submit_fan_confirmation(
+            email,
+            name,
+            token,
+            pin,
+            busy,
+            confirmation_session,
+            error,
+        );
     };
 
     let request_access = move |_| {
@@ -331,7 +377,18 @@ fn FanAccess(
                     if !email.get_untracked().trim().is_empty()
                         && pin.get_untracked().chars().count() >= 4
                     {
-                        submit_fan_confirmation(email, name, token, pin, busy, status_refresh, error);
+                        submit_fan_confirmation(
+                            email,
+                            name,
+                            token,
+                            pin,
+                            busy,
+                            FanConfirmationSession {
+                                status,
+                                status_refresh,
+                            },
+                            error,
+                        );
                     } else {
                         error.set(Some(tr("qr_scanned_enter_your_email_and_local").to_owned()));
                     }

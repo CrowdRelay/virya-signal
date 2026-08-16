@@ -4,11 +4,11 @@ fn AutopilotPanel(
     loading: RwSignal<bool>,
     chief: RwSignal<Option<AutopilotChiefOfStaff>>,
     chief_loading: RwSignal<bool>,
+    refresh_requested: RwSignal<u32>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let refresh = move |_| {
-        refresh_operator_autopilot(overview, loading, error);
-        refresh_operator_chief(chief, chief_loading, error);
+        refresh_requested.update(|value| *value = value.wrapping_add(1).max(1));
     };
     view! {
         <section class="ops-panel autopilot-panel">
@@ -115,7 +115,7 @@ fn AutopilotPanel(
                                 <For each=move || needs_you.clone() key=|action| action.id.clone() children={
                                     let available_assignees = available_assignees.clone();
                                     move |action| view! {
-                                        <AutopilotPendingCard action=action available_assignees=available_assignees.clone() overview=overview loading=loading error=error />
+                                        <AutopilotPendingCard action=action available_assignees=available_assignees.clone() loading=loading refresh_requested=refresh_requested error=error />
                                     }
                                 } />
                             </div>
@@ -169,7 +169,7 @@ fn AutopilotPanel(
                         {runtime_view}
                         <div class="section-head"><h3>{tr("autopilot_authority")}</h3></div>
                         <div class="ops-list autopilot-policies"><For each=move || policies.clone() key=|policy| policy.context.clone() children=move |policy| view! {
-                            <AutopilotPolicyCard policy=policy overview=overview loading=loading error=error />
+                            <AutopilotPolicyCard policy=policy loading=loading refresh_requested=refresh_requested error=error />
                         } /></div>
                         {guardrails_view}
                         {release_view}
@@ -187,10 +187,11 @@ fn AutopilotPanel(
 #[component]
 fn AutopilotPolicyCard(
     policy: AutopilotPolicySummary,
-    overview: RwSignal<Option<OperatorAutopilotOverview>>,
     loading: RwSignal<bool>,
+    refresh_requested: RwSignal<u32>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
+    let busy = RwSignal::new(false);
     let current = if policy.enabled { policy.autonomy_level.as_str() } else { "off" };
     let observe_policy = policy.clone();
     let recommend_policy = policy.clone();
@@ -207,11 +208,11 @@ fn AutopilotPolicyCard(
                 })}
             </div>
             <div class="autopilot-policy-actions" role="group" aria-label=tr("autopilot_authority")>
-                <button class="text-button" class:active=current == "off" on:click=move |_| set_autopilot_policy(off_policy.clone(), false, "observe", overview, loading, error)>{tr("autopilot_off")}</button>
-                <button class="text-button" class:active=current == "observe" on:click=move |_| set_autopilot_policy(observe_policy.clone(), true, "observe", overview, loading, error)>{tr("autopilot_observe")}</button>
-                <button class="text-button" class:active=current == "recommend" on:click=move |_| set_autopilot_policy(recommend_policy.clone(), true, "recommend", overview, loading, error)>{tr("autopilot_recommend")}</button>
-                <button class="text-button" class:active=current == "require_approval" on:click=move |_| set_autopilot_policy(approval_policy.clone(), true, "require_approval", overview, loading, error)>{tr("autopilot_approval")}</button>
-                <button class="text-button" class:active=current == "bounded_auto" on:click=move |_| set_autopilot_policy(auto_policy.clone(), true, "bounded_auto", overview, loading, error)>{tr("autopilot_auto")}</button>
+                <button class="text-button" class:active=current == "off" on:click=move |_| set_autopilot_policy(off_policy.clone(), false, "observe", busy, refresh_requested, error) disabled=move || busy.get() || loading.get()>{tr("autopilot_off")}</button>
+                <button class="text-button" class:active=current == "observe" on:click=move |_| set_autopilot_policy(observe_policy.clone(), true, "observe", busy, refresh_requested, error) disabled=move || busy.get() || loading.get()>{tr("autopilot_observe")}</button>
+                <button class="text-button" class:active=current == "recommend" on:click=move |_| set_autopilot_policy(recommend_policy.clone(), true, "recommend", busy, refresh_requested, error) disabled=move || busy.get() || loading.get()>{tr("autopilot_recommend")}</button>
+                <button class="text-button" class:active=current == "require_approval" on:click=move |_| set_autopilot_policy(approval_policy.clone(), true, "require_approval", busy, refresh_requested, error) disabled=move || busy.get() || loading.get()>{tr("autopilot_approval")}</button>
+                <button class="text-button" class:active=current == "bounded_auto" on:click=move |_| set_autopilot_policy(auto_policy.clone(), true, "bounded_auto", busy, refresh_requested, error) disabled=move || busy.get() || loading.get()>{tr("autopilot_auto")}</button>
             </div>
         </article>
     }
@@ -223,12 +224,12 @@ fn set_autopilot_policy(
     policy: AutopilotPolicySummary,
     enabled: bool,
     autonomy_level: &'static str,
-    overview: RwSignal<Option<OperatorAutopilotOverview>>,
-    loading: RwSignal<bool>,
+    busy: RwSignal<bool>,
+    refresh_requested: RwSignal<u32>,
     error: RwSignal<Option<String>>,
 ) {
-    if loading.get_untracked() { return; }
-    loading.set(true);
+    if busy.get_untracked() { return; }
+    busy.set(true);
     spawn_local(async move {
         let result = bridge::invoke::<AutopilotMutation, _>(
             "operator_autopilot_set_authority",
@@ -243,10 +244,10 @@ fn set_autopilot_policy(
         ).await;
         match result {
             Ok(_) => {
-                loading.set(false);
-                refresh_operator_autopilot(overview, loading, error);
+                busy.set(false);
+                refresh_requested.update(|value| *value = value.wrapping_add(1).max(1));
             }
-            Err(message) => { loading.set(false); error.set(Some(message)); }
+            Err(message) => { busy.set(false); error.set(Some(message)); }
         }
     });
 }
@@ -254,20 +255,23 @@ fn set_autopilot_policy(
 fn assign_autopilot_action(
     action_id: String,
     member_key: String,
-    overview: RwSignal<Option<OperatorAutopilotOverview>>,
-    loading: RwSignal<bool>,
+    busy: RwSignal<bool>,
+    refresh_requested: RwSignal<u32>,
     error: RwSignal<Option<String>>,
 ) {
-    if loading.get_untracked() || member_key.is_empty() { return; }
-    loading.set(true);
+    if busy.get_untracked() || member_key.is_empty() { return; }
+    busy.set(true);
     spawn_local(async move {
         let result = bridge::invoke::<AutopilotMutation, _>(
             "operator_autopilot_assign",
             &AutopilotAssignArgs { action_id: &action_id, member_key: &member_key },
         ).await;
         match result {
-            Ok(_) => { loading.set(false); refresh_operator_autopilot(overview, loading, error); }
-            Err(message) => { loading.set(false); error.set(Some(message)); }
+            Ok(_) => {
+                busy.set(false);
+                refresh_requested.update(|value| *value = value.wrapping_add(1).max(1));
+            }
+            Err(message) => { busy.set(false); error.set(Some(message)); }
         }
     });
 }
@@ -275,12 +279,12 @@ fn assign_autopilot_action(
 fn mutate_autopilot_action(
     command: &'static str,
     action_id: String,
-    overview: RwSignal<Option<OperatorAutopilotOverview>>,
-    loading: RwSignal<bool>,
+    busy: RwSignal<bool>,
+    refresh_requested: RwSignal<u32>,
     error: RwSignal<Option<String>>,
 ) {
-    if loading.get_untracked() { return; }
-    loading.set(true);
+    if busy.get_untracked() { return; }
+    busy.set(true);
     spawn_local(async move {
         let result = match command {
             "operator_autopilot_approve" => bridge::invoke::<AutopilotMutation, _>(
@@ -292,8 +296,11 @@ fn mutate_autopilot_action(
             _ => Err(tr("autopilot_invalid_action").to_owned()),
         };
         match result {
-            Ok(_) => { loading.set(false); refresh_operator_autopilot(overview, loading, error); }
-            Err(message) => { loading.set(false); error.set(Some(message)); }
+            Ok(_) => {
+                busy.set(false);
+                refresh_requested.update(|value| *value = value.wrapping_add(1).max(1));
+            }
+            Err(message) => { busy.set(false); error.set(Some(message)); }
         }
     });
 }

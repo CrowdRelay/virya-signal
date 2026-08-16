@@ -23,7 +23,6 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         guarded = (
             "refresh_operator_events",
             "refresh_operator_qr",
-            "refresh_operator_signal",
             "refresh_operator_autopilot",
             "refresh_operator_chief",
             "refresh_operator_ops",
@@ -54,6 +53,14 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         self.assertIn("if completed {\n                sale_loading.set(false);", checkout)
 
 
+
+    def test_operator_signal_read_is_bounded_and_cannot_stick_on_latest_invalidation(self) -> None:
+        support = (ROOT / "src/app/support.rs").read_text(encoding="utf-8")
+        body = function_body(support, "refresh_operator_signal")
+        self.assertIn("invoke_timeout::<OperatorSignalOverview", body)
+        self.assertNotIn("invoke_latest", body)
+        self.assertIn("loading.set(false);", body)
+
     def test_resume_listener_is_singleton_with_multiple_scoped_subscribers(self) -> None:
         app = (ROOT / "src/app.rs").read_text(encoding="utf-8")
         body = function_body(app, "install_resume_refresh")
@@ -71,6 +78,8 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         fan = (ROOT / "src/app/fan.rs").read_text(encoding="utf-8")
         self.assertGreaterEqual(fan.count('bridge::invalidate_latest("launcher:")'), 3)
         self.assertIn("status_refresh.update", fan)
+        self.assertIn("invoke_timeout::<FanSessionStatus", fan)
+        self.assertIn("status.set(value)", fan)
         self.assertIn("status_refresh=status_refresh", fan)
 
     def test_staff_bootstrap_does_not_treat_placeholder_dashboard_as_loaded(self) -> None:
@@ -108,7 +117,8 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         self.assertIn("Result<Option<crate::models::LauncherStatus>, String>", client)
         self.assertIn("let completed = latest_request_completed(&result);", app)
         self.assertIn("Ok(None) => {}", app)
-        self.assertIn("if completed {", app)
+        self.assertIn("if completed && initial_load {", app)
+        self.assertIn("let initial_load = !launcher_initialized.get_untracked();", app)
 
     def test_push_resume_waits_for_in_flight_settings_command(self) -> None:
         source = (ROOT / "src/app/fan_home.rs").read_text(encoding="utf-8")
@@ -160,10 +170,39 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         events = (ROOT / "src/app/fan/events.rs").read_text(encoding="utf-8")
         self.assertIn("focused_event_slug.set(Some(event_slug.clone()))", home)
         self.assertIn("focused_event_slug: RwSignal<Option<String>>", events)
+        self.assertIn("focused_event_preview: RwSignal<Option<PublicEvent>>", events)
+        self.assertIn("focused_event_preview.set(Some(event_preview.clone()))", home)
         self.assertIn("fan-event-detail", events)
         self.assertIn("referral-code-copy", shell)
         self.assertIn("bridge::copy_text(&url)", shell)
         self.assertIn('format!("https://www.virya.music/r/{referral_code}")', shell)
+
+
+    def test_resume_refresh_does_not_unmount_authenticated_trees(self) -> None:
+        app = (ROOT / "src/app.rs").read_text(encoding="utf-8")
+        self.assertIn("launcher_initialized", app)
+        self.assertIn("if initial_load {", app)
+        self.assertIn("if completed && initial_load", app)
+        self.assertIn("A transient resume failure must never tear down", app)
+
+    def test_autopilot_mutations_refresh_from_stable_settings_owner(self) -> None:
+        settings = (ROOT / "src/app/operator/commerce_settings.rs").read_text(encoding="utf-8")
+        autopilot = (ROOT / "src/app/operator/autopilot.rs").read_text(encoding="utf-8")
+        cards = (ROOT / "src/app/operator/autopilot_cards.rs").read_text(encoding="utf-8")
+        self.assertIn("autopilot_refresh_requested", settings)
+        self.assertIn("refresh_requested.update", autopilot)
+        self.assertIn("let busy = RwSignal::new(false)", autopilot)
+        self.assertIn("let busy = RwSignal::new(false)", cards)
+        set_policy = function_body(autopilot, "set_autopilot_policy")
+        self.assertNotIn("loading.set(true)", set_policy)
+
+    def test_staff_checklist_push_has_bounded_resume_recovery(self) -> None:
+        checklist = (ROOT / "src/app/operator/checklist.rs").read_text(encoding="utf-8")
+        native = (ROOT / "src-tauri/src/commands/operator.rs").read_text(encoding="utf-8")
+        self.assertIn("push_enable_after_settings", checklist)
+        self.assertIn("operator_push_open_settings", checklist)
+        self.assertIn("45_000", checklist)
+        self.assertIn("pub(crate) async fn operator_push_open_settings", native)
 
     def test_push_action_is_forced_below_status_at_full_width(self) -> None:
         css = (ROOT / "styles.css").read_text(encoding="utf-8")

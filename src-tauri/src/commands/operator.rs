@@ -372,6 +372,17 @@ pub(crate) async fn operator_push_enable(
 }
 
 #[tauri::command]
+pub(crate) async fn operator_push_open_settings(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<FanPushStatus, AppError> {
+    let _push_mutation = state.operator_push_mutation.lock().await;
+    operator_profile(&state).await?;
+    super::fan::open_native_push_settings(&app).map_err(AppError::InvalidInput)?;
+    sync_operator_push(&state, &app, false).await
+}
+
+#[tauri::command]
 pub(crate) async fn operator_push_disable(
     state: State<'_, AppState>,
     app: AppHandle,

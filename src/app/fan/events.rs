@@ -3,6 +3,7 @@ fn FanEvents(
     dashboard: RwSignal<Option<FanDashboardData>>,
     public: RwSignal<Option<PublicHomeData>>,
     focused_event_slug: RwSignal<Option<String>>,
+    focused_event_preview: RwSignal<Option<PublicEvent>>,
     checkout_event: RwSignal<Option<PublicEvent>>,
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
@@ -10,26 +11,39 @@ fn FanEvents(
     view! {
         <section class="screen">
             <header class="screen-title"><p class="eyebrow">{tr("where_we_play")}</p><h2>{tr("shows_tab")}</h2></header>
-            <Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }>
-                {move || {
-                    let events = fan_events(dashboard, public);
-                    if let Some(slug) = focused_event_slug.get()
-                        && let Some(event) = events.iter().find(|event| event.slug == slug).cloned()
-                    {
+            {move || {
+                let events = fan_events(dashboard, public);
+                if let Some(slug) = focused_event_slug.get() {
+                    let resolved = events
+                        .iter()
+                        .find(|event| event.slug == slug)
+                        .cloned()
+                        .or_else(|| {
+                            focused_event_preview
+                                .get()
+                                .filter(|event| event.slug == slug)
+                        });
+                    if let Some(event) = resolved {
                         return view! {
                             <div class="fan-event-detail">
-                                <button class="checkout-back" type="button" on:click=move |_| focused_event_slug.set(None)>{tr("back_back_to_shows")}</button>
+                                <button class="checkout-back" type="button" on:click=move |_| {
+                                    focused_event_slug.set(None);
+                                    focused_event_preview.set(None);
+                                }>{tr("back_back_to_shows")}</button>
                                 <FanEventCard event=event checkout_event=checkout_event dashboard=dashboard loading=loading error=error />
                             </div>
                         }.into_any();
                     }
-                    if events.is_empty() {
-                        view! { <div class="empty-state"><strong>{tr("no_shows_in_the_calendar")}</strong><p>{tr("new_events_will_appear_here_2")}</p></div> }.into_any()
-                    } else {
-                        view! { <div class="card-list fan-event-list">{events.into_iter().map(|event| view! { <FanEventCard event=event checkout_event=checkout_event dashboard=dashboard loading=loading error=error /> }).collect_view()}</div> }.into_any()
-                    }
-                }}
-            </Show>
+                }
+                if loading.get().events {
+                    return view! { <Skeleton /> }.into_any();
+                }
+                if events.is_empty() {
+                    view! { <div class="empty-state"><strong>{tr("no_shows_in_the_calendar")}</strong><p>{tr("new_events_will_appear_here_2")}</p></div> }.into_any()
+                } else {
+                    view! { <div class="card-list fan-event-list">{events.into_iter().map(|event| view! { <FanEventCard event=event checkout_event=checkout_event dashboard=dashboard loading=loading error=error /> }).collect_view()}</div> }.into_any()
+                }
+            }}
         </section>
     }
 }

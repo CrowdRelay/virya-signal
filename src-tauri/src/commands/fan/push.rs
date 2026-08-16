@@ -64,12 +64,12 @@ fn take_native_push_target(_app: &AppHandle) -> Result<Option<String>, String> {
 }
 
 #[cfg(target_os = "android")]
-fn open_native_push_settings(app: &AppHandle) -> Result<(), String> {
+pub(crate) fn open_native_push_settings(app: &AppHandle) -> Result<(), String> {
     crate::push_plugin::open_notification_settings(app)
 }
 
 #[cfg(not(target_os = "android"))]
-fn open_native_push_settings(_app: &AppHandle) -> Result<(), String> {
+pub(crate) fn open_native_push_settings(_app: &AppHandle) -> Result<(), String> {
     Err("android_push_unavailable".to_owned())
 }
 
