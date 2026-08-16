@@ -54,6 +54,17 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         self.assertIn("if completed {\n                sale_loading.set(false);", checkout)
 
 
+    def test_resume_listener_is_singleton_and_replacement_cleans_up(self) -> None:
+        app = (ROOT / "src/app.rs").read_text(encoding="utf-8")
+        body = function_body(app, "install_resume_refresh")
+        self.assertIn('"addEventListener"', body)
+        self.assertIn('"removeEventListener"', app)
+        self.assertIn("thread_local!", app)
+        self.assertIn("impl Drop for ResumeRefreshListener", app)
+        self.assertIn("RESUME_REFRESH_LISTENER.with(|slot|", body)
+        self.assertNotIn("on_cleanup(move ||", body)
+        self.assertNotIn("std::mem::forget(callback)", body)
+
     def test_launcher_resume_refresh_is_latest_wins(self) -> None:
         app = (ROOT / "src/app.rs").read_text(encoding="utf-8")
         client = (ROOT / "src/bridge/client.rs").read_text(encoding="utf-8")

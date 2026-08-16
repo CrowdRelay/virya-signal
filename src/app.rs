@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use crate::i18n::{self, Language, tr};
 use crate::util::{OptionValueOrElseExt, OptionValueOrExt};
 
@@ -31,32 +33,63 @@ use crate::{
     },
 };
 
+struct ResumeRefreshListener {
+    global: JsValue,
+    event: JsValue,
+    remove_listener: js_sys::Function,
+    callback: Closure<dyn FnMut(JsValue)>,
+}
+
+impl Drop for ResumeRefreshListener {
+    fn drop(&mut self) {
+        let _ = self.remove_listener.call2(
+            &self.global,
+            &self.event,
+            self.callback.as_ref().unchecked_ref(),
+        );
+    }
+}
+
+thread_local! {
+    static RESUME_REFRESH_LISTENER: RefCell<Option<ResumeRefreshListener>> = const { RefCell::new(None) };
+}
+
 fn install_resume_refresh(status_refresh: RwSignal<u32>) {
     let global: JsValue = js_sys::global().into();
-    let Ok(listener) = js_sys::Reflect::get(&global, &JsValue::from_str("addEventListener")) else {
+    let event = JsValue::from_str("virya:resume");
+    let Ok(add_listener) = js_sys::Reflect::get(&global, &JsValue::from_str("addEventListener"))
+    else {
         return;
     };
-    let Ok(listener) = listener.dyn_into::<js_sys::Function>() else {
+    let Ok(add_listener) = add_listener.dyn_into::<js_sys::Function>() else {
+        return;
+    };
+    let Ok(remove_listener) =
+        js_sys::Reflect::get(&global, &JsValue::from_str("removeEventListener"))
+    else {
+        return;
+    };
+    let Ok(remove_listener) = remove_listener.dyn_into::<js_sys::Function>() else {
         return;
     };
     let callback = Closure::<dyn FnMut(JsValue)>::new(move |_| {
         let _ = status_refresh.try_update(|value| *value = value.wrapping_add(1));
     });
-    if listener
-        .call2(
-            &global,
-            &JsValue::from_str("virya:resume"),
-            callback.as_ref().unchecked_ref(),
-        )
+    if add_listener
+        .call2(&global, &event, callback.as_ref().unchecked_ref())
         .is_err()
     {
         return;
     }
 
-    // Note: We intentionally leak the closure here because wasm-bindgen closures
-    // are not Send + Sync, so they can't be stored in Leptos signals or cleaned up
-    // with on_cleanup. This is a known limitation and acceptable for this use case.
-    std::mem::forget(callback);
+    RESUME_REFRESH_LISTENER.with(|slot| {
+        *slot.borrow_mut() = Some(ResumeRefreshListener {
+            global,
+            event,
+            remove_listener,
+            callback,
+        });
+    });
 }
 
 #[component]

@@ -13,6 +13,7 @@ class StaticFallbackTests(unittest.TestCase):
         environment = os.environ.copy()
         environment["VIRYA_FORCE_TOML_FALLBACK"] = "1"
         generated_root = ROOT / "target"
+        generated_root_preexisted = generated_root.exists()
         generated_json = generated_root / "static-check-fixture" / "events.json"
         generated_json.parent.mkdir(parents=True, exist_ok=True)
         generated_json.write_text('{"event":1}\n{"event":2}\n')
@@ -28,9 +29,11 @@ class StaticFallbackTests(unittest.TestCase):
         finally:
             generated_json.unlink(missing_ok=True)
             generated_json.parent.rmdir()
-            # The fixture deliberately lives under ignored generated output;
-            # remove the build root as well so source-only tests are read-only.
-            generated_root.rmdir()
+            # The fixture deliberately lives under ignored generated output.
+            # Never remove a pre-existing Cargo target directory: this test can
+            # run after cargo check/test in the same maintenance pipeline.
+            if not generated_root_preexisted and not any(generated_root.iterdir()):
+                generated_root.rmdir()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("static configuration", result.stdout)
 
