@@ -86,8 +86,6 @@ export async function viryaShareText(title, text, url) {
   throw new Error('share_unavailable');
 }
 
-export async function viryaCollectLocationSamples(minSamples, maxSamples, minDurationMs) {
-
 export async function viryaInvoke(command, args, timeoutMs) {
   const timeout = Math.max(1_000, Math.min(Number(timeoutMs) || 30_000, 60_000));
   const startedAt = Date.now();
