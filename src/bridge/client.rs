@@ -117,17 +117,22 @@ pub fn referral_code_from_location() -> Option<String> {
     (!value.is_empty()).then(|| value.to_owned())
 }
 
-pub async fn share_text(title: &str, text: &str, url: &str) -> Result<String, String> {
-    #[wasm_bindgen]
-    extern "C" {
-        #[wasm_bindgen(catch, js_name = viryaShareText)]
-        async fn share_text_js(title: &str, text: &str, url: &str) -> Result<JsValue, JsValue>;
-    }
-    share_text_js(title, text, url)
+async fn promise_string(promise: js_sys::Promise) -> Result<String, String> {
+    wasm_bindgen_futures::JsFuture::from(promise)
         .await
         .map_err(js_error)?
         .as_string()
         .ok_or_else(|| i18n::tr("server_response_has_an_unexpected_format").to_owned())
+}
+
+pub async fn copy_text(text: &str) -> Result<(), String> {
+    let promise = copy_text_js(text).map_err(js_error)?;
+    promise_string(promise).await.map(|_| ())
+}
+
+pub async fn share_text(title: &str, text: &str, url: &str) -> Result<String, String> {
+    let promise = share_text_js(title, text, url).map_err(js_error)?;
+    promise_string(promise).await
 }
 
 pub async fn invoke_unit<A>(command: &str, args: &A) -> Result<(), String>

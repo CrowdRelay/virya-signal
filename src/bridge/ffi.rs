@@ -66,24 +66,54 @@ export function viryaReferralCodeFromLocation() {
   }
 }
 
-export async function viryaShareText(title, text, url) {
+function viryaAsPromise(value) {
+  return value && typeof value.then === 'function' ? value : Promise.resolve(value);
+}
+
+export function viryaCopyText(text) {
+  const safeText = String(text ?? '').slice(0, 4_096);
+  return Promise.resolve().then(async () => {
+    if (window.navigator?.clipboard?.writeText) {
+      await viryaAsPromise(window.navigator.clipboard.writeText(safeText));
+      return 'copied';
+    }
+    const document = window.document;
+    if (!document?.body) throw new Error('clipboard_unavailable');
+    const textarea = document.createElement('textarea');
+    textarea.value = safeText;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    textarea.style.pointerEvents = 'none';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const copied = document.execCommand?.('copy') === true;
+    textarea.remove();
+    if (!copied) throw new Error('clipboard_unavailable');
+    return 'copied';
+  });
+}
+
+export function viryaShareText(title, text, url) {
   const safeTitle = String(title ?? '').slice(0, 160);
   const safeText = String(text ?? '').slice(0, 500);
   const safeUrl = String(url ?? '').slice(0, 2_048);
-  if (window.navigator?.share) {
-    try {
-      await window.navigator.share({ title: safeTitle, text: safeText, url: safeUrl });
-      return 'shared';
-    } catch (error) {
-      if (error?.name === 'AbortError') return 'cancelled';
-      window.console?.warn?.('[virya:share] native share failed, using clipboard fallback', error);
+  // Always return a real Promise. Some Android/Tauri WebViews expose native
+  // share/clipboard shims that synchronously return undefined, while the
+  // wasm-bindgen async ABI expects a thenable.
+  return Promise.resolve().then(async () => {
+    if (window.navigator?.share) {
+      try {
+        await viryaAsPromise(window.navigator.share({ title: safeTitle, text: safeText, url: safeUrl }));
+        return 'shared';
+      } catch (error) {
+        if (error?.name === 'AbortError') return 'cancelled';
+        window.console?.warn?.('[virya:share] native share failed, using clipboard fallback', error);
+      }
     }
-  }
-  if (window.navigator?.clipboard?.writeText) {
-    await window.navigator.clipboard.writeText([safeText, safeUrl].filter(Boolean).join('\n'));
+    await viryaCopyText([safeText, safeUrl].filter(Boolean).join('\n'));
     return 'copied';
-  }
-  throw new Error('share_unavailable');
+  });
 }
 
 export async function viryaInvoke(command, args, timeoutMs) {
@@ -839,7 +869,10 @@ extern "C" {
     fn referral_code_from_location_js() -> String;
 
     #[wasm_bindgen(catch, js_name = viryaShareText)]
-    async fn share_text_js(title: &str, text: &str, url: &str) -> Result<JsValue, JsValue>;
+    fn share_text_js(title: &str, text: &str, url: &str) -> Result<js_sys::Promise, JsValue>;
+
+    #[wasm_bindgen(catch, js_name = viryaCopyText)]
+    fn copy_text_js(text: &str) -> Result<js_sys::Promise, JsValue>;
     #[wasm_bindgen(catch, js_name = viryaInvoke)]
     async fn invoke_js(command: &str, args: JsValue, timeout_ms: u32) -> Result<JsValue, JsValue>;
 

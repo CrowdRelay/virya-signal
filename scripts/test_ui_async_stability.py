@@ -54,16 +54,52 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         self.assertIn("if completed {\n                sale_loading.set(false);", checkout)
 
 
-    def test_resume_listener_is_singleton_and_replacement_cleans_up(self) -> None:
+    def test_resume_listener_is_singleton_with_multiple_scoped_subscribers(self) -> None:
         app = (ROOT / "src/app.rs").read_text(encoding="utf-8")
         body = function_body(app, "install_resume_refresh")
         self.assertIn('"addEventListener"', body)
         self.assertIn('"removeEventListener"', app)
         self.assertIn("thread_local!", app)
         self.assertIn("impl Drop for ResumeRefreshListener", app)
+        self.assertIn("subscribers: Vec<(u64, RwSignal<u32>)>", app)
         self.assertIn("RESUME_REFRESH_LISTENER.with(|slot|", body)
-        self.assertNotIn("on_cleanup(move ||", body)
+        self.assertIn("listener.subscribers.push", body)
+        self.assertIn("on_cleanup(move || unregister_resume_refresh(subscriber_id))", body)
         self.assertNotIn("std::mem::forget(callback)", body)
+
+    def test_auth_commit_supersedes_pre_auth_launcher_snapshot(self) -> None:
+        fan = (ROOT / "src/app/fan.rs").read_text(encoding="utf-8")
+        self.assertGreaterEqual(fan.count('bridge::invalidate_latest("launcher:")'), 3)
+        self.assertIn("status_refresh.update", fan)
+        self.assertIn("status_refresh=status_refresh", fan)
+
+    def test_staff_bootstrap_does_not_treat_placeholder_dashboard_as_loaded(self) -> None:
+        shell = (ROOT / "src/app/operator/shell.rs").read_text(encoding="utf-8")
+        self.assertIn("bootstrap_requested", shell)
+        self.assertNotIn("status.get().unlocked && dashboard.get().is_none()", shell)
+        self.assertNotIn("dashboard.set(Some(DashboardData::default()))", shell)
+        self.assertIn("refresh_requested", shell)
+        self.assertIn('bridge::invalidate_latest("operator:")', shell)
+
+    def test_short_lived_menus_do_not_cancel_refresh_or_latarnik_actions(self) -> None:
+        fan_shell = (ROOT / "src/app/fan/shell.rs").read_text(encoding="utf-8")
+        operator_shell = (ROOT / "src/app/operator/shell.rs").read_text(encoding="utf-8")
+        latarnik = fan_shell.split("let open_latarnik", 1)[1].split("let refresh_all", 1)[0]
+        self.assertLess(latarnik.index("spawn_local"), latarnik.index("menu_open.set(false)"))
+        fan_refresh = fan_shell.split("let refresh_all", 1)[1].split("view!", 1)[0]
+        self.assertIn("refresh_requested.update", fan_refresh)
+        operator_refresh = operator_shell.split("let refresh_all", 1)[1].split("on_cleanup", 1)[0]
+        self.assertIn("refresh_requested.update", operator_refresh)
+
+    def test_share_bridge_always_crosses_wasm_as_a_real_promise(self) -> None:
+        ffi = (ROOT / "src/bridge/ffi.rs").read_text(encoding="utf-8")
+        client = (ROOT / "src/bridge/client.rs").read_text(encoding="utf-8")
+        self.assertIn("function viryaAsPromise", ffi)
+        self.assertIn("return Promise.resolve().then(async () =>", ffi)
+        self.assertIn("fn share_text_js", ffi)
+        self.assertIn("Result<js_sys::Promise, JsValue>", ffi)
+        self.assertIn("JsFuture::from(promise)", client)
+        self.assertIn("pub async fn copy_text", client)
 
     def test_launcher_resume_refresh_is_latest_wins(self) -> None:
         app = (ROOT / "src/app.rs").read_text(encoding="utf-8")
@@ -109,6 +145,31 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         self.assertIn("override fun onNewIntent", plugin)
         self.assertIn("takeLaunchTarget", plugin)
         self.assertIn('putExtra("virya_push_target_path", targetPath)', service)
+
+    def test_fan_home_event_contract_keeps_slug_on_native_and_wasm_sides(self) -> None:
+        ui_models = (ROOT / "src/models.rs").read_text(encoding="utf-8")
+        native_models = (ROOT / "src-tauri/src/models/session_fan.rs").read_text(encoding="utf-8")
+        ui_event = ui_models.split("pub struct FanHomeEvent", 1)[1].split("}", 1)[0]
+        native_event = native_models.split("pub struct FanHomeEvent", 1)[1].split("}", 1)[0]
+        self.assertIn("pub slug: String", ui_event)
+        self.assertIn("pub slug: String", native_event)
+
+    def test_fan_home_details_and_referral_copy_have_real_targets(self) -> None:
+        home = (ROOT / "src/app/fan_home.rs").read_text(encoding="utf-8")
+        shell = (ROOT / "src/app/fan/shell.rs").read_text(encoding="utf-8")
+        events = (ROOT / "src/app/fan/events.rs").read_text(encoding="utf-8")
+        self.assertIn("focused_event_slug.set(Some(event_slug.clone()))", home)
+        self.assertIn("focused_event_slug: RwSignal<Option<String>>", events)
+        self.assertIn("fan-event-detail", events)
+        self.assertIn("referral-code-copy", shell)
+        self.assertIn("bridge::copy_text(&url)", shell)
+        self.assertIn('format!("https://www.virya.music/r/{referral_code}")', shell)
+
+    def test_push_action_is_forced_below_status_at_full_width(self) -> None:
+        css = (ROOT / "styles.css").read_text(encoding="utf-8")
+        self.assertIn(".settings-list .push-setting-card {", css)
+        self.assertIn("grid-template-columns: minmax(0, 1fr);", css)
+        self.assertIn(".settings-list .push-setting-card .push-setting-action { width: 100%; }", css)
 
     def test_toast_timeout_cannot_clear_a_newer_message(self) -> None:
         support = (ROOT / "src/app/support.rs").read_text(encoding="utf-8")

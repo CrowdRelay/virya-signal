@@ -25,7 +25,7 @@ class AutopilotWireContract(unittest.TestCase):
         self.assertIn("get_untracked()", settings)
         self.assertNotIn("Ok(None) => return", support)
         self.assertNotIn("Ok(None) => return", fan_events)
-        ops = support.split("fn refresh_operator_ops", 1)[1].split("fn refresh_fan_status", 1)[0]
+        ops = support.split("fn refresh_operator_ops", 1)[1].split("fn refresh_fan_home", 1)[0]
         self.assertIn("if loading.get_untracked()", ops)
 
     def test_signal_authority_and_action_contract_match_new_growth_contexts(self):

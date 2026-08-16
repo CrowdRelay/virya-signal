@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 
 use crate::i18n::{self, Language, tr};
 use crate::util::{OptionValueOrElseExt, OptionValueOrExt};
@@ -38,6 +38,7 @@ struct ResumeRefreshListener {
     event: JsValue,
     remove_listener: js_sys::Function,
     callback: Closure<dyn FnMut(JsValue)>,
+    subscribers: Vec<(u64, RwSignal<u32>)>,
 }
 
 impl Drop for ResumeRefreshListener {
@@ -52,44 +53,100 @@ impl Drop for ResumeRefreshListener {
 
 thread_local! {
     static RESUME_REFRESH_LISTENER: RefCell<Option<ResumeRefreshListener>> = const { RefCell::new(None) };
+    static NEXT_RESUME_REFRESH_ID: Cell<u64> = const { Cell::new(1) };
+}
+
+fn unregister_resume_refresh(subscriber_id: u64) {
+    RESUME_REFRESH_LISTENER.with(|slot| {
+        let mut slot = slot.borrow_mut();
+        let Some(listener) = slot.as_mut() else {
+            return;
+        };
+        listener.subscribers.retain(|(id, _)| *id != subscriber_id);
+        if listener.subscribers.is_empty() {
+            // Dropping the final subscriber removes the one global browser
+            // listener as well. No wasm-bindgen closure is leaked.
+            slot.take();
+        }
+    });
 }
 
 fn install_resume_refresh(status_refresh: RwSignal<u32>) {
-    let global: JsValue = js_sys::global().into();
-    let event = JsValue::from_str("virya:resume");
-    let Ok(add_listener) = js_sys::Reflect::get(&global, &JsValue::from_str("addEventListener"))
-    else {
-        return;
-    };
-    let Ok(add_listener) = add_listener.dyn_into::<js_sys::Function>() else {
-        return;
-    };
-    let Ok(remove_listener) =
-        js_sys::Reflect::get(&global, &JsValue::from_str("removeEventListener"))
-    else {
-        return;
-    };
-    let Ok(remove_listener) = remove_listener.dyn_into::<js_sys::Function>() else {
-        return;
-    };
-    let callback = Closure::<dyn FnMut(JsValue)>::new(move |_| {
-        let _ = status_refresh.try_update(|value| *value = value.wrapping_add(1));
+    let subscriber_id = NEXT_RESUME_REFRESH_ID.with(|next| {
+        let id = next.get();
+        next.set(id.wrapping_add(1).max(1));
+        id
     });
-    if add_listener
-        .call2(&global, &event, callback.as_ref().unchecked_ref())
-        .is_err()
-    {
-        return;
-    }
 
-    RESUME_REFRESH_LISTENER.with(|slot| {
-        *slot.borrow_mut() = Some(ResumeRefreshListener {
+    let installed = RESUME_REFRESH_LISTENER.with(|slot| {
+        let mut slot = slot.borrow_mut();
+        if let Some(listener) = slot.as_mut() {
+            listener.subscribers.push((subscriber_id, status_refresh));
+            return true;
+        }
+
+        let global: JsValue = js_sys::global().into();
+        let event = JsValue::from_str("virya:resume");
+        let Ok(add_listener) =
+            js_sys::Reflect::get(&global, &JsValue::from_str("addEventListener"))
+        else {
+            return false;
+        };
+        let Ok(add_listener) = add_listener.dyn_into::<js_sys::Function>() else {
+            return false;
+        };
+        let Ok(remove_listener) =
+            js_sys::Reflect::get(&global, &JsValue::from_str("removeEventListener"))
+        else {
+            return false;
+        };
+        let Ok(remove_listener) = remove_listener.dyn_into::<js_sys::Function>() else {
+            return false;
+        };
+
+        let callback = Closure::<dyn FnMut(JsValue)>::new(move |_| {
+            // Clone the lightweight signals before updating them. An update can
+            // synchronously unmount a subscriber and run its cleanup, which
+            // must be allowed to borrow the registry mutably.
+            let subscribers = RESUME_REFRESH_LISTENER.with(|slot| {
+                slot.borrow()
+                    .as_ref()
+                    .map(|listener| {
+                        listener
+                            .subscribers
+                            .iter()
+                            .map(|(_, signal)| *signal)
+                            .collect::<Vec<_>>()
+                    })
+                    .unwrap_or_default()
+            });
+            for signal in subscribers {
+                let _ = signal.try_update(|value| *value = value.wrapping_add(1));
+            }
+        });
+        if add_listener
+            .call2(&global, &event, callback.as_ref().unchecked_ref())
+            .is_err()
+        {
+            return false;
+        }
+
+        *slot = Some(ResumeRefreshListener {
             global,
             event,
             remove_listener,
             callback,
+            subscribers: vec![(subscriber_id, status_refresh)],
         });
+        true
     });
+
+    if installed {
+        // Only the integer subscription id crosses the Leptos cleanup boundary,
+        // so the cleanup closure remains Send + Sync even though the actual
+        // wasm-bindgen callback stays thread-local.
+        on_cleanup(move || unregister_resume_refresh(subscriber_id));
+    }
 }
 
 #[component]

@@ -33,6 +33,7 @@ fn FanHomeOverview(
     home: RwSignal<Option<FanHomeData>>,
     loading: RwSignal<FanLoadingState>,
     tab: RwSignal<FanTab>,
+    focused_event_slug: RwSignal<Option<String>>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     view! {
@@ -86,6 +87,7 @@ fn FanHomeOverview(
                             {next_event.map(|event| {
                                 let ticket_url = event.ticket_url.clone();
                                 let title = event.title.clone();
+                                let event_slug = event.slug.clone();
                                 let is_live = event.phase == "live";
                                 let is_afterglow = event.phase == "afterglow";
                                 let is_upcoming = event.phase == "upcoming";
@@ -113,7 +115,14 @@ fn FanHomeOverview(
                                         <div class="home-card-actions">
                                             <button class="ghost" on:click={
                                                 let action = snapshot.recommended_action.clone();
-                                                move |_| tab.set(recommended_tab(&action))
+                                                let event_slug = event_slug.clone();
+                                                move |_| {
+                                                    let target = recommended_tab(&action);
+                                                    if target == FanTab::Events {
+                                                        focused_event_slug.set(Some(event_slug.clone()));
+                                                    }
+                                                    tab.set(target);
+                                                }
                                             }>{recommended_label(&snapshot.recommended_action)}</button>
                                             {ticket_url.filter(|_| is_upcoming).map(|url| view! { <ExternalLink url=url label=tr("tickets_tab") error=error /> })}
                                         </div>

@@ -1068,3 +1068,30 @@ html[data-virya-scanner-active] .app-shell {
 .checklist-copy small { color: var(--muted); font-size: var(--type-micro); letter-spacing: .08em; }
 .checklist-done .checklist-copy strong { text-decoration: line-through; }
 .success-note { margin: 0; }
+
+/* Fan UX reliability: the referral code is an explicit full-link copy target. */
+.referral-code-copy {
+  appearance: none;
+  width: fit-content;
+  max-width: 100%;
+  margin: 2px 0 0;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--amber, #f2b84b) 42%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--amber, #f2b84b) 9%, transparent);
+  color: var(--muted, #aaa);
+  font: inherit;
+  text-align: left;
+  cursor: copy;
+}
+.referral-code-copy:disabled { cursor: default; opacity: .72; }
+.referral-copy-status { display: block; margin-top: 6px; color: #9bd5ab; }
+
+/* .settings-list article is more specific than .push-setting-card above; keep
+   the push action below its copy/status and full-width on mobile. */
+.settings-list .push-setting-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+.settings-list .push-setting-card .push-setting-action { width: 100%; }

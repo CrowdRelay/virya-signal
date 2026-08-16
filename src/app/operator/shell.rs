@@ -8,6 +8,8 @@ fn OperatorApp(
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let loading = RwSignal::new(OperatorLoadingState::all());
+    let bootstrap_requested = RwSignal::new(false);
+    let refresh_requested = RwSignal::new(0_u32);
 
     let signal_overview = RwSignal::new(None::<OperatorSignalOverview>);
     let signal_loading = RwSignal::new(false);
@@ -15,10 +17,31 @@ fn OperatorApp(
     let staff_push_bootstrapped = RwSignal::new(false);
     let menu_open = RwSignal::new(false);
     Effect::new(move |_| {
-        if status.get().unlocked && dashboard.get().is_none() {
-            dashboard.set(Some(DashboardData::default()));
-            refresh_operator_parts(dashboard, loading, error);
+        let unlocked = status.get().unlocked;
+        if !unlocked {
+            bootstrap_requested.set(false);
+            return;
         }
+        if bootstrap_requested.get_untracked() {
+            return;
+        }
+        // `dashboard` lives in OperatorPortal and can survive an OperatorApp
+        // remount. Never use its placeholder presence as proof that network
+        // reads completed: a resume/status refresh can cancel the old owner
+        // after the placeholder was created and otherwise leave the connection state stuck forever.
+        bootstrap_requested.set(true);
+        refresh_operator_parts(dashboard, loading, error);
+    });
+
+    Effect::new(move |_| {
+        let generation = refresh_requested.get();
+        if generation == 0 {
+            return;
+        }
+        refresh_operator_parts(dashboard, loading, error);
+        signal_requested.set(false);
+        signal_overview.set(None);
+        signal_loading.set(false);
     });
 
     Effect::new(move |_| {
@@ -67,12 +90,12 @@ fn OperatorApp(
     });
 
     let refresh_all = move |_| {
-        bridge::invalidate_latest("operator:");
-        refresh_operator_parts(dashboard, loading, error);
-        signal_requested.set(false);
-        signal_overview.set(None);
-        signal_loading.set(false);
+        // The menu is a short-lived reactive owner. Trigger the actual reads
+        // from the stable OperatorApp owner instead of spawning tasks here and
+        // immediately cancelling them by closing the menu.
         menu_open.set(false);
+        bridge::invalidate_latest("operator:");
+        refresh_requested.update(|value| *value = value.wrapping_add(1).max(1));
     };
 
     on_cleanup(move || bridge::invalidate_latest("operator:"));

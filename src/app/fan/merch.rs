@@ -146,6 +146,11 @@ fn FanMerch(
                                         "https://virya.music/pl/merch/?source=signal-app&product={}",
                                         product.slug,
                                     );
+                                    let image_url = if product.slug == "echoes" {
+                                        Some(STAGE_PACK_PREVIEW_URL.to_owned())
+                                    } else {
+                                        product.image_url
+                                    };
                                     let product_name = product.name;
                                     let image_alt = i18n::format(
                                         "value_merch_virya",
@@ -163,7 +168,7 @@ fn FanMerch(
                                     });
                                     view! {
                                         <article class="fan-merch-card">
-                                            {product.image_url.map(|url| view! {
+                                            {image_url.map(|url| view! {
                                                 <img src=url alt=image_alt width="720" height="720" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
                                             })}
                                             <div class="fan-merch-body">

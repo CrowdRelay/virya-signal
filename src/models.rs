@@ -96,6 +96,7 @@ pub struct FanHomeProfile {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct FanHomeEvent {
+    pub slug: String,
     pub title: String,
     pub venue: Option<String>,
     pub city: Option<String>,

@@ -22,7 +22,7 @@ fn FanPortal(
         } else if status.get().unlocked {
             view! { <FanApp mode=mode status=status public=public push_target=push_target error=error /> }.into_any()
         } else {
-            view! { <FanAccess status=status error=error /> }.into_any()
+            view! { <FanAccess status=status status_refresh=status_refresh error=error /> }.into_any()
         }}
     }
 }
@@ -75,7 +75,7 @@ fn submit_fan_confirmation(
     token: RwSignal<String>,
     pin: RwSignal<String>,
     busy: RwSignal<bool>,
-    status: RwSignal<FanSessionStatus>,
+    status_refresh: RwSignal<u32>,
     error: RwSignal<Option<String>>,
 ) {
     if busy.get_untracked() {
@@ -116,7 +116,11 @@ fn submit_fan_confirmation(
             Ok(_) => {
                 pin.set(String::new());
                 token.set(String::new());
-                refresh_fan_status(status, error);
+                // A scanner/resume launcher snapshot can still be in flight with
+                // the pre-auth "locked" state. Supersede it and let the single
+                // launcher-status path publish the newly committed native session.
+                bridge::invalidate_latest("launcher:");
+                status_refresh.update(|value| *value = value.wrapping_add(1));
             }
             Err(message) => error.set(Some(message)),
         }
@@ -125,7 +129,11 @@ fn submit_fan_confirmation(
 }
 
 #[component]
-fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>) -> impl IntoView {
+fn FanAccess(
+    status: RwSignal<FanSessionStatus>,
+    status_refresh: RwSignal<u32>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
     let access_mode = RwSignal::new(FanAccessMode::Signup);
     let email = RwSignal::new(String::new());
     let name = RwSignal::new(String::new());
@@ -168,7 +176,9 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
             {
                 Ok(value) => {
                     pin.set(String::new());
+                    bridge::invalidate_latest("launcher:");
                     status.set(value);
+                    status_refresh.update(|generation| *generation = generation.wrapping_add(1));
                 }
                 Err(message) => error.set(Some(message)),
             }
@@ -240,7 +250,8 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
                 Ok(result) => {
                     if result.session_created {
                         pin.set(String::new());
-                        refresh_fan_status(status, error);
+                        bridge::invalidate_latest("launcher:");
+                        status_refresh.update(|value| *value = value.wrapping_add(1));
                     } else {
                         access_mode.set(FanAccessMode::Confirm);
                         let message = match result.email_queued {
@@ -273,7 +284,7 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
     };
 
     let confirm = move |_| {
-        submit_fan_confirmation(email, name, token, pin, busy, status, error);
+        submit_fan_confirmation(email, name, token, pin, busy, status_refresh, error);
     };
 
     let request_access = move |_| {
@@ -320,7 +331,7 @@ fn FanAccess(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>
                     if !email.get_untracked().trim().is_empty()
                         && pin.get_untracked().chars().count() >= 4
                     {
-                        submit_fan_confirmation(email, name, token, pin, busy, status, error);
+                        submit_fan_confirmation(email, name, token, pin, busy, status_refresh, error);
                     } else {
                         error.set(Some(tr("qr_scanned_enter_your_email_and_local").to_owned()));
                     }

@@ -232,15 +232,6 @@ fn refresh_operator_ops(
     });
 }
 
-fn refresh_fan_status(status: RwSignal<FanSessionStatus>, error: RwSignal<Option<String>>) {
-    spawn_local(async move {
-        match bridge::invoke::<FanSessionStatus, _>("fan_status", &EmptyArgs {}).await {
-            Ok(value) => status.set(value),
-            Err(message) => error.set(Some(message)),
-        }
-    });
-}
-
 fn refresh_fan_home(
     home: RwSignal<Option<FanHomeData>>,
     loading: RwSignal<FanLoadingState>,

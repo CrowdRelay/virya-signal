@@ -28,12 +28,14 @@ fn FanApp(
     let merch_bundles = RwSignal::new(None::<FanMerchBundleCatalog>);
     let wallets = RwSignal::new(Vec::<TicketWallet>::new());
     let checkout_event = RwSignal::new(None::<PublicEvent>);
+    let focused_event_slug = RwSignal::new(None::<String>);
     let admission_qr = RwSignal::new(None::<AdmissionQr>);
     let area = RwSignal::new(None::<AreaWallet>);
     let loading = RwSignal::new(FanLoadingState::all());
 
     let loaded = RwSignal::new(FanLoadedState::default());
     let menu_open = RwSignal::new(false);
+    let refresh_requested = RwSignal::new(0_u32);
 
     Effect::new(move |_| {
         let Some(target) = push_target.get() else {
@@ -127,6 +129,20 @@ fn FanApp(
         }
     });
     Effect::new(move |_| {
+        let generation = refresh_requested.get();
+        if generation == 0 {
+            return;
+        }
+        loaded.set(FanLoadedState::default());
+        refresh_fan_home(home, loading, error);
+        refresh_fan_parts(dashboard, loading, error);
+        refresh_fan_merch(merch, loading, error);
+        refresh_fan_merch_bundles(merch_bundles);
+        refresh_wallets(wallets, Some(loading), error);
+        refresh_fan_area(area, loading, error);
+    });
+
+    Effect::new(move |_| {
         if tab.get() != FanTab::Events && checkout_event.get_untracked().is_some() {
             checkout_event.set(None);
         }
@@ -144,6 +160,7 @@ fn FanApp(
                     merch_bundles.set(None);
                     wallets.set(Vec::new());
                     checkout_event.set(None);
+                    focused_event_slug.set(None);
                     admission_qr.set(None);
                     area.set(None);
                     loading.set(FanLoadingState::all());
@@ -156,7 +173,6 @@ fn FanApp(
     };
 
     let open_latarnik = move |_| {
-        menu_open.set(false);
         let url = if i18n::current().code() == "pl" {
             "https://virya.music/pl/latarnik/"
         } else {
@@ -166,18 +182,16 @@ fn FanApp(
             if let Err(message) = bridge::invoke_unit("open_external_url", &UrlArgs { url }).await {
                 error.set(Some(message));
             }
+            // Keep the menu owner alive until the native opener resolves;
+            // otherwise scoped async work is cancelled as soon as the menu hides.
+            menu_open.set(false);
         });
     };
 
     let refresh_all = move |_| {
-        loaded.set(FanLoadedState::default());
-        refresh_fan_home(home, loading, error);
-        refresh_fan_parts(dashboard, loading, error);
-        refresh_fan_merch(merch, loading, error);
-        refresh_fan_merch_bundles(merch_bundles);
-        refresh_wallets(wallets, Some(loading), error);
-        refresh_fan_area(area, loading, error);
         menu_open.set(false);
+        bridge::invalidate_latest("fan:");
+        refresh_requested.update(|value| *value = value.wrapping_add(1).max(1));
     };
 
     view! {
@@ -197,7 +211,7 @@ fn FanApp(
                 </nav>
             </Show>
             <div class="content">{move || match tab.get() {
-                FanTab::Signal => view! { <FanSignal home=home dashboard=dashboard tab=tab loading=loading error=error /> }.into_any(),
+                FanTab::Signal => view! { <FanSignal home=home dashboard=dashboard tab=tab focused_event_slug=focused_event_slug loading=loading error=error /> }.into_any(),
                 FanTab::Events => checkout_event.get().map(|event| view! {
                     <FanTicketCheckout
                         event=event
@@ -209,7 +223,7 @@ fn FanApp(
                         error=error
                     />
                 }.into_any()).value_or_else(|| view! {
-                    <FanEvents dashboard=dashboard public=public checkout_event=checkout_event loading=loading error=error />
+                    <FanEvents dashboard=dashboard public=public focused_event_slug=focused_event_slug checkout_event=checkout_event loading=loading error=error />
                 }.into_any()),
                 FanTab::Merch => view! { <FanMerch merch=merch bundles=merch_bundles loading=loading error=error /> }.into_any(),
                 FanTab::Game => view! { <AreaGameScreen area=area loading=loading error=error /> }.into_any(),
@@ -236,18 +250,41 @@ fn FanSignal(
     home: RwSignal<Option<FanHomeData>>,
     dashboard: RwSignal<Option<FanDashboardData>>,
     tab: RwSignal<FanTab>,
+    focused_event_slug: RwSignal<Option<String>>,
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let share_status = RwSignal::new(None::<String>);
+    let copy_referral = move |_| {
+        let Some(referral_code) = dashboard
+            .get_untracked()
+            .map(|data| data.referral.referral_code.trim().to_owned())
+        else {
+            return;
+        };
+        if referral_code.is_empty() {
+            return;
+        }
+        let url = format!("https://www.virya.music/r/{referral_code}");
+        share_status.set(None);
+        spawn_local(async move {
+            match bridge::copy_text(&url).await {
+                Ok(()) => share_status.set(Some(tr("signal_link_copied").to_owned())),
+                Err(message) => error.set(Some(message)),
+            }
+        });
+    };
     view! {
         <section class="screen fan-screen">
-            <FanHomeOverview home=home loading=loading tab=tab error=error />
+            <FanHomeOverview home=home loading=loading tab=tab focused_event_slug=focused_event_slug error=error />
             <header class="signal-dashboard-hero compact-referral-hero">
                 <p class="eyebrow">{tr("your_impact")}</p>
                 <h2>{move || dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned())}</h2>
                 <strong>{tr("confirmed_referrals")}</strong>
-                <p>{move || dashboard.with(|state| state.as_ref().map(|d| i18n::format("code", std::slice::from_ref(&d.referral.referral_code)))).value_or_else(|| tr("loading_signal").to_owned())}</p>
+                <button class="referral-code-copy" type="button" on:click=copy_referral disabled=move || dashboard.with(|state| state.as_ref().is_none_or(|data| data.referral.referral_code.trim().is_empty()))>
+                    {move || dashboard.with(|state| state.as_ref().map(|d| i18n::format("code", std::slice::from_ref(&d.referral.referral_code)))).value_or_else(|| tr("loading_signal").to_owned())}
+                </button>
+                {move || share_status.get().map(|message| view! { <small class="success referral-copy-status">{message}</small> })}
             </header>
             <Show when=move || !loading.get().referral fallback=move || view! { <Skeleton /> }>
             {move || dashboard.with(|state| state.as_ref().map(|data| data.referral.clone())).map(|referral| {

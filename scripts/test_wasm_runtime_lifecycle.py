@@ -18,7 +18,9 @@ class WasmRuntimeLifecycleTests(unittest.TestCase):
     def test_long_lived_callbacks_are_disposal_safe(self):
         app = (ROOT / "src" / "app.rs").read_text()
         support = (ROOT / "src" / "app" / "support.rs").read_text()
-        self.assertIn("status_refresh.try_update", app)
+        self.assertIn("signal.try_update", app)
+        self.assertIn("unregister_resume_refresh", app)
+        self.assertIn("listener.subscribers.retain", app)
         self.assertIn("dismiss_generation.try_get_untracked()", support)
         self.assertIn("error.try_set(None)", support)
 

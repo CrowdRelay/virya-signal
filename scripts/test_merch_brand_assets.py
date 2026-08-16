@@ -118,6 +118,10 @@ class MerchBrandAssetsTests(unittest.TestCase):
         merch = (ROOT / "src/app/fan/merch.rs").read_text()
         self.assertIn('STAGE_PACK_PREVIEW_URL', merch)
         self.assertIn('bundle.slug == "bundle-stage-pack"', merch)
+        self.assertIn('product.slug == "echoes"', merch)
+        canonical = ROOT.parent / "virya" / "public" / "covers" / "echoes.webp"
+        if canonical.exists():
+            self.assertEqual(preview.read_bytes(), canonical.read_bytes())
 
 
 if __name__ == "__main__":
