@@ -10,9 +10,9 @@ use formatters::{
     day, event_location, event_time_location, human_time, local_to_rfc3339, money, month, optional,
 };
 use leptos::prelude::*;
+use leptos::task::spawn_local_scoped_with_cancellation as spawn_local;
 use types::*;
 use wasm_bindgen::{JsCast, JsValue, closure::Closure};
-use leptos::task::spawn_local_scoped_with_cancellation as spawn_local;
 
 use crate::{
     bridge,
