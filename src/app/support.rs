@@ -510,10 +510,10 @@ fn refresh_wallets(
             Ok(None) => {}
             Err(message) => error.set(Some(message)),
         }
-        if completed {
-            if let Some(loading) = loading {
-                loading.update(|state| state.wallets = false);
-            }
+        if completed
+            && let Some(loading) = loading
+        {
+            loading.update(|state| state.wallets = false);
         }
     });
 }

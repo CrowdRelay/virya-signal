@@ -39,6 +39,7 @@ fn FanHomeOverview(
                 {move || home.get().map(|snapshot| {
                     let stale = snapshot.stale;
                     let synesthesia = snapshot.synesthesia.clone();
+                    let synesthesia_summary = synesthesia_best_summary(&synesthesia);
                     let counts = snapshot.counts.clone();
                     let referral = snapshot.referral.clone();
                     let next_event = snapshot.next_event.clone();
@@ -67,6 +68,9 @@ fn FanHomeOverview(
                                 }}</p>
                                 {synesthesia.client_total_elapsed_ms.map(|elapsed| view! {
                                     <small>{i18n::format("synesthesia_completed_in_minutes", &[((elapsed / 60_000).max(1)).to_string()])}</small>
+                                })}
+                                {synesthesia_summary.map(|summary| view! {
+                                    <small class="synesthesia-best-summary">{summary}</small>
                                 })}
                                 <Show when=move || synesthesia.reward_entered>
                                     <span class="cache-badge">{tr("reward_entry_confirmed")}</span>

@@ -1,5 +1,5 @@
 fn fan_tab_for_push_target(target: &str) -> FanTab {
-    let path = target.split(|character| character == '?' || character == '#').next().unwrap_or(target);
+    let path = target.split(['?', '#']).next().unwrap_or(target);
     if path.ends_with("/area") || path.ends_with("/area/") {
         FanTab::Game
     } else if path.ends_with("/merch") || path.ends_with("/merch/") {

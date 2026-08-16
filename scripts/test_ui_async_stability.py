@@ -41,7 +41,12 @@ class UiAsyncStabilityContracts(unittest.TestCase):
             body = function_body(support, name)
             self.assertIn("invoke_latest", body, name)
             self.assertIn("latest_request_completed(&result)", body, name)
-            self.assertIn("if completed {", body, name)
+            self.assertIn("if completed", body, name)
+            self.assertLess(
+                body.index("latest_request_completed(&result)"),
+                body.rindex("if completed"),
+                name,
+            )
 
         checkout = (ROOT / "src/app/fan/events.rs").read_text(encoding="utf-8")
         checkout = checkout.split("fn FanTicketCheckout", 1)[1]

@@ -247,17 +247,27 @@ fn OperatorChecklist(
                 {move || checklist.get().map(|snapshot| {
                     let done = snapshot.items.iter().filter(|item| item.status == "done").count();
                     let total = snapshot.items.len();
+                    let event_id = snapshot.event_id.clone();
+                    let event_slug = snapshot.event_slug.clone();
+                    let event_time = human_time(&snapshot.starts_at);
+                    let mut items = snapshot.items;
+                    items.sort_by(|left, right| {
+                        left.sort_order
+                            .cmp(&right.sort_order)
+                            .then_with(|| left.item_key.cmp(&right.item_key))
+                    });
                     view! {
-                        <article class="panel">
+                        <article class="panel" data-event-id=event_id data-event-slug=event_slug>
                             <div class="section-head">
                                 <div>
                                     <h3>{snapshot.event_title.clone()}</h3>
+                                    <p>{event_time}</p>
                                     <p>{i18n::format("checklist_progress", &[done.to_string(), total.to_string()])}</p>
                                 </div>
                                 <strong>{format!("{done}/{total}")}</strong>
                             </div>
                             <div class="card-list">
-                                {snapshot.items.into_iter().map(|item| {
+                                {items.into_iter().map(|item| {
                                     let key = item.item_key.clone();
                                     let key_for_click = key.clone();
                                     let key_for_busy = key.clone();
@@ -265,6 +275,8 @@ fn OperatorChecklist(
                                     let done = current == "done";
                                     let label = checklist_item_label(&item.item_key);
                                     let section = checklist_section_label(&item.section);
+                                    let note = item.note.filter(|value| !value.trim().is_empty());
+                                    let updated_at = human_time(&item.updated_at);
                                     view! {
                                         <button
                                             type="button"
@@ -274,7 +286,12 @@ fn OperatorChecklist(
                                             on:click=move |_| toggle(key_for_click.clone(), current.clone())
                                         >
                                             <span class="checklist-mark">{if done { "✓" } else { "○" }}</span>
-                                            <span class="checklist-copy"><small>{section}</small><strong>{label}</strong></span>
+                                            <span class="checklist-copy">
+                                                <small>{section}</small>
+                                                <strong>{label}</strong>
+                                                {note.map(|note| view! { <span>{note}</span> })}
+                                                <small>{updated_at}</small>
+                                            </span>
                                             <span>{move || if busy_item.get().as_deref() == Some(key_for_busy.as_str()) { "…" } else { "" }}</span>
                                         </button>
                                     }
