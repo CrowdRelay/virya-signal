@@ -14,8 +14,8 @@ fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
             dismiss_generation.set(generation);
             set_timeout(
                 move || {
-                    if dismiss_generation.get_untracked() == generation {
-                        error.set(None);
+                    if dismiss_generation.try_get_untracked() == Some(generation) {
+                        let _ = error.try_set(None);
                     }
                 },
                 std::time::Duration::from_secs(5),

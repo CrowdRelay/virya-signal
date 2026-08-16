@@ -104,7 +104,8 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         toast = support.split("fn Toast", 1)[1].split("fn latest_request_completed", 1)[0]
         self.assertIn("dismiss_generation", toast)
         self.assertIn("get_untracked().wrapping_add(1)", toast)
-        self.assertIn("dismiss_generation.get_untracked() == generation", toast)
+        self.assertIn("dismiss_generation.try_get_untracked() == Some(generation)", toast)
+        self.assertIn("error.try_set(None)", toast)
         self.assertNotIn("set_timeout(move || error.set(None)", toast)
 
 

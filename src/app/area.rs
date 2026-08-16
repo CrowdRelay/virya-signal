@@ -1,5 +1,5 @@
 use leptos::prelude::*;
-use wasm_bindgen_futures::spawn_local;
+use leptos::task::spawn_local_scoped_with_cancellation as spawn_local;
 
 use crate::{
     bridge,

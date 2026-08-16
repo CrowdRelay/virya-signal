@@ -12,7 +12,7 @@ use formatters::{
 use leptos::prelude::*;
 use types::*;
 use wasm_bindgen::{JsCast, JsValue, closure::Closure};
-use wasm_bindgen_futures::spawn_local;
+use leptos::task::spawn_local_scoped_with_cancellation as spawn_local;
 
 use crate::{
     bridge,
@@ -40,7 +40,7 @@ fn install_resume_refresh(status_refresh: RwSignal<u32>) {
         return;
     };
     let callback = Closure::<dyn FnMut(JsValue)>::new(move |_| {
-        status_refresh.update(|value| *value = value.wrapping_add(1));
+        let _ = status_refresh.try_update(|value| *value = value.wrapping_add(1));
     });
     if listener
         .call2(
