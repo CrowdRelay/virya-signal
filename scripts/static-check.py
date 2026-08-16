@@ -77,6 +77,11 @@ for retired in ('boot-initializer.mjs', 'src-tauri/launcher-assets'):
     if (root / retired).exists():
         raise SystemExit(f'retired source must stay deleted: {retired}')
 
+ignored = (root / '.gitignore').read_text(encoding='utf-8')
+for tombstone in ('/boot-initializer.mjs', '/src-tauri/launcher-assets/'):
+    if tombstone not in ignored:
+        raise SystemExit(f'retired source tombstone missing from .gitignore: {tombstone}')
+
 ui_main = read_app_source(root)
 ui = ui_main
 native = (root / 'src-tauri/src/lib.rs').read_text()

@@ -23,3 +23,6 @@ keystore.properties
 *.tmp
 *~
 .recovery-backup
+# Signal boot/launcher tombstones — required by principal/staff hardening contract.
+/boot-initializer.mjs
+/src-tauri/launcher-assets/
