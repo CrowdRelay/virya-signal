@@ -33,7 +33,7 @@ pub struct ExperimentAllocation {
     pub allocation_basis_points: u16,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum AutopilotActionPayload {
     ChangeTicketPrice {
@@ -160,6 +160,310 @@ pub enum AutopilotActionPayload {
         action_url_path: String,
         reminder_number: u8,
     },
+}
+
+/// Flat wire projection of [`AutopilotActionPayload`].
+///
+/// The payload is internally tagged, and `#[derive(Deserialize)]` on an
+/// internally tagged enum forces Serde's `Content` buffering path: the whole map
+/// is buffered, then each of the 22 variants is monomorphised again over
+/// `ContentDeserializer`. In the WASM bundle that single generated `visit_map`
+/// measured ~84 KiB. Deserialising one flat struct instead keeps exactly one
+/// streaming `visit_map`, and the variant reconstruction below is a plain
+/// non-generic function that is compiled once.
+///
+/// Unknown fields stay ignored (provider-only keys must never reach the UI), and
+/// the accepted wire shape is byte-identical to the derived implementation.
+#[derive(Deserialize)]
+struct WireAutopilotActionPayload {
+    kind: String,
+    #[serde(default)]
+    action_url_path: Option<String>,
+    #[serde(default)]
+    affinity_basis_points: Option<u16>,
+    #[serde(default)]
+    allocations: Option<Vec<ExperimentAllocation>>,
+    #[serde(default)]
+    artifact: Option<String>,
+    #[serde(default)]
+    assignment_id: Option<String>,
+    #[serde(default)]
+    beacon_id: Option<String>,
+    #[serde(default)]
+    beacon_version: Option<i64>,
+    #[serde(default)]
+    bundle_price_minor: Option<i64>,
+    #[serde(default)]
+    campaign_id: Option<String>,
+    #[serde(default)]
+    city_id: Option<String>,
+    #[serde(default)]
+    complete: Option<bool>,
+    #[serde(default)]
+    due_at: Option<String>,
+    #[serde(default)]
+    economics_version: Option<i64>,
+    #[serde(default)]
+    event_id: Option<String>,
+    #[serde(default)]
+    expected_version: Option<i64>,
+    #[serde(default)]
+    experiment_id: Option<String>,
+    #[serde(default)]
+    fan_id: Option<String>,
+    #[serde(default)]
+    from_capacity: Option<u32>,
+    #[serde(default)]
+    from_minor: Option<i64>,
+    #[serde(default)]
+    guardrail_version: Option<i64>,
+    #[serde(default)]
+    lever: Option<String>,
+    #[serde(default)]
+    milestone: Option<String>,
+    #[serde(default)]
+    opportunity_id: Option<String>,
+    #[serde(default)]
+    opportunity_kind: Option<String>,
+    #[serde(default)]
+    phase: Option<String>,
+    #[serde(default)]
+    product_a: Option<String>,
+    #[serde(default)]
+    product_b: Option<String>,
+    #[serde(default)]
+    product_id: Option<String>,
+    #[serde(default)]
+    quantity: Option<u32>,
+    #[serde(default)]
+    recipient_name: Option<String>,
+    #[serde(default)]
+    release_at: Option<String>,
+    #[serde(default)]
+    release_id: Option<String>,
+    #[serde(default)]
+    reminder_number: Option<u8>,
+    #[serde(default)]
+    roas_basis_points: Option<u32>,
+    #[serde(default)]
+    score: Option<u16>,
+    #[serde(default)]
+    source_id: Option<String>,
+    #[serde(default)]
+    source_version: Option<i64>,
+    #[serde(default)]
+    target_count: Option<u16>,
+    #[serde(default)]
+    target_id: Option<String>,
+    #[serde(default)]
+    target_name: Option<String>,
+    #[serde(default)]
+    target_version: Option<i64>,
+    #[serde(default)]
+    task: Option<String>,
+    #[serde(default)]
+    task_detail: Option<String>,
+    #[serde(default)]
+    task_title: Option<String>,
+    #[serde(default)]
+    template_key: Option<String>,
+    #[serde(default)]
+    ticket_type_id: Option<String>,
+    #[serde(default)]
+    title: Option<String>,
+    #[serde(default)]
+    to_capacity: Option<u32>,
+    #[serde(default)]
+    to_minor: Option<i64>,
+    #[serde(default)]
+    variant_id: Option<String>,
+    #[serde(default)]
+    winner_variant_id: Option<String>,
+}
+
+enum WirePayloadError {
+    MissingField(&'static str),
+    UnknownKind,
+}
+
+const AUTOPILOT_PAYLOAD_KINDS: &[&str] = &[
+    "change_ticket_price",
+    "change_ticket_capacity",
+    "request_fan_lifecycle_message",
+    "request_merch_reorder",
+    "change_merch_price",
+    "request_booking_outreach",
+    "request_audience_campaign",
+    "request_merch_bundle",
+    "request_outreach",
+    "request_beacon_discovery",
+    "request_beacon_outreach",
+    "request_show_growth",
+    "request_content_artifact",
+    "adjust_experiment",
+    "complete_show_task",
+    "escalate_show_task",
+    "request_promotion_budget_change",
+    "execute_release_milestone",
+    "apply_live_opportunity",
+    "prepare_funding_package",
+    "submit_funding_application",
+    "send_team_assignment_email",
+];
+
+#[inline]
+fn required<T>(value: Option<T>, field: &'static str) -> Result<T, WirePayloadError> {
+    value.ok_or(WirePayloadError::MissingField(field))
+}
+
+impl WireAutopilotActionPayload {
+    fn into_payload(self) -> Result<AutopilotActionPayload, WirePayloadError> {
+        Ok(match self.kind.as_str() {
+            "change_ticket_price" => AutopilotActionPayload::ChangeTicketPrice {
+                ticket_type_id: required(self.ticket_type_id, "ticket_type_id")?,
+                from_minor: required(self.from_minor, "from_minor")?,
+                to_minor: required(self.to_minor, "to_minor")?,
+            },
+            "change_ticket_capacity" => AutopilotActionPayload::ChangeTicketCapacity {
+                ticket_type_id: required(self.ticket_type_id, "ticket_type_id")?,
+                from_capacity: required(self.from_capacity, "from_capacity")?,
+                to_capacity: required(self.to_capacity, "to_capacity")?,
+                guardrail_version: required(self.guardrail_version, "guardrail_version")?,
+            },
+            "request_fan_lifecycle_message" => AutopilotActionPayload::RequestFanLifecycleMessage {
+                fan_id: required(self.fan_id, "fan_id")?,
+                template_key: required(self.template_key, "template_key")?,
+            },
+            "request_merch_reorder" => AutopilotActionPayload::RequestMerchReorder {
+                variant_id: required(self.variant_id, "variant_id")?,
+                quantity: required(self.quantity, "quantity")?,
+            },
+            "change_merch_price" => AutopilotActionPayload::ChangeMerchPrice {
+                product_id: required(self.product_id, "product_id")?,
+                from_minor: required(self.from_minor, "from_minor")?,
+                to_minor: required(self.to_minor, "to_minor")?,
+                economics_version: required(self.economics_version, "economics_version")?,
+            },
+            "request_booking_outreach" => AutopilotActionPayload::RequestBookingOutreach {
+                city_id: required(self.city_id, "city_id")?,
+                target_id: required(self.target_id, "target_id")?,
+                target_version: required(self.target_version, "target_version")?,
+                target_name: required(self.target_name, "target_name")?,
+                score: required(self.score, "score")?,
+                phase: required(self.phase, "phase")?,
+            },
+            "request_audience_campaign" => AutopilotActionPayload::RequestAudienceCampaign {
+                event_id: required(self.event_id, "event_id")?,
+                phase: required(self.phase, "phase")?,
+                template_key: required(self.template_key, "template_key")?,
+            },
+            "request_merch_bundle" => AutopilotActionPayload::RequestMerchBundle {
+                product_a: required(self.product_a, "product_a")?,
+                product_b: required(self.product_b, "product_b")?,
+                bundle_price_minor: required(self.bundle_price_minor, "bundle_price_minor")?,
+                affinity_basis_points: required(
+                    self.affinity_basis_points,
+                    "affinity_basis_points",
+                )?,
+            },
+            "request_outreach" => AutopilotActionPayload::RequestOutreach {
+                opportunity_id: required(self.opportunity_id, "opportunity_id")?,
+                target_id: required(self.target_id, "target_id")?,
+                target_version: required(self.target_version, "target_version")?,
+                target_name: required(self.target_name, "target_name")?,
+                phase: required(self.phase, "phase")?,
+                template_key: required(self.template_key, "template_key")?,
+            },
+            "request_beacon_discovery" => AutopilotActionPayload::RequestBeaconDiscovery {
+                event_id: required(self.event_id, "event_id")?,
+                target_count: required(self.target_count, "target_count")?,
+            },
+            "request_beacon_outreach" => AutopilotActionPayload::RequestBeaconOutreach {
+                beacon_id: required(self.beacon_id, "beacon_id")?,
+                event_id: required(self.event_id, "event_id")?,
+                beacon_version: required(self.beacon_version, "beacon_version")?,
+                phase: required(self.phase, "phase")?,
+                template_key: required(self.template_key, "template_key")?,
+            },
+            "request_show_growth" => AutopilotActionPayload::RequestShowGrowth {
+                event_id: required(self.event_id, "event_id")?,
+                lever: required(self.lever, "lever")?,
+                template_key: required(self.template_key, "template_key")?,
+            },
+            "request_content_artifact" => AutopilotActionPayload::RequestContentArtifact {
+                source_id: required(self.source_id, "source_id")?,
+                source_version: required(self.source_version, "source_version")?,
+                artifact: required(self.artifact, "artifact")?,
+                template_key: required(self.template_key, "template_key")?,
+            },
+            "adjust_experiment" => AutopilotActionPayload::AdjustExperiment {
+                experiment_id: required(self.experiment_id, "experiment_id")?,
+                expected_version: required(self.expected_version, "expected_version")?,
+                winner_variant_id: required(self.winner_variant_id, "winner_variant_id")?,
+                allocations: required(self.allocations, "allocations")?,
+                complete: required(self.complete, "complete")?,
+            },
+            "complete_show_task" => AutopilotActionPayload::CompleteShowTask {
+                event_id: required(self.event_id, "event_id")?,
+                task: required(self.task, "task")?,
+            },
+            "escalate_show_task" => AutopilotActionPayload::EscalateShowTask {
+                event_id: required(self.event_id, "event_id")?,
+                task: required(self.task, "task")?,
+            },
+            "request_promotion_budget_change" => {
+                AutopilotActionPayload::RequestPromotionBudgetChange {
+                    campaign_id: required(self.campaign_id, "campaign_id")?,
+                    from_minor: required(self.from_minor, "from_minor")?,
+                    to_minor: required(self.to_minor, "to_minor")?,
+                    roas_basis_points: required(self.roas_basis_points, "roas_basis_points")?,
+                }
+            }
+            "execute_release_milestone" => AutopilotActionPayload::ExecuteReleaseMilestone {
+                release_id: required(self.release_id, "release_id")?,
+                title: required(self.title, "title")?,
+                release_at: required(self.release_at, "release_at")?,
+                milestone: required(self.milestone, "milestone")?,
+            },
+            "apply_live_opportunity" => AutopilotActionPayload::ApplyLiveOpportunity {
+                opportunity_id: required(self.opportunity_id, "opportunity_id")?,
+                opportunity_kind: required(self.opportunity_kind, "opportunity_kind")?,
+                score: required(self.score, "score")?,
+            },
+            "prepare_funding_package" => AutopilotActionPayload::PrepareFundingPackage {
+                opportunity_id: required(self.opportunity_id, "opportunity_id")?,
+            },
+            "submit_funding_application" => AutopilotActionPayload::SubmitFundingApplication {
+                opportunity_id: required(self.opportunity_id, "opportunity_id")?,
+            },
+            "send_team_assignment_email" => AutopilotActionPayload::SendTeamAssignmentEmail {
+                assignment_id: required(self.assignment_id, "assignment_id")?,
+                recipient_name: required(self.recipient_name, "recipient_name")?,
+                task_title: required(self.task_title, "task_title")?,
+                task_detail: required(self.task_detail, "task_detail")?,
+                due_at: self.due_at,
+                action_url_path: required(self.action_url_path, "action_url_path")?,
+                reminder_number: required(self.reminder_number, "reminder_number")?,
+            },
+            _ => return Err(WirePayloadError::UnknownKind),
+        })
+    }
+}
+
+impl<'de> Deserialize<'de> for AutopilotActionPayload {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let wire = WireAutopilotActionPayload::deserialize(deserializer)?;
+        let kind = wire.kind.clone();
+        wire.into_payload().map_err(|error| match error {
+            WirePayloadError::MissingField(field) => serde::de::Error::missing_field(field),
+            WirePayloadError::UnknownKind => {
+                serde::de::Error::unknown_variant(&kind, AUTOPILOT_PAYLOAD_KINDS)
+            }
+        })
+    }
 }
 
 impl AutopilotActionPayload {

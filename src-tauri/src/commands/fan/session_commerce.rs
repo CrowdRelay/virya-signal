@@ -116,11 +116,12 @@ pub(crate) async fn fan_confirm(
     state: State<'_, AppState>,
     mut input: FanConfirmationInput,
     pin: String,
-) -> Result<FanAuthResult, AppError> {
+) -> Result<FanSessionStatus, AppError> {
     let _mutation = state.fan_mutation.lock().await;
     validate_fan_confirmation(&mut input, &pin)?;
     let pin = Zeroizing::new(pin);
-    let (result, session_token, canonical_email, canonical_name) = state.api.fan_confirm(&input).await?;
+    let (_result, session_token, canonical_email, canonical_name) =
+        state.api.fan_confirm(&input).await?;
     let profile = FanProfile {
         api_base_url: input.api_base_url,
         area_wallet_id: uuid::Uuid::new_v4().to_string(),
@@ -142,7 +143,14 @@ pub(crate) async fn fan_confirm(
     *state.fan_session.write().await = Some(Arc::new(profile));
     *state.fan_pin.write().await = Some(pin);
     state.wallet_qr_tokens.write().await.clear();
-    Ok(result)
+    drop(_mutation);
+
+    // Confirmation is a single atomic IPC from the WebView's perspective:
+    // once the one-time token is consumed and the encrypted profile is persisted,
+    // return the authoritative unlocked status in the same command. A second
+    // WebView IPC must never turn a successful one-time-token exchange into an
+    // ambiguous client-side failure.
+    fan_status(state).await
 }
 
 #[tauri::command]

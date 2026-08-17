@@ -17,12 +17,41 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertIn('let scan_pin = pin.get_untracked();', scan)
         self.assertLess(scan.index('let scan_email'), scan.index('bridge::scan_qr().await'))
         self.assertLess(scan.index('let scan_pin'), scan.index('bridge::scan_qr().await'))
-        self.assertIn('submit_fan_confirmation_values(', scan)
+        self.assertIn('run_fan_confirmation(values, token, pin, confirmation_session, error).await', scan)
+        self.assertNotIn('submit_fan_confirmation_values(values', scan)
+        self.assertNotIn('exchange_fan_confirmation(values).await', scan)
+        self.assertLess(scan.index('busy.set(true);'), scan.index('bridge::scan_qr().await'))
+        self.assertLess(scan.index('bridge::scan_qr().await'), scan.index('run_fan_confirmation(values, token, pin, confirmation_session, error).await'))
+        self.assertIn('token.try_set(scanned_token.clone())', scan)
+        helper = src.split('async fn run_fan_confirmation(', 1)[1].split('fn submit_fan_confirmation_values(', 1)[0]
+        self.assertIn('exchange_fan_confirmation(values).await', helper)
+        self.assertIn('session.status.try_set(value)', helper)
+        self.assertIn('persist_fan_tab(FanTab::Signal);', helper)
         post_scan = scan[scan.index('bridge::scan_qr().await'):]
         self.assertNotIn('email.get_untracked()', post_scan)
         self.assertNotIn('pin.get_untracked()', post_scan)
         bridge = read('src/bridge/client.rs')
         self.assertIn('option_env!("VIRYA_SIGNAL_E2E_QR_PAYLOAD")', bridge)
+
+    def test_mail_qr_token_is_native_validated_and_does_not_require_email_hint(self):
+        validation = read('src-tauri/src/validation.rs')
+        self.assertIn('virya-signal://fan/confirm?source=mail&token={token}', validation)
+        self.assertIn('https://virya.music/signal/confirm#token={token}', validation)
+        self.assertIn('The one-time token is the authentication credential.', validation)
+        scanner = read('src/app/fan.rs').split('let scan_confirmation = move |_|', 1)[1].split('    view! {', 1)[0]
+        self.assertNotIn('scan_email.is_empty()', scanner)
+
+    def test_fan_confirm_is_single_authoritative_ipc(self):
+        ui = read('src/app/fan.rs')
+        exchange = ui.split('async fn exchange_fan_confirmation(', 1)[1].split('async fn run_fan_confirmation(', 1)[0]
+        self.assertIn('bridge::invoke::<FanSessionStatus, _>(', exchange)
+        self.assertNotIn('invoke_timeout::<FanSessionStatus', exchange)
+        native = read('src-tauri/src/commands/fan/session_commerce.rs')
+        confirm = native.split('pub(crate) async fn fan_confirm(', 1)[1].split('#[tauri::command]', 1)[0]
+        self.assertIn('Result<FanSessionStatus, AppError>', confirm)
+        self.assertIn('vault::replace_fan', confirm)
+        self.assertIn('fan_status(state).await', confirm)
+        self.assertLess(confirm.index('vault::replace_fan'), confirm.index('fan_status(state).await'))
 
     def test_fan_confirmation_helper_stays_within_argument_budget(self):
         src = read('src/app/fan.rs')

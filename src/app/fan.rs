@@ -105,7 +105,7 @@ async fn exchange_fan_confirmation(
         display_name: input_name,
         token: current_token.trim().to_owned(),
     };
-    bridge::invoke::<FanAuthResult, _>(
+    let status = bridge::invoke::<FanSessionStatus, _>(
         "fan_confirm",
         &FanConfirmArgs {
             input: &input,
@@ -114,7 +114,38 @@ async fn exchange_fan_confirmation(
     )
     .await?;
     bridge::invalidate_latest("launcher:");
-    bridge::invoke_timeout::<FanSessionStatus, _>("fan_status", &EmptyArgs {}, 5_000).await
+    Ok(status)
+}
+
+async fn run_fan_confirmation(
+    values: FanConfirmationValues,
+    token: RwSignal<String>,
+    pin: RwSignal<String>,
+    session: FanConfirmationSession,
+    error: RwSignal<Option<String>>,
+) {
+    match exchange_fan_confirmation(values).await {
+        Ok(value) => {
+            // Camera transitions can temporarily dispose/remount the WebView. The
+            // native fan_confirm command has already persisted the session at this
+            // point, so UI reconciliation must be best-effort rather than turning a
+            // successful login into a client-side failure.
+            let _ = pin.try_set(String::new());
+            let _ = token.try_set(String::new());
+            // A confirmation (email code, deep link, or QR scan) is always a
+            // deliberate "come back to Signal" moment. Land the fan on the
+            // Signal tab even if a stale tab preference (e.g. Merch) was
+            // persisted from a session that never explicitly logged out.
+            persist_fan_tab(FanTab::Signal);
+            let _ = session.status.try_set(value);
+            let _ = session
+                .status_refresh
+                .try_update(|generation| *generation = generation.wrapping_add(1));
+        }
+        Err(message) => {
+            let _ = error.try_set(Some(message));
+        }
+    }
 }
 
 fn submit_fan_confirmation_values(
@@ -138,23 +169,8 @@ fn submit_fan_confirmation_values(
     }
     busy.set(true);
     spawn_local(async move {
-        match exchange_fan_confirmation(values).await {
-            Ok(value) => {
-                pin.set(String::new());
-                token.set(String::new());
-                // A confirmation (email code, deep link, or QR scan) is always a
-                // deliberate "come back to Signal" moment. Land the fan on the
-                // Signal tab even if a stale tab preference (e.g. Merch) was
-                // persisted from a session that never explicitly logged out.
-                persist_fan_tab(FanTab::Signal);
-                session.status.set(value);
-                session
-                    .status_refresh
-                    .update(|generation| *generation = generation.wrapping_add(1));
-            }
-            Err(message) => error.set(Some(message)),
-        }
-        busy.set(false);
+        run_fan_confirmation(values, token, pin, session, error).await;
+        let _ = busy.try_set(false);
     });
 }
 
@@ -427,13 +443,21 @@ fn FanAccess(
                     return;
                 }
             };
+
+            // Keep the UI lock held from camera-open through the native token
+            // exchange. The old nested submit helper rejected this path because
+            // `busy` was already true, so a successful QR scan could never log in.
+            // We deliberately bypass that click-level guard here and perform exactly
+            // one confirmation attempt for exactly one scanned token.
+            let _ = token.try_set(scanned_token.clone());
             let values = FanConfirmationValues {
                 email: scan_email,
                 name: scan_name,
                 token: scanned_token,
                 pin: scan_pin,
             };
-            submit_fan_confirmation_values(values, token, pin, busy, confirmation_session, error);
+            run_fan_confirmation(values, token, pin, confirmation_session, error).await;
+            let _ = busy.try_set(false);
         });
     };
 
