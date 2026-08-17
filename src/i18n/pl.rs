@@ -152,6 +152,13 @@ pub(super) fn text(key: &'static str) -> &'static str {
         }
         "select_a_show_first" => "Najpierw wybierz koncert.",
         "select_a_show" => "Wybierz koncert.",
+        "scan_status_redeemed" => "WYKORZYSTANE",
+        "scan_status_already_redeemed" => "JUŻ WYKORZYSTANE",
+        "scan_status_revoked" => "COFNIĘTE — NIE WPUSZCZAJ",
+        "scan_status_expired" => "WYGASŁE — NIE WPUSZCZAJ",
+        "scan_status_not_claimed" => "NIEODEBRANE — NIE WPUSZCZAJ",
+        "scan_status_offline_queued" => "W KOLEJCE OFFLINE",
+        "scan_status_offline_duplicate" => "JUŻ ZESKANOWANE (OFFLINE)",
         "snapshot_ready_durable_tickets" => "Snapshot gotowy: {} trwałych biletów.",
         "sync_saved_conflicts_still_pending" => "Sync: {} zapisane, {} konfliktów, {} nadal czeka.",
         "show_data_removed_from_the_device" => "Dane koncertu usunięte z urządzenia.",

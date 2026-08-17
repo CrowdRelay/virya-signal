@@ -176,6 +176,7 @@ button:disabled { opacity: .48; cursor: default; }
 .scan-result p { margin: 0; }
 .scan-success { border-color: #71d490; background: #0c1e12; color: #d9ffe5; }
 .scan-warning { border-color: #ffb94a; background: #231707; color: #ffe4b6; }
+.scan-denied { border-color: #ff5f6d; background: #240a0c; color: #ffd7da; }
 .order-card { grid-template-columns: 1fr auto; }
 .order-card > span { color: var(--yellow); font-weight: 800; }
 .revenue-card { margin-top: 10px; border: 1px solid #403718; background: var(--yellow-soft); padding: 20px; display: grid; gap: 4px; }

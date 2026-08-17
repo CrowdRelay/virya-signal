@@ -154,6 +154,13 @@ pub(super) fn text(key: &'static str) -> &'static str {
         }
         "select_a_show_first" => "Select a show first.",
         "select_a_show" => "Select a show.",
+        "scan_status_redeemed" => "REDEEMED",
+        "scan_status_already_redeemed" => "ALREADY REDEEMED",
+        "scan_status_revoked" => "REVOKED — DO NOT ADMIT",
+        "scan_status_expired" => "EXPIRED — DO NOT ADMIT",
+        "scan_status_not_claimed" => "NOT CLAIMED — DO NOT ADMIT",
+        "scan_status_offline_queued" => "QUEUED OFFLINE",
+        "scan_status_offline_duplicate" => "ALREADY SCANNED (OFFLINE)",
         "snapshot_ready_durable_tickets" => "Snapshot ready: {} durable tickets.",
         "sync_saved_conflicts_still_pending" => "Sync: {} saved, {} conflicts, {} still pending.",
         "show_data_removed_from_the_device" => "Show data removed from the device.",

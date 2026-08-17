@@ -1,5 +1,23 @@
 // Live gate scanner and offline Show Mode. Kept separate from the broader operator cockpit.
 
+// CrowdRelay's AdmissionRedemptionStatus can also return "revoked", "expired"
+// and "not_claimed" (a QR that was never claimed by its winner). Those must
+// read as an explicit, unambiguous door decision rather than the raw enum
+// string, since a misread here is the difference between admitting or
+// turning away a real person.
+fn scan_status_label(status: &str) -> String {
+    match status {
+        "redeemed" => tr("scan_status_redeemed").to_owned(),
+        "already_redeemed" => tr("scan_status_already_redeemed").to_owned(),
+        "revoked" => tr("scan_status_revoked").to_owned(),
+        "expired" => tr("scan_status_expired").to_owned(),
+        "not_claimed" => tr("scan_status_not_claimed").to_owned(),
+        "offline_queued" => tr("scan_status_offline_queued").to_owned(),
+        "offline_duplicate" => tr("scan_status_offline_duplicate").to_owned(),
+        other => other.to_uppercase(),
+    }
+}
+
 #[component]
 fn Scanner(
     dashboard: RwSignal<Option<DashboardData>>,
@@ -219,7 +237,8 @@ fn Scanner(
                     entry.status.as_str(),
                     "redeemed" | "already_redeemed" | "offline_queued" | "offline_duplicate"
                 );
-                view! { <article class:scan-success=success class:scan-warning=!success class="scan-result"><strong>{entry.status.to_uppercase()}</strong><span>{entry.public_reference}</span><p>{entry.holder_name.value_or(entry.holder_email_masked)}</p></article> }
+                let denied = matches!(entry.status.as_str(), "revoked" | "expired" | "not_claimed");
+                view! { <article class:scan-success=success class:scan-warning=!success && !denied class:scan-denied=denied class="scan-result"><strong>{scan_status_label(&entry.status)}</strong><span>{entry.public_reference}</span><p>{entry.holder_name.value_or(entry.holder_email_masked)}</p></article> }
             })}
         </section>
     }
