@@ -74,17 +74,28 @@ struct FanConfirmationSession {
     status_refresh: RwSignal<u32>,
 }
 
+#[derive(Clone, Debug)]
+struct FanConfirmationValues {
+    email: String,
+    name: Option<String>,
+    token: String,
+    pin: String,
+}
+
 fn submit_fan_confirmation_values(
-    input_email: String,
-    input_name: Option<String>,
-    current_token: String,
-    current_pin: String,
+    values: FanConfirmationValues,
     token: RwSignal<String>,
     pin: RwSignal<String>,
     busy: RwSignal<bool>,
     session: FanConfirmationSession,
     error: RwSignal<Option<String>>,
 ) {
+    let FanConfirmationValues {
+        email: input_email,
+        name: input_name,
+        token: current_token,
+        pin: current_pin,
+    } = values;
     if busy.get_untracked() {
         return;
     }
@@ -159,10 +170,12 @@ fn submit_fan_confirmation(
     error: RwSignal<Option<String>>,
 ) {
     submit_fan_confirmation_values(
-        email.get_untracked(),
-        optional(name.get_untracked().trim().to_owned()),
-        token.get_untracked(),
-        pin.get_untracked(),
+        FanConfirmationValues {
+            email: email.get_untracked(),
+            name: optional(name.get_untracked().trim().to_owned()),
+            token: token.get_untracked(),
+            pin: pin.get_untracked(),
+        },
         token,
         pin,
         busy,
@@ -415,10 +428,12 @@ fn FanAccess(
                     token.set(value.clone());
                     busy.set(false);
                     submit_fan_confirmation_values(
-                        scan_email,
-                        scan_name,
-                        value,
-                        scan_pin,
+                        FanConfirmationValues {
+                            email: scan_email,
+                            name: scan_name,
+                            token: value,
+                            pin: scan_pin,
+                        },
                         token,
                         pin,
                         busy,

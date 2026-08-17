@@ -24,6 +24,13 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         bridge = read('src/bridge/client.rs')
         self.assertIn('option_env!("VIRYA_SIGNAL_E2E_QR_PAYLOAD")', bridge)
 
+    def test_fan_confirmation_helper_stays_within_argument_budget(self):
+        src = read('src/app/fan.rs')
+        self.assertIn('struct FanConfirmationValues', src)
+        signature = src.split('fn submit_fan_confirmation_values(', 1)[1].split(') {', 1)[0]
+        top_level = [line for line in signature.splitlines() if line.strip().endswith(',')]
+        self.assertLessEqual(len(top_level), 7)
+
     def test_fan_tab_survives_android_settings_resume(self):
         shell = read('src/app/fan/shell.rs')
         bridge = read('src/bridge/client.rs')
@@ -48,7 +55,10 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertIn('offline_cache', command)
         self.assertIn('operator_signal_cache_fallback_allowed', command)
         self.assertIn('AppError::Network(_)', command)
-        self.assertIn('AppError::Remote { status: 500..=599, .. }', command)
+        self.assertRegex(
+            command,
+            r'AppError::Remote\s*\{\s*status:\s*500\.\.=599,\s*\.\.\s*\}',
+        )
         self.assertIn('save_operator_signal_cache_with_password', session)
         self.assertIn('load_operator_signal_cache_with_password', session)
         self.assertIn('OPERATOR_SIGNAL_CACHE_KEY', vault)
