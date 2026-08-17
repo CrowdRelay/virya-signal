@@ -291,7 +291,7 @@ function viryaMountScannerOverlay(scanner) {
   };
 }
 
-export async function viryaScanQr() {
+async function viryaScanQrRaw() {
   const scanner = window.__TAURI__?.barcodeScanner;
   if (!scanner?.scan || !scanner?.cancel) {
     throw new Error(viryaTexts.scannerUnavailable);
@@ -318,6 +318,36 @@ export async function viryaScanQr() {
   } finally {
     overlay.cleanup();
   }
+}
+
+export async function viryaScanQr() {
+  return viryaScanQrRaw();
+}
+
+export async function viryaScanAndConfirmFan() {
+  const core = window.__TAURI__?.core;
+  if (!core?.invoke) throw new Error(viryaTexts.nativeBridgeUnavailable);
+
+  let result;
+  try {
+    result = await viryaScanQrRaw();
+  } catch (error) {
+    await core.invoke('fan_clear_pending_confirmation').catch(() => {});
+    throw error;
+  }
+
+  if (result === VIRYA_SCAN_CANCELLED) {
+    await core.invoke('fan_clear_pending_confirmation').catch(() => {});
+    return null;
+  }
+
+  const token = String(result ?? '').trim();
+  if (!token) {
+    await core.invoke('fan_clear_pending_confirmation').catch(() => {});
+    throw new Error(viryaTexts.scannerUnavailable);
+  }
+
+  return core.invoke('fan_confirm_scanned', { token });
 }
 
 
@@ -912,6 +942,9 @@ extern "C" {
 
     #[wasm_bindgen(catch, js_name = viryaScanQr)]
     async fn scan_qr_js() -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(catch, js_name = viryaScanAndConfirmFan)]
+    async fn scan_and_confirm_fan_js() -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(catch, js_name = viryaCurrentPosition)]
     async fn current_position_js() -> Result<JsValue, JsValue>;

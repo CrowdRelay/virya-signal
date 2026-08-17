@@ -11,7 +11,7 @@ use tauri::{AppHandle, State};
 use zeroize::Zeroizing;
 
 use crate::{
-    AppError, AppState, MAX_SECRET_BYTES,
+    AppError, AppState, MAX_SECRET_BYTES, PendingFanConfirmation,
     api::{SignalMerchBundleCatalog, TicketCheckoutInput, TicketCheckoutStart, TicketSaleOffer},
     models::{
         AdmissionPass, AreaChallenge, AreaClaimResult, AreaPositionSample, FanAuthResult,
@@ -21,7 +21,10 @@ use crate::{
         WalletTicket,
     },
     session::{fan_profile, persist_fan, run_blocking},
-    validation::{bounded_secret, validate_fan_confirmation, validate_fan_signup, validate_pin},
+    validation::{
+        bounded_secret, validate_api_base, validate_fan_confirmation, validate_fan_signup,
+        validate_pin,
+    },
     vault,
 };
 

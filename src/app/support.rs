@@ -124,7 +124,7 @@ fn refresh_operator_signal(
         return;
     }
     loading.set(true);
-    spawn_local(async move {
+    wasm_bindgen_futures::spawn_local(async move {
         match bridge::invoke_timeout::<OperatorSignalOverview, _>(
             "operator_signal_overview",
             &EmptyArgs {},
@@ -132,10 +132,14 @@ fn refresh_operator_signal(
         )
         .await
         {
-            Ok(value) => overview.set(Some(value)),
-            Err(message) => error.set(Some(message)),
+            Ok(value) => {
+                let _ = overview.try_set(Some(value));
+            }
+            Err(message) => {
+                let _ = error.try_set(Some(message));
+            }
         }
-        loading.set(false);
+        let _ = loading.try_set(false);
     });
 }
 

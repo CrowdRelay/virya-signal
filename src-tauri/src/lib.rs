@@ -22,8 +22,9 @@ use api::CrowdRelayClient;
 use commands::{
     fan::{
         fan_admission_pass, fan_admission_qr, fan_area_challenge, fan_area_claim, fan_area_wallet,
-        fan_claim_pass, fan_confirm, fan_events, fan_forget, fan_home, fan_import_wallet,
-        fan_interests, fan_lock, fan_merch_bundles, fan_merch_catalog, fan_push_disable,
+        fan_claim_pass, fan_clear_pending_confirmation, fan_confirm, fan_confirm_scanned,
+        fan_events, fan_forget, fan_home, fan_import_wallet, fan_interests, fan_lock,
+        fan_merch_bundles, fan_merch_catalog, fan_prepare_confirmation, fan_push_disable,
         fan_push_enable, fan_push_open_settings, fan_push_status, fan_push_sync,
         fan_push_take_target, fan_referral, fan_register_interest, fan_request_access,
         fan_request_delivery, fan_signup, fan_start_ticket_checkout, fan_status, fan_ticket_sale,
@@ -53,6 +54,11 @@ use tauri::Manager;
 use tokio::sync::{Mutex, RwLock};
 use zeroize::Zeroizing;
 
+struct PendingFanConfirmation {
+    api_base_url: String,
+    pin: Zeroizing<String>,
+}
+
 /// Native session/application state, shared across every command via
 /// Tauri's `State` extractor. Field access helpers live in `session.rs`;
 /// commands themselves live under `commands/`.
@@ -66,6 +72,7 @@ pub struct AppState {
     show_mode_store: RwLock<Option<ShowModeStore>>,
     fan_session: RwLock<Option<Arc<FanProfile>>>,
     fan_pin: RwLock<Option<Zeroizing<String>>>,
+    pending_fan_confirmation: Mutex<Option<PendingFanConfirmation>>,
     fan_mutation: Mutex<()>,
     native_push_available: bool,
     feedback_queue_mutation: Mutex<()>,
@@ -139,6 +146,7 @@ pub fn run() {
                 show_mode_store: RwLock::new(None),
                 fan_session: RwLock::new(None),
                 fan_pin: RwLock::new(None),
+                pending_fan_confirmation: Mutex::new(None),
                 fan_mutation: Mutex::new(()),
                 native_push_available,
                 feedback_queue_mutation: Mutex::new(()),
@@ -199,7 +207,10 @@ pub fn run() {
             fan_forget,
             fan_signup,
             fan_request_access,
+            fan_prepare_confirmation,
+            fan_clear_pending_confirmation,
             fan_confirm,
+            fan_confirm_scanned,
             fan_home,
             fan_events,
             fan_merch_catalog,

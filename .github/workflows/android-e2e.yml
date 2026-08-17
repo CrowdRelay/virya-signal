@@ -1,27 +1,6 @@
 name: Android E2E
 
 on:
-  pull_request:
-    paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "src/**"
-      - "src-tauri/**"
-      - "scripts/e2e/**"
-      - "scripts/test_android_user_journeys_regression.py"
-      - ".github/workflows/_android-build.yml"
-      - ".github/workflows/android-e2e.yml"
-  push:
-    branches: [main]
-    paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "src/**"
-      - "src-tauri/**"
-      - "scripts/e2e/**"
-      - "scripts/test_android_user_journeys_regression.py"
-      - ".github/workflows/_android-build.yml"
-      - ".github/workflows/android-e2e.yml"
   workflow_dispatch:
 
 permissions:

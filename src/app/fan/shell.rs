@@ -171,8 +171,16 @@ fn FanApp(
     });
 
     Effect::new(move |_| {
-        if tab.get() != FanTab::Events && checkout_event.get_untracked().is_some() {
-            checkout_event.set(None);
+        if tab.get() != FanTab::Events {
+            if checkout_event.get_untracked().is_some() {
+                checkout_event.set(None);
+            }
+            if focused_event_slug.get_untracked().is_some() {
+                focused_event_slug.set(None);
+            }
+            if focused_event_preview.get_untracked().is_some() {
+                focused_event_preview.set(None);
+            }
         }
     });
     on_cleanup(move || bridge::invalidate_latest("fan:"));

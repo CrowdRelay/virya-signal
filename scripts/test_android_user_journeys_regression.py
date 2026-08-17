@@ -12,31 +12,33 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         start = src.index('let scan_confirmation = move |_|')
         end = src.index('    view! {', start)
         scan = src[start:end]
-        self.assertIn('let scan_email = email.get_untracked().trim().to_owned();', scan)
-        self.assertIn('let scan_name = optional(name.get_untracked().trim().to_owned());', scan)
+
+        # The only pre-camera secret the QR flow needs is the PIN used to
+        # encrypt the native vault. Identity comes from the one-time mail token.
         self.assertIn('let scan_pin = pin.get_untracked();', scan)
-        self.assertLess(scan.index('let scan_email'), scan.index('bridge::scan_qr().await'))
-        self.assertLess(scan.index('let scan_pin'), scan.index('bridge::scan_qr().await'))
-        self.assertIn('run_fan_confirmation(values, token, pin, confirmation_session, error).await', scan)
-        self.assertNotIn('submit_fan_confirmation_values(values', scan)
-        self.assertNotIn('exchange_fan_confirmation(values).await', scan)
-        self.assertLess(scan.index('busy.set(true);'), scan.index('bridge::scan_qr().await'))
-        self.assertLess(scan.index('bridge::scan_qr().await'), scan.index('run_fan_confirmation(values, token, pin, confirmation_session, error).await'))
-        self.assertIn('token.try_set(scanned_token.clone())', scan)
-        helper = src.split('async fn run_fan_confirmation(', 1)[1].split('fn submit_fan_confirmation_values(', 1)[0]
-        self.assertIn('exchange_fan_confirmation(values).await', helper)
-        # The confirmed-login writes are shared with the lost-response recovery
-        # path, so they live in adopt_fan_session rather than being inlined here.
-        self.assertIn('adopt_fan_session(value, token, pin, session)', helper)
-        adopt = src.split('fn adopt_fan_session(', 1)[1].split('\nasync fn ', 1)[0]
+        self.assertNotIn('email.get_untracked()', scan)
+        self.assertNotIn('name.get_untracked()', scan)
+        self.assertIn('"fan_prepare_confirmation"', scan)
+        self.assertIn('bridge::scan_and_confirm_fan().await', scan)
+        self.assertLess(
+            scan.index('"fan_prepare_confirmation"'),
+            scan.index('bridge::scan_and_confirm_fan().await'),
+        )
+        self.assertNotIn('bridge::scan_qr().await', scan)
+        self.assertNotIn('run_fan_confirmation(values', scan)
+
+        # Successful native confirmation still adopts the authoritative session
+        # and routes to Signal using the shared disposal-safe UI path.
+        self.assertIn('adopt_fan_session(', scan)
+        adopt = src.split('fn adopt_fan_session(', 1)[1].split('\\nasync fn ', 1)[0]
         self.assertIn('session.status.try_set(value)', adopt)
         self.assertIn('persist_fan_tab(FanTab::Signal);', adopt)
-        post_scan = scan[scan.index('bridge::scan_qr().await'):]
-        self.assertNotIn('email.get_untracked()', post_scan)
-        self.assertNotIn('pin.get_untracked()', post_scan)
-        bridge = read('src/bridge/client.rs')
-        self.assertIn('option_env!("VIRYA_SIGNAL_E2E_QR_PAYLOAD")', bridge)
 
+        bridge = read('src/bridge/client.rs')
+        ffi = read('src/bridge/ffi.rs')
+        self.assertIn('option_env!("VIRYA_SIGNAL_E2E_QR_PAYLOAD")', bridge)
+        self.assertIn('pub async fn scan_and_confirm_fan()', bridge)
+        self.assertIn("core.invoke('fan_confirm_scanned', { token })", ffi)
     def test_mail_qr_token_is_native_validated_and_does_not_require_email_hint(self):
         validation = read('src-tauri/src/validation.rs')
         self.assertIn('virya-signal://fan/confirm?source=mail&token={token}', validation)
@@ -50,13 +52,31 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         exchange = ui.split('async fn exchange_fan_confirmation(', 1)[1].split('async fn run_fan_confirmation(', 1)[0]
         self.assertIn('bridge::invoke::<FanSessionStatus, _>(', exchange)
         self.assertNotIn('invoke_timeout::<FanSessionStatus', exchange)
-        native = read('src-tauri/src/commands/fan/session_commerce.rs')
-        confirm = native.split('pub(crate) async fn fan_confirm(', 1)[1].split('#[tauri::command]', 1)[0]
-        self.assertIn('Result<FanSessionStatus, AppError>', confirm)
-        self.assertIn('vault::replace_fan', confirm)
-        self.assertIn('fan_status(state).await', confirm)
-        self.assertLess(confirm.index('vault::replace_fan'), confirm.index('fan_status(state).await'))
 
+        native = read('src-tauri/src/commands/fan/session_commerce.rs')
+        persist = native.split('async fn persist_confirmed_fan(', 1)[1].split('#[tauri::command]', 1)[0]
+        confirm = native.split('pub(crate) async fn fan_confirm(', 1)[1].split('#[tauri::command]', 1)[0]
+        scanned = native.split('pub(crate) async fn fan_confirm_scanned(', 1)[1].split('#[tauri::command]', 1)[0]
+
+        # Manual-code and scanner entrypoints share one authoritative native
+        # transaction. Token exchange, vault write and session publication are
+        # not duplicated across the two paths.
+        self.assertIn('vault::replace_fan', persist)
+        self.assertIn('state.api.fan_confirm(&input).await?', persist)
+        self.assertIn('*state.fan_session.write().await = Some(Arc::new(profile));', persist)
+        self.assertLess(
+            persist.index('vault::replace_fan'),
+            persist.index('*state.fan_session.write().await = Some(Arc::new(profile));'),
+        )
+        self.assertIn(
+            'persist_confirmed_fan(&state, input, Zeroizing::new(pin)).await?',
+            confirm,
+        )
+        self.assertIn('persist_confirmed_fan(&state, input, pin).await?', scanned)
+        self.assertIn('fan_status(state).await', confirm)
+        self.assertIn('fan_status(state).await', scanned)
+        self.assertNotIn('vault::replace_fan', confirm)
+        self.assertNotIn('vault::replace_fan', scanned)
     def test_lost_confirm_response_still_logs_the_fan_in(self):
         # The mail token is one-time. If fan_confirm succeeded natively but its
         # reply was lost (WebView disposed across the camera transition), the fan
@@ -172,6 +192,55 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertIn('timeout 20 adb logcat -d', workflow)
         self.assertIn(r'ANR in music\.virya\.signal', workflow)
         self.assertNotIn(r'ANR in music\.virya\.control', workflow)
+
+    def test_qr_login_transaction_is_native_owned_after_scanner_result(self):
+        native_lib = read('src-tauri/src/lib.rs')
+        native_fan = read('src-tauri/src/commands/fan/session_commerce.rs')
+        ffi = read('src/bridge/ffi.rs')
+        client = read('src/bridge/client.rs')
+        fan = read('src/app/fan.rs')
+
+        self.assertIn('pending_fan_confirmation: Mutex<Option<PendingFanConfirmation>>', native_lib)
+        self.assertIn('pin: Zeroizing<String>', native_lib)
+        self.assertIn('pub(crate) async fn fan_prepare_confirmation(', native_fan)
+        self.assertIn('pub(crate) async fn fan_confirm_scanned(', native_fan)
+        self.assertIn('if state.fan_session.read().await.is_some()', native_fan)
+        self.assertIn("return core.invoke('fan_confirm_scanned', { token });", ffi)
+        self.assertIn('pub async fn scan_and_confirm_fan()', client)
+
+        scan = fan.split('let scan_confirmation = move |_| {', 1)[1].split('    view! {', 1)[0]
+        self.assertIn('"fan_prepare_confirmation"', scan)
+        self.assertIn('bridge::scan_and_confirm_fan().await', scan)
+        self.assertNotIn('run_fan_confirmation(values', scan)
+        self.assertNotIn('bridge::scan_qr().await', scan)
+
+    def test_qr_remount_can_reuse_native_pin_without_localstorage_secret(self):
+        native_fan = read('src-tauri/src/commands/fan/session_commerce.rs')
+        ffi = read('src/bridge/ffi.rs')
+        self.assertIn('if pin.is_empty()', native_fan)
+        self.assertIn('pending.api_base_url == api_base_url', native_fan)
+        self.assertIn('pending_fan_confirmation.lock().await = Some(PendingFanConfirmation', native_fan)
+        scanner = ffi.split('export async function viryaScanAndConfirmFan()', 1)[1].split('function viryaLocationStates', 1)[0]
+        self.assertNotIn('localStorage', scanner)
+        self.assertNotIn('viryaStorageWrite', scanner)
+
+    def test_owner_signal_and_event_detail_lifetimes_are_bounded(self):
+        support = read('src/app/support.rs')
+        shell = read('src/app/fan/shell.rs')
+        home = read('src/app/fan_home.rs')
+        body = support.split('fn refresh_operator_signal(', 1)[1].split('fn refresh_operator_autopilot(', 1)[0]
+        self.assertIn('wasm_bindgen_futures::spawn_local(async move {', body)
+        self.assertIn('let _ = loading.try_set(false);', body)
+        self.assertIn('focused_event_slug.set(None);', shell)
+        self.assertIn('focused_event_preview.set(None);', shell)
+        self.assertIn('target != FanTab::Events && target != FanTab::Signal', home)
+
+    def test_android_device_e2e_is_manual_diagnostic_only(self):
+        workflow = read('.github/workflows/android-e2e.yml')
+        trigger = workflow.split('on:', 1)[1].split('permissions:', 1)[0]
+        self.assertIn('workflow_dispatch:', trigger)
+        self.assertNotIn('pull_request:', trigger)
+        self.assertNotIn('push:', trigger)
 
 if __name__ == '__main__':
     unittest.main()

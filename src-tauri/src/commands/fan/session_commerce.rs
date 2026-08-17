@@ -22,6 +22,7 @@ pub(crate) async fn fan_unlock(
     let profile = run_blocking(move || vault::load_fan(&app_data_dir, vault_pin.as_str())).await?;
     *state.fan_session.write().await = Some(Arc::new(profile));
     *state.fan_pin.write().await = Some(pin_for_session);
+    *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
     drop(_mutation);
     if let Err(error) = sync_native_push_if_desired(&state, &app).await {
@@ -35,6 +36,7 @@ pub(crate) async fn fan_lock(state: State<'_, AppState>) -> Result<FanSessionSta
     let _mutation = state.fan_mutation.lock().await;
     *state.fan_session.write().await = None;
     *state.fan_pin.write().await = None;
+    *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
     drop(_mutation);
     fan_status(state).await
@@ -68,11 +70,81 @@ pub(crate) async fn fan_forget(
     // needed to confirm remote audience cleanup before the vault is removed.
     *state.fan_session.write().await = None;
     *state.fan_pin.write().await = None;
+    *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
     let app_data_dir = state.app_data_dir.clone();
     run_blocking(move || vault::remove_fan(&app_data_dir)).await?;
     drop(_mutation);
     fan_status(state).await
+}
+
+async fn persist_confirmed_fan(
+    state: &AppState,
+    input: FanConfirmationInput,
+    pin: Zeroizing<String>,
+) -> Result<(), AppError> {
+    let (_result, session_token, canonical_email, canonical_name) =
+        state.api.fan_confirm(&input).await?;
+    let profile = FanProfile {
+        api_base_url: input.api_base_url,
+        area_wallet_id: uuid::Uuid::new_v4().to_string(),
+        email: canonical_email,
+        display_name: canonical_name,
+        fan_session_token: session_token,
+        push_enabled: false,
+        push_last_sync_ok: false,
+        pass_session_token: None,
+        wallets: Vec::new(),
+        cached_wallets: Vec::new(),
+        cached_wallet_qr: Vec::new(),
+    };
+    let app_data_dir = state.app_data_dir.clone();
+    let stored_profile = profile.clone();
+    let vault_pin = pin.clone();
+    run_blocking(move || vault::replace_fan(&app_data_dir, vault_pin.as_str(), &stored_profile))
+        .await?;
+    *state.fan_session.write().await = Some(Arc::new(profile));
+    *state.fan_pin.write().await = Some(pin);
+    state.wallet_qr_tokens.write().await.clear();
+    Ok(())
+}
+
+#[tauri::command]
+pub(crate) async fn fan_prepare_confirmation(
+    state: State<'_, AppState>,
+    mut api_base_url: String,
+    pin: String,
+) -> Result<(), AppError> {
+    let _mutation = state.fan_mutation.lock().await;
+    api_base_url = api_base_url.trim().to_owned();
+    validate_api_base(&api_base_url)?;
+
+    if pin.is_empty() {
+        let pending = state.pending_fan_confirmation.lock().await;
+        if pending
+            .as_ref()
+            .is_some_and(|pending| pending.api_base_url == api_base_url)
+        {
+            return Ok(());
+        }
+        return Err(AppError::InvalidPin);
+    }
+
+    validate_pin(&pin)?;
+    *state.pending_fan_confirmation.lock().await = Some(PendingFanConfirmation {
+        api_base_url,
+        pin: Zeroizing::new(pin),
+    });
+    Ok(())
+}
+
+#[tauri::command]
+pub(crate) async fn fan_clear_pending_confirmation(
+    state: State<'_, AppState>,
+) -> Result<(), AppError> {
+    let _mutation = state.fan_mutation.lock().await;
+    *state.pending_fan_confirmation.lock().await = None;
+    Ok(())
 }
 
 #[tauri::command]
@@ -106,7 +178,13 @@ pub(crate) async fn fan_signup(
             .await?;
         *state.fan_session.write().await = Some(Arc::new(profile));
         *state.fan_pin.write().await = Some(pin);
+        *state.pending_fan_confirmation.lock().await = None;
         state.wallet_qr_tokens.write().await.clear();
+    } else {
+        *state.pending_fan_confirmation.lock().await = Some(PendingFanConfirmation {
+            api_base_url: input.api_base_url.clone(),
+            pin,
+        });
     }
     Ok(result)
 }
@@ -119,37 +197,40 @@ pub(crate) async fn fan_confirm(
 ) -> Result<FanSessionStatus, AppError> {
     let _mutation = state.fan_mutation.lock().await;
     validate_fan_confirmation(&mut input, &pin)?;
-    let pin = Zeroizing::new(pin);
-    let (_result, session_token, canonical_email, canonical_name) =
-        state.api.fan_confirm(&input).await?;
-    let profile = FanProfile {
-        api_base_url: input.api_base_url,
-        area_wallet_id: uuid::Uuid::new_v4().to_string(),
-        email: canonical_email,
-        display_name: canonical_name,
-        fan_session_token: session_token,
-        push_enabled: false,
-        push_last_sync_ok: false,
-        pass_session_token: None,
-        wallets: Vec::new(),
-        cached_wallets: Vec::new(),
-        cached_wallet_qr: Vec::new(),
-    };
-    let app_data_dir = state.app_data_dir.clone();
-    let stored_profile = profile.clone();
-    let vault_pin = pin.clone();
-    run_blocking(move || vault::replace_fan(&app_data_dir, vault_pin.as_str(), &stored_profile))
-        .await?;
-    *state.fan_session.write().await = Some(Arc::new(profile));
-    *state.fan_pin.write().await = Some(pin);
-    state.wallet_qr_tokens.write().await.clear();
+    persist_confirmed_fan(&state, input, Zeroizing::new(pin)).await?;
+    *state.pending_fan_confirmation.lock().await = None;
     drop(_mutation);
+    fan_status(state).await
+}
 
-    // Confirmation is a single atomic IPC from the WebView's perspective:
-    // once the one-time token is consumed and the encrypted profile is persisted,
-    // return the authoritative unlocked status in the same command. A second
-    // WebView IPC must never turn a successful one-time-token exchange into an
-    // ambiguous client-side failure.
+#[tauri::command]
+pub(crate) async fn fan_confirm_scanned(
+    state: State<'_, AppState>,
+    token: String,
+) -> Result<FanSessionStatus, AppError> {
+    let _mutation = state.fan_mutation.lock().await;
+
+    if state.fan_session.read().await.is_some() {
+        drop(_mutation);
+        return fan_status(state).await;
+    }
+
+    let (api_base_url, pin) = {
+        let pending = state.pending_fan_confirmation.lock().await;
+        let pending = pending.as_ref().ok_or(AppError::InvalidPin)?;
+        (pending.api_base_url.clone(), pending.pin.clone())
+    };
+
+    let mut input = FanConfirmationInput {
+        api_base_url,
+        email: String::new(),
+        display_name: None,
+        token,
+    };
+    validate_fan_confirmation(&mut input, pin.as_str())?;
+    persist_confirmed_fan(&state, input, pin).await?;
+    *state.pending_fan_confirmation.lock().await = None;
+    drop(_mutation);
     fan_status(state).await
 }
 

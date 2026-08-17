@@ -441,50 +441,55 @@ fn FanAccess(
             return;
         }
 
-        // Camera transitions may fully remount the Android WebView. Snapshot only
-        // durable input before crossing the native boundary, then use an unscoped
-        // task whose post-scan writes are all disposal-safe. The one-time token is
-        // the authentication credential, so an empty/stale email can never force a
-        // second scan.
-        let scan_email = email.get_untracked().trim().to_owned();
-        let scan_name = optional(name.get_untracked().trim().to_owned());
         let scan_pin = pin.get_untracked();
-        if !new_operator_pin_is_valid(&scan_pin) {
-            error.set(Some(tr("enter_4_6_digits_for_this_fan_profile").to_owned()));
-            return;
-        }
-
         busy.set(true);
         spawn_local(async move {
-            let scanned_token = match bridge::scan_qr().await {
-                Ok(Some(value)) => value,
-                Ok(None) => {
-                    let _ = busy.try_set(false);
-                    return;
-                }
-                Err(message) => {
-                    let _ = error.try_set(Some(message));
-                    let _ = busy.try_set(false);
-                    return;
-                }
-            };
+            if let Err(message) = bridge::invoke_unit(
+                "fan_prepare_confirmation",
+                &FanPrepareConfirmationArgs {
+                    api_base_url: API_BASE,
+                    pin: &scan_pin,
+                },
+            )
+            .await
+            {
+                let _ = error.try_set(Some(message));
+                let _ = busy.try_set(false);
+                return;
+            }
 
-            // Keep the UI lock held from camera-open through the native token
-            // exchange. The old nested submit helper rejected this path because
-            // `busy` was already true, so a successful QR scan could never log in.
-            // We deliberately bypass that click-level guard here and perform exactly
-            // one confirmation attempt for exactly one scanned token.
-            let _ = token.try_set(scanned_token.clone());
-            let values = FanConfirmationValues {
-                email: scan_email,
-                name: scan_name,
-                token: scanned_token,
-                pin: scan_pin,
-            };
-            run_fan_confirmation(values, token, pin, confirmation_session, error).await;
+            match bridge::scan_and_confirm_fan().await {
+                Ok(Some(value)) => adopt_fan_session(
+                    value,
+                    token,
+                    pin,
+                    confirmation_session,
+                ),
+                Ok(None) => {}
+                Err(message) => {
+                    if let Ok(status) = bridge::invoke_timeout::<FanSessionStatus, _>(
+                        "fan_status",
+                        &EmptyArgs {},
+                        5_000,
+                    )
+                    .await
+                        && status.unlocked
+                    {
+                        adopt_fan_session(
+                            status,
+                            token,
+                            pin,
+                            confirmation_session,
+                        );
+                    } else {
+                        let _ = error.try_set(Some(message));
+                    }
+                }
+            }
             let _ = busy.try_set(false);
         });
     };
+
 
     view! {
         <section class="fan-access">

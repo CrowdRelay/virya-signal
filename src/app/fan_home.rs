@@ -136,7 +136,10 @@ fn FanHomeOverview(
                                             }>{tr("show_details")}</button>
                                             <Show when={
                                                 let action = snapshot.recommended_action.clone();
-                                                move || recommended_tab(&action) != FanTab::Events
+                                                move || {
+                                                    let target = recommended_tab(&action);
+                                                    target != FanTab::Events && target != FanTab::Signal
+                                                }
                                             }>
                                                 <button class="ghost" on:click={
                                                     let action = snapshot.recommended_action.clone();

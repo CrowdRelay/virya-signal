@@ -181,6 +181,34 @@ pub async fn scan_qr() -> Result<Option<String>, String> {
     }
 }
 
+pub async fn scan_and_confirm_fan() -> Result<Option<crate::models::FanSessionStatus>, String> {
+    #[derive(Serialize)]
+    struct ScannedTokenArgs<'a> {
+        token: &'a str,
+    }
+
+    #[cfg(debug_assertions)]
+    if let Some(value) = option_env!("VIRYA_SIGNAL_E2E_QR_PAYLOAD") {
+        let value = value.trim();
+        if !value.is_empty() {
+            return invoke::<crate::models::FanSessionStatus, _>(
+                "fan_confirm_scanned",
+                &ScannedTokenArgs { token: value },
+            )
+            .await
+            .map(Some);
+        }
+    }
+
+    let value = scan_and_confirm_fan_js().await.map_err(js_error)?;
+    if value.is_null() || value.is_undefined() {
+        return Ok(None);
+    }
+    serde_wasm_bindgen::from_value(value)
+        .map(Some)
+        .map_err(decode_error)
+}
+
 pub async fn current_position() -> Result<crate::models::AreaPositionSample, String> {
     #[derive(Deserialize)]
     #[serde(rename_all = "camelCase")]
