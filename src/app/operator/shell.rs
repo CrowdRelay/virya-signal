@@ -53,7 +53,7 @@ fn OperatorApp(
                 // Silent bootstrap only: if Android permission is already granted,
                 // bind this authenticated staff session to FCM. Permission prompting
                 // stays explicit in the checklist screen.
-                let _ = bridge::invoke::<FanPushStatus, _>("operator_push_sync", &EmptyArgs {}).await;
+                let _ = bridge::invoke_timeout::<FanPushStatus, _>("operator_push_sync", &EmptyArgs {}, 15_000).await;
             });
         }
     });

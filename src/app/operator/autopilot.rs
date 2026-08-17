@@ -168,7 +168,7 @@ fn AutopilotPanel(
                         </div>
                         {runtime_view}
                         <div class="section-head"><h3>{tr("autopilot_authority")}</h3></div>
-                        <div class="ops-list autopilot-policies"><For each=move || policies.clone() key=|policy| policy.context.clone() children=move |policy| view! {
+                        <div class="ops-list autopilot-policies"><For each=move || policies.clone() key=|policy| format!("{}:{}", policy.context, policy.version) children=move |policy| view! {
                             <AutopilotPolicyCard policy=policy loading=loading refresh_requested=refresh_requested error=error />
                         } /></div>
                         {guardrails_view}
@@ -208,11 +208,11 @@ fn AutopilotPolicyCard(
                 })}
             </div>
             <div class="autopilot-policy-actions" role="group" aria-label=tr("autopilot_authority")>
-                <button class="text-button" class:active=current == "off" on:click=move |_| set_autopilot_policy(off_policy.clone(), false, "observe", busy, refresh_requested, error) disabled=move || busy.get() || loading.get()>{tr("autopilot_off")}</button>
-                <button class="text-button" class:active=current == "observe" on:click=move |_| set_autopilot_policy(observe_policy.clone(), true, "observe", busy, refresh_requested, error) disabled=move || busy.get() || loading.get()>{tr("autopilot_observe")}</button>
-                <button class="text-button" class:active=current == "recommend" on:click=move |_| set_autopilot_policy(recommend_policy.clone(), true, "recommend", busy, refresh_requested, error) disabled=move || busy.get() || loading.get()>{tr("autopilot_recommend")}</button>
-                <button class="text-button" class:active=current == "require_approval" on:click=move |_| set_autopilot_policy(approval_policy.clone(), true, "require_approval", busy, refresh_requested, error) disabled=move || busy.get() || loading.get()>{tr("autopilot_approval")}</button>
-                <button class="text-button" class:active=current == "bounded_auto" on:click=move |_| set_autopilot_policy(auto_policy.clone(), true, "bounded_auto", busy, refresh_requested, error) disabled=move || busy.get() || loading.get()>{tr("autopilot_auto")}</button>
+                <button type="button" class="text-button" class:active=current == "off" on:click=move |_| set_autopilot_policy(off_policy.clone(), false, "observe", busy, refresh_requested, error) disabled=move || busy.get() || loading.get()>{tr("autopilot_off")}</button>
+                <button type="button" class="text-button" class:active=current == "observe" on:click=move |_| set_autopilot_policy(observe_policy.clone(), true, "observe", busy, refresh_requested, error) disabled=move || busy.get() || loading.get()>{tr("autopilot_observe")}</button>
+                <button type="button" class="text-button" class:active=current == "recommend" on:click=move |_| set_autopilot_policy(recommend_policy.clone(), true, "recommend", busy, refresh_requested, error) disabled=move || busy.get() || loading.get()>{tr("autopilot_recommend")}</button>
+                <button type="button" class="text-button" class:active=current == "require_approval" on:click=move |_| set_autopilot_policy(approval_policy.clone(), true, "require_approval", busy, refresh_requested, error) disabled=move || busy.get() || loading.get()>{tr("autopilot_approval")}</button>
+                <button type="button" class="text-button" class:active=current == "bounded_auto" on:click=move |_| set_autopilot_policy(auto_policy.clone(), true, "bounded_auto", busy, refresh_requested, error) disabled=move || busy.get() || loading.get()>{tr("autopilot_auto")}</button>
             </div>
         </article>
     }
@@ -231,7 +231,7 @@ fn set_autopilot_policy(
     if busy.get_untracked() { return; }
     busy.set(true);
     spawn_local(async move {
-        let result = bridge::invoke::<AutopilotMutation, _>(
+        let result = bridge::invoke_timeout::<AutopilotMutation, _>(
             "operator_autopilot_set_authority",
             &AutopilotAuthorityArgs {
                 context: &policy.context,
@@ -241,6 +241,7 @@ fn set_autopilot_policy(
                 max_actions_24h: policy.max_actions_24h,
                 expected_version: policy.version,
             },
+            15_000,
         ).await;
         match result {
             Ok(_) => {

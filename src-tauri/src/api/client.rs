@@ -45,8 +45,22 @@ fn transient_public_status(status: reqwest::StatusCode) -> bool {
     status == reqwest::StatusCode::TOO_MANY_REQUESTS || status.is_server_error()
 }
 
-const STAFF_GATE_URL: &str = "https://virya.music/api/staff/qr/login";
-const STAFF_GATE_ORIGIN: &str = "https://virya.music";
+const PRODUCTION_STAFF_GATE_URL: &str = "https://virya.music/api/staff/qr/login";
+const PRODUCTION_STAFF_GATE_ORIGIN: &str = "https://virya.music";
+#[cfg(debug_assertions)]
+const STAFF_GATE_URL: &str = match option_env!("VIRYA_SIGNAL_E2E_STAFF_GATE_URL") {
+    Some(value) => value,
+    None => PRODUCTION_STAFF_GATE_URL,
+};
+#[cfg(debug_assertions)]
+const STAFF_GATE_ORIGIN: &str = match option_env!("VIRYA_SIGNAL_E2E_STAFF_GATE_ORIGIN") {
+    Some(value) => value,
+    None => PRODUCTION_STAFF_GATE_ORIGIN,
+};
+#[cfg(not(debug_assertions))]
+const STAFF_GATE_URL: &str = PRODUCTION_STAFF_GATE_URL;
+#[cfg(not(debug_assertions))]
+const STAFF_GATE_ORIGIN: &str = PRODUCTION_STAFF_GATE_ORIGIN;
 
 #[derive(Serialize)]
 struct StaffGateRequest<'a> {

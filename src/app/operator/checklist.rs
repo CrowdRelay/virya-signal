@@ -138,7 +138,7 @@ fn OperatorChecklist(
         push_sync_requested.set(true);
         push_loading.set(true);
         spawn_local(async move {
-            match bridge::invoke::<FanPushStatus, _>("operator_push_sync", &EmptyArgs {}).await {
+            match bridge::invoke_timeout::<FanPushStatus, _>("operator_push_sync", &EmptyArgs {}, 15_000).await {
                 Ok(value) => push_status.set(Some(value)),
                 Err(message) => error.set(Some(message)),
             }
@@ -233,7 +233,7 @@ fn OperatorChecklist(
                 item_key: &item_key,
                 status: next_status,
             };
-            match bridge::invoke::<ShowChecklist, _>("operator_update_show_checklist", &args).await {
+            match bridge::invoke_timeout::<ShowChecklist, _>("operator_update_show_checklist", &args, 15_000).await {
                 Ok(value) => checklist.set(Some(value)),
                 Err(message) => error.set(Some(message)),
             }

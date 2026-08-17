@@ -117,6 +117,14 @@ pub fn referral_code_from_location() -> Option<String> {
     (!value.is_empty()).then(|| value.to_owned())
 }
 
+pub fn fan_tab_state() -> String {
+    read_fan_tab_js()
+}
+
+pub fn set_fan_tab_state(value: &str) {
+    write_fan_tab_js(value);
+}
+
 async fn promise_string(promise: js_sys::Promise) -> Result<String, String> {
     wasm_bindgen_futures::JsFuture::from(promise)
         .await
@@ -148,6 +156,16 @@ where
 
 pub async fn scan_qr() -> Result<Option<String>, String> {
     const CANCELLED: &str = "__VIRYA_SCAN_CANCELLED__";
+    // Debug-only deterministic scanner input for the Android black-box suite.
+    // Production artifacts never set this value and release builds compile the
+    // branch out entirely, so real users always cross the native camera path.
+    #[cfg(debug_assertions)]
+    if let Some(value) = option_env!("VIRYA_SIGNAL_E2E_QR_PAYLOAD") {
+        let value = value.trim();
+        if !value.is_empty() {
+            return Ok(Some(value.to_owned()));
+        }
+    }
     let value = scan_qr_js().await.map_err(js_error)?;
     let value = value
         .as_string()

@@ -6070,7 +6070,6 @@ dependencies = [
  "tauri-plugin-barcode-scanner",
  "tauri-plugin-geolocation",
  "tauri-plugin-opener",
- "thiserror 2.0.19",
  "time",
  "tokio",
  "url",

@@ -1,0 +1,150 @@
+name: Android E2E
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/**"
+      - "src-tauri/**"
+      - "scripts/e2e/**"
+      - "scripts/test_android_user_journeys_regression.py"
+      - ".github/workflows/_android-build.yml"
+      - ".github/workflows/android-e2e.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "src/**"
+      - "src-tauri/**"
+      - "scripts/e2e/**"
+      - "scripts/test_android_user_journeys_regression.py"
+      - ".github/workflows/_android-build.yml"
+      - ".github/workflows/android-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: signal-android-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-e2e:
+    uses: ./.github/workflows/_android-build.yml
+    with:
+      build_kind: debug-apk
+      version: 0.4.2-e2e
+      artifact_name: virya-signal-android-e2e
+      retention_days: 7
+      signed: false
+      target_arch: x86_64
+      e2e_api_base: http://10.0.2.2:8787/v1/
+
+  journeys:
+    needs: build-e2e
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      ANDROID_API: "35"
+      AVD_NAME: virya-signal-e2e
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v7.0.1
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v7.0.1
+        with:
+          name: virya-signal-android-e2e
+          path: artifacts/build
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v7.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+      - name: Install emulator image
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager \
+            "platform-tools" \
+            "emulator" \
+            "platforms;android-${ANDROID_API}" \
+            "system-images;android-${ANDROID_API};google_apis;x86_64"
+          echo no | avdmanager create avd \
+            --force \
+            --name "${AVD_NAME}" \
+            --package "system-images;android-${ANDROID_API};google_apis;x86_64" \
+            --device "pixel_6"
+      - name: Boot clean Android emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/android-e2e
+          nohup emulator -avd "${AVD_NAME}" \
+            -no-window -no-audio -no-boot-anim -no-snapshot \
+            -gpu swiftshader_indirect -camera-back virtualscene \
+            > artifacts/android-e2e/emulator.log 2>&1 &
+          adb wait-for-device
+          for _ in $(seq 1 120); do
+            if [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
+              break
+            fi
+            sleep 2
+          done
+          test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1"
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          adb shell wm size 1080x2400
+          adb shell wm density 420
+          adb logcat -c
+      - name: Start isolated CrowdRelay double
+        shell: bash
+        run: |
+          set -euo pipefail
+          OFFLINE_FILE="${RUNNER_TEMP}/signal-e2e-offline"
+          rm -f "${OFFLINE_FILE}"
+          nohup python3 scripts/e2e/mock_signal_api.py \
+            --port 8787 --offline-file "${OFFLINE_FILE}" \
+            > artifacts/android-e2e/mock-api.log 2>&1 &
+          echo "OFFLINE_FILE=${OFFLINE_FILE}" >> "${GITHUB_ENV}"
+          for _ in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8787/healthz >/dev/null && exit 0
+            sleep 1
+          done
+          cat artifacts/android-e2e/mock-api.log
+          exit 1
+      - name: Install E2E APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find artifacts/build -type f -name '*.apk' -print -quit)"
+          test -n "${APK}"
+          adb install -r -t "${APK}"
+          adb shell pm list packages | grep -F 'package:music.virya.control'
+      - name: Run black-box journeys
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/e2e/android_journeys.py \
+            --offline-file "${OFFLINE_FILE}" \
+            --artifacts artifacts/android-e2e
+      - name: Native crash / ANR gate
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          adb logcat -d > artifacts/android-e2e/logcat-final.txt || true
+          if grep -E 'FATAL EXCEPTION|ANR in music\.virya\.control|Render process gone' artifacts/android-e2e/logcat-final.txt; then
+            echo 'VIRYA_SIGNAL_ANDROID_CRASH_GATE=FAIL' >&2
+            exit 1
+          fi
+          echo 'VIRYA_SIGNAL_ANDROID_CRASH_GATE=PASS'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: virya-signal-android-e2e-report-${{ github.run_id }}
+          path: artifacts/android-e2e
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,3 +1,26 @@
+fn persisted_fan_tab() -> FanTab {
+    match bridge::fan_tab_state().as_str() {
+        "events" => FanTab::Events,
+        "merch" => FanTab::Merch,
+        "game" => FanTab::Game,
+        "wallet" => FanTab::Wallet,
+        "profile" => FanTab::Profile,
+        _ => FanTab::Signal,
+    }
+}
+
+fn persist_fan_tab(tab: FanTab) {
+    let value = match tab {
+        FanTab::Signal => "signal",
+        FanTab::Events => "events",
+        FanTab::Merch => "merch",
+        FanTab::Game => "game",
+        FanTab::Wallet => "wallet",
+        FanTab::Profile => "profile",
+    };
+    bridge::set_fan_tab_state(value);
+}
+
 fn fan_tab_for_push_target(target: &str) -> FanTab {
     let path = target.split(['?', '#']).next().unwrap_or(target);
     if path.ends_with("/area") || path.ends_with("/area/") {
@@ -21,7 +44,7 @@ fn FanApp(
     push_target: RwSignal<Option<String>>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
-    let tab = RwSignal::new(FanTab::Signal);
+    let tab = RwSignal::new(persisted_fan_tab());
     let home = RwSignal::new(None::<FanHomeData>);
     let dashboard = RwSignal::new(None::<FanDashboardData>);
     let merch = RwSignal::new(None::<MerchCatalog>);
@@ -37,6 +60,10 @@ fn FanApp(
     let loaded = RwSignal::new(FanLoadedState::default());
     let menu_open = RwSignal::new(false);
     let refresh_requested = RwSignal::new(0_u32);
+
+    Effect::new(move |_| {
+        persist_fan_tab(tab.get());
+    });
 
     Effect::new(move |_| {
         let Some(target) = push_target.get() else {
@@ -167,6 +194,7 @@ fn FanApp(
                     area.set(None);
                     loading.set(FanLoadingState::all());
                     status.set(value);
+                    persist_fan_tab(FanTab::Signal);
                     mode.set(RootMode::Fan);
                 }
                 Err(message) => error.set(Some(message)),

@@ -11,12 +11,13 @@ use zeroize::Zeroizing;
 
 use crate::{
     AppError,
-    models::{FanProfile, OperatorProfile, ShowModeStore},
+    models::{FanProfile, OperatorProfile, OperatorSignalOverview, ShowModeStore},
 };
 
 const OPERATOR_CLIENT_PATH: &[u8] = b"virya-control-device";
 const OPERATOR_PROFILE_KEY: &[u8] = b"operator-profile-v1";
 const SHOW_MODE_STORE_KEY: &[u8] = b"show-mode-store-v1";
+const OPERATOR_SIGNAL_CACHE_KEY: &[u8] = b"operator-signal-cache-v1";
 const FAN_CLIENT_PATH: &[u8] = b"virya-signal-fan";
 const FAN_PROFILE_KEY: &[u8] = b"fan-profile-v1";
 const SALT_BYTES: usize = 16;
@@ -143,6 +144,35 @@ pub fn load_show_mode_with_password(
         &operator_vault_path(app_data_dir),
         OPERATOR_CLIENT_PATH,
         SHOW_MODE_STORE_KEY,
+        password,
+    )
+}
+
+/// Stores the last known-good owner Signal aggregate in the same encrypted
+/// Stronghold snapshot as the operator session.
+pub fn save_operator_signal_cache_with_password(
+    app_data_dir: &Path,
+    password: &[u8],
+    overview: &OperatorSignalOverview,
+) -> Result<(), AppError> {
+    let bytes = Zeroizing::new(serde_json::to_vec(overview)?);
+    save_bytes_with_password_at(
+        &operator_vault_path(app_data_dir),
+        OPERATOR_CLIENT_PATH,
+        OPERATOR_SIGNAL_CACHE_KEY,
+        password,
+        bytes.as_ref(),
+    )
+}
+
+pub fn load_operator_signal_cache_with_password(
+    app_data_dir: &Path,
+    password: &[u8],
+) -> Result<OperatorSignalOverview, AppError> {
+    load_optional_with_password_at(
+        &operator_vault_path(app_data_dir),
+        OPERATOR_CLIENT_PATH,
+        OPERATOR_SIGNAL_CACHE_KEY,
         password,
     )
 }

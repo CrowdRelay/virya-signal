@@ -5,7 +5,14 @@ use crate::models::{
     OperatorProfileInput, RequestedCityInput, TicketCheckoutInput,
 };
 
-pub(super) const API_BASE: &str = "https://signal-api.virya.music/v1/";
+const PRODUCTION_API_BASE: &str = "https://signal-api.virya.music/v1/";
+#[cfg(debug_assertions)]
+pub(super) const API_BASE: &str = match option_env!("VIRYA_SIGNAL_E2E_API_BASE") {
+    Some(value) => value,
+    None => PRODUCTION_API_BASE,
+};
+#[cfg(not(debug_assertions))]
+pub(super) const API_BASE: &str = PRODUCTION_API_BASE;
 pub(super) const POLICY_VERSION: &str = "2026-07";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -271,7 +271,7 @@ fn OperatorAccess(
                         <label class="pin-field">
                             <span class="pin-field-label">{tr("create_an_unlock_pin")}</span>
                             <small id="operator-new-pin-help">{tr("enter_4_6_digits_for_example_2580")}</small>
-                            <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="operator-new-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) />
+                            <input aria-label=tr("create_an_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="operator-new-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) />
                         </label>
                         <button class="primary" on:click=submit_pairing disabled=move || busy.get() || pairing.get().trim().is_empty() || !new_operator_pin_is_valid(&pin.get())>{tr("pair_2")}</button>
                         <button class="text-button" type="button" on:click=move |_| advanced.update(|v| *v = !*v)>
@@ -279,13 +279,13 @@ fn OperatorAccess(
                         </button>
                         <Show when=move || advanced.get()>
                             <div class="advanced-config">
-                                <label>{tr("device_person_name")}<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e)) /></label>
-                                <label>"API CrowdRelay"<input prop:value=move || api.get() on:input=move |e| api.set(event_target_value(&e)) /></label>
+                                <label>{tr("device_person_name")}<input aria-label=tr("device_person_name") prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e)) /></label>
+                                <label>"API CrowdRelay"<input aria-label="API CrowdRelay" prop:value=move || api.get() on:input=move |e| api.set(event_target_value(&e)) /></label>
                                 <div class="segmented">
                                     <button class:active=move || role.get() == OperatorRole::Owner on:click=move |_| role.set(OperatorRole::Owner)>{tr("owner")}</button>
                                     <button class:active=move || role.get() == OperatorRole::Staff on:click=move |_| role.set(OperatorRole::Staff)>{tr("staff")}</button>
                                 </div>
-                                <label>{tr("device_token")}<textarea rows="3" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
+                                <label>{tr("device_token")}<textarea aria-label=tr("device_token") rows="3" prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
                                 <button class="ghost" on:click=configure_manual disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get())>{tr("save_manually")}</button>
                             </div>
                         </Show>

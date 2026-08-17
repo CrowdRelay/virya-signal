@@ -126,18 +126,23 @@ fn FanHomeOverview(
                                         <Show when=move || is_afterglow><p class="signal-afterglow-note">{tr("signal_afterglow_note")}</p></Show>
                                         <div class="home-card-actions">
                                             <button class="ghost" on:click={
-                                                let action = snapshot.recommended_action.clone();
                                                 let event_slug = event_slug.clone();
                                                 let event_preview = event_preview.clone();
                                                 move |_| {
-                                                    let target = recommended_tab(&action);
-                                                    if target == FanTab::Events {
-                                                        focused_event_preview.set(Some(event_preview.clone()));
-                                                        focused_event_slug.set(Some(event_slug.clone()));
-                                                    }
-                                                    tab.set(target);
+                                                    focused_event_preview.set(Some(event_preview.clone()));
+                                                    focused_event_slug.set(Some(event_slug.clone()));
+                                                    tab.set(FanTab::Events);
                                                 }
-                                            }>{recommended_label(&snapshot.recommended_action)}</button>
+                                            }>{tr("show_details")}</button>
+                                            <Show when={
+                                                let action = snapshot.recommended_action.clone();
+                                                move || recommended_tab(&action) != FanTab::Events
+                                            }>
+                                                <button class="ghost" on:click={
+                                                    let action = snapshot.recommended_action.clone();
+                                                    move |_| tab.set(recommended_tab(&action))
+                                                }>{recommended_label(&snapshot.recommended_action)}</button>
+                                            </Show>
                                             {ticket_url.filter(|_| is_upcoming).map(|url| view! { <ExternalLink url=url label=tr("tickets_tab") error=error /> })}
                                         </div>
                                     </article>

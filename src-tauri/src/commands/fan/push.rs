@@ -89,7 +89,7 @@ async fn persist_push_state(
     Ok(updated)
 }
 
-async fn current_native_push_status(
+pub(crate) async fn current_native_push_status(
     state: &State<'_, AppState>,
     app: &AppHandle,
     detail: Option<String>,

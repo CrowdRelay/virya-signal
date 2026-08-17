@@ -14,7 +14,9 @@ use crate::{
         OperatorOpsOverview, OperatorProfile, OperatorSignalOverview, OpsRetryResult, PublicEvent,
         SessionStatus, ShowChecklist, StaffEventDashboard, TicketingOverview,
     },
-    session::{operator_profile, run_blocking},
+    session::{
+        load_operator_signal_cache, operator_profile, persist_operator_signal_cache, run_blocking,
+    },
     validation::{
         validate_api_base, validate_campaign, validate_issue_pass, validate_new_operator_pin,
         validate_operator_profile, validate_pin,
@@ -23,6 +25,17 @@ use crate::{
 };
 
 const OPERATOR_PUSH_PREFERENCE_FILE: &str = "staff-push-preference-v1.json";
+
+fn operator_signal_cache_fallback_allowed(error: &AppError) -> bool {
+    matches!(
+        error,
+        AppError::Network(_)
+            | AppError::Remote {
+                status: 500..=599,
+                ..
+            }
+    )
+}
 
 #[derive(Clone, Copy, Debug, Default, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -379,7 +392,16 @@ pub(crate) async fn operator_push_open_settings(
     let _push_mutation = state.operator_push_mutation.lock().await;
     operator_profile(&state).await?;
     super::fan::open_native_push_settings(&app).map_err(AppError::InvalidInput)?;
-    sync_operator_push(&state, &app, false).await
+    // Opening Android Settings backgrounds the WebView. Do not start a remote
+    // sync while the app is losing focus: that used to leave the checklist UI
+    // stuck in a syncing state until a long request timed out. The existing
+    // resume effect completes the user's enable intent after Settings returns.
+    Ok(super::fan::current_native_push_status(
+        &state,
+        &app,
+        Some("notification_settings_opened".to_owned()),
+    )
+    .await)
 }
 
 #[tauri::command]
@@ -549,7 +571,30 @@ pub(crate) async fn operator_signal_overview(
     state: State<'_, AppState>,
 ) -> Result<OperatorSignalOverview, AppError> {
     let profile = operator_profile(&state).await?;
-    state.api.operator_signal_overview(&profile).await
+    match state.api.operator_signal_overview(&profile).await {
+        Ok(overview) => {
+            if let Err(error) = persist_operator_signal_cache(&state, &overview).await {
+                eprintln!("[virya:operator-cache] could not persist Signal overview: {error}");
+            }
+            Ok(overview)
+        }
+        Err(network_error) if operator_signal_cache_fallback_allowed(&network_error) => {
+            match load_operator_signal_cache(&state).await {
+                Ok(Some(mut cached)) => {
+                    if !cached
+                        .unavailable_sources
+                        .iter()
+                        .any(|source| source == "offline_cache")
+                    {
+                        cached.unavailable_sources.push("offline_cache".to_owned());
+                    }
+                    Ok(cached)
+                }
+                Ok(None) | Err(_) => Err(network_error),
+            }
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[tauri::command]

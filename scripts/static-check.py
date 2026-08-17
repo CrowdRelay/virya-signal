@@ -451,8 +451,10 @@ for trigger_path in ['index.html', 'boot.js', 'Trunk.toml', 'styles.css', 'rust-
         raise SystemExit(f'Android smoke workflow does not watch {trigger_path}')
 if "uses: ./.github/workflows/_android-build.yml" not in smoke or "build_kind: debug-apk" not in smoke:
     raise SystemExit('Android smoke must use the canonical reusable Android builder')
-if '--target aarch64' not in android_builder or '--max-size-mib' not in android_builder:
-    raise SystemExit('Reusable Android builder must create bounded ARM64 packages')
+if ('default: aarch64' not in android_builder
+        or '--target "${TARGET_ARCH}"' not in android_builder
+        or '--max-size-mib' not in android_builder):
+    raise SystemExit('Reusable Android builder must default to bounded ARM64 packages and support explicit E2E targets')
 if 'package="artifacts/virya-signal-${VERSION}.${ext}"' not in android_builder:
     raise SystemExit('Reusable Android builder must produce canonical Virya Signal artifact names')
 
@@ -584,15 +586,15 @@ if 'summary.http.errors_4xx.to_string()' not in ui:
     raise SystemExit('staff Ops UI must surface CrowdRelay 4xx telemetry separately from 5xx')
 
 for cache_contract in [
-    'shared-key: android-arm64',
+    'shared-key: android-${{ inputs.target_arch }}',
     'path: ~/.cache/trunk',
     'mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba',
     'cache-targets: false',
     'scripts/configure-android-signing.py',
     'scripts/analyze-android-package.py',
-    '--require-abi arm64-v8a',
+    '--require-abi "${required_abi}"',
     '--require-page-size 16384',
-    '--aab --target aarch64',
+    '--aab --target "${TARGET_ARCH}"',
     'artifact_manifest.py create artifacts android-artifact-manifest.json',
 ]:
     if cache_contract not in android_builder:
