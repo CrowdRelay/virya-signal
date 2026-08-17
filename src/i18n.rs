@@ -1,6 +1,5 @@
 use std::{
     cell::RefCell,
-    collections::HashMap,
     sync::atomic::{AtomicU8, Ordering},
 };
 
@@ -10,13 +9,12 @@ const LANGUAGE_STORAGE_KEY: &str = "virya:language:v1";
 static LANGUAGE: AtomicU8 = AtomicU8::new(0);
 
 thread_local! {
-    // Web copy lives in boot-i18n.js rather than the WASM data section. We leak
-    // each language/key pair once for the lifetime of the page so the rest of
-    // the Leptos UI can keep the existing &'static str API without repeated JS
-    // crossings or per-render allocations. We deliberately do not clear this map
-    // on language changes: that keeps Box::leak bounded to at most both catalogs.
-    static TRANSLATION_CACHE: RefCell<HashMap<(&'static str, &'static str), &'static str>> =
-        RefCell::new(HashMap::new());
+    // Web copy lives in boot-i18n.js rather than the WASM data section. Keep the
+    // tiny page-lifetime cache as a sorted Vec instead of pulling hash-table
+    // machinery into the release WASM. Lookups stay allocation-free after the
+    // first JS crossing and Box::leak remains bounded by both language catalogs.
+    static TRANSLATION_CACHE: RefCell<Vec<((&'static str, &'static str), &'static str)>> =
+        const { RefCell::new(Vec::new()) };
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -96,14 +94,25 @@ pub fn select(language: Language) {
 pub fn tr(key: &'static str) -> &'static str {
     let language = current().code();
     let cache_key = (language, key);
-    if let Some(value) = TRANSLATION_CACHE.with(|cache| cache.borrow().get(&cache_key).copied()) {
+    let cached = TRANSLATION_CACHE.with(|cache| {
+        let cache = cache.borrow();
+        cache
+            .binary_search_by_key(&cache_key, |(stored_key, _)| *stored_key)
+            .ok()
+            .map(|index| cache[index].1)
+    });
+    if let Some(value) = cached {
         return value;
     }
 
     let value = runtime_text_js(language, key);
     let value: &'static str = Box::leak(value.into_boxed_str());
     TRANSLATION_CACHE.with(|cache| {
-        cache.borrow_mut().insert(cache_key, value);
+        let mut cache = cache.borrow_mut();
+        match cache.binary_search_by_key(&cache_key, |(stored_key, _)| *stored_key) {
+            Ok(index) => cache[index].1 = value,
+            Err(index) => cache.insert(index, (cache_key, value)),
+        }
     });
     value
 }

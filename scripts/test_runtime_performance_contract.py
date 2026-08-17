@@ -75,6 +75,14 @@ class RuntimePerformanceContract(unittest.TestCase):
             "z",
         )
 
+
+    def test_web_i18n_cache_avoids_hashing_machinery_in_release_wasm(self):
+        source = (ROOT / "src/i18n.rs").read_text()
+        self.assertIn("RefCell<Vec<", source)
+        self.assertIn("binary_search_by_key", source)
+        self.assertNotIn("HashMap", source)
+        self.assertNotIn("collections::HashMap", source)
+
     def test_vault_uses_os_rng_without_rand_facade(self):
         manifest = ROOT / "src-tauri/Cargo.toml"
         self.assertEqual(toml_value(manifest, "dependencies", "getrandom"), "0.4")
