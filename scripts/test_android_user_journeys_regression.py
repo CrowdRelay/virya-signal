@@ -163,5 +163,15 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertIn('def fan_recovery_qr', journey)
         self.assertIn('d.tap(["SKANUJ QR", "SCAN QR"]', journey)
 
+    def test_android_e2e_boot_and_crash_gate_are_bounded_and_current(self):
+        workflow = read('.github/workflows/android-e2e.yml')
+        self.assertIn('-accel on -gpu swiftshader', workflow)
+        self.assertNotIn('swiftshader_indirect', workflow)
+        self.assertNotIn('-camera-back virtualscene', workflow)
+        self.assertIn('timeout 15 adb get-state', workflow)
+        self.assertIn('timeout 20 adb logcat -d', workflow)
+        self.assertIn(r'ANR in music\.virya\.signal', workflow)
+        self.assertNotIn(r'ANR in music\.virya\.control', workflow)
+
 if __name__ == '__main__':
     unittest.main()

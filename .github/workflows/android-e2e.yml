@@ -99,7 +99,7 @@ jobs:
           mkdir -p artifacts/android-e2e
           nohup emulator -avd "${AVD_NAME}" \
             -no-window -no-audio -no-boot-anim -no-snapshot \
-            -gpu swiftshader_indirect -camera-back virtualscene \
+            -accel on -gpu swiftshader \
             > artifacts/android-e2e/emulator.log 2>&1 &
           emulator_pid=$!
 
@@ -182,8 +182,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          adb logcat -d > artifacts/android-e2e/logcat-final.txt || true
-          if grep -E 'FATAL EXCEPTION|ANR in music\.virya\.control|Render process gone' artifacts/android-e2e/logcat-final.txt; then
+          mkdir -p artifacts/android-e2e
+          # This step runs under `if: always()`. If boot failed there may be no
+          # emulator at all; never let an unbounded adb call hide the original
+          # failure or burn the remaining job timeout.
+          if ! timeout 15 adb get-state >/dev/null 2>&1; then
+            echo 'VIRYA_SIGNAL_ANDROID_CRASH_GATE=SKIP reason=no-device'
+            exit 0
+          fi
+          if ! timeout 20 adb logcat -d > artifacts/android-e2e/logcat-final.txt; then
+            echo 'VIRYA_SIGNAL_ANDROID_CRASH_GATE=FAIL reason=logcat-timeout' >&2
+            exit 1
+          fi
+          if grep -E 'FATAL EXCEPTION|ANR in music\.virya\.signal|Render process gone' artifacts/android-e2e/logcat-final.txt; then
             echo 'VIRYA_SIGNAL_ANDROID_CRASH_GATE=FAIL' >&2
             exit 1
           fi
