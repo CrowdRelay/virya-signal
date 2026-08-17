@@ -268,6 +268,22 @@ class RuntimePerformanceContract(unittest.TestCase):
         self.assertGreaterEqual(commands.count("state.feedback_queue_mutation.lock().await"), 2)
         self.assertLessEqual(8, 8)
 
+    def test_launcher_status_does_not_wait_for_feedback_delivery(self):
+        commands = (ROOT / "src-tauri/src/commands/misc.rs").read_text()
+        launcher = commands.split(
+            "pub(crate) async fn launcher_status(", 1
+        )[1].split("#[tauri::command]", 1)[0]
+        self.assertIn("app: AppHandle", launcher)
+        self.assertIn("let status = LauncherStatus", launcher)
+        self.assertIn("tauri::async_runtime::spawn", launcher)
+        self.assertIn("flush_feedback_outbox(&state).await;", launcher)
+        self.assertIn("Ok(status)", launcher)
+        critical = launcher[: launcher.index("tauri::async_runtime::spawn")]
+        self.assertNotIn("flush_feedback_outbox", critical)
+        self.assertLess(
+            launcher.index("let status = LauncherStatus"),
+            launcher.index("tauri::async_runtime::spawn"),
+        )
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 //! Small commands that don't belong to the operator/fan/show-mode domains.
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 use uuid::Uuid;
 use zeroize::Zeroizing;
@@ -72,14 +72,14 @@ pub(crate) async fn request_city(
 
 #[tauri::command]
 pub(crate) async fn launcher_status(
+    app: AppHandle,
     state: State<'_, AppState>,
     locale: String,
 ) -> Result<LauncherStatus, AppError> {
     i18n::set_language(&locale);
-    flush_feedback_outbox(&state).await;
     let operator_session = state.session.read().await;
     let fan_session = state.fan_session.read().await;
-    Ok(LauncherStatus {
+    let status = LauncherStatus {
         operator: SessionStatus {
             configured: vault::exists(&state.app_data_dir),
             unlocked: operator_session.is_some(),
@@ -92,7 +92,18 @@ pub(crate) async fn launcher_status(
             unlocked: fan_session.is_some(),
             session: fan_session.as_ref().map(|profile| profile.as_ref().into()),
         },
-    })
+    };
+    drop(operator_session);
+    drop(fan_session);
+
+    // Anonymous feedback is maintenance work. A queued retry can involve disk
+    // I/O plus up to three network requests and must never delay first render.
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        flush_feedback_outbox(&state).await;
+    });
+
+    Ok(status)
 }
 
 #[tauri::command]
