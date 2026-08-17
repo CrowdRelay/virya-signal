@@ -183,6 +183,7 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
     let status = RwSignal::new(None::<FanPushStatus>);
     let busy = RwSignal::new(false);
     let resume_refresh = RwSignal::new(0_u32);
+    let enable_after_settings = RwSignal::new(false);
     install_resume_refresh(resume_refresh);
 
     Effect::new(move |_| {
@@ -192,17 +193,21 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
         }
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke_latest::<FanPushStatus, _>(
-                "fan_push_sync",
-                &EmptyArgs {},
-                15_000,
-                "fan:push-sync",
-            )
-            .await
+            let current = status.get_untracked();
+            if enable_after_settings.get_untracked()
+                && current.as_ref().is_some_and(|value| value.permission != "denied" && !value.enabled)
             {
-                Ok(Some(value)) => status.set(Some(value)),
-                Ok(None) => {}
-                Err(message) => error.set(Some(message)),
+                enable_after_settings.set(false);
+                match bridge::invoke_timeout::<FanPushStatus, _>("fan_push_enable", &EmptyArgs {}, 45_000).await {
+                    Ok(value) => status.set(Some(value)),
+                    Err(message) => error.set(Some(message)),
+                }
+            } else {
+                match bridge::invoke_latest::<FanPushStatus, _>("fan_push_sync", &EmptyArgs {}, 15_000, "fan:push-sync").await {
+                    Ok(Some(value)) => status.set(Some(value)),
+                    Ok(None) => {}
+                    Err(message) => error.set(Some(message)),
+                }
             }
             busy.set(false);
         });
@@ -224,6 +229,9 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
             "fan_push_enable"
         };
         busy.set(true);
+        if opens_settings {
+            enable_after_settings.set(true);
+        }
         spawn_local(async move {
             match bridge::invoke_timeout::<FanPushStatus, _>(command, &EmptyArgs {}, 45_000).await {
                 Ok(value) => status.set(Some(value)),

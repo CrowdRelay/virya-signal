@@ -409,37 +409,26 @@ fn FanAccess(
         }
 
         busy.set(true);
-        wasm_bindgen_futures::spawn_local(async move {
-            let result = match bridge::scan_qr().await {
-                Ok(Some(value)) => {
-                    let values = FanConfirmationValues {
-                        email: scan_email,
-                        name: scan_name,
-                        token: value,
-                        pin: scan_pin,
-                    };
-                    exchange_fan_confirmation(values).await
-                }
+        spawn_local(async move {
+            let scanned_token = match bridge::scan_qr().await {
+                Ok(Some(value)) => value,
                 Ok(None) => {
                     let _ = busy.try_set(false);
                     return;
                 }
-                Err(message) => Err(message),
-            };
-
-            match result {
-                Ok(value) => {
-                    let _ = token.try_set(String::new());
-                    let _ = pin.try_set(String::new());
-                    let _ = status.try_set(value);
-                    let _ = status_refresh
-                        .try_update(|generation| *generation = generation.wrapping_add(1));
-                }
                 Err(message) => {
                     let _ = error.try_set(Some(message));
+                    let _ = busy.try_set(false);
+                    return;
                 }
-            }
-            let _ = busy.try_set(false);
+            };
+            let values = FanConfirmationValues {
+                email: scan_email,
+                name: scan_name,
+                token: scanned_token,
+                pin: scan_pin,
+            };
+            submit_fan_confirmation_values(values, token, pin, busy, confirmation_session, error);
         });
     };
 

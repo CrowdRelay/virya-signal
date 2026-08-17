@@ -295,7 +295,7 @@ impl super::CrowdRelayClient {
                 status: 200,
                 detail: crate::i18n::tr("native_fan_session_missing").into(),
             })?;
-        let canonical_email = bounded_required(body.email, "fan email")?;
+        let canonical_email = bounded_required(&body.email, "fan email", 320)?.to_owned();
         let canonical_name = normalized_optional(&body.display_name);
         Ok((
             FanAuthResult {

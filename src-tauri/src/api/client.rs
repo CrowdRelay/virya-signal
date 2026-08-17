@@ -47,16 +47,28 @@ fn transient_public_status(status: reqwest::StatusCode) -> bool {
 
 const PRODUCTION_STAFF_GATE_URL: &str = "https://virya.music/api/staff/qr/login";
 const PRODUCTION_STAFF_GATE_ORIGIN: &str = "https://virya.music";
+
+const fn staff_gate_env_or_default(
+    env: Option<&'static str>,
+    default: &'static str,
+) -> &'static str {
+    if let Some(value) = env {
+        if value.is_empty() { default } else { value }
+    } else {
+        default
+    }
+}
+
 #[cfg(debug_assertions)]
-const STAFF_GATE_URL: &str = match option_env!("VIRYA_SIGNAL_E2E_STAFF_GATE_URL") {
-    Some("") | None => PRODUCTION_STAFF_GATE_URL,
-    Some(value) => value,
-};
+const STAFF_GATE_URL: &str = staff_gate_env_or_default(
+    option_env!("VIRYA_SIGNAL_E2E_STAFF_GATE_URL"),
+    PRODUCTION_STAFF_GATE_URL,
+);
 #[cfg(debug_assertions)]
-const STAFF_GATE_ORIGIN: &str = match option_env!("VIRYA_SIGNAL_E2E_STAFF_GATE_ORIGIN") {
-    Some("") | None => PRODUCTION_STAFF_GATE_ORIGIN,
-    Some(value) => value,
-};
+const STAFF_GATE_ORIGIN: &str = staff_gate_env_or_default(
+    option_env!("VIRYA_SIGNAL_E2E_STAFF_GATE_ORIGIN"),
+    PRODUCTION_STAFF_GATE_ORIGIN,
+);
 #[cfg(not(debug_assertions))]
 const STAFF_GATE_URL: &str = PRODUCTION_STAFF_GATE_URL;
 #[cfg(not(debug_assertions))]

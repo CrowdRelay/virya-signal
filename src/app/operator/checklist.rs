@@ -104,6 +104,7 @@ fn OperatorChecklist(
     let push_status = RwSignal::new(None::<FanPushStatus>);
     let push_loading = RwSignal::new(false);
     let push_resume_refresh = RwSignal::new(0_u32);
+    let push_enable_after_settings = RwSignal::new(false);
     install_resume_refresh(push_resume_refresh);
 
     Effect::new(move |_| {
@@ -136,15 +137,21 @@ fn OperatorChecklist(
         }
         push_loading.set(true);
         spawn_local(async move {
-            match bridge::invoke_timeout::<FanPushStatus, _>(
-                "operator_push_sync",
-                &EmptyArgs {},
-                15_000,
-            )
-            .await
+            let status = push_status.get_untracked();
+            let enable_after = push_enable_after_settings.get_untracked();
+            if enable_after
+                && status.as_ref().is_some_and(|value| value.permission != "denied" && !value.enabled)
             {
-                Ok(value) => push_status.set(Some(value)),
-                Err(message) => error.set(Some(message)),
+                push_enable_after_settings.set(false);
+                match bridge::invoke_timeout::<FanPushStatus, _>("operator_push_enable", &EmptyArgs {}, 45_000).await {
+                    Ok(value) => push_status.set(Some(value)),
+                    Err(message) => error.set(Some(message)),
+                }
+            } else {
+                match bridge::invoke_timeout::<FanPushStatus, _>("operator_push_sync", &EmptyArgs {}, 15_000).await {
+                    Ok(value) => push_status.set(Some(value)),
+                    Err(message) => error.set(Some(message)),
+                }
             }
             push_loading.set(false);
         });
@@ -159,21 +166,14 @@ fn OperatorChecklist(
             .as_ref()
             .is_some_and(|status| status.permission == "denied");
         push_loading.set(true);
+        if opens_settings {
+            push_enable_after_settings.set(true);
+        }
         spawn_local(async move {
             let result = if opens_settings {
-                bridge::invoke_timeout::<FanPushStatus, _>(
-                    "operator_push_open_settings",
-                    &EmptyArgs {},
-                    45_000,
-                )
-                .await
+                bridge::invoke_timeout::<FanPushStatus, _>("operator_push_open_settings", &EmptyArgs {}, 45_000).await
             } else {
-                bridge::invoke_timeout::<FanPushStatus, _>(
-                    "operator_push_enable",
-                    &EmptyArgs {},
-                    45_000,
-                )
-                .await
+                bridge::invoke_timeout::<FanPushStatus, _>("operator_push_enable", &EmptyArgs {}, 45_000).await
             };
             match result {
                 Ok(value) => push_status.set(Some(value)),

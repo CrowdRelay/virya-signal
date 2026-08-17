@@ -312,3 +312,15 @@ include!("operator/commerce_settings.rs");
 include!("operator/checklist.rs");
 include!("operator/autopilot.rs");
 include!("operator/ops.rs");
+
+#[allow(dead_code)]
+fn format_operator_push_summary(overview: &OperatorOpsOverview) -> String {
+    let push = &overview.summary.push;
+    format!(
+        "pending={} processing={} dead={} delivered_24h={}",
+        push.pending, push.processing, push.dead, push.delivered_24h
+    )
+}
+
+// operator_push_open_settings is surfaced from OperatorChecklist when the team
+// push permission is denied; settings continuation re-syncs via operator_push_sync.

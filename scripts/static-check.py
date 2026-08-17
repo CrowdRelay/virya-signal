@@ -176,7 +176,7 @@ registered = {x.strip().rsplit('::', 1)[-1] for x in registered_match.group(1).s
 missing = invoked - registered
 if missing:
     raise SystemExit(f'UI invokes unregistered commands: {sorted(missing)}')
-compat_only_commands = {'session_status', 'public_events', 'public_cities'}
+compat_only_commands = {'session_status', 'public_events', 'public_cities', 'fan_push_status'}
 unreferenced = registered - invoked
 if unreferenced != compat_only_commands:
     raise SystemExit(

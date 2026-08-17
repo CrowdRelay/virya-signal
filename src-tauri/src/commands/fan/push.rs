@@ -210,6 +210,14 @@ pub(crate) async fn fan_push_sync(
 }
 
 #[tauri::command]
+pub(crate) async fn fan_push_status(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<FanPushStatus, AppError> {
+    fan_push_sync(state, app).await
+}
+
+#[tauri::command]
 pub(crate) async fn fan_push_enable(
     state: State<'_, AppState>,
     app: AppHandle,
