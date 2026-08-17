@@ -37,6 +37,9 @@ struct FanSignupApiResponse {
 #[derive(Deserialize)]
 struct FanConfirmationApiResponse {
     fan_session_token: Option<String>,
+    email: String,
+    #[serde(default)]
+    display_name: Option<String>,
 }
 
 fn fan_home_key(profile: &FanProfile) -> String {
@@ -260,7 +263,7 @@ impl super::CrowdRelayClient {
     pub async fn fan_confirm(
         &self,
         input: &FanConfirmationInput,
-    ) -> Result<(FanAuthResult, String), AppError> {
+    ) -> Result<(FanAuthResult, String, String, Option<String>), AppError> {
         let response = self
             .http
             .post(endpoint(&input.api_base_url, "fans/confirm")?)
@@ -292,6 +295,8 @@ impl super::CrowdRelayClient {
                 status: 200,
                 detail: crate::i18n::tr("native_fan_session_missing").into(),
             })?;
+        let canonical_email = bounded_required(body.email, "fan email")?;
+        let canonical_name = normalized_optional(&body.display_name);
         Ok((
             FanAuthResult {
                 session_created: true,
@@ -300,6 +305,8 @@ impl super::CrowdRelayClient {
                 retry_after_seconds: None,
             },
             session_token,
+            canonical_email,
+            canonical_name,
         ))
     }
 }

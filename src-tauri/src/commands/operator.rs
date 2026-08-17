@@ -391,6 +391,13 @@ pub(crate) async fn operator_push_open_settings(
 ) -> Result<FanPushStatus, AppError> {
     let _push_mutation = state.operator_push_mutation.lock().await;
     operator_profile(&state).await?;
+    persist_operator_push_preference(
+        &state.app_data_dir,
+        OperatorPushPreference {
+            desired: true,
+            last_sync_ok: false,
+        },
+    )?;
     super::fan::open_native_push_settings(&app).map_err(AppError::InvalidInput)?;
     // Opening Android Settings backgrounds the WebView. Do not start a remote
     // sync while the app is losing focus: that used to leave the checklist UI

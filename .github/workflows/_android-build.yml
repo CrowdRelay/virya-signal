@@ -153,6 +153,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Empty GitHub input values must not become compile-time Some("") via option_env!.
+          # Ordinary debug/release builds therefore compile with production defaults; only
+          # the dedicated emulator E2E build keeps these overrides.
+          if [[ -z "${VIRYA_SIGNAL_E2E_API_BASE:-}" ]]; then
+            unset VIRYA_SIGNAL_E2E_API_BASE
+            unset VIRYA_SIGNAL_E2E_QR_PAYLOAD
+            unset VIRYA_SIGNAL_E2E_STAFF_GATE_URL
+            unset VIRYA_SIGNAL_E2E_STAFF_GATE_ORIGIN
+          fi
           case "${BUILD_KIND}" in
             debug-apk) cargo tauri android build --ci --debug --apk --target "${TARGET_ARCH}" ;;
             release-apk) cargo tauri android build --ci --apk --target "${TARGET_ARCH}" ;;

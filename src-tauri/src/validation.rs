@@ -106,7 +106,10 @@ pub(crate) fn validate_fan_confirmation(
         .ok_or_else(|| AppError::InvalidInput(crate::i18n::tr("native_paste_valid_code").into()))?;
     input.display_name = clean_optional(input.display_name.take());
     validate_api_base(&input.api_base_url)?;
-    if !valid_email(&input.email)
+    // The one-time token is the authentication credential. Email/display name are
+    // optional UI hints and must never make QR recovery depend on stale/remounted
+    // form state. Canonical identity is returned by CrowdRelay after exchange.
+    if (!input.email.is_empty() && !valid_email(&input.email))
         || input
             .display_name
             .as_ref()

@@ -189,11 +189,24 @@ async fn sync_native_push_if_desired(
 }
 
 #[tauri::command]
-pub(crate) async fn fan_push_status(
+pub(crate) async fn fan_push_sync(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<FanPushStatus, AppError> {
-    Ok(current_native_push_status(&state, &app, None).await)
+    let _mutation = state.fan_mutation.lock().await;
+    match sync_native_push_if_desired(&state, &app).await {
+        Ok(()) => Ok(current_native_push_status(&state, &app, None).await),
+        Err(AppError::Forbidden) => Ok(current_native_push_status(
+            &state,
+            &app,
+            Some("notification_permission_denied".to_owned()),
+        )
+        .await),
+        Err(AppError::Conflict(detail)) => {
+            Ok(current_native_push_status(&state, &app, Some(detail)).await)
+        }
+        Err(error) => Err(error),
+    }
 }
 
 #[tauri::command]
@@ -300,6 +313,11 @@ pub(crate) async fn fan_push_open_settings(
         )
         .await);
     }
+    let _mutation = state.fan_mutation.lock().await;
+    let profile = fan_profile(&state).await?;
+    // Persist the user's desired state before Android backgrounds/remounts the
+    // WebView. fan_push_sync will reconcile FCM/backend registration on resume.
+    let _ = persist_push_state(&state, &profile, true, false).await?;
     open_native_push_settings(&app).map_err(AppError::InvalidInput)?;
     Ok(current_native_push_status(
         &state,

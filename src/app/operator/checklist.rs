@@ -103,8 +103,6 @@ fn OperatorChecklist(
     let busy_item = RwSignal::new(None::<String>);
     let push_status = RwSignal::new(None::<FanPushStatus>);
     let push_loading = RwSignal::new(false);
-    let push_sync_requested = RwSignal::new(false);
-    let push_enable_after_settings = RwSignal::new(false);
     let push_resume_refresh = RwSignal::new(0_u32);
     install_resume_refresh(push_resume_refresh);
 
@@ -132,32 +130,16 @@ fn OperatorChecklist(
     });
 
     Effect::new(move |_| {
-        if push_sync_requested.get_untracked() {
-            return;
-        }
-        push_sync_requested.set(true);
-        push_loading.set(true);
-        spawn_local(async move {
-            match bridge::invoke_timeout::<FanPushStatus, _>("operator_push_sync", &EmptyArgs {}, 15_000).await {
-                Ok(value) => push_status.set(Some(value)),
-                Err(message) => error.set(Some(message)),
-            }
-            push_loading.set(false);
-        });
-    });
-
-    Effect::new(move |_| {
         push_resume_refresh.get();
-        if !push_enable_after_settings.get_untracked() || push_loading.get_untracked() {
+        if push_loading.get_untracked() {
             return;
         }
-        push_enable_after_settings.set(false);
         push_loading.set(true);
         spawn_local(async move {
             match bridge::invoke_timeout::<FanPushStatus, _>(
-                "operator_push_enable",
+                "operator_push_sync",
                 &EmptyArgs {},
-                45_000,
+                15_000,
             )
             .await
             {
@@ -176,9 +158,6 @@ fn OperatorChecklist(
             .get_untracked()
             .as_ref()
             .is_some_and(|status| status.permission == "denied");
-        if opens_settings {
-            push_enable_after_settings.set(true);
-        }
         push_loading.set(true);
         spawn_local(async move {
             let result = if opens_settings {
@@ -198,10 +177,7 @@ fn OperatorChecklist(
             };
             match result {
                 Ok(value) => push_status.set(Some(value)),
-                Err(message) => {
-                    push_enable_after_settings.set(false);
-                    error.set(Some(message));
-                }
+                Err(message) => error.set(Some(message)),
             }
             push_loading.set(false);
         });
@@ -209,7 +185,6 @@ fn OperatorChecklist(
 
     let disable_push = move |_| {
         if push_loading.get_untracked() { return; }
-        push_enable_after_settings.set(false);
         push_loading.set(true);
         spawn_local(async move {
             match bridge::invoke_timeout::<FanPushStatus, _>("operator_push_disable", &EmptyArgs {}, 30_000).await {

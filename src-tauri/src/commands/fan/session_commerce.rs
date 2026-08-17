@@ -120,12 +120,12 @@ pub(crate) async fn fan_confirm(
     let _mutation = state.fan_mutation.lock().await;
     validate_fan_confirmation(&mut input, &pin)?;
     let pin = Zeroizing::new(pin);
-    let (result, session_token) = state.api.fan_confirm(&input).await?;
+    let (result, session_token, canonical_email, canonical_name) = state.api.fan_confirm(&input).await?;
     let profile = FanProfile {
         api_base_url: input.api_base_url,
         area_wallet_id: uuid::Uuid::new_v4().to_string(),
-        email: input.email,
-        display_name: input.display_name,
+        email: canonical_email,
+        display_name: canonical_name,
         fan_session_token: session_token,
         push_enabled: false,
         push_last_sync_ok: false,

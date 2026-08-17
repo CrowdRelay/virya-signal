@@ -82,6 +82,41 @@ struct FanConfirmationValues {
     pin: String,
 }
 
+async fn exchange_fan_confirmation(
+    values: FanConfirmationValues,
+) -> Result<FanSessionStatus, String> {
+    let FanConfirmationValues {
+        email: input_email,
+        name: input_name,
+        token: current_token,
+        pin: current_pin,
+    } = values;
+    if current_token.trim().is_empty() {
+        return Err(tr("paste_the_code_or_full_link_or").to_owned());
+    }
+    if !new_operator_pin_is_valid(&current_pin) {
+        return Err(tr("enter_4_6_digits_for_this_fan_profile").to_owned());
+    }
+    let input = FanConfirmationInput {
+        api_base_url: API_BASE.to_owned(),
+        // Email/display name are optional hints only. CrowdRelay resolves and
+        // returns the canonical identity from the one-time token.
+        email: input_email.trim().to_owned(),
+        display_name: input_name,
+        token: current_token.trim().to_owned(),
+    };
+    bridge::invoke::<FanAuthResult, _>(
+        "fan_confirm",
+        &FanConfirmArgs {
+            input: &input,
+            pin: &current_pin,
+        },
+    )
+    .await?;
+    bridge::invalidate_latest("launcher:");
+    bridge::invoke_timeout::<FanSessionStatus, _>("fan_status", &EmptyArgs {}, 5_000).await
+}
+
 fn submit_fan_confirmation_values(
     values: FanConfirmationValues,
     token: RwSignal<String>,
@@ -90,72 +125,30 @@ fn submit_fan_confirmation_values(
     session: FanConfirmationSession,
     error: RwSignal<Option<String>>,
 ) {
-    let FanConfirmationValues {
-        email: input_email,
-        name: input_name,
-        token: current_token,
-        pin: current_pin,
-    } = values;
     if busy.get_untracked() {
         return;
     }
-
-    if input_email.trim().is_empty() {
-        error.set(Some(tr("enter_the_email_used_to_join_signal").to_owned()));
-        return;
-    }
-    if current_token.trim().is_empty() {
+    if values.token.trim().is_empty() {
         error.set(Some(tr("paste_the_code_or_full_link_or").to_owned()));
         return;
     }
-    if !new_operator_pin_is_valid(&current_pin) {
+    if !new_operator_pin_is_valid(&values.pin) {
         error.set(Some(tr("enter_4_6_digits_for_this_fan_profile").to_owned()));
         return;
     }
-
-    let input = FanConfirmationInput {
-        api_base_url: API_BASE.to_owned(),
-        email: input_email.trim().to_owned(),
-        display_name: input_name,
-        token: current_token.trim().to_owned(),
-    };
-
     busy.set(true);
-
     spawn_local(async move {
-        match bridge::invoke::<FanAuthResult, _>(
-            "fan_confirm",
-            &FanConfirmArgs {
-                input: &input,
-                pin: &current_pin,
-            },
-        )
-        .await
-        {
-            Ok(_) => {
+        match exchange_fan_confirmation(values).await {
+            Ok(value) => {
                 pin.set(String::new());
                 token.set(String::new());
-
-                bridge::invalidate_latest("launcher:");
-
-                match bridge::invoke_timeout::<FanSessionStatus, _>(
-                    "fan_status",
-                    &EmptyArgs {},
-                    5_000,
-                )
-                .await
-                {
-                    Ok(value) => session.status.set(value),
-                    Err(message) => error.set(Some(message)),
-                }
-
+                session.status.set(value);
                 session
                     .status_refresh
-                    .update(|value| *value = value.wrapping_add(1));
+                    .update(|generation| *generation = generation.wrapping_add(1));
             }
             Err(message) => error.set(Some(message)),
         }
-
         busy.set(false);
     });
 }
@@ -402,53 +395,51 @@ fn FanAccess(
             return;
         }
 
-        // Opening the native camera can foreground/background the Android WebView.
-        // Snapshot the form *before* crossing that native boundary; reading the
-        // reactive fields after the scanner returns caused first-login/recovery
-        // to observe freshly remounted empty signals and require a second scan.
+        // Camera transitions may fully remount the Android WebView. Snapshot only
+        // durable input before crossing the native boundary, then use an unscoped
+        // task whose post-scan writes are all disposal-safe. The one-time token is
+        // the authentication credential, so an empty/stale email can never force a
+        // second scan.
         let scan_email = email.get_untracked().trim().to_owned();
         let scan_name = optional(name.get_untracked().trim().to_owned());
         let scan_pin = pin.get_untracked();
-        if scan_email.is_empty() {
-            error.set(Some(tr("enter_the_email_used_to_join_signal").to_owned()));
-            return;
-        }
         if !new_operator_pin_is_valid(&scan_pin) {
             error.set(Some(tr("enter_4_6_digits_for_this_fan_profile").to_owned()));
             return;
         }
 
         busy.set(true);
-        spawn_local(async move {
-            match bridge::scan_qr().await {
+        wasm_bindgen_futures::spawn_local(async move {
+            let result = match bridge::scan_qr().await {
                 Ok(Some(value)) => {
-                    // Keep the visible field in sync, but exchange the token with
-                    // the immutable pre-scan email/PIN snapshot. One successful
-                    // scan therefore always performs exactly one login attempt.
-                    token.set(value.clone());
-                    busy.set(false);
-                    submit_fan_confirmation_values(
-                        FanConfirmationValues {
-                            email: scan_email,
-                            name: scan_name,
-                            token: value,
-                            pin: scan_pin,
-                        },
-                        token,
-                        pin,
-                        busy,
-                        FanConfirmationSession {
-                            status,
-                            status_refresh,
-                        },
-                        error,
-                    );
+                    let values = FanConfirmationValues {
+                        email: scan_email,
+                        name: scan_name,
+                        token: value,
+                        pin: scan_pin,
+                    };
+                    exchange_fan_confirmation(values).await
+                }
+                Ok(None) => {
+                    let _ = busy.try_set(false);
                     return;
                 }
-                Ok(None) => {}
-                Err(message) => error.set(Some(message)),
+                Err(message) => Err(message),
+            };
+
+            match result {
+                Ok(value) => {
+                    let _ = token.try_set(String::new());
+                    let _ = pin.try_set(String::new());
+                    let _ = status.try_set(value);
+                    let _ = status_refresh
+                        .try_update(|generation| *generation = generation.wrapping_add(1));
+                }
+                Err(message) => {
+                    let _ = error.try_set(Some(message));
+                }
             }
-            busy.set(false);
+            let _ = busy.try_set(false);
         });
     };
 
@@ -488,7 +479,7 @@ fn FanAccess(
                                 <p class="confirm-hint"><strong>{tr("fastest_scan_the_qr_from_the_email")}</strong><br/>{tr("you_can_also_paste_the_full_link")}</p>
                                 <label>{tr("email_link_or_code")}<textarea aria-label=tr("email_link_or_code") rows="3" autocomplete="one-time-code" spellcheck="false" autocapitalize="none" placeholder=tr("paste_a_link_or_code_or_use") prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
                                 <div class="confirmation-actions single">
-                                    <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() || email.get().trim().is_empty() || !new_operator_pin_is_valid(&pin.get()) on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("or_hold_the_field_above_and_choose")}</small></button>
+                                    <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("or_hold_the_field_above_and_choose")}</small></button>
                                 </div>
                                 <label class="pin-field">
                                     <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
@@ -496,7 +487,7 @@ fn FanAccess(
                                     <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-confirm-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e)))/>
                                 </label>
                                 <p class="confirmation-note">{tr("pin_encrypts_your_profile_on_this_device")}</p>
-                                <button class="primary" disabled=move || busy.get() || email.get().trim().is_empty() || token.get().trim().is_empty() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_enter")}</button>
+                                <button class="primary" disabled=move || busy.get() || token.get().trim().is_empty() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_enter")}</button>
                                 <button type="button" class="text-button" disabled=move || busy.get() || email.get().trim().is_empty() on:click=request_access>{tr("i_already_have_an_account_send_login")}</button>
                                 <p class="confirmation-resend">{tr("no_message_check_spam_after_15_minutes")}</p>
                             </>
@@ -552,14 +543,14 @@ fn FanAccess(
                             <button type="button" class="ghost" disabled=move || busy.get() || email.get().trim().is_empty() on:click=request_access>{tr("send_login_link")}</button>
                             <label>{tr("email_link_or_code")}<textarea aria-label=tr("email_link_or_code") rows="3" autocomplete="one-time-code" spellcheck="false" autocapitalize="none" placeholder=tr("paste_link_or_code") prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
                             <div class="confirmation-actions single">
-                                <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() || email.get().trim().is_empty() || !new_operator_pin_is_valid(&pin.get()) on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("or_hold_the_field_and_choose_paste")}</small></button>
+                                <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("or_hold_the_field_and_choose_paste")}</small></button>
                             </div>
                             <label class="pin-field">
                                 <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
                                 <small id="fan-recovery-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
                                 <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-recovery-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e)))/>
                             </label>
-                            <button class="primary" disabled=move || busy.get() || email.get().trim().is_empty() || token.get().trim().is_empty() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_set_new_pin")}</button>
+                            <button class="primary" disabled=move || busy.get() || token.get().trim().is_empty() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_set_new_pin")}</button>
                             <button type="button" class="text-button" on:click=move |_| recovery_open.set(false)>{tr("back_to_pin_login")}</button>
                         </div>
                     </Show>

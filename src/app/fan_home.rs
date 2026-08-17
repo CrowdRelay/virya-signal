@@ -183,7 +183,6 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
     let status = RwSignal::new(None::<FanPushStatus>);
     let busy = RwSignal::new(false);
     let resume_refresh = RwSignal::new(0_u32);
-    let enable_after_settings = RwSignal::new(false);
     install_resume_refresh(resume_refresh);
 
     Effect::new(move |_| {
@@ -191,32 +190,13 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
         if !bridge::native_available() || busy.get() {
             return;
         }
-
-        // A permanently denied Android permission must be changed in system
-        // Settings. Treat returning from that screen as continuation of the
-        // original enable intent: if permission is now granted, finish FCM +
-        // CrowdRelay registration automatically instead of requiring a second
-        // tap. Clearing the flag before spawning also makes duplicate resume
-        // events harmless.
-        if enable_after_settings.get_untracked() {
-            enable_after_settings.set(false);
-            busy.set(true);
-            spawn_local(async move {
-                match bridge::invoke_timeout::<FanPushStatus, _>("fan_push_enable", &EmptyArgs {}, 45_000).await {
-                    Ok(value) => status.set(Some(value)),
-                    Err(message) => error.set(Some(message)),
-                }
-                busy.set(false);
-            });
-            return;
-        }
-
+        busy.set(true);
         spawn_local(async move {
             match bridge::invoke_latest::<FanPushStatus, _>(
-                "fan_push_status",
+                "fan_push_sync",
                 &EmptyArgs {},
-                10_000,
-                "fan:push-status",
+                15_000,
+                "fan:push-sync",
             )
             .await
             {
@@ -224,6 +204,7 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
                 Ok(None) => {}
                 Err(message) => error.set(Some(message)),
             }
+            busy.set(false);
         });
     });
 
@@ -242,19 +223,11 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
         } else {
             "fan_push_enable"
         };
-        if opens_settings {
-            enable_after_settings.set(true);
-        }
         busy.set(true);
         spawn_local(async move {
             match bridge::invoke_timeout::<FanPushStatus, _>(command, &EmptyArgs {}, 45_000).await {
                 Ok(value) => status.set(Some(value)),
-                Err(message) => {
-                    if opens_settings {
-                        enable_after_settings.set(false);
-                    }
-                    error.set(Some(message));
-                }
+                Err(message) => error.set(Some(message)),
             }
             busy.set(false);
         });
