@@ -358,8 +358,10 @@ for required_connect_source in (
             f'{required_connect_source}'
         )
 
-if 'console_error_panic_hook::set_once();' not in main or '#[cfg(debug_assertions)]' in main:
-    raise SystemExit('release startup panics must remain diagnosable')
+if '#[cfg(debug_assertions)]\n    console_error_panic_hook::set_once();' not in main:
+    raise SystemExit('rich Rust panic formatting must stay debug-only to protect the WASM budget')
+if 'window.addEventListener("error"' not in boot or 'window.addEventListener("unhandledrejection"' not in boot:
+    raise SystemExit('production WASM traps must remain visible through boot-shell recovery')
 if 'futures::join!' in ui or 'fn Splash()' in ui:
     raise SystemExit('startup must render immediately instead of waiting behind a second splash')
 

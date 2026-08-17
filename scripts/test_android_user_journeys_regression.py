@@ -73,9 +73,13 @@ class AndroidUserJourneysRegression(unittest.TestCase):
     def test_staff_sync_actions_have_terminal_timeout(self):
         checklist = read('src/app/operator/checklist.rs')
         shell = read('src/app/operator/shell.rs')
-        self.assertIn('"operator_push_sync", &EmptyArgs {}, 15_000', checklist)
+        self.assertIn('"operator_push_sync"', checklist)
+        checklist_sync = checklist.split('"operator_push_sync"', 1)[1].split(');', 1)[0]
+        self.assertIn('15_000', checklist_sync)
         self.assertIn('"operator_update_show_checklist", &args, 15_000', checklist)
-        self.assertIn('"operator_push_sync", &EmptyArgs {}, 15_000', shell)
+        self.assertIn('"operator_push_sync"', shell)
+        shell_sync = shell.split('"operator_push_sync"', 1)[1].split(');', 1)[0]
+        self.assertIn('15_000', shell_sync)
 
     def test_autopilot_policy_rekeys_on_version_and_mutation_has_terminal_timeout(self):
         src = read('src/app/operator/autopilot.rs')

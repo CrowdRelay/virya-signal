@@ -56,9 +56,24 @@ require(kotlin_service, "FirebaseMessagingService", "firebase-message-service")
 require(kotlin_service, 'getIdentifier("virya_signal_notification", "drawable", packageName)', "notification-monochrome-icon")
 require(kotlin_service, 'putExtra("virya_push_target_path", targetPath)', "notification-launch-target")
 require(fan_home, "enable_after_settings", "push-settings-resume-intent")
-require(fan_home, 'bridge::invoke_timeout::<FanPushStatus, _>("fan_push_enable"', "push-settings-auto-enable")
+fan_resume = fan_home.split("fn NativePushControl", 1)[1].split("let toggle", 1)[0]
+require(fan_resume, '"fan_push_sync"', "push-settings-refresh-before-enable")
+require(fan_resume, '"fan_push_enable"', "push-settings-auto-enable")
+require(fan_resume, 'set(!value.enabled && value.permission != "denied")', "push-settings-transient-retry-intent")
+if fan_resume.index('"fan_push_sync"') > fan_resume.index('"fan_push_enable"'):
+    raise SystemExit("SIGNAL_PUSH_CONTROL=FAIL push settings must refresh permission before enable")
+if "enable_after_settings.set(false)" in fan_resume.split('"fan_push_enable"', 1)[0]:
+    raise SystemExit("SIGNAL_PUSH_CONTROL=FAIL fan push retry intent is cleared before enable resolves")
 require(fan_home, "busy.get()", "push-resume-race-guard")
 require(operator, "operator_push_open_settings", "staff-push-settings-continuation")
+operator_resume = operator.split("fn OperatorChecklist", 1)[1].split("let enable_push", 1)[0]
+require(operator_resume, '"operator_push_sync"', "staff-push-settings-refresh-before-enable")
+require(operator_resume, '"operator_push_enable"', "staff-push-settings-auto-enable")
+require(operator_resume, '.set(!value.enabled && value.permission != "denied")', "staff-push-transient-retry-intent")
+if operator_resume.index('"operator_push_sync"') > operator_resume.index('"operator_push_enable"'):
+    raise SystemExit("SIGNAL_PUSH_CONTROL=FAIL staff push settings must refresh permission before enable")
+if "push_enable_after_settings.set(false)" in operator_resume.split('"operator_push_enable"', 1)[0]:
+    raise SystemExit("SIGNAL_PUSH_CONTROL=FAIL staff push retry intent is cleared before enable resolves")
 for needle in ("SignalPushPlugin.kt", "ViryaFirebaseMessagingService.kt", "virya_signal_notification.xml", "android.permission.POST_NOTIFICATIONS"):
     require(android_prepare, needle, f"android-stage-{needle}")
 print("SIGNAL_PUSH_CONTROL=PASS native=permission+token+deep-link+install-id+fcm-service operator=queue-health contract=ops-summary")

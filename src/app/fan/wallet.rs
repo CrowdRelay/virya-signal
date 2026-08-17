@@ -115,6 +115,26 @@ fn WalletCard(wallet: TicketWallet, error: RwSignal<Option<String>>) -> impl Int
     }
 }
 
+fn wallet_ticket_state(ticket: &WalletTicket) -> String {
+    match ticket.status.as_str() {
+        "redeemed" => ticket.redeemed_at.as_deref().map_or_else(
+            || tr("wallet_ticket_used").to_owned(),
+            |redeemed_at| {
+                i18n::format(
+                    "wallet_ticket_used_at",
+                    &[human_time(redeemed_at).to_string()],
+                )
+            },
+        ),
+        "revoked" => tr("wallet_ticket_revoked").to_owned(),
+        "expired" => tr("wallet_ticket_expired").to_owned(),
+        "issued" => tr("wallet_ticket_not_claimed").to_owned(),
+        "claimed" if ticket.qr_available => tr("wallet_ticket_ready").to_owned(),
+        _ if ticket.qr_available => tr("wallet_ticket_ready").to_owned(),
+        _ => tr("qr_unavailable").to_owned(),
+    }
+}
+
 #[component]
 fn WalletTicketCard(
     order_id: String,
@@ -123,6 +143,7 @@ fn WalletTicketCard(
 ) -> impl IntoView {
     let public_reference = ticket.public_reference.clone();
     let qr_available = ticket.qr_available;
+    let ticket_state = wallet_ticket_state(&ticket);
     let qr_svg = RwSignal::new(None::<String>);
     let qr_visible = RwSignal::new(false);
     let busy = RwSignal::new(false);
@@ -157,7 +178,7 @@ fn WalletTicketCard(
         });
     };
     view! {
-        <article class="ticket-card"><div><p class="eyebrow">{ticket.ticket_type_name}</p><strong>{ticket.public_reference}</strong><span>{ticket.holder_name.value_or(ticket.holder_email_masked)}</span></div><button class="ticket-qr-button" on:click=toggle_qr disabled=move || busy.get() || !qr_available>{move || if busy.get() { tr("generating") } else if qr_visible.get() { tr("hide_qr") } else if qr_available { tr("show_qr") } else { tr("qr_unavailable") }}</button><Show when=move || qr_visible.get()>{move || qr_svg.get().map(|svg| view! { <div class="mini-qr" inner_html=svg></div> })}</Show><small>{i18n::format("qr_valid_until", &[human_time(&ticket.qr_expires_at).to_string()])}</small></article>
+        <article class="ticket-card"><div><p class="eyebrow">{ticket.ticket_type_name}</p><strong>{ticket.public_reference}</strong><span>{ticket.holder_name.value_or(ticket.holder_email_masked)}</span></div><button class="ticket-qr-button" on:click=toggle_qr disabled=move || busy.get() || !qr_available>{move || if busy.get() { tr("generating") } else if qr_visible.get() { tr("hide_qr") } else if qr_available { tr("show_qr") } else { tr("qr_unavailable") }}</button><Show when=move || qr_visible.get()>{move || qr_svg.get().map(|svg| view! { <div class="mini-qr" inner_html=svg></div> })}</Show><small>{ticket_state}</small><Show when=move || qr_available><small>{i18n::format("qr_valid_until", &[human_time(&ticket.qr_expires_at).to_string()])}</small></Show></article>
     }
 }
 

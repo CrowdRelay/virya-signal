@@ -37,12 +37,16 @@ mod tests {
                 public_reference: "VRY-TICKET".into(),
                 holder_name: Some("Fan".into()),
                 holder_email_masked: "f***@example.com".into(),
+                status: "claimed".into(),
+                redeemed_at: None,
                 qr_token: Some("v1.private-token".into()),
                 qr_expires_at: "2099-08-01T21:00:00Z".into(),
             }],
         };
         let (public, tokens, cached_qr) = prepare_wallet(wallet);
         assert!(public.tickets[0].qr_available);
+        assert_eq!(public.tickets[0].status, "claimed");
+        assert_eq!(public.tickets[0].redeemed_at, None);
         assert_eq!(tokens["VRY-TICKET"].as_str(), "v1.private-token");
         assert_eq!(cached_qr.len(), 1);
     }
@@ -63,6 +67,8 @@ mod tests {
                 public_reference: "VRY-TICKET".into(),
                 holder_name: None,
                 holder_email_masked: "f***@example.com".into(),
+                status: "claimed".into(),
+                redeemed_at: None,
                 qr_token: Some(String::new()),
                 qr_expires_at: "2026-08-01T21:00:00Z".into(),
             }],

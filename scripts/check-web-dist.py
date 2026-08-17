@@ -44,9 +44,15 @@ def main() -> int:
     parser.add_argument("--warn-wasm-kib", type=int, default=1400)
     parser.add_argument("--max-wasm-kib", type=int, default=1536)
     parser.add_argument("--max-total-kib", type=int, default=2048)
+    parser.add_argument("--min-hard-headroom-kib", type=int, default=8)
     args = parser.parse_args()
-    if args.warn_wasm_kib <= 0 or args.max_wasm_kib <= 0 or args.max_total_kib <= 0:
-        parser.error("size budgets must be positive")
+    if (
+        args.warn_wasm_kib <= 0
+        or args.max_wasm_kib <= 0
+        or args.max_total_kib <= 0
+        or args.min_hard_headroom_kib < 0
+    ):
+        parser.error("size budgets must be positive and reserved headroom cannot be negative")
     if args.warn_wasm_kib >= args.max_wasm_kib:
         parser.error("WASM early-warning budget must stay below the hard limit")
     try:
@@ -61,6 +67,12 @@ def main() -> int:
     state = wasm_budget_state(wasm_size, args.warn_wasm_kib, args.max_wasm_kib)
     hard_headroom = args.max_wasm_kib - kib(wasm_size)
     target_delta = kib(wasm_size) - args.warn_wasm_kib
+    if hard_headroom < args.min_hard_headroom_kib:
+        raise SystemExit(
+            f"WASM reserved headroom {hard_headroom:.1f} KiB is below "
+            f"{args.min_hard_headroom_kib} KiB; keep emergency release capacity below "
+            f"the {args.max_wasm_kib} KiB absolute ceiling"
+        )
     print(
         f"frontend size: {kib(total_size):.1f} KiB; WASM: {kib(wasm_size):.1f} KiB; "
         f"gzip projection: {kib(gzip_size):.1f} KiB; WASM modules: {wasm_modules}; "
@@ -85,6 +97,7 @@ def main() -> int:
             summary.write(f"- Early-warning target: **{args.warn_wasm_kib} KiB**\n")
             summary.write(f"- Hard WASM limit: **{args.max_wasm_kib} KiB**\n")
             summary.write(f"- Hard-limit headroom: **{hard_headroom:.1f} KiB**\n")
+            summary.write(f"- Reserved emergency headroom: **{args.min_hard_headroom_kib} KiB**\n")
             summary.write(f"- Gzip projection: **{kib(gzip_size):.1f} KiB**\n")
             summary.write(f"- WASM modules/chunks: **{wasm_modules}**\n")
     return 0

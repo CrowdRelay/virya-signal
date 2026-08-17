@@ -212,12 +212,17 @@ class RuntimePerformanceContract(unittest.TestCase):
         self.assertIn("persist_fan(&state, &updated).await?", commands)
         self.assertIn("profile.cached_wallet_qr", commands)
         # The token is consumed in native render_wallet_qr; TicketWallet sent to
-        # the WebView contains only qr_available + expiry, never the raw token.
+        # the WebView contains public status/redeemed_at + QR availability/expiry,
+        # never the raw token.
         wallet_block = models.split("pub struct TicketWallet {", 1)[1].split("}", 1)[0]
         ticket_block = models.split("pub struct WalletTicket {", 1)[1].split("}", 1)[0]
         self.assertNotIn("token", wallet_block)
         self.assertNotIn("token", ticket_block)
+        self.assertIn("pub status: String", ticket_block)
+        self.assertIn("pub redeemed_at: Option<String>", ticket_block)
         self.assertIn('tr("wallet_cached_offline")', ui)
+        self.assertIn('"redeemed" =>', ui)
+        self.assertIn('tr("wallet_ticket_revoked")', ui)
 
     def test_native_error_log_preserves_full_crowdrelay_git_sha(self):
         http = (ROOT / "src-tauri/src/api/http.rs").read_text()

@@ -193,21 +193,41 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
         }
         busy.set(true);
         spawn_local(async move {
-            let current = status.get_untracked();
-            if enable_after_settings.get_untracked()
-                && current.as_ref().is_some_and(|value| value.permission != "denied" && !value.enabled)
-            {
-                enable_after_settings.set(false);
-                match bridge::invoke_timeout::<FanPushStatus, _>("fan_push_enable", &EmptyArgs {}, 45_000).await {
-                    Ok(value) => status.set(Some(value)),
-                    Err(message) => error.set(Some(message)),
+            let retry_after_settings = enable_after_settings.get_untracked();
+            let synced = bridge::invoke_latest::<FanPushStatus, _>(
+                "fan_push_sync",
+                &EmptyArgs {},
+                15_000,
+                "fan:push-sync",
+            )
+            .await;
+            match synced {
+                Ok(Some(value))
+                    if retry_after_settings && value.permission != "denied" && !value.enabled =>
+                {
+                    status.set(Some(value));
+                    match bridge::invoke_timeout::<FanPushStatus, _>(
+                        "fan_push_enable",
+                        &EmptyArgs {},
+                        45_000,
+                    )
+                    .await
+                    {
+                        Ok(value) => {
+                            enable_after_settings.set(!value.enabled && value.permission != "denied");
+                            status.set(Some(value));
+                        }
+                        Err(message) => error.set(Some(message)),
+                    }
                 }
-            } else {
-                match bridge::invoke_latest::<FanPushStatus, _>("fan_push_sync", &EmptyArgs {}, 15_000, "fan:push-sync").await {
-                    Ok(Some(value)) => status.set(Some(value)),
-                    Ok(None) => {}
-                    Err(message) => error.set(Some(message)),
+                Ok(Some(value)) => {
+                    if value.enabled || value.permission == "denied" {
+                        enable_after_settings.set(false);
+                    }
+                    status.set(Some(value));
                 }
+                Ok(None) => {}
+                Err(message) => error.set(Some(message)),
             }
             busy.set(false);
         });

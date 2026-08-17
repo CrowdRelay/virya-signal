@@ -36,6 +36,13 @@ class WebDistTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "no WASM"):
                 MODULE.inspect(dist, 2, 4)
 
+
+    def test_cli_reserves_emergency_headroom_before_absolute_ceiling(self):
+        source = SCRIPT.read_text()
+        self.assertIn('--min-hard-headroom-kib', source)
+        self.assertIn('hard_headroom < args.min_hard_headroom_kib', source)
+        self.assertIn('emergency release capacity', source)
+
     def test_warns_before_the_hard_wasm_budget(self):
         self.assertEqual(MODULE.wasm_budget_state(1399 * 1024, 1400, 1536), "target")
         self.assertEqual(MODULE.wasm_budget_state(1401 * 1024, 1400, 1536), "warning")

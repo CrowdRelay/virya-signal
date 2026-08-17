@@ -964,6 +964,10 @@ pub struct WalletTicket {
     pub public_reference: String,
     pub holder_name: Option<String>,
     pub holder_email_masked: String,
+    #[serde(default)]
+    pub status: String,
+    #[serde(default)]
+    pub redeemed_at: Option<String>,
     pub qr_available: bool,
     pub qr_expires_at: String,
 }

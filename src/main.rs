@@ -69,6 +69,10 @@ fn virya_app_mounted() {
 }
 
 fn main() {
+    // Keep the rich Rust panic formatter in developer builds only. Production
+    // traps are still surfaced by the boot shell's global error/rejection
+    // handlers, without carrying the formatter into the size-critical WASM.
+    #[cfg(debug_assertions)]
     console_error_panic_hook::set_once();
     i18n::initialize();
     bridge::install_runtime_guards();

@@ -221,6 +221,8 @@ fn prepare_wallet(
                 public_reference: ticket.public_reference,
                 holder_name: ticket.holder_name,
                 holder_email_masked: ticket.holder_email_masked,
+                status: ticket.status,
+                redeemed_at: ticket.redeemed_at,
                 qr_available,
                 qr_expires_at: ticket.qr_expires_at,
             }
