@@ -1,5 +1,5 @@
 #!/usr/bin/env fish
-set -l package music.virya.control
+set -l package music.virya.signal
 set -l stamp (date +%Y%m%d-%H%M%S)
 set -l out "$HOME/Downloads/virya-signal-startup-$stamp.log"
 set -l raw "$HOME/Downloads/virya-signal-startup-$stamp.raw.log"

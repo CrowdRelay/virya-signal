@@ -331,7 +331,24 @@ gradle_properties.write_text(properties_text.lstrip(), encoding="utf-8")
 # Firebase Messaging is the only Firebase runtime dependency: analytics,
 # Crashlytics and other SDKs are intentionally absent from Virya Signal.
 PUSH_TEMPLATE_DIR = root / "src-tauri" / "android-push"
-PUSH_PACKAGE = "music.virya.signal.push"
+
+
+def _application_id() -> str:
+    """Read the Android application ID from its single source of truth.
+
+    A Play application ID is permanent identity after the first upload, so it
+    must never be re-declared per script or per workflow where the copies can
+    drift apart. tauri.conf.json is what actually generates the Android project.
+    """
+    conf = json.loads((root / "src-tauri" / "tauri.conf.json").read_text(encoding="utf-8"))
+    identifier = str(conf.get("identifier", "")).strip()
+    if not re.fullmatch(r"[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+", identifier):
+        raise SystemExit(f"tauri.conf.json identifier is not a valid Android application ID: {identifier!r}")
+    return identifier
+
+
+APPLICATION_ID = _application_id()
+PUSH_PACKAGE = f"{APPLICATION_ID}.push"
 PUSH_PACKAGE_PATH = Path(*PUSH_PACKAGE.split("."))
 FIREBASE_MESSAGING_VERSION = "25.1.1"
 GOOGLE_SERVICES_PLUGIN_VERSION = "4.5.0"
@@ -522,8 +539,12 @@ def _stage_android_push() -> bool:
             for client in document.get("client", [])
             if isinstance(client, dict)
         }
-        if not project_id or "music.virya.control" not in packages:
-            raise SystemExit("google-services.json does not target music.virya.control")
+        if not project_id or APPLICATION_ID not in packages:
+            raise SystemExit(
+                f"google-services.json does not target {APPLICATION_ID}; "
+                "register the Android app for this application ID in Firebase and "
+                "download a fresh google-services.json"
+            )
         google_services.write_bytes(raw)
         _ensure_google_plugin_repository()
         gradle_text = _insert_in_gradle_block(

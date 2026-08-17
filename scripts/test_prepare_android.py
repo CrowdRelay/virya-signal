@@ -11,6 +11,20 @@ from pathlib import Path
 
 
 SCRIPT = Path(__file__).with_name("prepare-android.py")
+# prepare-android.py derives the Android application ID from tauri.conf.json,
+# which is the single source of truth for that permanent Play identity. The
+# fixture therefore has to model that file the same way a real checkout does.
+APPLICATION_ID = json.loads(
+    (Path(__file__).parent.parent / "src-tauri" / "tauri.conf.json").read_text()
+)["identifier"]
+
+
+def seed_tauri_conf(root: Path) -> None:
+    (root / "src-tauri").mkdir(parents=True, exist_ok=True)
+    (root / "src-tauri" / "tauri.conf.json").write_text(
+        json.dumps({"identifier": APPLICATION_ID}), encoding="utf-8"
+    )
+
 PUSH_TEMPLATES = SCRIPT.parent.parent / "src-tauri" / "android-push"
 ANDROID_ICONS = SCRIPT.parent.parent / "src-tauri" / "icons" / "android"
 
@@ -25,6 +39,7 @@ class PrepareAndroidTests(unittest.TestCase):
             scripts.mkdir()
             app.mkdir(parents=True)
             shutil.copy2(SCRIPT, scripts / SCRIPT.name)
+            seed_tauri_conf(root)
             push_templates = root / "src-tauri" / "android-push"
             shutil.copytree(PUSH_TEMPLATES, push_templates)
             shutil.copytree(ANDROID_ICONS, root / "src-tauri" / "icons" / "android")
@@ -136,6 +151,7 @@ dependencies {
             scripts.mkdir()
             app.mkdir(parents=True)
             shutil.copy2(SCRIPT, scripts / SCRIPT.name)
+            seed_tauri_conf(root)
             shutil.copytree(PUSH_TEMPLATES, root / "src-tauri" / "android-push")
             shutil.copytree(ANDROID_ICONS, root / "src-tauri" / "icons" / "android")
             res = app / "src" / "main" / "res" / "mipmap-anydpi-v26"
@@ -156,7 +172,7 @@ dependencies {
             manifest.write_text('<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application /></manifest>')
             document = {
                 "project_info": {"project_id": "virya-signal"},
-                "client": [{"client_info": {"android_client_info": {"package_name": "music.virya.control"}}}],
+                "client": [{"client_info": {"android_client_info": {"package_name": APPLICATION_ID}}}],
             }
             encoded = base64.b64encode(json.dumps(document).encode()).decode()
             environment = os.environ.copy()

@@ -16,7 +16,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 
-PKG = "music.virya.control"
+PKG = "music.virya.signal"
 FAN_EMAIL = "e2e@virya.music"
 PIN = "2580"
 OWNER_TOKEN = "e2e_owner_token_" + "c" * 48
@@ -301,7 +301,7 @@ def main() -> None:
         (artifacts / "logcat.txt").write_text(adb("logcat", "-d", check=False, timeout=30), errors="replace")
 
     logcat = (artifacts / "logcat.txt").read_text(errors="replace")
-    fatal = [line for line in logcat.splitlines() if "FATAL EXCEPTION" in line or "ANR in music.virya.control" in line or "Render process gone" in line]
+    fatal = [line for line in logcat.splitlines() if "FATAL EXCEPTION" in line or "ANR in music.virya.signal" in line or "Render process gone" in line]
     if fatal:
         raise JourneyError("native/WebView crash detected:\n" + "\n".join(fatal[-20:]))
     print("VIRYA_SIGNAL_ANDROID_E2E=PASS journeys=fan_auth,fan_recovery,event_detail,native_settings,owner_online,owner_offline,owner_autopilot,staff_checklist")

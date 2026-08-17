@@ -60,7 +60,7 @@ jobs:
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: music.virya.control
+          packageName: music.virya.signal
           releaseFiles: promoted/artifacts/virya-signal-${{ inputs.version }}.aab
           track: ${{ inputs.play_track }}
           status: completed

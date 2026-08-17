@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-package_name="${1:-music.virya.control}"
+package_name="${1:-music.virya.signal}"
 profile_dir="${2:-artifacts/device-profile-$(date +%Y%m%d-%H%M%S)}"
 run_count="${3:-5}"
 activity_name="${package_name}/.MainActivity"

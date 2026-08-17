@@ -122,7 +122,7 @@ jobs:
           APK="$(find artifacts/build -type f -name '*.apk' -print -quit)"
           test -n "${APK}"
           adb install -r -t "${APK}"
-          adb shell pm list packages | grep -F 'package:music.virya.control'
+          adb shell pm list packages | grep -F 'package:music.virya.signal'
       - name: Run black-box journeys
         shell: bash
         run: |

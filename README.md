@@ -48,6 +48,8 @@ cargo tauri android init --ci --skip-targets-install
 cargo tauri android dev
 ```
 
-CI builds ARM64 debug/signed artifacts and enforces package-size/alignment contracts. Build outputs belong in CI artifacts or local `/artifacts`, never in source control. The installed application ID remains `music.virya.control` for upgrade compatibility.
+CI builds ARM64 debug/signed artifacts and enforces package-size/alignment contracts. Build outputs belong in CI artifacts or local `/artifacts`, never in source control.
+
+The Android application ID is `music.virya.signal`, declared once as the `identifier` in `src-tauri/tauri.conf.json`. Every script, workflow and Play upload derives it from there rather than repeating the literal, and `scripts/test_android_application_id.py` fails the build if a copy drifts. Google Play treats the application ID as permanent identity from the first upload onwards, so it must not be changed after the first release; the push transport lives in the `music.virya.signal.push` sub-package and follows it automatically.
 
 Translations are compile-time catalogs in `src/i18n/{pl,en}.rs`; regenerate the pre-WASM boot catalog with `python3 scripts/generate-boot-i18n.py` after changing boot-visible copy.
