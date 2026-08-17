@@ -25,8 +25,12 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertIn('token.try_set(scanned_token.clone())', scan)
         helper = src.split('async fn run_fan_confirmation(', 1)[1].split('fn submit_fan_confirmation_values(', 1)[0]
         self.assertIn('exchange_fan_confirmation(values).await', helper)
-        self.assertIn('session.status.try_set(value)', helper)
-        self.assertIn('persist_fan_tab(FanTab::Signal);', helper)
+        # The confirmed-login writes are shared with the lost-response recovery
+        # path, so they live in adopt_fan_session rather than being inlined here.
+        self.assertIn('adopt_fan_session(value, token, pin, session)', helper)
+        adopt = src.split('fn adopt_fan_session(', 1)[1].split('\nasync fn ', 1)[0]
+        self.assertIn('session.status.try_set(value)', adopt)
+        self.assertIn('persist_fan_tab(FanTab::Signal);', adopt)
         post_scan = scan[scan.index('bridge::scan_qr().await'):]
         self.assertNotIn('email.get_untracked()', post_scan)
         self.assertNotIn('pin.get_untracked()', post_scan)
@@ -52,6 +56,29 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertIn('vault::replace_fan', confirm)
         self.assertIn('fan_status(state).await', confirm)
         self.assertLess(confirm.index('vault::replace_fan'), confirm.index('fan_status(state).await'))
+
+    def test_lost_confirm_response_still_logs_the_fan_in(self):
+        # The mail token is one-time. If fan_confirm succeeded natively but its
+        # reply was lost (WebView disposed across the camera transition), the fan
+        # must not be stranded on the login screen holding a spent token.
+        ui = read('src/app/fan.rs')
+        run = ui.split('async fn run_fan_confirmation(', 1)[1].split('\nfn ', 1)[0]
+        self.assertIn('Err(message)', run)
+        recovery = run.split('Err(message)', 1)[1]
+        self.assertIn('fan_status', recovery)
+        self.assertIn('status.unlocked', recovery)
+        self.assertIn('adopt_fan_session(status', recovery)
+        # The error is only surfaced after native state has been consulted.
+        self.assertLess(recovery.index('status.unlocked'), recovery.index('error.try_set'))
+
+    def test_confirmation_success_path_is_shared_and_disposal_safe(self):
+        ui = read('src/app/fan.rs')
+        adopt = ui.split('fn adopt_fan_session(', 1)[1].split('\nasync fn ', 1)[0]
+        # Every UI write after a confirmed login is best-effort: a remounted
+        # WebView must never turn a successful login into a client-side failure.
+        for required in ('try_set', 'persist_fan_tab(FanTab::Signal);', 'status_refresh'):
+            self.assertIn(required, adopt)
+        self.assertNotIn('.set(', adopt)
 
     def test_fan_confirmation_helper_stays_within_argument_budget(self):
         src = read('src/app/fan.rs')

@@ -117,6 +117,31 @@ async fn exchange_fan_confirmation(
     Ok(status)
 }
 
+/// Adopt an authoritative unlocked session into the UI.
+///
+/// Camera transitions can temporarily dispose/remount the WebView, so every
+/// write here is best-effort: the native command has already persisted the
+/// session and UI reconciliation must never turn a successful login into a
+/// client-side failure.
+fn adopt_fan_session(
+    value: FanSessionStatus,
+    token: RwSignal<String>,
+    pin: RwSignal<String>,
+    session: FanConfirmationSession,
+) {
+    let _ = pin.try_set(String::new());
+    let _ = token.try_set(String::new());
+    // A confirmation (email code, deep link, or QR scan) is always a
+    // deliberate "come back to Signal" moment. Land the fan on the
+    // Signal tab even if a stale tab preference (e.g. Merch) was
+    // persisted from a session that never explicitly logged out.
+    persist_fan_tab(FanTab::Signal);
+    let _ = session.status.try_set(value);
+    let _ = session
+        .status_refresh
+        .try_update(|generation| *generation = generation.wrapping_add(1));
+}
+
 async fn run_fan_confirmation(
     values: FanConfirmationValues,
     token: RwSignal<String>,
@@ -125,24 +150,24 @@ async fn run_fan_confirmation(
     error: RwSignal<Option<String>>,
 ) {
     match exchange_fan_confirmation(values).await {
-        Ok(value) => {
-            // Camera transitions can temporarily dispose/remount the WebView. The
-            // native fan_confirm command has already persisted the session at this
-            // point, so UI reconciliation must be best-effort rather than turning a
-            // successful login into a client-side failure.
-            let _ = pin.try_set(String::new());
-            let _ = token.try_set(String::new());
-            // A confirmation (email code, deep link, or QR scan) is always a
-            // deliberate "come back to Signal" moment. Land the fan on the
-            // Signal tab even if a stale tab preference (e.g. Merch) was
-            // persisted from a session that never explicitly logged out.
-            persist_fan_tab(FanTab::Signal);
-            let _ = session.status.try_set(value);
-            let _ = session
-                .status_refresh
-                .try_update(|generation| *generation = generation.wrapping_add(1));
-        }
+        Ok(value) => adopt_fan_session(value, token, pin, session),
         Err(message) => {
+            // The mail token is one-time: by the time fan_confirm can fail on the
+            // client, the native side may already have consumed it, written the
+            // vault and unlocked the session. Losing that response (a WebView
+            // disposed across the camera transition, a dropped IPC reply) would
+            // otherwise strand the fan on the login screen holding a token that
+            // can never be redeemed again. Native state is authoritative, so ask
+            // it before reporting a failure and adopt an already-unlocked
+            // session instead of surfacing an error for a login that succeeded.
+            if let Ok(status) =
+                bridge::invoke_timeout::<FanSessionStatus, _>("fan_status", &EmptyArgs {}, 5_000)
+                    .await
+                && status.unlocked
+            {
+                adopt_fan_session(status, token, pin, session);
+                return;
+            }
             let _ = error.try_set(Some(message));
         }
     }
