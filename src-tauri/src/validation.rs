@@ -307,6 +307,80 @@ mod tests {
         assert_eq!(normalized_fan_confirmation_token("not-a-token"), None);
     }
 
+    /// Cross-repo grammar contract with CrowdRelay `FanActionToken::parse`,
+    /// which accepts exactly 64 hexadecimal characters and normalises to
+    /// lowercase. This is the credential the mailed ticket QR carries, so a
+    /// silent divergence here breaks every QR login rather than degrading it.
+    #[test]
+    fn confirmation_token_grammar_matches_crowdrelay_fan_action_token() {
+        let token = "0f9e8d7c6b5a49382716f0e1d2c3b4a5968778695a4b3c2d1e0f918273645506";
+        assert_eq!(token.len(), 64);
+
+        // A realistic mixed-case token survives every mailed encoding, and QR
+        // decoders routinely hand back surrounding whitespace or a trailing
+        // newline.
+        for candidate in [
+            token.to_owned(),
+            token.to_ascii_uppercase(),
+            format!("  {token}\n"),
+            format!("token={token}"),
+            format!("#token={token}"),
+            format!("https://virya.music/signal/confirm#token={token}"),
+            format!("virya-signal://fan/confirm?source=mail&token={token}"),
+            format!("virya-signal://fan/confirm?token={token}&source=mail"),
+            format!("  https://virya.music/signal/confirm#token={token}  "),
+        ] {
+            assert_eq!(
+                normalized_fan_confirmation_token(&candidate),
+                Some(token.to_owned()),
+                "mailed QR encoding must resolve to the canonical token: {candidate}"
+            );
+        }
+
+        // Anything that is not exactly 64 hex characters is not a credential.
+        for candidate in [
+            String::new(),
+            "g".repeat(64),
+            token[..63].to_owned(),
+            format!("{token}a"),
+            format!("https://virya.music/signal/confirm#token={}", &token[..63]),
+            format!("virya-signal://fan/confirm?source=mail&token={}a", token),
+            "virya-signal://fan/confirm?source=mail".to_owned(),
+        ] {
+            assert_eq!(
+                normalized_fan_confirmation_token(&candidate),
+                None,
+                "non-credential input must be rejected: {candidate}"
+            );
+        }
+    }
+
+    /// The one-time token is the only credential. A mailed QR must still log a
+    /// fan in when the email/name form fields were never filled in or were lost
+    /// to an Android WebView remount during the camera transition.
+    #[test]
+    fn confirmation_succeeds_without_email_or_display_name_hints() {
+        let token = "0f9e8d7c6b5a49382716f0e1d2c3b4a5968778695a4b3c2d1e0f918273645506";
+        let mut input = FanConfirmationInput {
+            api_base_url: "https://api.virya.music".to_owned(),
+            email: String::new(),
+            display_name: None,
+            token: format!("virya-signal://fan/confirm?source=mail&token={token}"),
+        };
+        assert!(validate_fan_confirmation(&mut input, "1234").is_ok());
+        assert_eq!(input.token, token);
+        assert!(input.email.is_empty());
+
+        // A malformed hint is still rejected, but only when actually supplied.
+        let mut with_bad_email = FanConfirmationInput {
+            api_base_url: "https://api.virya.music".to_owned(),
+            email: "not-an-email".to_owned(),
+            display_name: None,
+            token: token.to_owned(),
+        };
+        assert!(validate_fan_confirmation(&mut with_bad_email, "1234").is_err());
+    }
+
     #[test]
     fn optional_text_is_trimmed() {
         assert_eq!(
