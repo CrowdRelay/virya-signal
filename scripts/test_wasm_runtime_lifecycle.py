@@ -9,6 +9,8 @@ class WasmRuntimeLifecycleTests(unittest.TestCase):
         area = (ROOT / "src" / "app" / "area.rs").read_text()
         self.assertIn("spawn_local_scoped_with_cancellation as spawn_local", app)
         self.assertIn("spawn_local_scoped_with_cancellation as spawn_local", area)
+        self.assertIn("fn spawn_lifecycle_task(", app)
+        self.assertIn("wasm_bindgen_futures::spawn_local(future);", app)
         for path in (ROOT / "src").rglob("*.rs"):
             text = path.read_text()
             if path.as_posix().endswith("src/app.rs") or path.as_posix().endswith("src/app/area.rs"):

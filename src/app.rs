@@ -149,6 +149,25 @@ fn install_resume_refresh(status_refresh: RwSignal<u32>) {
     }
 }
 
+fn spawn_lifecycle_task(future: impl std::future::Future<Output = ()> + 'static) {
+    // Normal UI work is owner-scoped. Only native operations that must survive
+    // Android pause/resume or a reactive Effect rerun use this explicit escape hatch.
+    wasm_bindgen_futures::spawn_local(future);
+}
+
+fn finish_resumable_ui_task(
+    busy: RwSignal<bool>,
+    resume_pending: RwSignal<bool>,
+    resume_refresh: RwSignal<u32>,
+) {
+    let pending = resume_pending.try_get_untracked() == Some(true);
+    let _ = busy.try_set(false);
+    if pending {
+        let _ = resume_pending.try_set(false);
+        let _ = resume_refresh.try_update(|value| *value = value.wrapping_add(1).max(1));
+    }
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     let mode = RwSignal::new(RootMode::Fan);

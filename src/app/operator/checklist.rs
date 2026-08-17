@@ -104,6 +104,7 @@ fn OperatorChecklist(
     let push_status = RwSignal::new(None::<FanPushStatus>);
     let push_loading = RwSignal::new(false);
     let push_resume_refresh = RwSignal::new(0_u32);
+    let push_resume_pending = RwSignal::new(false);
     let push_enable_after_settings = RwSignal::new(false);
     install_resume_refresh(push_resume_refresh);
 
@@ -133,11 +134,14 @@ fn OperatorChecklist(
     Effect::new(move |_| {
         push_resume_refresh.get();
         if push_loading.get_untracked() {
+            push_resume_pending.set(true);
             return;
         }
+        push_resume_pending.set(false);
         push_loading.set(true);
-        spawn_local(async move {
-            let retry_after_settings = push_enable_after_settings.get_untracked();
+        spawn_lifecycle_task(async move {
+            let retry_after_settings =
+                push_enable_after_settings.try_get_untracked().unwrap_or(false);
             match bridge::invoke_timeout::<FanPushStatus, _>(
                 "operator_push_sync",
                 &EmptyArgs {},
@@ -148,7 +152,7 @@ fn OperatorChecklist(
                 Ok(value)
                     if retry_after_settings && value.permission != "denied" && !value.enabled =>
                 {
-                    push_status.set(Some(value));
+                    let _ = push_status.try_set(Some(value));
                     match bridge::invoke_timeout::<FanPushStatus, _>(
                         "operator_push_enable",
                         &EmptyArgs {},
@@ -157,22 +161,30 @@ fn OperatorChecklist(
                     .await
                     {
                         Ok(value) => {
-                            push_enable_after_settings
-                                .set(!value.enabled && value.permission != "denied");
-                            push_status.set(Some(value));
+                            let _ = push_enable_after_settings
+                                .try_set(!value.enabled && value.permission != "denied");
+                            let _ = push_status.try_set(Some(value));
                         }
-                        Err(message) => error.set(Some(message)),
+                        Err(message) => {
+                            let _ = error.try_set(Some(message));
+                        }
                     }
                 }
                 Ok(value) => {
                     if value.enabled || value.permission == "denied" {
-                        push_enable_after_settings.set(false);
+                        let _ = push_enable_after_settings.try_set(false);
                     }
-                    push_status.set(Some(value));
+                    let _ = push_status.try_set(Some(value));
                 }
-                Err(message) => error.set(Some(message)),
+                Err(message) => {
+                    let _ = error.try_set(Some(message));
+                }
             }
-            push_loading.set(false);
+            finish_resumable_ui_task(
+                push_loading,
+                push_resume_pending,
+                push_resume_refresh,
+            );
         });
     });
 
@@ -188,29 +200,63 @@ fn OperatorChecklist(
         if opens_settings {
             push_enable_after_settings.set(true);
         }
-        spawn_local(async move {
+        spawn_lifecycle_task(async move {
             let result = if opens_settings {
-                bridge::invoke_timeout::<FanPushStatus, _>("operator_push_open_settings", &EmptyArgs {}, 45_000).await
+                bridge::invoke_timeout::<FanPushStatus, _>(
+                    "operator_push_open_settings",
+                    &EmptyArgs {},
+                    45_000,
+                )
+                .await
             } else {
-                bridge::invoke_timeout::<FanPushStatus, _>("operator_push_enable", &EmptyArgs {}, 45_000).await
+                bridge::invoke_timeout::<FanPushStatus, _>(
+                    "operator_push_enable",
+                    &EmptyArgs {},
+                    45_000,
+                )
+                .await
             };
             match result {
-                Ok(value) => push_status.set(Some(value)),
-                Err(message) => error.set(Some(message)),
+                Ok(value) => {
+                    let _ = push_status.try_set(Some(value));
+                }
+                Err(message) => {
+                    let _ = error.try_set(Some(message));
+                }
             }
-            push_loading.set(false);
+            finish_resumable_ui_task(
+                push_loading,
+                push_resume_pending,
+                push_resume_refresh,
+            );
         });
     };
 
     let disable_push = move |_| {
-        if push_loading.get_untracked() { return; }
+        if push_loading.get_untracked() {
+            return;
+        }
         push_loading.set(true);
-        spawn_local(async move {
-            match bridge::invoke_timeout::<FanPushStatus, _>("operator_push_disable", &EmptyArgs {}, 30_000).await {
-                Ok(value) => push_status.set(Some(value)),
-                Err(message) => error.set(Some(message)),
+        spawn_lifecycle_task(async move {
+            match bridge::invoke_timeout::<FanPushStatus, _>(
+                "operator_push_disable",
+                &EmptyArgs {},
+                30_000,
+            )
+            .await
+            {
+                Ok(value) => {
+                    let _ = push_status.try_set(Some(value));
+                }
+                Err(message) => {
+                    let _ = error.try_set(Some(message));
+                }
             }
-            push_loading.set(false);
+            finish_resumable_ui_task(
+                push_loading,
+                push_resume_pending,
+                push_resume_refresh,
+            );
         });
     };
 

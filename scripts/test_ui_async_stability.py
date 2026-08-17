@@ -59,7 +59,8 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         body = function_body(support, "refresh_operator_signal")
         self.assertIn("invoke_timeout::<OperatorSignalOverview", body)
         self.assertNotIn("invoke_latest", body)
-        self.assertIn("loading.set(false);", body)
+        self.assertIn("spawn_lifecycle_task", body)
+        self.assertIn("let _ = loading.try_set(false);", body)
 
     def test_resume_listener_is_singleton_with_multiple_scoped_subscribers(self) -> None:
         app = (ROOT / "src/app.rs").read_text(encoding="utf-8")
@@ -124,10 +125,22 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         source = (ROOT / "src/app/fan_home.rs").read_text(encoding="utf-8")
         push = source.split("fn NativePushControl", 1)[1]
         self.assertIn("resume_refresh.get();", push)
-        self.assertIn("busy.get()", push)
-        self.assertNotIn("busy.get_untracked() {\n            return;", push.split("let toggle", 1)[0])
+        self.assertIn("busy.get_untracked()", push)
+        self.assertIn("resume_pending", push)
+        self.assertIn("spawn_lifecycle_task", push)
+        self.assertIn("finish_resumable_ui_task", push)
         self.assertIn("enable_after_settings", push)
+        self.assertNotIn(
+            '<Show when=move || status.get().is_some_and(|value| value.supported)>',
+            push,
+        )
 
+        checklist = (ROOT / "src/app/operator/checklist.rs").read_text(encoding="utf-8")
+        staff = checklist.split("fn OperatorChecklist", 1)[1]
+        self.assertIn("push_resume_pending", staff)
+        self.assertIn("push_loading.get_untracked()", staff)
+        self.assertIn("spawn_lifecycle_task", staff)
+        self.assertGreaterEqual(staff.count("finish_resumable_ui_task"), 3)
     def test_fan_refresh_is_explicit_instead_of_a_hidden_double_click(self) -> None:
         shell = (ROOT / "src/app/fan/shell.rs").read_text(encoding="utf-8")
         self.assertIn('on:click=refresh_all', shell)

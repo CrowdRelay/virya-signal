@@ -205,7 +205,9 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertIn('pub(crate) async fn fan_prepare_confirmation(', native_fan)
         self.assertIn('pub(crate) async fn fan_confirm_scanned(', native_fan)
         self.assertIn('if state.fan_session.read().await.is_some()', native_fan)
-        self.assertIn("return core.invoke('fan_confirm_scanned', { token });", ffi)
+        self.assertIn("const confirmed = await core.invoke('fan_confirm_scanned', { token });", ffi)
+        self.assertIn("viryaWriteFanTab('signal');", ffi)
+        self.assertIn("window.dispatchEvent(new Event('virya:resume'));", ffi)
         self.assertIn('pub async fn scan_and_confirm_fan()', client)
 
         scan = fan.split('let scan_confirmation = move |_| {', 1)[1].split('    view! {', 1)[0]
@@ -229,7 +231,7 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         shell = read('src/app/fan/shell.rs')
         home = read('src/app/fan_home.rs')
         body = support.split('fn refresh_operator_signal(', 1)[1].split('fn refresh_operator_autopilot(', 1)[0]
-        self.assertIn('wasm_bindgen_futures::spawn_local(async move {', body)
+        self.assertIn('spawn_lifecycle_task(async move {', body)
         self.assertIn('let _ = loading.try_set(false);', body)
         self.assertIn('focused_event_slug.set(None);', shell)
         self.assertIn('focused_event_preview.set(None);', shell)
@@ -241,6 +243,44 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertIn('workflow_dispatch:', trigger)
         self.assertNotIn('pull_request:', trigger)
         self.assertNotIn('push:', trigger)
+
+    def test_qr_commit_reconciles_after_camera_resume_race(self):
+        ffi = read('src/bridge/ffi.rs')
+        scanner = ffi.split(
+            'export async function viryaScanAndConfirmFan()', 1
+        )[1].split('function viryaLocationStates', 1)[0]
+        confirm = "const confirmed = await core.invoke('fan_confirm_scanned', { token });"
+        self.assertIn(confirm, scanner)
+        self.assertIn("viryaWriteFanTab('signal');", scanner)
+        self.assertIn("window.dispatchEvent(new Event('virya:resume'));", scanner)
+        self.assertIn("return confirmed;", scanner)
+        self.assertLess(scanner.index(confirm), scanner.index("viryaWriteFanTab('signal');"))
+        self.assertLess(
+            scanner.index("viryaWriteFanTab('signal');"),
+            scanner.index("window.dispatchEvent(new Event('virya:resume'));"),
+        )
+        self.assertLess(
+            scanner.index("window.dispatchEvent(new Event('virya:resume'));"),
+            scanner.index("return confirmed;"),
+        )
+
+        app = read('src/app.rs')
+        self.assertIn("latest_request_completed(&result)", app)
+        self.assertIn("Ok(None) => {}", app)
+
+    def test_push_lifecycle_tasks_have_terminal_resume_replay(self):
+        app = read('src/app.rs')
+        fan = read('src/app/fan_home.rs')
+        staff = read('src/app/operator/checklist.rs')
+        self.assertIn("fn spawn_lifecycle_task(", app)
+        self.assertIn("fn finish_resumable_ui_task(", app)
+        self.assertIn("resume_pending", fan)
+        self.assertIn("busy.get_untracked()", fan)
+        self.assertIn("spawn_lifecycle_task", fan)
+        self.assertIn("finish_resumable_ui_task", fan)
+        self.assertIn("push_resume_pending", staff)
+        self.assertIn("spawn_lifecycle_task", staff)
+        self.assertGreaterEqual(staff.count("finish_resumable_ui_task"), 3)
 
 if __name__ == '__main__':
     unittest.main()

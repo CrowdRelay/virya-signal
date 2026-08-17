@@ -347,7 +347,13 @@ export async function viryaScanAndConfirmFan() {
     throw new Error(viryaTexts.scannerUnavailable);
   }
 
-  return core.invoke('fan_confirm_scanned', { token });
+  const confirmed = await core.invoke('fan_confirm_scanned', { token });
+  // A camera-resume launcher read can race this native commit. Reconcile once
+  // more only after native state is authoritative; a disposed FanAccess owner
+  // is no longer required to finish navigation.
+  viryaWriteFanTab('signal');
+  window.dispatchEvent(new Event('virya:resume'));
+  return confirmed;
 }
 
 

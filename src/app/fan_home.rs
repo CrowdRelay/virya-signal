@@ -186,17 +186,26 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
     let status = RwSignal::new(None::<FanPushStatus>);
     let busy = RwSignal::new(false);
     let resume_refresh = RwSignal::new(0_u32);
+    let resume_pending = RwSignal::new(false);
     let enable_after_settings = RwSignal::new(false);
     install_resume_refresh(resume_refresh);
 
     Effect::new(move |_| {
         resume_refresh.get();
-        if !bridge::native_available() || busy.get() {
+        if !bridge::native_available() {
             return;
         }
+        if busy.get_untracked() {
+            // Android can resume while the permission/settings command is still
+            // completing. Preserve that edge and reconcile once it terminates.
+            resume_pending.set(true);
+            return;
+        }
+        resume_pending.set(false);
         busy.set(true);
-        spawn_local(async move {
-            let retry_after_settings = enable_after_settings.get_untracked();
+        spawn_lifecycle_task(async move {
+            let retry_after_settings =
+                enable_after_settings.try_get_untracked().unwrap_or(false);
             let synced = bridge::invoke_latest::<FanPushStatus, _>(
                 "fan_push_sync",
                 &EmptyArgs {},
@@ -208,7 +217,7 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
                 Ok(Some(value))
                     if retry_after_settings && value.permission != "denied" && !value.enabled =>
                 {
-                    status.set(Some(value));
+                    let _ = status.try_set(Some(value));
                     match bridge::invoke_timeout::<FanPushStatus, _>(
                         "fan_push_enable",
                         &EmptyArgs {},
@@ -217,22 +226,27 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
                     .await
                     {
                         Ok(value) => {
-                            enable_after_settings.set(!value.enabled && value.permission != "denied");
-                            status.set(Some(value));
+                            let _ = enable_after_settings
+                                .try_set(!value.enabled && value.permission != "denied");
+                            let _ = status.try_set(Some(value));
                         }
-                        Err(message) => error.set(Some(message)),
+                        Err(message) => {
+                            let _ = error.try_set(Some(message));
+                        }
                     }
                 }
                 Ok(Some(value)) => {
                     if value.enabled || value.permission == "denied" {
-                        enable_after_settings.set(false);
+                        let _ = enable_after_settings.try_set(false);
                     }
-                    status.set(Some(value));
+                    let _ = status.try_set(Some(value));
                 }
                 Ok(None) => {}
-                Err(message) => error.set(Some(message)),
+                Err(message) => {
+                    let _ = error.try_set(Some(message));
+                }
             }
-            busy.set(false);
+            finish_resumable_ui_task(busy, resume_pending, resume_refresh);
         });
     });
 
@@ -255,12 +269,16 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
         if opens_settings {
             enable_after_settings.set(true);
         }
-        spawn_local(async move {
+        spawn_lifecycle_task(async move {
             match bridge::invoke_timeout::<FanPushStatus, _>(command, &EmptyArgs {}, 45_000).await {
-                Ok(value) => status.set(Some(value)),
-                Err(message) => error.set(Some(message)),
+                Ok(value) => {
+                    let _ = status.try_set(Some(value));
+                }
+                Err(message) => {
+                    let _ = error.try_set(Some(message));
+                }
             }
-            busy.set(false);
+            finish_resumable_ui_task(busy, resume_pending, resume_refresh);
         });
     };
 
@@ -289,24 +307,22 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
                         view! { <small class:success=current.enabled class:warning=!current.enabled>{message}</small> }
                     })}
                 </div>
-                <Show when=move || status.get().is_some_and(|value| value.supported)>
-                    <button
-                        type="button"
-                        class="ghost push-setting-action"
-                        disabled=move || busy.get()
-                        on:click=toggle
-                    >
-                        {move || if busy.get() {
-                            tr("syncing_push_notifications")
-                        } else if status.get().is_some_and(|value| value.enabled) {
-                            tr("disable_push_notifications")
-                        } else if status.get().as_ref().is_some_and(|value| value.permission == "denied") {
-                            tr("open_notification_settings")
-                        } else {
-                            tr("enable_push_notifications")
-                        }}
-                    </button>
-                </Show>
+                <button
+                    type="button"
+                    class="ghost push-setting-action"
+                    disabled=move || busy.get()
+                    on:click=toggle
+                >
+                    {move || if busy.get() {
+                        tr("syncing_push_notifications")
+                    } else if status.get().is_some_and(|value| value.enabled) {
+                        tr("disable_push_notifications")
+                    } else if status.get().as_ref().is_some_and(|value| value.permission == "denied") {
+                        tr("open_notification_settings")
+                    } else {
+                        tr("enable_push_notifications")
+                    }}
+                </button>
             </article>
         </Show>
     }
