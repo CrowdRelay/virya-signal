@@ -76,7 +76,23 @@ jobs:
             --name "${AVD_NAME}" \
             --package "system-images;android-${ANDROID_API};google_apis;x86_64" \
             --device "pixel_6"
+      - name: Enable KVM for the Android emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          # ubuntu-24.04 runners expose /dev/kvm but do not grant the runner
+          # user access to it. Without KVM the x86_64 emulator either refuses to
+          # start or falls back to software emulation that never finishes
+          # booting, which is what turned this job into a silent multi-minute
+          # hang rather than a failure.
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -w /dev/kvm || { echo "::error::/dev/kvm is not writable; the emulator cannot be accelerated" >&2; exit 1; }
+          echo "ANDROID_E2E_KVM=PASS"
       - name: Boot clean Android emulator
+        timeout-minutes: 12
         shell: bash
         run: |
           set -euo pipefail
@@ -85,14 +101,45 @@ jobs:
             -no-window -no-audio -no-boot-anim -no-snapshot \
             -gpu swiftshader_indirect -camera-back virtualscene \
             > artifacts/android-e2e/emulator.log 2>&1 &
-          adb wait-for-device
+          emulator_pid=$!
+
+          # Every wait below is bounded and checks that the emulator is still
+          # alive. An unbounded `adb wait-for-device` turns any startup failure
+          # into a hang that burns the whole job timeout with no output.
+          fail() {
+            echo "::error::${1}"
+            echo "----- emulator.log (last 200 lines) -----"
+            tail -n 200 artifacts/android-e2e/emulator.log 2>/dev/null || echo "(no emulator log)"
+            echo "----- adb devices -----"
+            adb devices -l 2>&1 || true
+            exit 1
+          }
+
+          attached=0
+          for _ in $(seq 1 60); do
+            if ! kill -0 "${emulator_pid}" 2>/dev/null; then
+              fail "emulator process exited during startup"
+            fi
+            if timeout 5 adb wait-for-device >/dev/null 2>&1; then
+              attached=1
+              break
+            fi
+          done
+          [[ "${attached}" == "1" ]] || fail "no emulator device attached within 5 minutes"
+
+          booted=0
           for _ in $(seq 1 120); do
-            if [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
+            if ! kill -0 "${emulator_pid}" 2>/dev/null; then
+              fail "emulator process exited before boot completed"
+            fi
+            if [[ "$(timeout 10 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
+              booted=1
               break
             fi
             sleep 2
           done
-          test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1"
+          [[ "${booted}" == "1" ]] || fail "sys.boot_completed never became 1"
+          echo "ANDROID_E2E_EMULATOR=PASS boot=completed"
           adb shell settings put global window_animation_scale 0
           adb shell settings put global transition_animation_scale 0
           adb shell settings put global animator_duration_scale 0
