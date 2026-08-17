@@ -142,6 +142,11 @@ fn submit_fan_confirmation_values(
             Ok(value) => {
                 pin.set(String::new());
                 token.set(String::new());
+                // A confirmation (email code, deep link, or QR scan) is always a
+                // deliberate "come back to Signal" moment. Land the fan on the
+                // Signal tab even if a stale tab preference (e.g. Merch) was
+                // persisted from a session that never explicitly logged out.
+                persist_fan_tab(FanTab::Signal);
                 session.status.set(value);
                 session
                     .status_refresh
