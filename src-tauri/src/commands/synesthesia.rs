@@ -6,11 +6,14 @@
 //! is unlocked.
 
 use tauri::{AppHandle, State};
+#[cfg(any(target_os = "android", test))]
 use url::Url;
+#[cfg(any(target_os = "android", test))]
 use zeroize::Zeroizing;
 
 use crate::{AppError, AppState, session::fan_profile};
 
+#[cfg(any(target_os = "android", test))]
 fn handoff_from_app_link(value: &str) -> Result<Zeroizing<String>, AppError> {
     let value = value.trim();
     if value.len() > 1024 || !value.is_ascii() {
@@ -63,14 +66,12 @@ pub(crate) async fn fan_take_synesthesia_app_link(
     state: State<'_, AppState>,
     _app: AppHandle,
 ) -> Result<bool, AppError> {
-    if cfg!(target_os = "android") {
-        #[cfg(target_os = "android")]
-        if let Some(link) =
-            crate::push_plugin::take_synesthesia_app_link(&_app).map_err(AppError::InvalidInput)?
-        {
-            let handoff = handoff_from_app_link(&link)?;
-            *state.pending_synesthesia_handoff.lock().await = Some(handoff);
-        }
+    #[cfg(target_os = "android")]
+    if let Some(link) =
+        crate::push_plugin::take_synesthesia_app_link(&_app).map_err(AppError::InvalidInput)?
+    {
+        let handoff = handoff_from_app_link(&link)?;
+        *state.pending_synesthesia_handoff.lock().await = Some(handoff);
     }
     Ok(state.pending_synesthesia_handoff.lock().await.is_some())
 }
@@ -131,7 +132,11 @@ mod tests {
     #[test]
     fn accepts_only_the_synesthesia_my_signal_fragment_contract() {
         let valid = format!("https://virya.music/pl/my-signal/?source=synesthesia#handoff={CODE}");
-        assert_eq!(handoff_from_app_link(&valid).unwrap().as_str(), CODE);
+        let handoff = match handoff_from_app_link(&valid) {
+            Ok(handoff) => handoff,
+            Err(error) => panic!("valid Synesthesia app link was rejected: {error}"),
+        };
+        assert_eq!(handoff.as_str(), CODE);
 
         for invalid in [
             format!("https://evil.example/pl/my-signal/?source=synesthesia#handoff={CODE}"),
