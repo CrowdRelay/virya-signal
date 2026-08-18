@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import sys
 import os
 import re
 import shutil
@@ -683,8 +684,23 @@ def _stage_android_push() -> bool:
         import hashlib
         config_sha = hashlib.sha256(raw).hexdigest()
         configured = True
+    elif args.signing:
+        # A --signing run produces a shippable artifact. Dropping the Firebase
+        # wiring here yields an APK/AAB whose only symptom is the native plugin
+        # rejecting with "firebase_not_configured" the first time an operator
+        # touches push, long after the build looked successful. Refuse instead.
+        raise SystemExit(
+            "VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64 is required for a signed build: "
+            "without it the artifact ships with push permanently broken. Export it, "
+            "or drop --signing for a local build without push."
+        )
     else:
         google_services.unlink(missing_ok=True)
+        print(
+            "WARNING: no VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64; this build has no "
+            "Firebase wiring and push will reject with firebase_not_configured",
+            file=sys.stderr,
+        )
 
     gradle.write_text(gradle_text, encoding="utf-8")
     receipt = {
