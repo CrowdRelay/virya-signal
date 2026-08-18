@@ -244,11 +244,17 @@ fn FanTicketCheckout(
     let event_title = event.title.clone();
     let event_meta = event_time_location(&event.starts_at, event.venue.as_deref());
     let event_slug = event.slug.clone();
-    let fallback_url = event
-        .ticket_url
-        .clone()
-        .value_or_else(|| format!("https://virya.music/pl/live/{}/#tickets", event.slug));
-    let full_form_url = format!("https://virya.music/pl/live/{}/#tickets", event.slug);
+    // Virya's own show page is the first-party ticket surface, so it wins over
+    // whatever external promoter link the provider happened to attach. Falling
+    // back to ticket_url only matters for shows we do not sell ourselves.
+    // The locale segment has to follow the reader: /pl/live/<slug> is a 404 for
+    // an English fan, and the page exists under both prefixes.
+    let live_url = match i18n::current() {
+        i18n::Language::Pl => format!("https://virya.music/pl/live/{}/#tickets", event.slug),
+        i18n::Language::En => format!("https://virya.music/live/{}/#tickets", event.slug),
+    };
+    let fallback_url = live_url.clone();
+    let full_form_url = live_url;
 
     view! {
         <section class="screen fan-ticket-checkout-screen">
