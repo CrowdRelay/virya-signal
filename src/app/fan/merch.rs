@@ -1,5 +1,7 @@
 const STAGE_PACK_PREVIEW_URL: &str = "bundle-stage-pack.webp";
 
+include!("affiliate.rs");
+
 #[component]
 fn FanMerch(
     merch: RwSignal<Option<MerchCatalog>>,
@@ -201,6 +203,7 @@ fn FanMerch(
                     </div>
                 }.into_any())}
             </Show>
+            <FanAffiliateGear error=error />
         </section>
     }
 }
