@@ -562,8 +562,20 @@ for cache_contract in ['IF_NONE_MATCH', 'IF_MODIFIED_SINCE', 'DiskPublicCache', 
         raise SystemExit(f'persistent conditional public cache is missing: {cache_contract}')
 if 'invoke_latest::<WalletBatch' not in ui or 'viryaInvokeLatest' not in bridge:
     raise SystemExit('refresh requests must suppress superseded responses')
-if 'isMinifyEnabled = true' not in (root / 'scripts/prepare-android.py').read_text() or 'isShrinkResources = true' not in (root / 'scripts/prepare-android.py').read_text():
-    raise SystemExit('release Android builds must enable R8 and resource shrinking')
+prepare_android = (root / 'scripts/prepare-android.py').read_text()
+release_shrinker = re.search(
+    r'_patch_build_type\(\s*text,\s*"release",\s*'
+    r'minify=(True|False),\s*shrink=(True|False),\s*proguard=(True|False)\s*\)',
+    prepare_android,
+    re.S,
+)
+if not release_shrinker:
+    raise SystemExit('release Android shrinker policy must be explicit')
+release_modes = tuple(value == 'True' for value in release_shrinker.groups())
+if len(set(release_modes)) != 1:
+    raise SystemExit(
+        'release Android shrinker policy must move minify/resource-shrink/proguard together'
+    )
 if 'gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb' not in workflows:
     raise SystemExit('Android workflows must use the SHA-pinned Gradle v6.3.0 cache action')
 if 'Result<TicketWalletApi, AppError>' not in api or 'Vec<serde_json::Value>' in read_rust_module(root, 'src-tauri/src/models.rs'):
