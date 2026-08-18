@@ -217,21 +217,62 @@ dependencies {
         # The silent path used to emit a signed artifact whose only symptom was
         # the native plugin rejecting "firebase_not_configured" the first time an
         # operator touched push, long after the build reported success.
-        environment = dict(os.environ)
-        environment.pop("VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64", None)
-        result = subprocess.run(
-            [sys.executable, str(SCRIPT), "--signing"],
-            capture_output=True,
-            text=True,
-            env=environment,
-            cwd=SCRIPT.parent.parent,
-            check=False,
-        )
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn(
-            "VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64 is required",
-            result.stdout + result.stderr,
-        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            scripts = root / "scripts"
+            android = root / "src-tauri" / "gen" / "android"
+            app = android / "app"
+            scripts.mkdir()
+            app.mkdir(parents=True)
+            shutil.copy2(SCRIPT, scripts / SCRIPT.name)
+            seed_tauri_conf(root)
+            shutil.copytree(PUSH_TEMPLATES, root / "src-tauri" / "android-push")
+            shutil.copytree(ANDROID_ICONS, root / "src-tauri" / "icons" / "android")
+            res = app / "src" / "main" / "res" / "mipmap-anydpi-v26"
+            res.mkdir(parents=True)
+            res.joinpath("ic_launcher.xml").write_text(
+                '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">'
+                '<background android:drawable="@color/x"/>'
+                '<foreground android:drawable="@mipmap/ic_launcher_foreground"/></adaptive-icon>'
+            )
+            app.joinpath("build.gradle.kts").write_text(
+                'plugins {\n    id("com.android.application")\n}\n\nandroid {\n'
+                "    compileSdk = 35\n    defaultConfig { targetSdk = 35 }\n"
+                '    buildTypes {\n        getByName("release") {\n'
+                "            isMinifyEnabled = false\n        }\n    }\n}\n\ndependencies {\n}\n"
+            )
+            android.joinpath("settings.gradle").write_text(
+                "include ':app'\n\napply from: 'tauri.settings.gradle'\n"
+            )
+            manifest = app / "src" / "main" / "AndroidManifest.xml"
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
+                '<application><activity android:name=".MainActivity" /></application></manifest>'
+            )
+            # --signing checks the keystore before it reaches the Firebase
+            # branch, so the fixture needs one for the refusal under test to be
+            # the one that actually fires.
+            android.joinpath("keystore.properties").write_text(
+                "storeFile=upload.jks\nstorePassword=x\nkeyAlias=upload\nkeyPassword=x\n"
+            )
+
+            environment = os.environ.copy()
+            environment.pop("VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64", None)
+            result = subprocess.run(
+                ["python3", str(scripts / SCRIPT.name), "--signing"],
+                cwd=root,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64 is required",
+                result.stdout + result.stderr,
+            )
+            self.assertFalse((app / "google-services.json").exists())
 
 
 if __name__ == "__main__":
