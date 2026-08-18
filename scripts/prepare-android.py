@@ -627,7 +627,7 @@ def _stage_android_push() -> bool:
         # host to serve its own assetlinks.json without redirects; keeping www
         # out of the verified filter avoids coupling app-link verification to a
         # redirecting alias while generated invites already use virya.music.
-        for path_prefix in ("/latarnik", "/pl/latarnik"):
+        for path_prefix in ("/latarnik", "/pl/latarnik", "/my-signal", "/pl/my-signal"):
             ET.SubElement(
                 latarnik_filter,
                 "data",

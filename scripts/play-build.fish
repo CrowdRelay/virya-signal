@@ -70,17 +70,36 @@ test -d "$NDK_HOME"; or begin
     exit 1
 end
 
-# Local Play builds use the same generated-Android preparation contract as CI.
-# Preserve an already-configured local Firebase file by feeding it back through
-# the canonical preparer instead of letting a missing env var silently remove it.
+# Local Play builds must have the same Firebase guarantee as signed CI builds.
+# Keep the config outside the generated Tauri tree, because `src-tauri/gen` is
+# disposable and can be recreated by `tauri android init`.
 set -l GOOGLE_SERVICES "src-tauri/gen/android/app/google-services.json"
-if not set -q VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64; and test -s "$GOOGLE_SERVICES"
-    set -gx VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64 (base64 < "$GOOGLE_SERVICES" | tr -d '\n')
+set -l LOCAL_FIREBASE "$HOME/.config/virya-signal/google-services.json"
+
+if not set -q VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64
+    if test -s "$GOOGLE_SERVICES"
+        set -gx VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64 (base64 < "$GOOGLE_SERVICES" | tr -d '\n')
+    else if test -s "$LOCAL_FIREBASE"
+        set -gx VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64 (base64 < "$LOCAL_FIREBASE" | tr -d '\n')
+    end
+end
+
+if not set -q VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64; or test -z "$VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64"
+    echo "ERROR: Firebase config missing for signed Play build" >&2
+    echo "Expected: $LOCAL_FIREBASE" >&2
+    echo "or export VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64 before building." >&2
+    exit 1
 end
 
 python3 scripts/prepare-android.py --signing
 or begin
     echo "ERROR: canonical Android preparation failed" >&2
+    exit 1
+end
+
+python3 -c 'import json; from pathlib import Path; p=Path("src-tauri/gen/android/push-build-config.json"); d=json.loads(p.read_text()); assert d.get("firebaseConfigured") is True, "signed Play build is missing Firebase configuration"; print("SIGNAL_LOCAL_PLAY_PUSH_BUILD_GATE=PASS firebase=true")'
+or begin
+    echo "ERROR: signed Play build failed Firebase configuration gate" >&2
     exit 1
 end
 

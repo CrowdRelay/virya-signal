@@ -214,6 +214,7 @@ fn finish_resumable_ui_task(
 fn persisted_root_mode() -> RootMode {
     match bridge::root_mode_state().as_str() {
         "latarnik" => RootMode::Latarnik,
+        "team" => RootMode::Team,
         _ => RootMode::Fan,
     }
 }
@@ -222,7 +223,11 @@ fn persist_root_mode(mode: RootMode) {
     match mode {
         RootMode::Latarnik => bridge::set_root_mode_state("latarnik"),
         RootMode::Fan => bridge::set_root_mode_state("fan"),
-        RootMode::StaffGate | RootMode::Team => {}
+        // Team is persisted only for the current WebView session on the JS
+        // side. This survives the i18n reload without making staff access a
+        // durable localStorage bypass after a real app restart.
+        RootMode::Team => bridge::set_root_mode_state("team"),
+        RootMode::StaffGate => {}
     }
 }
 
@@ -233,6 +238,8 @@ pub fn App() -> impl IntoView {
     let fan_status = RwSignal::new(FanSessionStatus::default());
     let beacon_status = RwSignal::new(BeaconSessionStatus::default());
     let beacon_pending_link = RwSignal::new(false);
+    let synesthesia_pending_link = RwSignal::new(false);
+    let synesthesia_link_busy = RwSignal::new(false);
     let operator_status_loading = RwSignal::new(true);
     let fan_status_loading = RwSignal::new(true);
     let beacon_status_loading = RwSignal::new(true);
@@ -309,6 +316,66 @@ pub fn App() -> impl IntoView {
                 Ok(_) => {}
                 Err(message) => error.set(Some(message)),
             }
+        });
+    });
+
+    // Synesthesia completion App Links have their own native channel. The
+    // capability stays native while the fan is locked and is consumed only
+    // after the existing fan session is unlocked. QR/scanner state is unrelated.
+    Effect::new(move |_| {
+        status_refresh.get();
+        if !bridge::native_available() {
+            return;
+        }
+        spawn_local(async move {
+            match bridge::invoke::<bool, _>("fan_take_synesthesia_app_link", &EmptyArgs {}).await {
+                Ok(true) => {
+                    synesthesia_pending_link.set(true);
+                    mode.set(RootMode::Fan);
+                }
+                Ok(false) => {}
+                Err(message) => error.set(Some(message)),
+            }
+        });
+    });
+
+    Effect::new(move |_| {
+        status_refresh.get();
+        let pending = synesthesia_pending_link.get();
+        let unlocked = fan_status.get().unlocked;
+        if !pending || !unlocked || synesthesia_link_busy.get_untracked() {
+            return;
+        }
+        synesthesia_link_busy.set(true);
+        spawn_lifecycle_task(async move {
+            match bridge::invoke_timeout::<String, _>(
+                "fan_link_pending_synesthesia",
+                &EmptyArgs {},
+                15_000,
+            )
+            .await
+            {
+                Ok(outcome) if outcome == "linked" => {
+                    let _ = synesthesia_pending_link.try_set(false);
+                    let _ = error.try_set(Some("Wynik Synesthesia zapisany w Signal.".to_owned()));
+                }
+                Ok(outcome) if outcome == "expired" => {
+                    let _ = synesthesia_pending_link.try_set(false);
+                    let _ = error.try_set(Some(
+                        "Łącze Synesthesia wygasło. Wróć do finału i wybierz połączenie z Signal ponownie."
+                            .to_owned(),
+                    ));
+                }
+                Ok(_) => {
+                    let _ = synesthesia_pending_link.try_set(false);
+                }
+                Err(message) => {
+                    // Retryable failures keep the native capability. A later
+                    // resume/status refresh can retry without minting a new one.
+                    let _ = error.try_set(Some(message));
+                }
+            }
+            let _ = synesthesia_link_busy.try_set(false);
         });
     });
 

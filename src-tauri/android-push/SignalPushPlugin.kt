@@ -31,6 +31,8 @@ class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
     private var pendingLaunchTarget: String? = null
     private var pendingAppLink: String? = null
     private var pendingAppLinkRejected = false
+    private var pendingSynesthesiaAppLink: String? = null
+    private var pendingSynesthesiaAppLinkRejected = false
 
     override fun onNewIntent(intent: Intent) {
         launchTargetFrom(intent)?.let { pendingLaunchTarget = it }
@@ -41,6 +43,11 @@ class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
             val link = appLinkFrom(intent)
             pendingAppLink = link
             pendingAppLinkRejected = link == null
+        }
+        if (isSynesthesiaIntent(intent)) {
+            val link = synesthesiaAppLinkFrom(intent)
+            pendingSynesthesiaAppLink = link
+            pendingSynesthesiaAppLinkRejected = link == null
         }
     }
     @Command
@@ -113,6 +120,24 @@ class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     @Command
+    fun takeSynesthesiaAppLink(invoke: Invoke) {
+        val currentIsSynesthesia = isSynesthesiaIntent(activity.intent)
+        val currentLink = synesthesiaAppLinkFrom(activity.intent)
+        val link = pendingSynesthesiaAppLink ?: currentLink
+        val rejected =
+            pendingSynesthesiaAppLinkRejected || (currentIsSynesthesia && currentLink == null)
+        pendingSynesthesiaAppLink = null
+        pendingSynesthesiaAppLinkRejected = false
+        if (currentIsSynesthesia && (currentLink == null || currentLink == link)) {
+            activity.intent.data = null
+        }
+        val result = JSObject()
+        result.put("appLink", link.orEmpty())
+        result.put("rejected", rejected)
+        invoke.resolve(result)
+    }
+
+    @Command
     fun openNotificationSettings(invoke: Invoke) {
         val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
             putExtra(Settings.EXTRA_APP_PACKAGE, activity.packageName)
@@ -163,6 +188,37 @@ class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
         if (invite.length !in 24..128 || !invite.all { isInviteChar(it) }) return null
         val link = uri.toString()
         return link.takeIf { it.length <= MAX_APP_LINK_BYTES && !it.any { character -> character.code < 0x20 || character.code >= 0x7f } }
+    }
+
+    private fun isSynesthesiaIntent(intent: Intent?): Boolean {
+        if (intent?.action != Intent.ACTION_VIEW) return false
+        val uri: Uri = intent.data ?: return false
+        if (uri.scheme != "https") return false
+        if (uri.host != "virya.music" && uri.host != "www.virya.music") return false
+        if (uri.port != -1) return false
+        val path = uri.path?.trimEnd('/').orEmpty()
+        return path == "/my-signal" || path == "/pl/my-signal"
+    }
+
+    private fun isHexChar(character: Char): Boolean =
+        character in '0'..'9' || character in 'a'..'f' || character in 'A'..'F'
+
+    private fun synesthesiaAppLinkFrom(intent: Intent?): String? {
+        if (!isSynesthesiaIntent(intent)) return null
+        val uri: Uri = intent?.data ?: return null
+        if (uri.userInfo != null) return null
+        if (uri.queryParameterNames != setOf("source")) return null
+        val sources = uri.getQueryParameters("source")
+        if (sources.size != 1 || sources.single() != "synesthesia") return null
+        val fragment = uri.fragment ?: return null
+        if (!fragment.startsWith("handoff=")) return null
+        val handoff = fragment.removePrefix("handoff=")
+        if (handoff.length != 64 || !handoff.all { isHexChar(it) }) return null
+        val link = uri.toString()
+        return link.takeIf {
+            it.length <= MAX_APP_LINK_BYTES &&
+                !it.any { character -> character.code < 0x20 || character.code >= 0x7f }
+        }
     }
 
     private fun permissionState(invoke: Invoke) {
