@@ -73,6 +73,10 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "synesthesia_rooms_progress" => "{}/11 rooms",
         "synesthesia_rooms_done" => "{}/11 rooms · completed",
         "synesthesia_runs_count" => "{} attempts",
+        "synesthesia_result_saved_in_signal" => "Synesthesia result saved in Signal.",
+        "synesthesia_handoff_expired_retry" => {
+            "The Synesthesia link expired. Return to the finale and choose Connect to Signal again."
+        }
         "your_signal_now" => "YOUR SIGNAL NOW",
         "your_participation" => "YOUR TRACE",
         "participation_history_title" => "What you have been part of",

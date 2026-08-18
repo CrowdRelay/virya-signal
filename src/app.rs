@@ -357,14 +357,12 @@ pub fn App() -> impl IntoView {
             {
                 Ok(outcome) if outcome == "linked" => {
                     let _ = synesthesia_pending_link.try_set(false);
-                    let _ = error.try_set(Some("Wynik Synesthesia zapisany w Signal.".to_owned()));
+                    let _ =
+                        error.try_set(Some(tr("synesthesia_result_saved_in_signal").to_owned()));
                 }
                 Ok(outcome) if outcome == "expired" => {
                     let _ = synesthesia_pending_link.try_set(false);
-                    let _ = error.try_set(Some(
-                        "Łącze Synesthesia wygasło. Wróć do finału i wybierz połączenie z Signal ponownie."
-                            .to_owned(),
-                    ));
+                    let _ = error.try_set(Some(tr("synesthesia_handoff_expired_retry").to_owned()));
                 }
                 Ok(_) => {
                     let _ = synesthesia_pending_link.try_set(false);
