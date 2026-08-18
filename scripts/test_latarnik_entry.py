@@ -58,9 +58,22 @@ class LatarnikSignalEntryContract(unittest.TestCase):
         ffi = (ROOT / "src/bridge/ffi.rs").read_text(encoding="utf-8")
         self.assertIn("persisted_root_mode()", app)
         self.assertIn('RootMode::Latarnik => bridge::set_root_mode_state("latarnik")', app)
-        self.assertIn('RootMode::StaffGate | RootMode::Team => {}', app)
+        # Team is now restored across the i18n reload, so the old combined arm
+        # no longer exists. The guarantee it protected is unchanged and is
+        # asserted directly: the staff gate is never persisted, team lives in
+        # sessionStorage under its own key so it dies with the WebView session,
+        # and the durable localStorage read is clamped to fan/latarnik so a
+        # tampered value can never boot straight into the operator surface.
+        self.assertIn('RootMode::StaffGate => {}', app)
         self.assertIn("VIRYA_ROOT_MODE_STORAGE_KEY", ffi)
         self.assertIn("window.localStorage?.setItem(VIRYA_ROOT_MODE_STORAGE_KEY, safe)", ffi)
+        self.assertIn(
+            "window.sessionStorage?.setItem(VIRYA_TRANSIENT_ROOT_MODE_STORAGE_KEY, 'team')", ffi
+        )
+        self.assertIn("return value === 'latarnik' ? 'latarnik' : 'fan'", ffi)
+        self.assertNotIn(
+            "localStorage?.setItem(VIRYA_ROOT_MODE_STORAGE_KEY, 'team')", ffi
+        )
 
 
 if __name__ == "__main__":
