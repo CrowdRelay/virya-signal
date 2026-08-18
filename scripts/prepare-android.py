@@ -126,6 +126,87 @@ def _set_kotlin_property(body: str, key: str, value: str, indent: str) -> str:
     return f"\n{replacement}" + body
 
 
+
+def _remove_kotlin_call_statements(source: str, name: str) -> str:
+    # Remove complete Kotlin call statements such as proguardFiles(...).
+    # Handles nested parentheses and multiline generated Gradle formatting.
+    pattern = re.compile(rf'(?m)^[ \t]*{re.escape(name)}[ \t]*\(')
+
+    while True:
+        match = pattern.search(source)
+        if match is None:
+            return source
+
+        opening = source.find("(", match.start(), match.end())
+        if opening < 0:
+            raise SystemExit(f"could not locate opening parenthesis for {name}")
+
+        depth = 0
+        quote: str | None = None
+        escaped = False
+        line_comment = False
+        block_comment = False
+        index = opening
+
+        while index < len(source):
+            char = source[index]
+            next_char = source[index + 1] if index + 1 < len(source) else ""
+
+            if line_comment:
+                if char == "\n":
+                    line_comment = False
+                index += 1
+                continue
+
+            if block_comment:
+                if char == "*" and next_char == "/":
+                    block_comment = False
+                    index += 2
+                else:
+                    index += 1
+                continue
+
+            if quote is not None:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == quote:
+                    quote = None
+                index += 1
+                continue
+
+            if char == "/" and next_char == "/":
+                line_comment = True
+                index += 2
+                continue
+            if char == "/" and next_char == "*":
+                block_comment = True
+                index += 2
+                continue
+            if char in ('"', "'"):
+                quote = char
+                index += 1
+                continue
+
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0:
+                    end = index + 1
+                    while end < len(source) and source[end] in " \t":
+                        end += 1
+                    if end < len(source) and source[end] == "\n":
+                        end += 1
+                    source = source[:match.start()] + source[end:]
+                    break
+
+            index += 1
+        else:
+            raise SystemExit(f"unterminated Kotlin call: {name}(...)")
+
+
 def _patch_build_type(
     source: str,
     name: str,
@@ -145,11 +226,7 @@ def _patch_build_type(
     else:
         body = _set_kotlin_property(body, "isShrinkResources", str(shrink).lower(), indent)
 
-    proguard_pattern = (
-        r'(?m)^\s*proguardFiles\(getDefaultProguardFile\('
-        r'\"proguard-android-optimize\.txt\"\),\s*\"proguard-rules\.pro\"\)\s*\n?'
-    )
-    body = re.sub(proguard_pattern, "", body)
+    body = _remove_kotlin_call_statements(body, "proguardFiles")
     if proguard:
         body = (
             f'\n{indent}proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), '
