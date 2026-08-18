@@ -30,7 +30,7 @@ ANDROID_ICONS = SCRIPT.parent.parent / "src-tauri" / "icons" / "android"
 
 
 class PrepareAndroidTests(unittest.TestCase):
-    def test_enables_release_shrinking_and_gradle_cache(self) -> None:
+    def test_enforces_safe_release_and_gradle_cache(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             scripts = root / "scripts"
@@ -106,9 +106,9 @@ dependencies {
             output = gradle.read_text()
             self.assertIn("compileSdk = 36", output)
             self.assertIn("targetSdk = 36", output)
-            self.assertIn("isMinifyEnabled = true", output)
-            self.assertIn("isShrinkResources = true", output)
-            self.assertEqual(output.count("proguardFiles("), 1)
+            self.assertIn("isMinifyEnabled = false", output)
+            self.assertIn("isShrinkResources = false", output)
+            self.assertEqual(output.count("proguardFiles("), 0)
 
             properties = (android / "gradle.properties").read_text()
             self.assertIn("org.gradle.caching=true", properties)
