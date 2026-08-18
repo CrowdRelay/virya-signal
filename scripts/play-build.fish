@@ -102,7 +102,7 @@ echo "VERSION_CODE=$OLD_CODE -> $NEW_CODE"
 echo "BUILD=START"
 echo
 
-cargo tauri android build --aab
+cargo tauri android build --aab --target aarch64
 set -l BUILD_STATUS $status
 
 # Nie marnujemy versionCode, jeśli sam build nie powstał.

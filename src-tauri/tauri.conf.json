@@ -38,7 +38,7 @@
     },
     "android": {
       "minSdkVersion": 26,
-      "versionCode": 2007
+      "versionCode": 2009
     },
     "icon": [
       "icons/32x32.png",
