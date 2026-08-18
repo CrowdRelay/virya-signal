@@ -70,6 +70,20 @@ test -d "$NDK_HOME"; or begin
     exit 1
 end
 
+# Local Play builds use the same generated-Android preparation contract as CI.
+# Preserve an already-configured local Firebase file by feeding it back through
+# the canonical preparer instead of letting a missing env var silently remove it.
+set -l GOOGLE_SERVICES "src-tauri/gen/android/app/google-services.json"
+if not set -q VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64; and test -s "$GOOGLE_SERVICES"
+    set -gx VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64 (base64 < "$GOOGLE_SERVICES" | tr -d '\n')
+end
+
+python3 scripts/prepare-android.py --signing
+or begin
+    echo "ERROR: canonical Android preparation failed" >&2
+    exit 1
+end
+
 # Odczytaj obecny versionCode.
 set -l OLD_CODE (python3 -c 'import json; d=json.load(open("src-tauri/tauri.conf.json")); print(d["bundle"]["android"]["versionCode"])')
 or exit 1
@@ -103,6 +117,14 @@ end
 
 test -s "$AAB"; or begin
     echo "ERROR: AAB missing after successful build" >&2
+    exit 1
+end
+
+python3 scripts/analyze-android-package.py "$AAB" --require-abi arm64-v8a --require-page-size 16384
+or begin
+    python3 -c 'import json,sys; p="src-tauri/tauri.conf.json"; d=json.load(open(p)); d["bundle"]["android"]["versionCode"]=int(sys.argv[1]); open(p,"w").write(json.dumps(d,indent=2,ensure_ascii=False)+"\n")' "$OLD_CODE"
+    echo "ERROR: release AAB structural/page-size gate failed" >&2
+    echo "VERSION_CODE=RESTORED_TO_$OLD_CODE"
     exit 1
 end
 

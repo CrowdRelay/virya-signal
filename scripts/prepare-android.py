@@ -32,9 +32,11 @@ if compile_count != 1 or target_count != 1:
         f"(found {compile_count}/{target_count})"
     )
 
-# Release APK/AAB builds should ship neither unused CameraX/ML Kit bytecode nor
-# dead Android resources. Debug APKs must remain unminified: Android/Tauri
-# plugins use generated entry points that are unsafe to shrink in smoke builds.
+# Keep Android release startup conservative until the release artifact itself
+# is runtime-smoked. Tauri/plugin generated entry points have previously been
+# exercised only by unminified debug E2E; enabling R8 without a release-runtime
+# gate can therefore turn a structurally valid Play AAB into an instant crash.
+# Size optimisation can be re-enabled later behind that gate.
 def _find_kotlin_named_block(source: str, name: str) -> tuple[int, int, str]:
     patterns = (
         rf'getByName\(\"{re.escape(name)}\"\)\s*\{{',
@@ -160,7 +162,7 @@ def _patch_build_type(
 has_debug_build_type = _has_kotlin_named_block(text, "debug")
 if has_debug_build_type:
     text = _patch_build_type(text, "debug", minify=False, shrink=None, proguard=False)
-text = _patch_build_type(text, "release", minify=True, shrink=True, proguard=True)
+text = _patch_build_type(text, "release", minify=False, shrink=False, proguard=False)
 
 # Verify the effective configuration after all mutations.
 if has_debug_build_type:
@@ -173,12 +175,13 @@ if has_debug_build_type:
 release_open, release_close, _ = _find_kotlin_named_block(text, "release")
 release_body = text[release_open + 1 : release_close]
 for fragment in (
-    "isMinifyEnabled = true",
-    "isShrinkResources = true",
-    'proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")',
+    "isMinifyEnabled = false",
+    "isShrinkResources = false",
 ):
     if fragment not in release_body:
         raise SystemExit(f"release build invariant missing: {fragment}")
+if "proguardFiles(" in release_body:
+    raise SystemExit("release build must not enable ProGuard while the safe release mode is active")
 
 # Each Kotlin shrinker property must remain on its own physical line. The
 # property matcher above intentionally uses horizontal whitespace only because
@@ -626,7 +629,7 @@ def _stage_android_push() -> bool:
 push_configured = _stage_android_push()
 
 print(
-    f"Android project prepared: API 36, R8/resource shrinking=on, "
+    f"Android project prepared: API 36, R8/resource shrinking=off-safe-release, "
     f"signing={'on' if args.signing else 'off'}, canonical-icons=on, debug-r8=off, "
     f"push-firebase={'on' if push_configured else 'degraded-no-config'}"
 )
