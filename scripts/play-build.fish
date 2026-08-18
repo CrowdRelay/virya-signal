@@ -22,6 +22,35 @@ test -f "$PROPS"; or begin
     exit 1
 end
 
+# Resolve and verify the JDK before anything else. Gradle fails deep in the
+# build with a poor message when JAVA_HOME is wrong or absent, and inheriting
+# whatever the shell happens to carry is how the wrong JDK gets used silently.
+set -l JAVA21 ""
+
+if brew list --formula openjdk@21 >/dev/null 2>&1
+    set JAVA21 (brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home
+else
+    set JAVA21 (/usr/libexec/java_home -v 21 2>/dev/null)
+end
+
+if test -z "$JAVA21"; or not test -x "$JAVA21/bin/java"
+    echo "ERROR: JDK 21 not found" >&2
+    echo "Install with: brew install openjdk@21" >&2
+    exit 1
+end
+
+set -gx JAVA_HOME "$JAVA21"
+
+set -l JAVA_MAJOR ("$JAVA_HOME/bin/java" -version 2>&1 | string match -r 'version "[0-9]+' | string replace 'version "' '')
+
+if test "$JAVA_MAJOR" != "21"
+    echo "ERROR: Signal requires JDK 21, found $JAVA_MAJOR" >&2
+    "$JAVA_HOME/bin/java" -version >&2
+    exit 1
+end
+
+echo "JAVA_HOME=$JAVA_HOME"
+
 # Przywróć środowisko Androida również w świeżym terminalu.
 set -gx ANDROID_HOME "$HOME/Library/Android/sdk"
 set -gx ANDROID_SDK_ROOT "$ANDROID_HOME"
