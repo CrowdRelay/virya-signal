@@ -72,6 +72,11 @@ jobs:
         run: |
           trunk build --release
           python3 scripts/check-web-dist.py dist
+      # Debug-gated support code is only unreferenced once debug_assertions is
+      # off, so a debug-only clippy run structurally cannot see it. This reuses
+      # the release artifacts trunk just built.
+      - name: Release-mode lint
+        run: cargo clippy --locked --release -p virya-signal-ui --target wasm32-unknown-unknown -- -D warnings
       - name: Record and compare Web performance metrics
         id: web_metrics
         env:
@@ -130,6 +135,11 @@ jobs:
         run: |
           cargo test --locked -p virya-signal
           cargo clippy --locked -p virya-signal --all-targets -- -D warnings
+      # Same reason as the WASM job: dead code behind cfg(debug_assertions) is
+      # invisible until the release profile drops its callers. sccache keeps the
+      # release dependency build warm across runs.
+      - name: Release-mode lint
+        run: cargo clippy --locked --release -p virya-signal --all-targets -- -D warnings
       - name: Compiler cache statistics
         if: always()
         run: sccache --show-stats
