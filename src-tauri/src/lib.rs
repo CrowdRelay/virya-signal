@@ -55,10 +55,10 @@ use commands::{
         revoke_qr_campaign, session_status, staff_event_dashboard, ticketing_overview, unlock,
     },
     pairing::configure_from_pairing,
-    synesthesia::{fan_link_pending_synesthesia, fan_take_synesthesia_app_link},
     show_mode::{
         show_mode_clear, show_mode_prepare, show_mode_scan, show_mode_status, show_mode_sync,
     },
+    synesthesia::{fan_link_pending_synesthesia, fan_take_synesthesia_app_link},
 };
 use models::{BeaconProfile, FanProfile, OperatorProfile, ShowModeStore};
 use tauri::Manager;
