@@ -5,6 +5,8 @@ use std::{
 
 use wasm_bindgen::prelude::*;
 
+pub(crate) mod affiliate;
+
 const LANGUAGE_STORAGE_KEY: &str = "virya:language:v1";
 static LANGUAGE: AtomicU8 = AtomicU8::new(0);
 
