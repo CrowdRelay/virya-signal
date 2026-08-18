@@ -381,8 +381,23 @@ if ui.count('mode.set(RootMode::Team)') != 1 or 'Ok(()) => mode.set(RootMode::Te
     raise SystemExit('operator UI must be reachable only after successful staff-gate verification')
 if 'fn persisted_root_mode() -> RootMode' not in ui or '_ => RootMode::Fan' not in ui:
     raise SystemExit('persisted member mode must fail closed to the Fan surface')
-if 'RootMode::StaffGate | RootMode::Team => {}' not in ui:
-    raise SystemExit('staff/operator modes must never be persisted as startup member mode')
+if 'RootMode::StaffGate => {}' not in ui:
+    raise SystemExit('the staff gate must never be persisted as startup member mode')
+# Team used to be unpersistable outright. It is now restored across the i18n
+# reload, which is why the old single-token check no longer describes the
+# guarantee. Assert the property instead: team lives in sessionStorage under its
+# own key so it dies with the WebView session, and the durable localStorage read
+# is clamped to fan/latarnik so a tampered value can never boot into operator.
+bridge_ffi = (root / 'src/bridge/ffi.rs').read_text()
+for contract in (
+    "window.sessionStorage?.setItem(VIRYA_TRANSIENT_ROOT_MODE_STORAGE_KEY, 'team')",
+    "window.sessionStorage?.removeItem(VIRYA_TRANSIENT_ROOT_MODE_STORAGE_KEY)",
+    "return value === 'latarnik' ? 'latarnik' : 'fan'",
+):
+    if contract not in bridge_ffi:
+        raise SystemExit(f'transient staff mode contract is missing: {contract}')
+if "localStorage?.setItem(VIRYA_ROOT_MODE_STORAGE_KEY, 'team')" in bridge_ffi:
+    raise SystemExit('operator mode must never reach durable localStorage')
 
 native_client = (root / 'src-tauri/src/api/client.rs').read_text()
 native_misc = (root / 'src-tauri/src/commands/misc.rs').read_text()
