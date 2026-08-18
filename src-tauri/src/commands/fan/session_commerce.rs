@@ -43,6 +43,32 @@ pub(crate) async fn fan_lock(state: State<'_, AppState>) -> Result<FanSessionSta
 }
 
 #[tauri::command]
+pub(crate) async fn fan_delete_account(
+    state: State<'_, AppState>,
+) -> Result<FanSessionStatus, AppError> {
+    let _mutation = state.fan_mutation.lock().await;
+    let profile = state
+        .fan_session
+        .read()
+        .await
+        .clone()
+        .ok_or(AppError::Locked)?;
+
+    // The server erases the account first. Only after that durable confirmation
+    // do we remove the local encrypted profile. The device FCM token is shared
+    // with Staff mode, so the server removes only the fan endpoint association.
+    state.api.fan_delete_account(&profile).await?;
+    *state.fan_session.write().await = None;
+    *state.fan_pin.write().await = None;
+    *state.pending_fan_confirmation.lock().await = None;
+    state.wallet_qr_tokens.write().await.clear();
+    let app_data_dir = state.app_data_dir.clone();
+    run_blocking(move || vault::remove_fan(&app_data_dir)).await?;
+    drop(_mutation);
+    fan_status(state).await
+}
+
+#[tauri::command]
 pub(crate) async fn fan_forget(
     state: State<'_, AppState>,
 ) -> Result<FanSessionStatus, AppError> {
@@ -309,6 +335,15 @@ pub(crate) async fn fan_area_claim(
         .api
         .fan_area_claim(&profile, &drop_id, challenge, &samples)
         .await
+}
+
+#[tauri::command]
+pub(crate) async fn fan_unpublish_synesthesia_leaderboard(
+    state: State<'_, AppState>,
+) -> Result<bool, AppError> {
+    let _mutation = state.fan_mutation.lock().await;
+    let profile = fan_profile(&state).await?;
+    state.api.fan_unpublish_synesthesia_leaderboard(&profile).await
 }
 
 #[tauri::command]

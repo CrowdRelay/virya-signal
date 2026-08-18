@@ -147,6 +147,22 @@ or begin
     exit 1
 end
 
+python3 scripts/check-android-firebase-artifact.py "$AAB"
+or begin
+    python3 -c 'import json,sys; p="src-tauri/tauri.conf.json"; d=json.load(open(p)); d["bundle"]["android"]["versionCode"]=int(sys.argv[1]); open(p,"w").write(json.dumps(d,indent=2,ensure_ascii=False)+"\n")' "$OLD_CODE"
+    echo "ERROR: release AAB Firebase runtime gate failed" >&2
+    echo "VERSION_CODE=RESTORED_TO_$OLD_CODE"
+    exit 1
+end
+
+python3 scripts/check-android-app-links-artifact.py "$AAB"
+or begin
+    python3 -c 'import json,sys; p="src-tauri/tauri.conf.json"; d=json.load(open(p)); d["bundle"]["android"]["versionCode"]=int(sys.argv[1]); open(p,"w").write(json.dumps(d,indent=2,ensure_ascii=False)+"\n")' "$OLD_CODE"
+    echo "ERROR: release AAB App Links gate failed" >&2
+    echo "VERSION_CODE=RESTORED_TO_$OLD_CODE"
+    exit 1
+end
+
 echo
 echo "=== PLAY BUILD READY ==="
 echo "versionName=$VERSION_NAME"

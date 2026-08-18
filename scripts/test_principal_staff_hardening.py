@@ -21,6 +21,17 @@ class PrincipalStaffHardeningTests(unittest.TestCase):
         for path in ("boot-i18n.js", "runtime-i18n.js", "bundle-stage-pack.webp"):
             self.assertGreaterEqual(workflow.count(path), 2, path)
 
+    def test_firebase_runtime_can_self_initialize_from_compiled_resources(self):
+        kotlin = read("src-tauri/android-push/SignalPushPlugin.kt")
+        rust = read("src-tauri/src/push_plugin.rs")
+        fan = read("src-tauri/src/commands/fan/push.rs")
+        self.assertIn("FirebaseApp.initializeApp(context)", kotlin)
+        self.assertIn("ensureFirebaseInitialized", kotlin)
+        self.assertIn("getFirebaseState", kotlin)
+        self.assertIn('"getFirebaseState"', rust)
+        self.assertIn("native_firebase_configured", fan)
+        self.assertIn('"firebase_not_configured"', fan)
+
     def test_fcm_provider_token_is_device_scoped_not_audience_scoped(self):
         rust_push = read("src-tauri/src/push_plugin.rs")
         kotlin_plugin = read("src-tauri/android-push/SignalPushPlugin.kt")

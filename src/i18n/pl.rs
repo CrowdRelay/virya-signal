@@ -241,7 +241,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "language" => "Język",
         "app_language" => "Język aplikacji",
         "changing_the_language_reloads_the_interface_your" => {
-            "Zmiana języka przeładuje interfejs. Dane i sesja pozostaną bez zmian."
+            "Zmiana języka działa od razu. Dane i sesja pozostają bez zmian."
         }
         "polish" => "Polski",
         "english" => "Angielski",
@@ -469,6 +469,12 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "refresh_data" => "Odśwież dane",
         "lock_app" => "Zablokuj aplikację",
         "remove_profile_and_tickets_from_device" => "Usuń profil i bilety z urządzenia",
+        "delete_virya_account" => "Usuń konto Virya",
+        "delete_account_warning" => {
+            "To trwale usuwa Twoje konto fana Virya, wyłącza powiadomienia, usuwa publiczne powiązanie z Synesthesią i wylogowuje to urządzenie. Rekordy płatnych biletów i zgód mogą pozostać, jeśli są potrzebne do realizacji, księgowości lub audytu."
+        }
+        "confirm_delete_account" => "Tak, usuń moje konto",
+        "cancel_delete_account" => "Anuluj",
         "fan_session_admission_pass_and_private_wallet" => {
             "Sesja fana, wejściówka oraz prywatne tokeny portfela są przechowywane w osobnym, zaszyfrowanym sejfie Stronghold."
         }
@@ -930,6 +936,11 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "fan_360_summary" => "Fan 360 · agregaty",
         "ticket_buyers" => "kupili bilet",
         "concert_attendees" => "byli na koncercie",
+        "remove_from_leaderboard" => "Usuń mnie z rankingu",
+        "removing_from_leaderboard" => "Usuwam…",
+        "leaderboard_unpublish_failed" => {
+            "Nie udało się usunąć wpisu z publicznego rankingu. Spróbuj ponownie."
+        }
         "synesthesia_participants" => "Synesthesia",
         "qualified_referrals" => "polecenia qualified",
         "ticket_revenue" => "przychód biletowy",
@@ -1055,6 +1066,9 @@ pub(super) fn text(key: &'static str) -> &'static str {
         }
         "push_notifications_waiting_backend" => {
             "Kanał push nie jest jeszcze aktywny po stronie VIRYA OS."
+        }
+        "push_firebase_not_configured" => {
+            "Firebase nie zainicjalizował się w tym buildzie. Zainstaluj najnowszy build testowy z Google Play."
         }
         "push_notifications_degraded" => {
             "Nie udało się potwierdzić synchronizacji push. Spróbuj ponownie bez zmiany ustawienia."

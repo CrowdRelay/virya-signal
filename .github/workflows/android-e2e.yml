@@ -21,6 +21,10 @@ jobs:
       signed: false
       target_arch: x86_64
       e2e_api_base: http://10.0.2.2:8787/v1/
+    # Manual E2E may use the repository Firebase config even though the APK is
+    # debug/unsigned. This lets the emulator prove default-app initialization
+    # without exposing or logging the config.
+    secrets: inherit
 
   journeys:
     needs: build-e2e

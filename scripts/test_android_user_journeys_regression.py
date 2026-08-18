@@ -115,6 +115,28 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertIn('pub fn fan_tab_state()', bridge)
         self.assertIn('pub fn set_fan_tab_state(value: &str)', bridge)
 
+    def test_synesthesia_leaderboard_has_account_level_unpublish_control(self):
+        home = read('src/app/fan_home.rs')
+        native = read('src-tauri/src/api/synesthesia.rs')
+        command = read('src-tauri/src/commands/fan/session_commerce.rs')
+        lib = read('src-tauri/src/lib.rs')
+        self.assertIn('fan_unpublish_synesthesia_leaderboard', home)
+        self.assertIn('synesthesia.leaderboard_published', home)
+        self.assertIn('snapshot.synesthesia.leaderboard_published = false;', home)
+        self.assertIn('snapshot.synesthesia.leaderboard_rank = None;', home)
+        self.assertIn('"synesthesia_leaderboard_unpublish_v1"', native)
+        self.assertIn('Method::DELETE', native)
+        self.assertIn('"me/synesthesia/leaderboard"', native)
+        self.assertIn('fan_unpublish_synesthesia_leaderboard', command)
+        self.assertIn('fan_unpublish_synesthesia_leaderboard,', lib)
+
+    def test_fan_home_contract_keeps_locale_and_does_not_duplicate_live_note(self):
+        models = read('src/models.rs')
+        profile = models.split('pub struct FanHomeProfile', 1)[1].split('}', 1)[0]
+        self.assertIn('pub locale: Option<String>', profile)
+        home = read('src/app/fan_home.rs')
+        self.assertEqual(home.count('tr("signal_live_note")'), 1)
+
     def test_next_signal_has_deterministic_event_details_route(self):
         home = read('src/app/fan_home.rs')
         self.assertIn('focused_event_preview.set(Some(event_preview.clone()));', home)
@@ -173,6 +195,32 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertEqual(post.count('self._body()'), 1)
         self.assertIn('body = self._body()', post)
 
+    def test_android_e2e_exercises_synesthesia_app_link_end_to_end(self):
+        journey = read('scripts/e2e/android_journeys.py')
+        mock = read('scripts/e2e/mock_signal_api.py')
+        self.assertIn('def synesthesia_app_link_round_trip', journey)
+        self.assertIn('synesthesia_app_link_round_trip(d)', journey)
+        block = journey.split('def synesthesia_app_link_round_trip', 1)[1].split('def fan_event_details', 1)[0]
+        self.assertIn('android.intent.action.VIEW', block)
+        self.assertIn('/pl/my-signal/', block)
+        self.assertIn('Synesthesia result saved in Signal.', block)
+        self.assertIn('/v1/me/synesthesia/link', mock)
+        self.assertIn('{"linked": True}', mock)
+
+    def test_android_e2e_proves_staff_language_switch_keeps_session(self):
+        journey = read('scripts/e2e/android_journeys.py')
+        self.assertIn('def find_exact_text', journey)
+        self.assertIn('def tap_exact_text', journey)
+        self.assertIn('def staff_language_switch_preserves_session', journey)
+        self.assertIn('staff_language_switch_preserves_session(d)', journey)
+        block = journey.split('def staff_language_switch_preserves_session', 1)[1].split('def owner_online_and_offline_cache', 1)[0]
+        self.assertIn('d.tap_exact_text("EN"', block)
+        self.assertIn('d.tap_exact_text("PL"', block)
+        self.assertIn('"Connection"', block)
+        self.assertIn('"Połączenie"', block)
+        self.assertIn('"OPEN STAFF ZONE"', block)
+        self.assertIn('assert_absent', block)
+
     def test_android_e2e_exercises_autopilot_mutation(self):
         journey = read('scripts/e2e/android_journeys.py')
         mock = read('scripts/e2e/mock_signal_api.py')
@@ -182,6 +230,15 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertIn('/v1/admin/autopilot/policies/', mock)
         self.assertIn('def fan_recovery_qr', journey)
         self.assertIn('d.tap(["SKANUJ QR", "SCAN QR"]', journey)
+
+    def test_android_e2e_uses_firebase_config_and_checks_runtime_initialization(self):
+        workflow = read('.github/workflows/android-e2e.yml')
+        journey = read('scripts/e2e/android_journeys.py')
+        build_job = workflow.split('build-e2e:', 1)[1].split('journeys:', 1)[0]
+        self.assertIn('secrets: inherit', build_job)
+        settings = journey.split('def fan_settings_survives_android_settings', 1)[1].split('def open_staff_and_configure_owner', 1)[0]
+        self.assertIn('Notifications are disabled on this device.', settings)
+        self.assertIn('Powiadomienia są wyłączone na tym urządzeniu.', settings)
 
     def test_android_e2e_boot_and_crash_gate_are_bounded_and_current(self):
         workflow = read('.github/workflows/android-e2e.yml')

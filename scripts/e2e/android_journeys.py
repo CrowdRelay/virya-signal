@@ -107,6 +107,19 @@ class Device:
         sample = "\n".join(f"{n.cls}: text={n.text!r} desc={n.desc!r}" for n in last if n.text or n.desc)
         raise JourneyError(f"could not find any of {labels!r} in UI after {timeout}s. Visible:\n{sample[-6000:]}")
 
+    def find_exact_text(self, label: str, *, timeout: float = 15) -> Node:
+        deadline = time.monotonic() + timeout
+        wanted = label.strip().casefold()
+        last: list[Node] = []
+        while time.monotonic() < deadline:
+            last = self.dump()
+            for node in last:
+                if node.text.strip().casefold() == wanted:
+                    return node
+            time.sleep(0.5)
+        sample = "\n".join(f"{n.cls}: text={n.text!r} desc={n.desc!r}" for n in last if n.text or n.desc)
+        raise JourneyError(f"could not find exact text {label!r} in UI after {timeout}s. Visible:\n{sample[-6000:]}")
+
     def exists(self, labels: list[str], timeout: float = 2) -> bool:
         try:
             self.find(labels, timeout=timeout)
@@ -121,6 +134,9 @@ class Device:
 
     def tap(self, labels: list[str], *, timeout: float = 15) -> None:
         self.tap_node(self.find(labels, timeout=timeout))
+
+    def tap_exact_text(self, label: str, *, timeout: float = 15) -> None:
+        self.tap_node(self.find_exact_text(label, timeout=timeout))
 
     def input(self, labels: list[str], value: str, *, timeout: float = 15) -> None:
         node = self.find(labels, timeout=timeout, cls_contains="EditText")
@@ -189,6 +205,26 @@ def fan_recovery_qr(d: Device) -> None:
     d.snapshot("fan-recovery-qr")
 
 
+def synesthesia_app_link_round_trip(d: Device) -> None:
+    handoff = "a" * 64
+    url = f"https://virya.music/pl/my-signal/?source=synesthesia#handoff={handoff}"
+    # Package-scoped VIEW resolution still goes through Android intent-filter
+    # matching. If /my-signal disappeared from the merged manifest, am start
+    # fails before the app can receive the capability.
+    shell(
+        "am", "start", "-W",
+        "-a", "android.intent.action.VIEW",
+        "-d", url,
+        "-p", PKG,
+        timeout=20,
+    )
+    d.assert_text([
+        "Wynik Synesthesia zapisany w Signal.",
+        "Synesthesia result saved in Signal.",
+    ], timeout=25)
+    d.snapshot("synesthesia-app-link-linked")
+
+
 def fan_event_details(d: Device) -> None:
     d.assert_text(["VIRYA E2E — TEST EVENT"], timeout=25)
     d.tap(["SZCZEGÓŁY", "DETAILS"], timeout=10)
@@ -201,6 +237,14 @@ def fan_settings_survives_android_settings(d: Device) -> None:
     d.tap(["Otwórz menu", "Open menu"], timeout=10)
     d.tap(["Profil", "Profile"], timeout=10)
     d.assert_text(["Ustawienia Sygnału", "Signal settings"], timeout=15)
+    # The E2E build inherits the Firebase config but stays unsigned/debug. The
+    # settings status therefore proves that the runtime can initialize Firebase
+    # from the compiled resources; a broken build shows the dedicated
+    # firebase_not_configured message instead of this normal OFF state.
+    d.assert_text([
+        "Powiadomienia są wyłączone na tym urządzeniu.",
+        "Notifications are disabled on this device.",
+    ], timeout=20)
     d.snapshot("fan-settings-before-native")
     # Exercise the exact native Activity boundary that used to remount FanApp and reset FanTab.
     shell("am", "start", "-a", "android.settings.APP_NOTIFICATION_SETTINGS", "--es", "android.provider.extra.APP_PACKAGE", PKG, timeout=15)
@@ -228,6 +272,28 @@ def open_staff_and_configure_owner(d: Device) -> None:
     d.snapshot("owner-manual-config")
     d.tap(["ZAPISZ RĘCZNIE", "SAVE MANUALLY"], timeout=10)
     d.assert_text(["LIVE OPERATIONS", "VIRYA CONTROL"], timeout=20)
+
+
+def staff_language_switch_preserves_session(d: Device) -> None:
+    d.tap(["Otwórz menu", "Open menu"], timeout=10)
+    d.tap(["Ustawienia", "Settings"], timeout=10)
+    d.assert_text(["Ustawienia", "Settings"], timeout=15)
+
+    # Language buttons are deliberately selected by exact text. Substring matching
+    # for the two-letter labels (especially EN) is too broad for a UI hierarchy.
+    d.tap_exact_text("EN", timeout=10)
+    d.assert_text(["Settings"], timeout=15)
+    d.assert_text(["Connection"], timeout=15)
+    d.assert_text(["Permissions"], timeout=15)
+    d.assert_absent(["Staff password", "Hasło staffu", "OPEN STAFF ZONE", "OTWÓRZ STREFĘ STAFF"], seconds=3)
+    d.snapshot("staff-language-en-session-preserved")
+
+    d.tap_exact_text("PL", timeout=10)
+    d.assert_text(["Ustawienia"], timeout=15)
+    d.assert_text(["Połączenie"], timeout=15)
+    d.assert_text(["Uprawnienia"], timeout=15)
+    d.assert_absent(["Staff password", "Hasło staffu", "OPEN STAFF ZONE", "OTWÓRZ STREFĘ STAFF"], seconds=3)
+    d.snapshot("staff-language-pl-session-preserved")
 
 
 def owner_online_and_offline_cache(d: Device, offline_file: Path) -> None:
@@ -287,9 +353,11 @@ def main() -> None:
     try:
         fan_first_login(d)
         fan_recovery_qr(d)
+        synesthesia_app_link_round_trip(d)
         fan_event_details(d)
         fan_settings_survives_android_settings(d)
         open_staff_and_configure_owner(d)
+        staff_language_switch_preserves_session(d)
         owner_online_and_offline_cache(d, offline_file)
         owner_autopilot_mode_changes(d)
         staff_checklist_never_hangs(d)
@@ -304,7 +372,7 @@ def main() -> None:
     fatal = [line for line in logcat.splitlines() if "FATAL EXCEPTION" in line or "ANR in music.virya.signal" in line or "Render process gone" in line]
     if fatal:
         raise JourneyError("native/WebView crash detected:\n" + "\n".join(fatal[-20:]))
-    print("VIRYA_SIGNAL_ANDROID_E2E=PASS journeys=fan_auth,fan_recovery,event_detail,native_settings,owner_online,owner_offline,owner_autopilot,staff_checklist")
+    print("VIRYA_SIGNAL_ANDROID_E2E=PASS journeys=fan_auth,fan_recovery,synesthesia_app_link,event_detail,native_settings,staff_language,owner_online,owner_offline,owner_autopilot,staff_checklist")
 
 
 if __name__ == "__main__":

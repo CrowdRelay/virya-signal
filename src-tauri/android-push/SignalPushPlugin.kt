@@ -50,9 +50,28 @@ class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
             pendingSynesthesiaAppLinkRejected = link == null
         }
     }
+    private fun ensureFirebaseInitialized(): Boolean {
+        val context = activity.applicationContext
+        if (FirebaseApp.getApps(context).isNotEmpty()) {
+            return true
+        }
+        // FirebaseInitProvider normally creates the default app before the
+        // Activity starts. A Play/WebView lifecycle edge must not make push
+        // depend on that ordering: initialize explicitly from the compiled
+        // google-services resources and still fail closed when they are absent.
+        return FirebaseApp.initializeApp(context) != null
+    }
+
+    @Command
+    fun getFirebaseState(invoke: Invoke) {
+        val result = JSObject()
+        result.put("configured", ensureFirebaseInitialized())
+        invoke.resolve(result)
+    }
+
     @Command
     fun getToken(invoke: Invoke) {
-        if (FirebaseApp.getApps(activity.applicationContext).isEmpty()) {
+        if (!ensureFirebaseInitialized()) {
             invoke.reject("firebase_not_configured")
             return
         }

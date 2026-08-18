@@ -97,15 +97,14 @@ fn StaffGate(mode: RwSignal<RootMode>, error: RwSignal<Option<String>>) -> impl 
 fn OperatorPortal(
     mode: RwSignal<RootMode>,
     status: RwSignal<SessionStatus>,
+    dashboard: RwSignal<Option<DashboardData>>,
+    tab: RwSignal<OperatorTab>,
     status_loading: RwSignal<bool>,
     status_failed: RwSignal<bool>,
     status_refresh: RwSignal<u32>,
     push_target: RwSignal<Option<String>>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
-    let dashboard = RwSignal::new(None::<DashboardData>);
-    let tab = RwSignal::new(OperatorTab::Home);
-
     view! {
         {move || if status_failed.get() {
             view! { <StatusFailure mode=mode status_refresh=status_refresh label=tr("failed_to_read_the_staff_vault") show_back=true /> }.into_any()

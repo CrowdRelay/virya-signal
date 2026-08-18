@@ -206,6 +206,12 @@ class Handler(BaseHTTPRequestHandler):
             self._reply(HTTPStatus.OK, {"fan_session_token": TOKEN})
         elif path == "/v1/fans/access":
             self._reply(HTTPStatus.OK, {"accepted": True})
+        elif path == "/v1/me/synesthesia/link":
+            handoff = str(body.get("handoff_code", "")) if isinstance(body, dict) else ""
+            if len(handoff) == 64 and all(c in "0123456789abcdef" for c in handoff.lower()):
+                self._reply(HTTPStatus.OK, {"linked": True})
+            else:
+                self._reply(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": "invalid_handoff"})
         elif path in {"/v1/me/push/register", "/v1/me/push/unregister", "/v1/staff/push/register", "/v1/staff/push/unregister"}:
             self._reply(HTTPStatus.OK, {"registered": True})
         elif re.fullmatch(r"/v1/admin/autopilot/policies/[a-z_]+", path):

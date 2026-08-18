@@ -44,9 +44,9 @@ impl Language {
 export function viryaStoredLanguage(key) {
   try { return window.localStorage?.getItem(key) || 'pl'; } catch { return 'pl'; }
 }
-export function viryaSetLanguageAndReload(key, value) {
+export function viryaSetLanguage(key, value) {
   try { window.localStorage?.setItem(key, value); } catch {}
-  window.location.reload();
+  try { window.dispatchEvent(new CustomEvent('virya:language-change', { detail: { language: value } })); } catch {}
 }
 export function viryaRuntimeText(language, key) {
   const catalogs = globalThis.__VIRYA_RUNTIME_I18N__;
@@ -57,8 +57,8 @@ export function viryaRuntimeText(language, key) {
 extern "C" {
     #[wasm_bindgen(js_name = viryaStoredLanguage)]
     fn stored_language_js(key: &str) -> String;
-    #[wasm_bindgen(js_name = viryaSetLanguageAndReload)]
-    fn set_language_and_reload_js(key: &str, value: &str);
+    #[wasm_bindgen(js_name = viryaSetLanguage)]
+    fn set_language_js(key: &str, value: &str);
     #[wasm_bindgen(js_name = viryaRuntimeText)]
     fn runtime_text_js(language: &str, key: &str) -> String;
 }
@@ -87,7 +87,7 @@ fn set_current(language: Language) {
 pub fn select(language: Language) {
     if language != current() {
         set_current(language);
-        set_language_and_reload_js(LANGUAGE_STORAGE_KEY, language.code());
+        set_language_js(LANGUAGE_STORAGE_KEY, language.code());
     }
 }
 

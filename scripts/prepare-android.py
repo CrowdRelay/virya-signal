@@ -611,33 +611,43 @@ def _stage_android_push() -> bool:
     )
     if activity is None:
         raise SystemExit("generated Android manifest is missing an unambiguous launcher activity")
-    latarnik_filter = next(
+    app_link_filter = next(
         (node for node in activity.findall("intent-filter")
          if node.attrib.get(f"{{{ANDROID_NS}}}autoVerify") == "true"
          and any(data.attrib.get(f"{{{ANDROID_NS}}}host") == "virya.music" for data in node.findall("data"))),
         None,
     )
-    if latarnik_filter is None:
-        latarnik_filter = ET.SubElement(
+    if app_link_filter is None:
+        app_link_filter = ET.SubElement(
             activity, "intent-filter", {f"{{{ANDROID_NS}}}autoVerify": "true"}
         )
-        ET.SubElement(latarnik_filter, "action", {permission_name: "android.intent.action.VIEW"})
-        ET.SubElement(latarnik_filter, "category", {permission_name: "android.intent.category.DEFAULT"})
-        ET.SubElement(latarnik_filter, "category", {permission_name: "android.intent.category.BROWSABLE"})
-        # Verify only the canonical apex host. Android requires every declared
-        # host to serve its own assetlinks.json without redirects; keeping www
-        # out of the verified filter avoids coupling app-link verification to a
-        # redirecting alias while generated invites already use virya.music.
-        for path_prefix in ("/latarnik", "/pl/latarnik", "/my-signal", "/pl/my-signal"):
-            ET.SubElement(
-                latarnik_filter,
-                "data",
-                {
-                    f"{{{ANDROID_NS}}}scheme": "https",
-                    f"{{{ANDROID_NS}}}host": "virya.music",
-                    f"{{{ANDROID_NS}}}pathPrefix": path_prefix,
-                },
-            )
+
+    def ensure_intent_child(tag: str, name: str) -> None:
+        if not any(
+            node.attrib.get(permission_name) == name
+            for node in app_link_filter.findall(tag)
+        ):
+            ET.SubElement(app_link_filter, tag, {permission_name: name})
+
+    ensure_intent_child("action", "android.intent.action.VIEW")
+    ensure_intent_child("category", "android.intent.category.DEFAULT")
+    ensure_intent_child("category", "android.intent.category.BROWSABLE")
+
+    # Verify only the canonical apex host. Android requires every declared host
+    # to serve its own assetlinks.json without redirects. Reconcile each path on
+    # every run because generated Android trees can survive across source
+    # upgrades and may already contain an older Latarnik-only verified filter.
+    for path_prefix in ("/latarnik", "/pl/latarnik", "/my-signal", "/pl/my-signal"):
+        expected = {
+            f"{{{ANDROID_NS}}}scheme": "https",
+            f"{{{ANDROID_NS}}}host": "virya.music",
+            f"{{{ANDROID_NS}}}pathPrefix": path_prefix,
+        }
+        if not any(
+            all(data.attrib.get(key) == value for key, value in expected.items())
+            for data in app_link_filter.findall("data")
+        ):
+            ET.SubElement(app_link_filter, "data", expected)
     tree.write(manifest, encoding="utf-8", xml_declaration=True)
 
     gradle_text = gradle.read_text(encoding="utf-8")

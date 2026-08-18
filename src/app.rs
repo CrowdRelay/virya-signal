@@ -62,6 +62,71 @@ thread_local! {
     static NEXT_RESUME_REFRESH_ID: Cell<u64> = const { Cell::new(1) };
 }
 
+struct LanguageRefreshListener {
+    global: JsValue,
+    event: JsValue,
+    remove_listener: js_sys::Function,
+    callback: Closure<dyn FnMut(JsValue)>,
+}
+
+impl Drop for LanguageRefreshListener {
+    fn drop(&mut self) {
+        let _ = self.remove_listener.call2(
+            &self.global,
+            &self.event,
+            self.callback.as_ref().unchecked_ref(),
+        );
+    }
+}
+
+thread_local! {
+    static LANGUAGE_REFRESH_LISTENER: RefCell<Option<LanguageRefreshListener>> = const { RefCell::new(None) };
+}
+
+fn install_language_refresh(language_refresh: RwSignal<u32>) {
+    LANGUAGE_REFRESH_LISTENER.with(|slot| {
+        if slot.borrow().is_some() {
+            return;
+        }
+
+        let global: JsValue = js_sys::global().into();
+        let Ok(add_listener) =
+            js_sys::Reflect::get(&global, &JsValue::from_str("addEventListener"))
+        else {
+            return;
+        };
+        let Ok(add_listener) = add_listener.dyn_into::<js_sys::Function>() else {
+            return;
+        };
+        let Ok(remove_listener) =
+            js_sys::Reflect::get(&global, &JsValue::from_str("removeEventListener"))
+        else {
+            return;
+        };
+        let Ok(remove_listener) = remove_listener.dyn_into::<js_sys::Function>() else {
+            return;
+        };
+        let event = JsValue::from_str("virya:language-change");
+        let callback = Closure::<dyn FnMut(JsValue)>::new(move |_| {
+            let _ = language_refresh.try_update(|value| {
+                *value = value.wrapping_add(1).max(1);
+            });
+        });
+        if add_listener
+            .call2(&global, &event, callback.as_ref().unchecked_ref())
+            .is_err()
+        {
+            return;
+        }
+        *slot.borrow_mut() = Some(LanguageRefreshListener {
+            global,
+            event,
+            remove_listener,
+            callback,
+        });
+    });
+}
+
 fn unregister_resume_refresh(subscriber_id: u64) {
     RESUME_REFRESH_LISTENER.with(|slot| {
         let mut slot = slot.borrow_mut();
@@ -235,6 +300,8 @@ fn persist_root_mode(mode: RootMode) {
 pub fn App() -> impl IntoView {
     let mode = RwSignal::new(persisted_root_mode());
     let operator_status = RwSignal::new(SessionStatus::default());
+    let operator_dashboard = RwSignal::new(None::<DashboardData>);
+    let operator_tab = RwSignal::new(OperatorTab::Home);
     let fan_status = RwSignal::new(FanSessionStatus::default());
     let beacon_status = RwSignal::new(BeaconSessionStatus::default());
     let beacon_pending_link = RwSignal::new(false);
@@ -252,7 +319,9 @@ pub fn App() -> impl IntoView {
     let operator_push_target = RwSignal::new(None::<String>);
     let beacon_push_target = RwSignal::new(None::<String>);
     let error = RwSignal::new(None::<String>);
+    let language_refresh = RwSignal::new(0_u32);
     install_root_resume_refresh(status_refresh);
+    install_language_refresh(language_refresh);
 
     Effect::new(move |_| {
         persist_root_mode(mode.get());
@@ -424,7 +493,13 @@ pub fn App() -> impl IntoView {
 
     view! {
         <main class="app-shell">
-            {move || match mode.get() {
+            {move || {
+                // Translation strings are intentionally external to the WASM and
+                // evaluated while a component subtree is built. Rebuild only the
+                // active portal after a language change instead of reloading the
+                // WebView, which would destroy transient Team-mode state on Android.
+                language_refresh.get();
+                match mode.get() {
                 RootMode::Fan => view! {
                     <FanPortal
                         mode=mode
@@ -455,6 +530,8 @@ pub fn App() -> impl IntoView {
                     <OperatorPortal
                         mode=mode
                         status=operator_status
+                        dashboard=operator_dashboard
+                        tab=operator_tab
                         status_loading=operator_status_loading
                         status_failed=operator_status_failed
                         status_refresh=status_refresh
@@ -462,6 +539,7 @@ pub fn App() -> impl IntoView {
                         error=error
                     />
                 }.into_any(),
+                }
             }}
             <Toast error=error />
         </main>

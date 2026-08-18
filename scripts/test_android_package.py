@@ -67,8 +67,19 @@ class AndroidPackageTests(unittest.TestCase):
         workflow = (ROOT / ".github" / "workflows" / "_android-build.yml").read_text()
         self.assertIn("FIREBASE_CONFIG: ${{ secrets.VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64 }}", workflow)
         self.assertIn("Missing VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64 for signed push-capable build", workflow)
+        self.assertIn("--tauri-config src-tauri/tauri.conf.json", workflow)
+        self.assertIn("--push-build-config src-tauri/gen/android/push-build-config.json", workflow)
+        self.assertIn('check-android-firebase-artifact.py "${package}"', workflow)
+        self.assertIn('check-android-app-links-artifact.py "${package}"', workflow)
         self.assertIn('receipt.get("firebaseConfigured") is not True', workflow)
         self.assertIn("SIGNAL_ANDROID_PUSH_BUILD_GATE=PASS", workflow)
+
+    def test_every_google_play_track_requires_push_capable_artifact(self):
+        play = (ROOT / ".github/workflows/android-play.yml").read_text()
+        verify = play.split("- name: Verify exact build artifact", 1)[1].split("- name: Upload exact AAB", 1)[0]
+        self.assertIn(".firebaseConfigured == true", verify)
+        self.assertIn(".push.firebaseConfigured == true", verify)
+        self.assertNotIn("inputs.play_track == 'production'", verify)
 
 if __name__ == "__main__":
     unittest.main()

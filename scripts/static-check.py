@@ -59,6 +59,8 @@ required = [
     'scripts/test-boot.mjs', 'scripts/check-web-dist.py',
     'scripts/configure-android-signing.py',
     'scripts/analyze-android-package.py',
+    'scripts/check-android-firebase-artifact.py',
+    'scripts/check-android-app-links-artifact.py',
     'scripts/profile-android.sh',
     'scripts/install-android-sdk.sh', 'scripts/quality-fix.sh',
     'src-tauri/icons/icon.ico', 'src-tauri/icons/icon.icns',

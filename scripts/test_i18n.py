@@ -122,6 +122,16 @@ class I18nContracts(unittest.TestCase):
         self.assertIn("Language::En", ui)
         self.assertIn("virya:language:v1", (ROOT / "src/i18n.rs").read_text())
 
+    def test_language_switch_does_not_reload_or_drop_staff_mode(self):
+        source = (ROOT / "src/i18n.rs").read_text()
+        app = (ROOT / "src/app.rs").read_text()
+        self.assertNotIn("window.location.reload()", source)
+        self.assertIn("virya:language-change", source)
+        self.assertIn("install_language_refresh(language_refresh)", app)
+        self.assertIn("language_refresh.get();", app)
+        self.assertIn("dashboard=operator_dashboard", app)
+        self.assertIn("tab=operator_tab", app)
+
     def test_catalog_identifiers_are_english_ascii_snake_case(self):
         for key in self.en:
             self.assertRegex(key, r"^[a-z][a-z0-9_]*$")

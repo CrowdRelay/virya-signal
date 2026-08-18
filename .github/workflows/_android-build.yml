@@ -204,6 +204,13 @@ jobs:
             python3 scripts/analyze-android-package.py "${package}" --require-abi "${required_abi}" --require-page-size 16384
           fi
           cp src-tauri/gen/android/push-build-config.json artifacts/push-build-config.json
+          if [[ "${ext}" == "aab" ]]; then
+            # Inspect the exact artifact that will be uploaded to Play, not only
+            # generated Gradle/source state. This catches missing google-services
+            # processing and stale App Link manifest merges.
+            python3 scripts/check-android-firebase-artifact.py "${package}"
+            python3 scripts/check-android-app-links-artifact.py "${package}"
+          fi
           if [[ "${ext}" == "apk" ]]; then
             zipalign -c -P 16 -v 4 "${package}"
           fi
@@ -213,6 +220,8 @@ jobs:
             --source-sha "${GITHUB_SHA}" \
             --lockfile Cargo.lock \
             --artifact-manifest android-artifact-manifest.json \
+            --tauri-config src-tauri/tauri.conf.json \
+            --push-build-config src-tauri/gen/android/push-build-config.json \
             --output release-provenance.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

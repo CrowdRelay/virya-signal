@@ -141,12 +141,76 @@ dependencies {
             self.assertNotIn('android:host="www.virya.music"', manifest_text)
             self.assertIn('android:pathPrefix="/latarnik"', manifest_text)
             self.assertIn('android:pathPrefix="/pl/latarnik"', manifest_text)
+            self.assertIn('android:pathPrefix="/my-signal"', manifest_text)
+            self.assertIn('android:pathPrefix="/pl/my-signal"', manifest_text)
             push_receipt = json.loads((android / "push-build-config.json").read_text())
             self.assertFalse(push_receipt["firebaseConfigured"])
             self.assertEqual(push_receipt["firebaseMessagingVersion"], "25.1.1")
             self.assertFalse(push_receipt["analyticsIncluded"])
             self.assertFalse(push_receipt["crashlyticsIncluded"])
             self.assertFalse((app / "google-services.json").exists())
+
+    def test_reconciles_synesthesia_paths_into_existing_verified_filter(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            scripts = root / "scripts"
+            android = root / "src-tauri" / "gen" / "android"
+            app = android / "app"
+            scripts.mkdir()
+            app.mkdir(parents=True)
+            shutil.copy2(SCRIPT, scripts / SCRIPT.name)
+            seed_tauri_conf(root)
+            shutil.copytree(PUSH_TEMPLATES, root / "src-tauri" / "android-push")
+            shutil.copytree(ANDROID_ICONS, root / "src-tauri" / "icons" / "android")
+            res = app / "src" / "main" / "res" / "mipmap-anydpi-v26"
+            res.mkdir(parents=True)
+            res.joinpath("ic_launcher.xml").write_text(
+                '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">'
+                '<background android:drawable="@color/x"/>'
+                '<foreground android:drawable="@mipmap/ic_launcher_foreground"/></adaptive-icon>'
+            )
+            app.joinpath("build.gradle.kts").write_text(
+                'plugins {\n    id("com.android.application")\n}\n\nandroid {\n'
+                '    compileSdk = 35\n    defaultConfig { targetSdk = 35 }\n'
+                '    buildTypes {\n        getByName("release") {\n'
+                '            isMinifyEnabled = false\n        }\n    }\n}\n\ndependencies {\n}\n'
+            )
+            manifest = app / "src" / "main" / "AndroidManifest.xml"
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
+                '<application><activity android:name=".MainActivity">'
+                '<intent-filter android:autoVerify="true">'
+                '<action android:name="android.intent.action.VIEW"/>'
+                '<category android:name="android.intent.category.DEFAULT"/>'
+                '<category android:name="android.intent.category.BROWSABLE"/>'
+                '<data android:scheme="https" android:host="virya.music" android:pathPrefix="/latarnik"/>'
+                '</intent-filter></activity></application></manifest>'
+            )
+
+            result = subprocess.run(
+                ["python3", str(scripts / SCRIPT.name)],
+                cwd=root,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            manifest_text = manifest.read_text()
+            for path in ("/latarnik", "/pl/latarnik", "/my-signal", "/pl/my-signal"):
+                self.assertEqual(manifest_text.count(f'android:pathPrefix="{path}"'), 1)
+
+            second = subprocess.run(
+                ["python3", str(scripts / SCRIPT.name)],
+                cwd=root,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(second.returncode, 0, second.stderr)
+            manifest_text = manifest.read_text()
+            for path in ("/latarnik", "/pl/latarnik", "/my-signal", "/pl/my-signal"):
+                self.assertEqual(manifest_text.count(f'android:pathPrefix="{path}"'), 1)
 
     def test_configures_firebase_only_with_valid_secret(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
