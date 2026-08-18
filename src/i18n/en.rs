@@ -243,7 +243,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "language" => "Language",
         "app_language" => "App language",
         "changing_the_language_reloads_the_interface_your" => {
-            "Changing the language reloads the interface. Your data and session remain unchanged."
+            "Language changes apply immediately. Your data and session stay unchanged."
         }
         "polish" => "Polish",
         "english" => "English",
@@ -465,6 +465,12 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "refresh_data" => "Refresh data",
         "lock_app" => "Lock app",
         "remove_profile_and_tickets_from_device" => "Remove profile and tickets from device",
+        "delete_virya_account" => "Delete Virya account",
+        "delete_account_warning" => {
+            "This permanently deletes your Virya fan account, removes push registration and public Synesthesia identity, and signs this device out. Paid ticket and consent records may be retained where required for fulfilment, accounting or audit."
+        }
+        "confirm_delete_account" => "Yes, delete my account",
+        "cancel_delete_account" => "Cancel",
         "fan_session_admission_pass_and_private_wallet" => {
             "The fan session, admission pass and private wallet tokens are stored in a separate encrypted Stronghold vault."
         }
@@ -928,6 +934,9 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "fan_360_summary" => "Fan 360 · aggregates",
         "ticket_buyers" => "ticket buyers",
         "concert_attendees" => "concert attendees",
+        "remove_from_leaderboard" => "Remove me from ranking",
+        "removing_from_leaderboard" => "Removing…",
+        "leaderboard_unpublish_failed" => "Could not remove the public ranking entry. Try again.",
         "synesthesia_participants" => "Synesthesia",
         "qualified_referrals" => "qualified referrals",
         "ticket_revenue" => "ticket revenue",
@@ -1052,6 +1061,9 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "Android is blocking notifications. Enable them for Virya Signal in your phone settings."
         }
         "push_notifications_waiting_backend" => "The push channel is not live in VIRYA OS yet.",
+        "push_firebase_not_configured" => {
+            "Firebase is not initialized in this build. Install the latest Play test build."
+        }
         "push_notifications_degraded" => {
             "Push synchronization could not be confirmed. Retry without changing the setting."
         }

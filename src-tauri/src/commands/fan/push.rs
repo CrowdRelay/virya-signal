@@ -44,6 +44,16 @@ pub(crate) fn request_native_push_permission(_app: &AppHandle) -> Result<String,
 }
 
 #[cfg(target_os = "android")]
+pub(crate) fn native_firebase_configured(app: &AppHandle) -> Result<bool, String> {
+    crate::push_plugin::firebase_configured(app)
+}
+
+#[cfg(not(target_os = "android"))]
+pub(crate) fn native_firebase_configured(_app: &AppHandle) -> Result<bool, String> {
+    Ok(false)
+}
+
+#[cfg(target_os = "android")]
 pub(crate) fn native_push_token(app: &AppHandle) -> Result<String, String> {
     crate::push_plugin::token(app)
 }
@@ -120,16 +130,19 @@ pub(crate) async fn current_native_push_status(
         Ok(config) => (config.enabled && config.android_fcm, None),
         Err(error) => (false, Some(format!("push_config_unavailable:{error}"))),
     };
+    let firebase_configured = native_firebase_configured(app).unwrap_or(false);
+    let provider_detail = (!firebase_configured).then(|| "firebase_not_configured".to_owned());
     FanPushStatus {
         supported,
         backend_enabled,
         enabled: profile.push_enabled
             && profile.push_last_sync_ok
             && backend_enabled
+            && firebase_configured
             && permission == "granted",
         permission,
         transport: Some("android_fcm".to_owned()),
-        detail: detail.or(config_detail),
+        detail: detail.or(config_detail).or(provider_detail),
     }
 }
 

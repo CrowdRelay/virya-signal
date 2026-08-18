@@ -135,6 +135,8 @@ impl super::CrowdRelayClient {
         &self,
         profile: &OperatorProfile,
     ) -> Result<super::fan::FanPushConfigApi, AppError> {
+        self.require_capability(&profile.api_base_url, "staff_show_checklist_push_v1")
+            .await?;
         let response = self
             .http
             .get(super::http::endpoint(
@@ -153,6 +155,8 @@ impl super::CrowdRelayClient {
         installation_id: &str,
         fcm_token: &str,
     ) -> Result<super::fan::FanPushMutationApi, AppError> {
+        self.require_capability(&profile.api_base_url, "staff_show_checklist_push_v1")
+            .await?;
         let body = serde_json::json!({
             "installation_id": installation_id,
             "transport": "android_fcm",
@@ -169,6 +173,8 @@ impl super::CrowdRelayClient {
         profile: &OperatorProfile,
         installation_id: &str,
     ) -> Result<super::fan::FanPushMutationApi, AppError> {
+        self.require_capability(&profile.api_base_url, "staff_show_checklist_push_v1")
+            .await?;
         let body = serde_json::json!({
             "installation_id": installation_id,
             "transport": "android_fcm",

@@ -229,6 +229,27 @@ fn FanProfileScreen(
             }
         })
     };
+    let delete_confirming = RwSignal::new(false);
+    let delete_account = move |_| {
+        if !delete_confirming.get_untracked() {
+            delete_confirming.set(true);
+            return;
+        }
+        spawn_local(async move {
+            match bridge::invoke::<FanSessionStatus, _>("fan_delete_account", &EmptyArgs {}).await {
+                Ok(value) => {
+                    dashboard.set(None);
+                    wallets.set(Vec::new());
+                    area.set(None);
+                    loading.set(FanLoadingState::all());
+                    delete_confirming.set(false);
+                    status.set(value);
+                }
+                Err(message) => error.set(Some(message)),
+            }
+        })
+    };
+    let cancel_delete = move |_| delete_confirming.set(false);
     view! {
         <section class="screen">
             <header class="screen-title"><p class="eyebrow">{tr("my_profile")}</p><h2>{tr("signal_settings")}</h2></header>
@@ -243,6 +264,16 @@ fn FanProfileScreen(
                 <button on:click=refresh disabled=move || { let state = loading.get(); state.events || state.referral || state.interests || state.admission_pass || state.wallets }>{move || { let state = loading.get(); if state.events || state.referral || state.interests || state.admission_pass || state.wallets { tr("refreshing_2") } else { tr("refresh_data") } }}</button>
                 <button on:click=lock>{tr("lock_app")}</button>
                 <button class="danger ghost" on:click=forget>{tr("remove_profile_and_tickets_from_device")}</button>
+                <button class="danger ghost" on:click=delete_account>{tr("delete_virya_account")}</button>
+                <Show when=move || delete_confirming.get()>
+                    <div class="security-note">
+                        <p>{tr("delete_account_warning")}</p>
+                        <div class="button-row">
+                            <button class="danger" on:click=delete_account>{tr("confirm_delete_account")}</button>
+                            <button class="ghost" on:click=cancel_delete>{tr("cancel_delete_account")}</button>
+                        </div>
+                    </div>
+                </Show>
             </div>
             <AnonymousFeedback error=error />
             <p class="security-note">{tr("fan_session_admission_pass_and_private_wallet")}</p>

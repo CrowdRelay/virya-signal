@@ -37,6 +37,7 @@ fn FanHomeOverview(
     focused_event_preview: RwSignal<Option<PublicEvent>>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
+    let leaderboard_busy = RwSignal::new(false);
     view! {
         <section class="fan-home-overview">
             <Show when=move || !loading.get().home fallback=move || view! { <Skeleton rows=3 /> }>
@@ -84,6 +85,37 @@ fn FanHomeOverview(
                                     <small>{format!("{}/11", synesthesia.rooms_completed.clamp(0, 11))}</small>
                                 </Show>
                                 <ExternalLink url="https://synesthesia.virya.music/?source=signal-app&resume=1".to_owned() label=if synesthesia.started { tr("open_synesthesia") } else { tr("enter_synesthesia") } error=error />
+                                <Show when=move || bridge::native_available() && synesthesia.leaderboard_published>
+                                    <button
+                                        class="ghost"
+                                        disabled=move || leaderboard_busy.get()
+                                        on:click=move |_| {
+                                            if leaderboard_busy.get_untracked() {
+                                                return;
+                                            }
+                                            leaderboard_busy.set(true);
+                                            spawn_local(async move {
+                                                match bridge::invoke_timeout::<bool, _>(
+                                                    "fan_unpublish_synesthesia_leaderboard",
+                                                    &EmptyArgs {},
+                                                    12_000,
+                                                )
+                                                .await
+                                                {
+                                                    Ok(true) => home.update(|current| {
+                                                        if let Some(snapshot) = current {
+                                                            snapshot.synesthesia.leaderboard_published = false;
+                                                            snapshot.synesthesia.leaderboard_rank = None;
+                                                        }
+                                                    }),
+                                                    Ok(false) => error.set(Some(tr("leaderboard_unpublish_failed").to_owned())),
+                                                    Err(message) => error.set(Some(message)),
+                                                }
+                                                leaderboard_busy.set(false);
+                                            });
+                                        }
+                                    >{move || if leaderboard_busy.get() { tr("removing_from_leaderboard") } else { tr("remove_from_leaderboard") }}</button>
+                                </Show>
                             </article>
                             {next_event.map(|event| {
                                 let ticket_url = event.ticket_url.clone();
@@ -312,6 +344,8 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
                     {move || status.get().map(|current| {
                         let message = if !current.supported {
                             tr("push_notifications_degraded")
+                        } else if current.detail.as_deref() == Some("firebase_not_configured") {
+                            tr("push_firebase_not_configured")
                         } else if !current.backend_enabled {
                             tr("push_notifications_waiting_backend")
                         } else if current.permission == "denied" {

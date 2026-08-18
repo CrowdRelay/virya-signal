@@ -36,6 +36,9 @@ require(contracts, "pub push: QueueSummary", "ops-push-summary")
 require(push_plugin, "SignalPushPlugin", "android-fcm-plugin")
 for needle in (
     "FirebaseMessaging.getInstance().token",
+    "FirebaseApp.initializeApp(context)",
+    "ensureFirebaseInitialized",
+    "getFirebaseState",
     "Manifest.permission.POST_NOTIFICATIONS",
     "getNotificationPermissionState",
     "requestNotificationPermission",
@@ -48,6 +51,7 @@ for needle in (
 for forbidden in ("override fun checkPermissions", "override fun requestPermissions"):
     if forbidden in kotlin_plugin:
         raise SystemExit(f"SIGNAL_PUSH_CONTROL=FAIL inherited-command-collision={forbidden}")
+require(push_plugin, '"getFirebaseState"', "rust-native-firebase-state-command")
 require(push_plugin, '"getNotificationPermissionState"', "rust-native-permission-command")
 require(push_plugin, '"requestNotificationPermission"', "rust-native-request-command")
 require(push_plugin, '"openNotificationSettings"', "rust-native-settings-command")
@@ -56,6 +60,8 @@ require(kotlin_service, "FirebaseMessagingService", "firebase-message-service")
 require(kotlin_service, 'getIdentifier("virya_signal_notification", "drawable", packageName)', "notification-monochrome-icon")
 require(kotlin_service, 'putExtra("virya_push_target_path", targetPath)', "notification-launch-target")
 require(fan_home, "enable_after_settings", "push-settings-resume-intent")
+require(fan_home, 'push_firebase_not_configured', "firebase-runtime-visible")
+require(fan, "native_firebase_configured", "firebase-runtime-state")
 fan_resume = fan_home.split("fn NativePushControl", 1)[1].split("let toggle", 1)[0]
 require(fan_resume, '"fan_push_sync"', "push-settings-refresh-before-enable")
 require(fan_resume, '"fan_push_enable"', "push-settings-auto-enable")

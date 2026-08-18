@@ -92,6 +92,8 @@ impl FanHomeData {
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct FanHomeProfile {
     pub display_name: Option<String>,
+    #[allow(dead_code)]
+    pub locale: Option<String>,
     pub primary_city: Option<String>,
 }
 

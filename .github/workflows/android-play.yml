@@ -53,9 +53,11 @@ jobs:
           python3 promoted/scripts/artifact_manifest.py verify promoted/artifacts promoted/android-artifact-manifest.json --source-sha "$GITHUB_SHA"
           test -s promoted/release-provenance.json
           test -f "promoted/artifacts/virya-signal-${{ inputs.version }}.aab"
-          if [[ "${{ inputs.play_track }}" == "production" ]]; then
-            jq -e '.firebaseConfigured == true and .analyticsIncluded == false and .crashlyticsIncluded == false' promoted/artifacts/push-build-config.json >/dev/null
-          fi
+          # Internal/alpha/beta are where push is tested, so they must have the
+          # same Firebase guarantee as production. Never upload a known-degraded
+          # signed AAB to any Play track.
+          jq -e '.firebaseConfigured == true and .analyticsIncluded == false and .crashlyticsIncluded == false' promoted/artifacts/push-build-config.json >/dev/null
+          jq -e '.push.firebaseConfigured == true and (.push.firebaseConfigSha256 | test("^[0-9a-f]{64}$"))' promoted/release-provenance.json >/dev/null
       - name: Upload exact AAB to Google Play
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1
         with:

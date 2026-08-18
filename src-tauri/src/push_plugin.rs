@@ -29,6 +29,12 @@ mod android {
 
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
+    struct FirebaseStateResponse {
+        configured: bool,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
     struct LaunchTargetResponse {
         target_path: String,
     }
@@ -67,6 +73,14 @@ mod android {
             return Err("invalid FCM token returned by Android".to_owned());
         }
         Ok(token.to_owned())
+    }
+
+    pub fn firebase_configured<R: Runtime>(app: &AppHandle<R>) -> Result<bool, String> {
+        handle(app)
+            .0
+            .run_mobile_plugin::<FirebaseStateResponse>("getFirebaseState", ())
+            .map(|response| response.configured)
+            .map_err(|error| error.to_string())
     }
 
     pub fn permission<R: Runtime>(app: &AppHandle<R>) -> Result<String, String> {

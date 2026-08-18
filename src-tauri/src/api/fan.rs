@@ -42,6 +42,11 @@ struct FanConfirmationApiResponse {
     display_name: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct FanAccountDeletionApiResponse {
+    deleted: bool,
+}
+
 fn fan_home_key(profile: &FanProfile) -> String {
     let mut hasher = DefaultHasher::new();
     profile.api_base_url.hash(&mut hasher);
@@ -104,6 +109,31 @@ impl super::CrowdRelayClient {
             .get(key)
             .filter(|entry| entry.fetched_at.elapsed() < max_age)
             .map(|entry| entry.value.clone())
+    }
+
+    pub async fn fan_delete_account(&self, profile: &FanProfile) -> Result<(), AppError> {
+        self.require_capability(&profile.api_base_url, "fan_account_deletion_v1")
+            .await?;
+        let response = self
+            .fan_json::<FanAccountDeletionApiResponse, ()>(
+                profile,
+                Method::DELETE,
+                "me/account",
+                None,
+            )
+            .await?;
+        if !response.deleted {
+            return Err(AppError::Conflict(
+                "fan_account_deletion_not_confirmed".to_owned(),
+            ));
+        }
+        self.invalidate_fan_home(profile).await;
+        Ok(())
+    }
+
+    pub(super) async fn invalidate_fan_home(&self, profile: &FanProfile) {
+        let key = fan_home_key(profile);
+        self.fan_home_cache.write().await.remove(&key);
     }
 
     pub async fn fan_events(&self, profile: &FanProfile) -> Result<Vec<PublicEvent>, AppError> {
@@ -327,6 +357,8 @@ impl super::CrowdRelayClient {
         &self,
         profile: &FanProfile,
     ) -> Result<FanPushConfigApi, AppError> {
+        self.require_capability(&profile.api_base_url, "fan_push_delivery_v1")
+            .await?;
         let response = self
             .http
             .get(endpoint(&profile.api_base_url, "public/push/config")?)
@@ -342,6 +374,8 @@ impl super::CrowdRelayClient {
         installation_id: &str,
         fcm_token: &str,
     ) -> Result<FanPushMutationApi, AppError> {
+        self.require_capability(&profile.api_base_url, "fan_push_delivery_v1")
+            .await?;
         let body = serde_json::json!({
             "installation_id": installation_id,
             "transport": "android_fcm",
@@ -358,6 +392,8 @@ impl super::CrowdRelayClient {
         profile: &FanProfile,
         installation_id: &str,
     ) -> Result<FanPushMutationApi, AppError> {
+        self.require_capability(&profile.api_base_url, "fan_push_delivery_v1")
+            .await?;
         let body = serde_json::json!({
             "installation_id": installation_id,
             "transport": "android_fcm",

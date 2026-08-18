@@ -36,6 +36,7 @@ use super::{
 
 pub(super) const FAN_COOKIE: &str = "crowdrelay_fan";
 pub(super) const PASS_COOKIE: &str = "crowdrelay_pass_session";
+const MIN_ECOSYSTEM_SCHEMA_VERSION: u32 = 68;
 pub(super) const WALLET_REQUEST_TIMEOUT: Duration = Duration::from_secs(12);
 const MERCH_CACHE_TTL: Duration = Duration::from_secs(15);
 const MERCH_STALE_TTL: Duration = Duration::from_secs(10 * 60);
@@ -199,6 +200,8 @@ impl CrowdRelayClient {
         api_base_url: &str,
         pairing_code: &str,
     ) -> Result<StaffPairingExchange, AppError> {
+        self.require_capability(api_base_url, "staff_device_sessions_v2")
+            .await?;
         let pairing_code = pairing_code.trim();
         if !(24..=128).contains(&pairing_code.len())
             || !pairing_code
@@ -239,7 +242,7 @@ impl CrowdRelayClient {
         self.report_rum_background(api_base_url, "api_latency_ms", latency_ms, "meta");
         self.report_rum_background(api_base_url, "cold_start_ms", cold_start_ms, "meta");
         if meta.api_version != "1"
-            || meta.schema_version < 36
+            || meta.schema_version < MIN_ECOSYSTEM_SCHEMA_VERSION
             || meta.minimum_postgres_server_version_num < 180_000
         {
             return Err(AppError::Remote {
