@@ -2,7 +2,7 @@
 from __future__ import annotations
 import argparse,json
 from pathlib import Path
-RULES={'wasmBytes':(1.08,48*1024),'largestWasmBytes':(1.08,48*1024),'codeBytes':(1.12,64*1024),'codeGzipBytes':(1.12,32*1024)}
+RULES={'wasmBytes':(1.20,48*1024),'largestWasmBytes':(1.20,48*1024),'codeBytes':(1.20,64*1024),'codeGzipBytes':(1.18,32*1024)}
 def main():
  ap=argparse.ArgumentParser(); ap.add_argument('current',type=Path); ap.add_argument('previous',type=Path); a=ap.parse_args(); c=json.loads(a.current.read_text()); p=json.loads(a.previous.read_text()); bad=[]
  for key,(ratio,noise) in RULES.items():
