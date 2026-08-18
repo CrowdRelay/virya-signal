@@ -190,6 +190,7 @@ pub async fn scan_qr() -> Result<Option<String>, String> {
 }
 
 pub async fn scan_and_confirm_fan() -> Result<Option<crate::models::FanSessionStatus>, String> {
+    #[cfg(debug_assertions)]
     #[derive(Serialize)]
     struct ScannedTokenArgs<'a> {
         token: &'a str,
@@ -218,6 +219,7 @@ pub async fn scan_and_confirm_fan() -> Result<Option<crate::models::FanSessionSt
 }
 
 pub async fn scan_and_confirm_beacon() -> Result<Option<crate::models::BeaconSessionStatus>, String> {
+    #[cfg(debug_assertions)]
     #[derive(Serialize)]
     struct ScannedTokenArgs<'a> {
         token: &'a str,
