@@ -24,29 +24,20 @@ end
 
 # Przywróć środowisko Androida również w świeżym terminalu.
 set -gx ANDROID_HOME "$HOME/Library/Android/sdk"
+set -gx ANDROID_SDK_ROOT "$ANDROID_HOME"
 
-if not set -q JAVA_HOME
-    if brew list --formula openjdk@21 >/dev/null 2>&1
-        set -gx JAVA_HOME (brew --prefix openjdk@21)/libexec/openjdk.jdk/Contents/Home
-    end
-end
-
-if not set -q NDK_HOME
-    set -gx NDK_HOME "$ANDROID_HOME/ndk/29.0.14206865"
-end
-
-test -x "$JAVA_HOME/bin/java"; or begin
-    echo "ERROR: invalid JAVA_HOME=$JAVA_HOME" >&2
-    exit 1
-end
+set -gx NDK_HOME "$ANDROID_HOME/ndk/29.0.14206865"
+set -gx ANDROID_NDK_HOME "$NDK_HOME"
 
 test -d "$ANDROID_HOME/platforms/android-36"; or begin
-    echo "ERROR: Android API 36 missing" >&2
+    echo "ERROR: Android API 36 missing: $ANDROID_HOME/platforms/android-36" >&2
     exit 1
 end
 
 test -d "$NDK_HOME"; or begin
-    echo "ERROR: invalid NDK_HOME=$NDK_HOME" >&2
+    echo "ERROR: Signal NDK missing: $NDK_HOME" >&2
+    echo "Available NDKs:" >&2
+    ls "$ANDROID_HOME/ndk" 2>/dev/null
     exit 1
 end
 
