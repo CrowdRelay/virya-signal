@@ -8,3 +8,4 @@ pub(crate) mod misc;
 pub(crate) mod operator;
 pub(crate) mod pairing;
 pub(crate) mod show_mode;
+pub(crate) mod synesthesia;

@@ -121,6 +121,26 @@ mod android {
         Ok(Some(link.to_owned()))
     }
 
+    pub fn take_synesthesia_app_link<R: Runtime>(
+        app: &AppHandle<R>,
+    ) -> Result<Option<String>, String> {
+        let response = handle(app)
+            .0
+            .run_mobile_plugin::<AppLinkResponse>("takeSynesthesiaAppLink", ())
+            .map_err(|error| error.to_string())?;
+        let link = response.app_link.trim();
+        if link.is_empty() {
+            if response.rejected {
+                return Err("rejected_synesthesia_app_link".to_owned());
+            }
+            return Ok(None);
+        }
+        if link.len() > 1024 || !link.is_ascii() {
+            return Err("invalid_synesthesia_app_link".to_owned());
+        }
+        Ok(Some(link.to_owned()))
+    }
+
     pub fn open_notification_settings<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
         handle(app)
             .0

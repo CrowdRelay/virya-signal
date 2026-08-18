@@ -21,6 +21,7 @@ const viryaTemplate = (text, name, value) => String(text).replace(`{${name}}`, S
 const VIRYA_OPERATION_STORAGE_KEY = 'virya:last-operation:v3';
 const VIRYA_FAN_TAB_STORAGE_KEY = 'virya:fan-tab:v1';
 const VIRYA_ROOT_MODE_STORAGE_KEY = 'virya:root-mode:v1';
+const VIRYA_TRANSIENT_ROOT_MODE_STORAGE_KEY = 'virya:root-mode-transient:v1';
 
 export function viryaReadFanTab() {
   try {
@@ -39,6 +40,9 @@ export function viryaWriteFanTab(value) {
 
 export function viryaReadRootMode() {
   try {
+    if (window.sessionStorage?.getItem(VIRYA_TRANSIENT_ROOT_MODE_STORAGE_KEY) === 'team') {
+      return 'team';
+    }
     const value = String(window.localStorage?.getItem(VIRYA_ROOT_MODE_STORAGE_KEY) ?? 'fan');
     return value === 'latarnik' ? 'latarnik' : 'fan';
   } catch {
@@ -47,8 +51,16 @@ export function viryaReadRootMode() {
 }
 
 export function viryaWriteRootMode(value) {
-  const safe = String(value) === 'latarnik' ? 'latarnik' : 'fan';
-  try { window.localStorage?.setItem(VIRYA_ROOT_MODE_STORAGE_KEY, safe); } catch {}
+  const requested = String(value);
+  try {
+    if (requested === 'team') {
+      window.sessionStorage?.setItem(VIRYA_TRANSIENT_ROOT_MODE_STORAGE_KEY, 'team');
+      return;
+    }
+    window.sessionStorage?.removeItem(VIRYA_TRANSIENT_ROOT_MODE_STORAGE_KEY);
+    const safe = requested === 'latarnik' ? 'latarnik' : 'fan';
+    window.localStorage?.setItem(VIRYA_ROOT_MODE_STORAGE_KEY, safe);
+  } catch {}
 }
 
 

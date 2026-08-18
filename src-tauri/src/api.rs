@@ -7,6 +7,7 @@ mod operator;
 mod public;
 mod retry;
 mod site;
+mod synesthesia;
 mod ticketing;
 
 pub use client::CrowdRelayClient;
