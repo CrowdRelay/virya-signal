@@ -1259,6 +1259,23 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "To ustawi globalny brak kontaktu: Latarnik zostanie wyłączony, a VIRYA nie będzie mogła używać tej relacji do outreachu."
         }
         "latarnik_confirm_action" => "POTWIERDZAM",
+        "affiliate_disclosure" => {
+            "Linki afiliacyjne. Zakup może przynieść VIRYA prowizję bez dodatkowych kosztów dla Ciebie."
+        }
+        "affiliate_eyebrow" => "SPRZĘT VIRYA",
+        "affiliate_general_cta" => "ZACZNIJ PRZEZ VIRYA ↗",
+        "affiliate_general_note" => {
+            "Zacznij przez VIRYA. Twój zakup może wesprzeć kolejne koncerty i projekty."
+        }
+        "affiliate_general_title" => "I tak robisz zakupy w Thomannie?",
+        "affiliate_intro" => {
+            "Bez katalogu sponsorów. Tylko rzeczy, które faktycznie trafiają do naszego live rigu."
+        }
+        "affiliate_product_cta" => "SPRAWDŹ W THOMANN ↗",
+        "affiliate_product_note" => "Nasz główny procesor gitarowy i centrum live rigu.",
+        "affiliate_section_aria" => "Sprzęt VIRYA i linki afiliacyjne Thomann",
+        "affiliate_title" => "Sprzęt, którego naprawdę używamy",
+        "affiliate_used_live" => "UŻYWAMY NA ŻYWO",
         _ => key,
     }
 }

@@ -47,6 +47,22 @@ class I18nContracts(unittest.TestCase):
         source = (ROOT / "src/i18n.rs").read_text()
         self.assertNotIn("mod pl;", source)
         self.assertNotIn("mod en;", source)
+        # Naming the two known catalogs let a third slip in: src/i18n/affiliate.rs
+        # put 22 hardcoded strings back into the WASM data section without
+        # tripping anything. Any module under src/i18n/ that carries user-facing
+        # copy belongs in runtime-i18n.js, so assert on the shape rather than on
+        # the filenames we happened to think of.
+        copy_modules = sorted(
+            path.stem
+            for path in (ROOT / "src/i18n").glob("*.rs")
+            if '"' in path.read_text() and path.stem not in {"pl", "en"}
+        )
+        self.assertEqual(
+            copy_modules,
+            [],
+            "these src/i18n modules hold literal copy that should live in "
+            "runtime-i18n.js: " + ", ".join(copy_modules),
+        )
         self.assertIn("viryaRuntimeText", source)
         self.assertIn("TRANSLATION_CACHE", source)
         self.assertIn("Box::leak", source)
