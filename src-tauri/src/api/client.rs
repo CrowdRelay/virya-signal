@@ -48,6 +48,9 @@ fn transient_public_status(status: reqwest::StatusCode) -> bool {
 const PRODUCTION_STAFF_GATE_URL: &str = "https://virya.music/api/staff/qr/login";
 const PRODUCTION_STAFF_GATE_ORIGIN: &str = "https://virya.music";
 
+// Only the debug_assertions consts below call this; in release the E2E
+// overrides are compiled out and so is their helper.
+#[cfg(debug_assertions)]
 const fn staff_gate_env_or_default(
     env: Option<&'static str>,
     default: &'static str,
