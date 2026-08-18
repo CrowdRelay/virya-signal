@@ -1253,6 +1253,23 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "This sets a global do-not-contact preference: Latarnik is disabled and VIRYA must not use this relationship for outreach."
         }
         "latarnik_confirm_action" => "CONFIRM",
+        "affiliate_disclosure" => {
+            "Affiliate links. A purchase may earn VIRYA a commission at no extra cost to you."
+        }
+        "affiliate_eyebrow" => "VIRYA GEAR",
+        "affiliate_general_cta" => "START THROUGH VIRYA ↗",
+        "affiliate_general_note" => {
+            "Start through VIRYA. Your purchase can help support future shows and projects."
+        }
+        "affiliate_general_title" => "Already shopping at Thomann?",
+        "affiliate_intro" => {
+            "No sponsor catalogue. Just equipment that is genuinely part of our live rig."
+        }
+        "affiliate_product_cta" => "VIEW AT THOMANN ↗",
+        "affiliate_product_note" => "Our main guitar processor and the centre of the live rig.",
+        "affiliate_section_aria" => "VIRYA gear and Thomann affiliate links",
+        "affiliate_title" => "Gear we actually use",
+        "affiliate_used_live" => "USED LIVE",
         _ => key,
     }
 }

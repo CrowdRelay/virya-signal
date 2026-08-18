@@ -4,7 +4,10 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 AFFILIATE = ROOT / "src/app/fan/affiliate.rs"
-AFFILIATE_I18N = ROOT / "src/i18n/affiliate.rs"
+# Affiliate copy lives in the shared PL/EN catalogs like every other string,
+# not in its own Rust module that would ship inside the WASM data section.
+AFFILIATE_PL = ROOT / "src/i18n/pl.rs"
+AFFILIATE_EN = ROOT / "src/i18n/en.rs"
 MERCH = ROOT / "src/app/fan/merch.rs"
 INDEX = ROOT / "index.html"
 POLISH_DIACRITICS = re.compile(r"[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")
@@ -22,14 +25,19 @@ class AffiliateGearContracts(unittest.TestCase):
 
     def test_affiliate_copy_is_localized_and_transparent(self):
         ui = AFFILIATE.read_text(encoding="utf-8")
-        copy = AFFILIATE_I18N.read_text(encoding="utf-8")
+        polish = AFFILIATE_PL.read_text(encoding="utf-8")
+        english = AFFILIATE_EN.read_text(encoding="utf-8")
         self.assertIsNone(POLISH_DIACRITICS.search(ui))
-        self.assertIn("Linki afiliacyjne", copy)
-        self.assertIn("Affiliate links", copy)
-        self.assertIn("bez dodatkowych kosztów", copy)
-        self.assertIn("at no extra cost", copy)
-        self.assertNotIn("3.5%", copy)
-        self.assertNotIn("3,5%", copy)
+        # The component must reach copy through the runtime catalog, never hold it.
+        self.assertNotIn("AffiliateGearCopy", ui)
+        self.assertIn('tr("affiliate_disclosure")', ui)
+        self.assertIn("Linki afiliacyjne", polish)
+        self.assertIn("Affiliate links", english)
+        self.assertIn("bez dodatkowych kosztów", polish)
+        self.assertIn("at no extra cost", english)
+        for catalog in (polish, english):
+            self.assertNotIn("3.5%", catalog)
+            self.assertNotIn("3,5%", catalog)
 
     def test_affiliate_section_stays_inside_merch_and_uses_its_own_stylesheet(self):
         merch = MERCH.read_text(encoding="utf-8")

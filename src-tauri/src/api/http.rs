@@ -42,7 +42,14 @@ pub(super) async fn decode_with_error_mapper<T: DeserializeOwned>(
             detail: crate::i18n::tr("native_response_too_large").into(),
         });
     }
-    let initial_capacity = content_length.value_or(0).min(MAX_RESPONSE_BYTES) as usize;
+    // Content-Length is the server's claim, not a measurement. Sizing the
+    // buffer straight from it let a response that promised 2 MiB and sent
+    // nothing reserve 2 MiB per concurrent request on a phone. Real payloads
+    // are far under this, and anything larger just grows.
+    const INITIAL_BODY_CAPACITY_CEILING: u64 = 64 * 1024;
+    let initial_capacity = content_length
+        .value_or(0)
+        .min(INITIAL_BODY_CAPACITY_CEILING) as usize;
     let mut bytes = Vec::with_capacity(initial_capacity);
     while let Some(chunk) = response.chunk().await? {
         if bytes.len().saturating_add(chunk.len()) > MAX_RESPONSE_BYTES as usize {
