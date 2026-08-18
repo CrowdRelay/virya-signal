@@ -5,6 +5,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -210,6 +211,27 @@ dependencies {
             self.assertTrue(receipt["firebaseConfigured"])
             self.assertRegex(receipt["firebaseConfigSha256"], r"^[0-9a-f]{64}$")
             self.assertEqual(json.loads((app / "google-services.json").read_text()), document)
+
+
+    def test_signed_build_refuses_to_ship_without_firebase(self) -> None:
+        # The silent path used to emit a signed artifact whose only symptom was
+        # the native plugin rejecting "firebase_not_configured" the first time an
+        # operator touched push, long after the build reported success.
+        environment = dict(os.environ)
+        environment.pop("VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64", None)
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), "--signing"],
+            capture_output=True,
+            text=True,
+            env=environment,
+            cwd=SCRIPT.parent.parent,
+            check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64 is required",
+            result.stdout + result.stderr,
+        )
 
 
 if __name__ == "__main__":
