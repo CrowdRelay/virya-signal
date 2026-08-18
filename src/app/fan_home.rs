@@ -146,7 +146,26 @@ fn FanHomeOverview(
                                                     move |_| tab.set(recommended_tab(&action))
                                                 }>{recommended_label(&snapshot.recommended_action)}</button>
                                             </Show>
-                                            {ticket_url.filter(|_| is_upcoming).map(|url| view! { <ExternalLink url=url label=tr("tickets_tab") error=error /> })}
+                                            // First-party ticketing wins whenever the show has an
+                                            // active sale: send the fan into the Events tab focused on
+                                            // this show, where the in-app checkout lives, exactly like
+                                            // the details button beside it. The external link is only a
+                                            // fallback for shows we do not sell ourselves, so a fan is
+                                            // never pushed out to a resale page for a ticket Virya has.
+                                            {(is_upcoming && ticket_sale_active).then(|| {
+                                                let event_slug = event_slug.clone();
+                                                let event_preview = event_preview.clone();
+                                                view! {
+                                                    <button class="ticket-buy-button" on:click=move |_| {
+                                                        focused_event_preview.set(Some(event_preview.clone()));
+                                                        focused_event_slug.set(Some(event_slug.clone()));
+                                                        tab.set(FanTab::Events);
+                                                    }>{tr("buy_ticket")}</button>
+                                                }
+                                            })}
+                                            {ticket_url
+                                                .filter(|_| is_upcoming && !ticket_sale_active)
+                                                .map(|url| view! { <ExternalLink url=url label=tr("tickets_tab") error=error /> })}
                                         </div>
                                     </article>
                                 }
