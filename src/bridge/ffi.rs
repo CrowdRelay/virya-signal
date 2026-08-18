@@ -20,6 +20,7 @@ const viryaTemplate = (text, name, value) => String(text).replace(`{${name}}`, S
 
 const VIRYA_OPERATION_STORAGE_KEY = 'virya:last-operation:v3';
 const VIRYA_FAN_TAB_STORAGE_KEY = 'virya:fan-tab:v1';
+const VIRYA_ROOT_MODE_STORAGE_KEY = 'virya:root-mode:v1';
 
 export function viryaReadFanTab() {
   try {
@@ -34,6 +35,20 @@ export function viryaWriteFanTab(value) {
     ? String(value)
     : 'signal';
   try { window.sessionStorage?.setItem(VIRYA_FAN_TAB_STORAGE_KEY, safe); } catch {}
+}
+
+export function viryaReadRootMode() {
+  try {
+    const value = String(window.localStorage?.getItem(VIRYA_ROOT_MODE_STORAGE_KEY) ?? 'fan');
+    return value === 'latarnik' ? 'latarnik' : 'fan';
+  } catch {
+    return 'fan';
+  }
+}
+
+export function viryaWriteRootMode(value) {
+  const safe = String(value) === 'latarnik' ? 'latarnik' : 'fan';
+  try { window.localStorage?.setItem(VIRYA_ROOT_MODE_STORAGE_KEY, safe); } catch {}
 }
 
 
@@ -352,6 +367,37 @@ export async function viryaScanAndConfirmFan() {
   // more only after native state is authoritative; a disposed FanAccess owner
   // is no longer required to finish navigation.
   viryaWriteFanTab('signal');
+  window.dispatchEvent(new Event('virya:resume'));
+  return confirmed;
+}
+
+
+export async function viryaScanAndConfirmBeacon() {
+  const core = window.__TAURI__?.core;
+  if (!core?.invoke) throw new Error(viryaTexts.nativeBridgeUnavailable);
+
+  let result;
+  try {
+    result = await viryaScanQrRaw();
+  } catch (error) {
+    await core.invoke('beacon_clear_pending_confirmation').catch(() => {});
+    throw error;
+  }
+
+  if (result === VIRYA_SCAN_CANCELLED) {
+    await core.invoke('beacon_clear_pending_confirmation').catch(() => {});
+    return null;
+  }
+
+  const token = String(result ?? '').trim();
+  if (!token) {
+    await core.invoke('beacon_clear_pending_confirmation').catch(() => {});
+    throw new Error(viryaTexts.scannerUnavailable);
+  }
+
+  const confirmed = await core.invoke('beacon_confirm_scanned', { token });
+  // Like fan confirmation, native Stronghold state is committed before camera
+  // resume can remount the WebView. The UI only reconciles afterwards.
   window.dispatchEvent(new Event('virya:resume'));
   return confirmed;
 }
@@ -927,6 +973,12 @@ extern "C" {
     #[wasm_bindgen(js_name = viryaWriteFanTab)]
     fn write_fan_tab_js(value: &str);
 
+    #[wasm_bindgen(js_name = viryaReadRootMode)]
+    fn read_root_mode_js() -> String;
+
+    #[wasm_bindgen(js_name = viryaWriteRootMode)]
+    fn write_root_mode_js(value: &str);
+
     #[wasm_bindgen(catch, js_name = viryaShareText)]
     fn share_text_js(title: &str, text: &str, url: &str) -> Result<js_sys::Promise, JsValue>;
 
@@ -951,6 +1003,9 @@ extern "C" {
 
     #[wasm_bindgen(catch, js_name = viryaScanAndConfirmFan)]
     async fn scan_and_confirm_fan_js() -> Result<JsValue, JsValue>;
+
+    #[wasm_bindgen(catch, js_name = viryaScanAndConfirmBeacon)]
+    async fn scan_and_confirm_beacon_js() -> Result<JsValue, JsValue>;
 
     #[wasm_bindgen(catch, js_name = viryaCurrentPosition)]
     async fn current_position_js() -> Result<JsValue, JsValue>;

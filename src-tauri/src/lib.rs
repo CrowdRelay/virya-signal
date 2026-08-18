@@ -20,6 +20,16 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use api::CrowdRelayClient;
 use commands::{
+    beacon::{
+        beacon_clear_pending_confirmation, beacon_clear_pending_invite, beacon_confirm_scanned,
+        beacon_coverage, beacon_engagement, beacon_exchange_invite, beacon_exchange_pending,
+        beacon_home, beacon_leave, beacon_lock, beacon_logout, beacon_news,
+        beacon_preferences_update, beacon_prepare_invite, beacon_press_request_create,
+        beacon_press_requests, beacon_press_room, beacon_push_disable, beacon_push_enable,
+        beacon_push_open_settings, beacon_push_sync, beacon_release_confirm,
+        beacon_release_decline, beacon_releases, beacon_status, beacon_take_app_link,
+        beacon_unlock,
+    },
     fan::{
         fan_admission_pass, fan_admission_qr, fan_area_challenge, fan_area_claim, fan_area_wallet,
         fan_claim_pass, fan_clear_pending_confirmation, fan_confirm, fan_confirm_scanned,
@@ -49,7 +59,7 @@ use commands::{
         show_mode_clear, show_mode_prepare, show_mode_scan, show_mode_status, show_mode_sync,
     },
 };
-use models::{FanProfile, OperatorProfile, ShowModeStore};
+use models::{BeaconProfile, FanProfile, OperatorProfile, ShowModeStore};
 use tauri::Manager;
 use tokio::sync::{Mutex, RwLock};
 use zeroize::Zeroizing;
@@ -57,6 +67,14 @@ use zeroize::Zeroizing;
 struct PendingFanConfirmation {
     api_base_url: String,
     pin: Zeroizing<String>,
+}
+
+struct PendingBeaconConfirmation {
+    api_base_url: String,
+    pin: Zeroizing<String>,
+    radius_km: i32,
+    locale: String,
+    topics: Vec<String>,
 }
 
 /// Native session/application state, shared across every command via
@@ -74,6 +92,11 @@ pub struct AppState {
     fan_pin: RwLock<Option<Zeroizing<String>>>,
     pending_fan_confirmation: Mutex<Option<PendingFanConfirmation>>,
     fan_mutation: Mutex<()>,
+    beacon_session: RwLock<Option<Arc<BeaconProfile>>>,
+    beacon_pin: RwLock<Option<Zeroizing<String>>>,
+    beacon_mutation: Mutex<()>,
+    pending_beacon_confirmation: Mutex<Option<PendingBeaconConfirmation>>,
+    pending_beacon_link: Mutex<Option<Zeroizing<String>>>,
     native_push_available: bool,
     feedback_queue_mutation: Mutex<()>,
     wallet_qr_tokens: RwLock<HashMap<String, HashMap<String, Zeroizing<String>>>>,
@@ -148,6 +171,11 @@ pub fn run() {
                 fan_pin: RwLock::new(None),
                 pending_fan_confirmation: Mutex::new(None),
                 fan_mutation: Mutex::new(()),
+                beacon_session: RwLock::new(None),
+                beacon_pin: RwLock::new(None),
+                beacon_mutation: Mutex::new(()),
+                pending_beacon_confirmation: Mutex::new(None),
+                pending_beacon_link: Mutex::new(None),
                 native_push_available,
                 feedback_queue_mutation: Mutex::new(()),
                 wallet_qr_tokens: RwLock::new(HashMap::new()),
@@ -236,6 +264,33 @@ pub fn run() {
             fan_push_disable,
             fan_push_open_settings,
             fan_push_take_target,
+            beacon_status,
+            beacon_take_app_link,
+            beacon_prepare_invite,
+            beacon_clear_pending_confirmation,
+            beacon_clear_pending_invite,
+            beacon_confirm_scanned,
+            beacon_exchange_pending,
+            beacon_news,
+            beacon_unlock,
+            beacon_lock,
+            beacon_exchange_invite,
+            beacon_home,
+            beacon_preferences_update,
+            beacon_press_room,
+            beacon_press_requests,
+            beacon_press_request_create,
+            beacon_engagement,
+            beacon_coverage,
+            beacon_releases,
+            beacon_release_confirm,
+            beacon_release_decline,
+            beacon_logout,
+            beacon_leave,
+            beacon_push_sync,
+            beacon_push_enable,
+            beacon_push_disable,
+            beacon_push_open_settings,
             submit_anonymous_feedback,
         ])
         .run(tauri::generate_context!());

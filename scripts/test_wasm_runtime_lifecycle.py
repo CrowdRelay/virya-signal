@@ -22,7 +22,7 @@ class WasmRuntimeLifecycleTests(unittest.TestCase):
         support = (ROOT / "src" / "app" / "support.rs").read_text()
         self.assertIn("signal.try_update", app)
         self.assertIn("unregister_resume_refresh", app)
-        self.assertIn("listener.subscribers.retain", app)
+        self.assertIn(".retain(|(id, _, _)| *id != subscriber_id)", app)
         self.assertIn("dismiss_generation.try_get_untracked()", support)
         self.assertIn("error.try_set(None)", support)
 

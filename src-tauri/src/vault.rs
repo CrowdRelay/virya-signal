@@ -11,7 +11,7 @@ use zeroize::Zeroizing;
 
 use crate::{
     AppError,
-    models::{FanProfile, OperatorProfile, OperatorSignalOverview, ShowModeStore},
+    models::{BeaconProfile, FanProfile, OperatorProfile, OperatorSignalOverview, ShowModeStore},
 };
 
 const OPERATOR_CLIENT_PATH: &[u8] = b"virya-control-device";
@@ -20,6 +20,8 @@ const SHOW_MODE_STORE_KEY: &[u8] = b"show-mode-store-v1";
 const OPERATOR_SIGNAL_CACHE_KEY: &[u8] = b"operator-signal-cache-v1";
 const FAN_CLIENT_PATH: &[u8] = b"virya-signal-fan";
 const FAN_PROFILE_KEY: &[u8] = b"fan-profile-v1";
+const BEACON_CLIENT_PATH: &[u8] = b"virya-signal-beacon";
+const BEACON_PROFILE_KEY: &[u8] = b"beacon-profile-v1";
 const SALT_BYTES: usize = 16;
 const PASSWORD_BYTES: usize = 32;
 
@@ -245,6 +247,83 @@ pub fn remove_fan(app_data_dir: &Path) -> Result<(), AppError> {
     remove_pair(&fan_vault_path(app_data_dir), &fan_salt_path(app_data_dir))
 }
 
+pub fn beacon_exists(app_data_dir: &Path) -> bool {
+    exists_at(
+        &beacon_vault_path(app_data_dir),
+        &beacon_salt_path(app_data_dir),
+    )
+}
+
+pub fn save_beacon(
+    app_data_dir: &Path,
+    pin: &str,
+    profile: &BeaconProfile,
+) -> Result<(), AppError> {
+    save_at(
+        &beacon_vault_path(app_data_dir),
+        &beacon_salt_path(app_data_dir),
+        BEACON_CLIENT_PATH,
+        BEACON_PROFILE_KEY,
+        pin,
+        profile,
+    )
+}
+
+pub fn load_beacon(app_data_dir: &Path, pin: &str) -> Result<BeaconProfile, AppError> {
+    load_at(
+        &beacon_vault_path(app_data_dir),
+        &beacon_salt_path(app_data_dir),
+        BEACON_CLIENT_PATH,
+        BEACON_PROFILE_KEY,
+        pin,
+    )
+}
+
+pub fn replace_beacon(
+    app_data_dir: &Path,
+    pin: &str,
+    profile: &BeaconProfile,
+) -> Result<(), AppError> {
+    let vault_path = beacon_vault_path(app_data_dir);
+    let salt_path = beacon_salt_path(app_data_dir);
+    let vault_backup = backup_path(&vault_path);
+    let salt_backup = backup_path(&salt_path);
+    remove_if_present(&vault_backup)?;
+    remove_if_present(&salt_backup)?;
+    move_if_present(&vault_path, &vault_backup)?;
+    if let Err(error) = move_if_present(&salt_path, &salt_backup) {
+        let _ = move_if_present(&vault_backup, &vault_path);
+        return Err(error);
+    }
+    match save_at(
+        &vault_path,
+        &salt_path,
+        BEACON_CLIENT_PATH,
+        BEACON_PROFILE_KEY,
+        pin,
+        profile,
+    ) {
+        Ok(()) => {
+            let _ = remove_if_present(&vault_backup);
+            let _ = remove_if_present(&salt_backup);
+            Ok(())
+        }
+        Err(error) => {
+            let _ = remove_pair(&vault_path, &salt_path);
+            let _ = move_if_present(&vault_backup, &vault_path);
+            let _ = move_if_present(&salt_backup, &salt_path);
+            Err(error)
+        }
+    }
+}
+
+pub fn remove_beacon(app_data_dir: &Path) -> Result<(), AppError> {
+    remove_pair(
+        &beacon_vault_path(app_data_dir),
+        &beacon_salt_path(app_data_dir),
+    )
+}
+
 fn operator_vault_path(app_data_dir: &Path) -> PathBuf {
     app_data_dir.join("operator.vault.hold")
 }
@@ -259,6 +338,14 @@ fn fan_vault_path(app_data_dir: &Path) -> PathBuf {
 
 fn fan_salt_path(app_data_dir: &Path) -> PathBuf {
     app_data_dir.join("fan.vault.salt")
+}
+
+fn beacon_vault_path(app_data_dir: &Path) -> PathBuf {
+    app_data_dir.join("beacon.vault.hold")
+}
+
+fn beacon_salt_path(app_data_dir: &Path) -> PathBuf {
+    app_data_dir.join("beacon.vault.salt")
 }
 
 fn exists_at(vault_path: &Path, salt_path: &Path) -> bool {

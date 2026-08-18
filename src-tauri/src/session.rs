@@ -10,7 +10,7 @@ use zeroize::Zeroizing;
 
 use crate::{
     AppError, AppState,
-    models::{FanProfile, OperatorProfile, OperatorSignalOverview},
+    models::{BeaconProfile, FanProfile, OperatorProfile, OperatorSignalOverview},
     vault,
 };
 
@@ -44,6 +44,17 @@ pub(crate) async fn fan_profile(state: &State<'_, AppState>) -> Result<Arc<FanPr
         .ok_or(AppError::Locked)
 }
 
+pub(crate) async fn beacon_profile(
+    state: &State<'_, AppState>,
+) -> Result<Arc<BeaconProfile>, AppError> {
+    state
+        .beacon_session
+        .read()
+        .await
+        .clone()
+        .ok_or(AppError::Locked)
+}
+
 pub(crate) async fn operator_vault_password(
     state: &State<'_, AppState>,
 ) -> Result<Zeroizing<Vec<u8>>, AppError> {
@@ -64,6 +75,21 @@ pub(crate) async fn persist_fan(
     let app_data_dir = state.app_data_dir.clone();
     let profile = profile.clone();
     run_blocking(move || vault::save_fan(&app_data_dir, pin.as_str(), &profile)).await
+}
+
+pub(crate) async fn persist_beacon(
+    state: &State<'_, AppState>,
+    profile: &BeaconProfile,
+) -> Result<(), AppError> {
+    let pin = state
+        .beacon_pin
+        .read()
+        .await
+        .clone()
+        .ok_or(AppError::Locked)?;
+    let app_data_dir = state.app_data_dir.clone();
+    let profile = profile.clone();
+    run_blocking(move || vault::save_beacon(&app_data_dir, pin.as_str(), &profile)).await
 }
 
 pub(crate) async fn persist_operator_signal_cache(

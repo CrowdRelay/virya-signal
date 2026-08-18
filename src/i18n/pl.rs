@@ -47,6 +47,8 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "device_person_name" => "Nazwa urządzenia / osoby",
         "device_token" => "Token urządzenia",
         "save_manually" => "ZAPISZ RĘCZNIE",
+        "cancel" => "ANULUJ",
+        "save" => "ZAPISZ",
         "app_unlock_pin" => "PIN do odblokowania aplikacji",
         "enter_the_pin_created_when_this_device" => {
             "Wpisz PIN ustawiony podczas parowania tego urządzenia."
@@ -1125,6 +1127,138 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "checklist_post_show_reconciliation" => "Po koncercie rozliczyć merch / bilety / gotówkę",
         "checklist_post_show_report" => "Po koncercie zapisać wynik, materiały i rzeczy do poprawy",
         "checklist_unknown_item" => "Pozycja checklisty",
+        "latarnik_vault_failed" => "NIE UDAŁO SIĘ ODCZYTAĆ SEJFU LATARNIKA",
+        "latarnik_vault_checking" => "SPRAWDZAM SEJF LATARNIKA",
+        "latarnik_native_label" => "VIRYA SIGNAL · LATARNIK",
+        "latarnik_private_network" => "Prywatna sieć dla ludzi sceny.",
+        "latarnik_access_pitch" => {
+            "Lokalne koncerty, gotowe materiały prasowe, szybkie prośby o akredytację i kontakt — bez newsletterowego szumu."
+        }
+        "latarnik_invite_received" => "ZAPROSZENIE ODEBRANE",
+        "latarnik_invite_received_hint" => {
+            "Link z zaproszenia został bezpiecznie przejęty przez aplikację. Ustaw PIN i aktywuj Latarnika."
+        }
+        "latarnik_pin_create" => "Utwórz PIN Latarnika",
+        "latarnik_pin_hint" => "4–6 cyfr. PIN szyfruje osobny profil Latarnika na tym urządzeniu.",
+        "latarnik_topic_shows" => "Koncerty",
+        "latarnik_topic_press" => "Materiały",
+        "latarnik_topic_releases" => "Premiery",
+        "latarnik_topic_interviews" => "Wywiady",
+        "latarnik_topic_accreditation" => "Akredytacje",
+        "latarnik_activate_invite" => "AKTYWUJ ZAPROSZENIE",
+        "latarnik_scan_invite" => "SKANUJ QR ZAPROSZENIA",
+        "latarnik_scan_hint" => "Ten sam jednorazowy link działa w QR i w przeglądarce.",
+        "latarnik_invite_link" => "Link lub kod zaproszenia",
+        "latarnik_paste_invite" => "Wklej link z maila albo jednorazowy kod",
+        "latarnik_activate_pasted" => "AKTYWUJ WKLEJONE ZAPROSZENIE",
+        "latarnik_vault_locked" => "Profil Latarnika jest zaszyfrowany na tym urządzeniu.",
+        "latarnik_pin" => "PIN Latarnika",
+        "latarnik_unlock" => "OTWÓRZ LATARNIKA",
+        "latarnik_use_new_invite" => "MAM NOWE ZAPROSZENIE",
+        "latarnik_open_web" => "OTWÓRZ W PRZEGLĄDARCE ↗",
+        "latarnik_not_street_team" => {
+            "Latarnik nie jest street teamem ani programem zadań za nagrody. Pomoc i publikacje są zawsze dobrowolne."
+        }
+        "latarnik_name" => "Latarnik",
+        "latarnik_lock" => "Zablokuj Latarnika",
+        "latarnik_my_signal" => "Mój Signal",
+        "latarnik_tab_briefing" => "Briefing",
+        "latarnik_tab_radar" => "Radar",
+        "latarnik_tab_press" => "Press Room",
+        "latarnik_tab_access" => "Dostęp",
+        "latarnik_briefing_label" => "TWÓJ BRIEFING",
+        "latarnik_briefing_title" => "Tylko istotne sygnały.",
+        "latarnik_briefing_subtitle" => {
+            "To, co warto wiedzieć teraz: lokalne koncerty, materiały i rzeczy wymagające Twojej uwagi."
+        }
+        "latarnik_near_you" => "W TWOIM REGIONIE",
+        "latarnik_open_radar" => "OTWÓRZ RADAR",
+        "latarnik_local_signals" => "lokalne sygnały",
+        "latarnik_open_requests" => "otwarte prośby",
+        "latarnik_allocations" => "przydziały",
+        "latarnik_news_label" => "VIRYA · NEWSROOM",
+        "latarnik_news_title" => "Co nowego",
+        "latarnik_read" => "CZYTAJ ↗",
+        "latarnik_radar_label" => "LOKALNY RADAR",
+        "latarnik_radar_title" => "Koncerty w Twoim promieniu",
+        "latarnik_radar_subtitle" => {
+            "Wybierz tylko te wydarzenia, które są dla Ciebie faktycznie istotne."
+        }
+        "latarnik_interested" => "INTERESUJE MNIE",
+        "latarnik_can_help" => "MOGĘ POMÓC",
+        "latarnik_not_this_time" => "NIE TYM RAZEM",
+        "latarnik_help_kind" => "Jak możesz pomóc",
+        "latarnik_help_article" => "Artykuł / publikacja",
+        "latarnik_help_radio" => "Radio",
+        "latarnik_help_podcast" => "Podcast",
+        "latarnik_help_photos" => "Zdjęcia",
+        "latarnik_help_share" => "Udostępnienie",
+        "latarnik_help_contact" => "Kontakt / polecenie",
+        "latarnik_help_other" => "Inne",
+        "latarnik_details_optional" => "Szczegóły — opcjonalnie",
+        "latarnik_confirm_help" => "POTWIERDŹ, ŻE MOŻESZ POMÓC",
+        "latarnik_open_press_room" => "OTWÓRZ PRESS ROOM",
+        "latarnik_press_label" => "PRESS ROOM",
+        "latarnik_press_title" => "Materiały gotowe do użycia",
+        "latarnik_open_asset" => "OTWÓRZ ↗",
+        "latarnik_need_something" => "BRAKUJE CZEGOŚ?",
+        "latarnik_request_material" => "Poproś zespół o materiał",
+        "latarnik_request_accreditation" => "Akredytacja / guestlista",
+        "latarnik_request_photos" => "Zdjęcia prasowe",
+        "latarnik_request_clean" => "Clean version",
+        "latarnik_request_interview" => "Wywiad",
+        "latarnik_request_other" => "Inny materiał",
+        "latarnik_send_request" => "WYŚLIJ PROŚBĘ",
+        "latarnik_accreditation_note" => {
+            "Akredytacja zależy od możliwości organizatora i dostępnej puli. Publikacja nie jest warunkiem wejścia."
+        }
+        "latarnik_coverage_label" => "EFEKT WSPÓŁPRACY",
+        "latarnik_coverage_title" => "Dodaj opublikowany materiał",
+        "latarnik_coverage_hint" => {
+            "Jeśli coś już opublikowałeś, możesz podać link. To dobrowolne i nie jest warunkiem akredytacji ani dostępu."
+        }
+        "latarnik_coverage_kind" => "Rodzaj materiału",
+        "latarnik_coverage_video" => "Wideo",
+        "latarnik_coverage_social" => "Post / social",
+        "latarnik_coverage_url" => "Link HTTPS",
+        "latarnik_coverage_title_optional" => "Tytuł — opcjonalnie",
+        "latarnik_coverage_submit" => "DODAJ PUBLIKACJĘ",
+        "latarnik_coverage_saved" => "Publikacja zapisana. Dzięki.",
+        "latarnik_access_label" => "DOSTĘP",
+        "latarnik_access_title" => "Akredytacje i przydziały",
+        "latarnik_access_subtitle" => {
+            "Status próśb, guestlista i wybrane fizyczne materiały promocyjne w jednym miejscu."
+        }
+        "latarnik_requests" => "Twoje prośby",
+        "latarnik_release_allocations" => "Wybrane wydania",
+        "latarnik_claim_until" => "Potwierdź do",
+        "latarnik_confirm_delivery" => "POTWIERDŹ ODBIÓR",
+        "latarnik_decline" => "NIE TYM RAZEM",
+        "latarnik_decline_release_confirm_title" => "ODDAĆ ZAREZERWOWANĄ SZTUKĘ?",
+        "latarnik_decline_release_confirm_hint" => {
+            "{0} wróci do puli. Tej akcji nie wykonujemy jednym przypadkowym tapnięciem."
+        }
+        "latarnik_delivery_details" => "Dane do wysyłki",
+        "latarnik_phone" => "Telefon",
+        "latarnik_recipient_name" => "Imię odbiorcy",
+        "latarnik_parcel_locker" => "Kod Paczkomatu",
+        "latarnik_save_delivery" => "ZAPISZ DANE",
+        "latarnik_settings" => "USTAWIENIA LATARNIKA",
+        "latarnik_preferences" => "Promień i powiadomienia",
+        "latarnik_nearby_push" => "Informuj mnie o istotnych koncertach w pobliżu",
+        "latarnik_logout_device" => "Wyloguj Latarnika z tego urządzenia",
+        "latarnik_logout_confirm_hint" => {
+            "Ta operacja revokuje bieżącą sesję i usuwa dostęp Latarnika z tego urządzenia. Powrót będzie wymagał nowego zaproszenia."
+        }
+        "latarnik_leave" => "Wyłącz kanał Latarnika",
+        "latarnik_leave_confirm_hint" => {
+            "Wyłączysz kanał Latarnika i wszystkie jego sesje, ale nie ustawisz globalnej blokady kontaktu z VIRYA."
+        }
+        "latarnik_do_not_contact" => "Nie kontaktujcie się ze mną",
+        "latarnik_dnc_confirm_hint" => {
+            "To ustawi globalny brak kontaktu: Latarnik zostanie wyłączony, a VIRYA nie będzie mogła używać tej relacji do outreachu."
+        }
+        "latarnik_confirm_action" => "POTWIERDZAM",
         _ => key,
     }
 }

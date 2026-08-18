@@ -22,7 +22,7 @@ fn FanPortal(
         } else if status.get().unlocked {
             view! { <FanApp mode=mode status=status public=public push_target=push_target error=error /> }.into_any()
         } else {
-            view! { <FanAccess status=status status_refresh=status_refresh error=error /> }.into_any()
+            view! { <FanAccess mode=mode status=status status_refresh=status_refresh error=error /> }.into_any()
         }}
     }
 }
@@ -225,6 +225,7 @@ fn submit_fan_confirmation(
 
 #[component]
 fn FanAccess(
+    mode: RwSignal<RootMode>,
     status: RwSignal<FanSessionStatus>,
     status_refresh: RwSignal<u32>,
     error: RwSignal<Option<String>>,
@@ -246,18 +247,7 @@ fn FanAccess(
     let busy = RwSignal::new(false);
     let recovery_open = RwSignal::new(false);
 
-    let open_latarnik = move |_| {
-        let url = if i18n::current().code() == "pl" {
-            "https://virya.music/pl/latarnik/"
-        } else {
-            "https://virya.music/latarnik/"
-        };
-        spawn_local(async move {
-            if let Err(message) = bridge::invoke_unit("open_external_url", &UrlArgs { url }).await {
-                error.set(Some(message));
-            }
-        });
-    };
+    let open_latarnik = move |_| mode.set(RootMode::Latarnik);
 
     let unlock = move |_| {
         let current_pin = pin.get();

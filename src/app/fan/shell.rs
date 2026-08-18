@@ -210,21 +210,7 @@ fn FanApp(
         });
     };
 
-    let open_latarnik = move |_| {
-        let url = if i18n::current().code() == "pl" {
-            "https://virya.music/pl/latarnik/"
-        } else {
-            "https://virya.music/latarnik/"
-        };
-        spawn_local(async move {
-            if let Err(message) = bridge::invoke_unit("open_external_url", &UrlArgs { url }).await {
-                error.set(Some(message));
-            }
-            // Keep the menu owner alive until the native opener resolves;
-            // otherwise scoped async work is cancelled as soon as the menu hides.
-            menu_open.set(false);
-        });
-    };
+    let open_latarnik = move |_| { menu_open.set(false); mode.set(RootMode::Latarnik); };
 
     let refresh_all = move |_| {
         menu_open.set(false);

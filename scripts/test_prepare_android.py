@@ -91,7 +91,7 @@ dependencies {
             manifest = app / "src" / "main" / "AndroidManifest.xml"
             manifest.parent.mkdir(parents=True, exist_ok=True)
             manifest.write_text(
-                '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:label="Virya Signal" /></manifest>'
+                '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:label="Virya Signal"><activity android:name=".MainActivity" /></application></manifest>'
             )
 
             result = subprocess.run(
@@ -135,6 +135,11 @@ dependencies {
             manifest_text = manifest.read_text()
             self.assertIn("android.permission.POST_NOTIFICATIONS", manifest_text)
             self.assertIn("ViryaFirebaseMessagingService", manifest_text)
+            self.assertIn('android:autoVerify="true"', manifest_text)
+            self.assertIn('android:host="virya.music"', manifest_text)
+            self.assertNotIn('android:host="www.virya.music"', manifest_text)
+            self.assertIn('android:pathPrefix="/latarnik"', manifest_text)
+            self.assertIn('android:pathPrefix="/pl/latarnik"', manifest_text)
             push_receipt = json.loads((android / "push-build-config.json").read_text())
             self.assertFalse(push_receipt["firebaseConfigured"])
             self.assertEqual(push_receipt["firebaseMessagingVersion"], "25.1.1")
@@ -169,7 +174,7 @@ dependencies {
             )
             manifest = app / "src" / "main" / "AndroidManifest.xml"
             manifest.parent.mkdir(parents=True, exist_ok=True)
-            manifest.write_text('<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application /></manifest>')
+            manifest.write_text('<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><activity android:name=".MainActivity" /></application></manifest>')
             document = {
                 "project_info": {"project_id": "virya-signal"},
                 "client": [{"client_info": {"android_client_info": {"package_name": APPLICATION_ID}}}],

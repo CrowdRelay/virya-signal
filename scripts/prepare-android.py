@@ -509,6 +509,54 @@ def _stage_android_push() -> bool:
             "action",
             {permission_name: "com.google.firebase.MESSAGING_EVENT"},
         )
+
+    # Verified HTTPS App Links are the canonical Latarnik invitation transport.
+    # The token remains a one-time CrowdRelay capability; Android only routes
+    # the trusted virya.music URL into the native shell.
+    # The filter has to land on the activity Android actually starts for a VIEW
+    # intent, so prefer the declared launcher rather than manifest order.
+    activities = [node for node in application.findall("activity") if node.attrib.get(permission_name)]
+    activity = next(
+        (
+            node
+            for node in activities
+            if any(
+                category.attrib.get(permission_name) == "android.intent.category.LAUNCHER"
+                for intent_filter in node.findall("intent-filter")
+                for category in intent_filter.findall("category")
+            )
+        ),
+        activities[0] if len(activities) == 1 else None,
+    )
+    if activity is None:
+        raise SystemExit("generated Android manifest is missing an unambiguous launcher activity")
+    latarnik_filter = next(
+        (node for node in activity.findall("intent-filter")
+         if node.attrib.get(f"{{{ANDROID_NS}}}autoVerify") == "true"
+         and any(data.attrib.get(f"{{{ANDROID_NS}}}host") == "virya.music" for data in node.findall("data"))),
+        None,
+    )
+    if latarnik_filter is None:
+        latarnik_filter = ET.SubElement(
+            activity, "intent-filter", {f"{{{ANDROID_NS}}}autoVerify": "true"}
+        )
+        ET.SubElement(latarnik_filter, "action", {permission_name: "android.intent.action.VIEW"})
+        ET.SubElement(latarnik_filter, "category", {permission_name: "android.intent.category.DEFAULT"})
+        ET.SubElement(latarnik_filter, "category", {permission_name: "android.intent.category.BROWSABLE"})
+        # Verify only the canonical apex host. Android requires every declared
+        # host to serve its own assetlinks.json without redirects; keeping www
+        # out of the verified filter avoids coupling app-link verification to a
+        # redirecting alias while generated invites already use virya.music.
+        for path_prefix in ("/latarnik", "/pl/latarnik"):
+            ET.SubElement(
+                latarnik_filter,
+                "data",
+                {
+                    f"{{{ANDROID_NS}}}scheme": "https",
+                    f"{{{ANDROID_NS}}}host": "virya.music",
+                    f"{{{ANDROID_NS}}}pathPrefix": path_prefix,
+                },
+            )
     tree.write(manifest, encoding="utf-8", xml_declaration=True)
 
     gradle_text = gradle.read_text(encoding="utf-8")

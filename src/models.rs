@@ -51,6 +51,7 @@ pub struct FanSessionStatus {
 pub struct LauncherStatus {
     pub operator: SessionStatus,
     pub fan: FanSessionStatus,
+    pub beacon: BeaconSessionStatus,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -973,3 +974,4 @@ pub struct WalletTicket {
 }
 
 pub use virya_signal_contracts::push::*;
+include!("models/beacon.rs");

@@ -182,6 +182,7 @@ pub struct FanSessionStatus {
 pub struct LauncherStatus {
     pub operator: SessionStatus,
     pub fan: FanSessionStatus,
+    pub beacon: BeaconSessionStatus,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

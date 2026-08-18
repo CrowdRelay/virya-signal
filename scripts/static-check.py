@@ -160,6 +160,7 @@ invoked.update(re.findall(
 # Push enable/disable share one dynamic bridge call; the literal command names are
 # still audited as active IPC rather than being silently treated as compatibility-only.
 invoked.update(re.findall(r'"(fan_push_(?:enable|disable|open_settings))"', ui))
+invoked.update(re.findall(r'"(beacon_push_(?:enable|disable|open_settings))"', ui))
 # Some native commands are intentionally hidden behind bridge helpers or the
 # boot-time JS crash reporter. Count those literal calls too so the audit
 # reflects the real IPC surface instead of under-reporting it.
@@ -366,7 +367,7 @@ if 'futures::join!' in ui or 'fn Splash()' in ui:
     raise SystemExit('startup must render immediately instead of waiting behind a second splash')
 
 for contract in (
-    'RwSignal::new(RootMode::Fan)',
+    'RwSignal::new(persisted_root_mode())',
     'RootMode::StaffGate',
     'verify_staff_access',
     'are_you_on_the_staff',
@@ -378,6 +379,10 @@ for contract in (
         raise SystemExit(f'fan-first or staff-gate UX contract is missing: {contract}')
 if ui.count('mode.set(RootMode::Team)') != 1 or 'Ok(()) => mode.set(RootMode::Team)' not in ui:
     raise SystemExit('operator UI must be reachable only after successful staff-gate verification')
+if 'fn persisted_root_mode() -> RootMode' not in ui or '_ => RootMode::Fan' not in ui:
+    raise SystemExit('persisted member mode must fail closed to the Fan surface')
+if 'RootMode::StaffGate | RootMode::Team => {}' not in ui:
+    raise SystemExit('staff/operator modes must never be persisted as startup member mode')
 
 native_client = (root / 'src-tauri/src/api/client.rs').read_text()
 native_misc = (root / 'src-tauri/src/commands/misc.rs').read_text()

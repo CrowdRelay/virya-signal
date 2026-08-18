@@ -1096,3 +1096,49 @@ html[data-virya-scanner-active] .app-shell {
   align-items: stretch;
 }
 .settings-list .push-setting-card .push-setting-action { width: 100%; }
+
+/* Latarnik is a separate professional principal and surface, not a fan tier. */
+.beacon-authenticated { --beacon-gold: #d8b44a; }
+.beacon-content { padding-bottom: 88px; }
+.beacon-screen { display: grid; gap: 16px; }
+.beacon-hero { padding: 18px; border: 1px solid #3b3420; border-radius: 20px; background: linear-gradient(145deg, #17150e, #0b0b0a 62%); }
+.beacon-hero h2 { max-width: 18ch; }
+.beacon-access-card { border-color: #3b3420; background: linear-gradient(150deg, #15140f, #0b0b0a 70%); }
+.beacon-access-card > h1 { max-width: 15ch; }
+.beacon-pending-invite { padding: 13px; border: 1px solid #5c4c1c; border-radius: 14px; background: #f3c51a0a; }
+.beacon-pending-invite p { margin: 5px 0 0; color: var(--muted); }
+.beacon-radius { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 7px; }
+.beacon-radius button, .beacon-topic-grid button { min-height: 40px; border: 1px solid #2e2d27; border-radius: 11px; background: #11110f; color: var(--muted); }
+.beacon-radius button.active, .beacon-topic-grid button.active { border-color: #78641d; background: #f3c51a12; color: #f3d872; }
+.beacon-topic-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.beacon-bottom-nav .beacon-nav-glyph { display: block; font-size: 19px; line-height: 1; }
+.beacon-feature-card, .beacon-news-card, .beacon-event-card, .beacon-request-card,
+.beacon-request-status, .beacon-release-card, .beacon-delivery-form, .beacon-settings,
+.beacon-asset-card { border: 1px solid #2b2a24; border-radius: 16px; background: #0f0f0d; padding: 15px; }
+.beacon-feature-card { border-color: #57491b; background: linear-gradient(145deg, #18150b, #0f0f0d); }
+.beacon-feature-card h3, .beacon-news-card h3, .beacon-event-card h3, .beacon-release-card h3 { margin: 5px 0 7px; }
+.beacon-status-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.beacon-status-strip article { min-width: 0; padding: 12px 8px; border: 1px solid #282720; border-radius: 12px; background: #0d0d0c; text-align: center; }
+.beacon-status-strip strong { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+.beacon-status-strip span { display: block; margin-top: 4px; color: var(--muted); font-size: var(--type-micro); }
+.beacon-news-list, .beacon-event-list { gap: 10px; }
+.beacon-news-card p, .beacon-event-card p, .beacon-request-status p, .beacon-release-card p { color: var(--muted); line-height: 1.45; }
+.beacon-event-card.selected { border-color: #64551d; box-shadow: inset 0 0 0 1px #64551d33; }
+.beacon-action-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.beacon-action-row > * { flex: 1 1 120px; }
+.beacon-help-box { display: grid; gap: 10px; margin-top: 12px; padding: 12px; border: 1px solid #37352b; border-radius: 13px; background: #0b0b0a; }
+.beacon-press-cta { width: 100%; margin-top: 10px; }
+.beacon-assets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+.beacon-asset-card { display: grid; gap: 9px; min-width: 0; }
+.beacon-asset-card strong { overflow-wrap: anywhere; }
+.beacon-request-card, .beacon-delivery-form, .beacon-settings { display: grid; gap: 11px; }
+.beacon-request-status { display: grid; gap: 7px; }
+.beacon-request-status strong { overflow-wrap: anywhere; }
+.beacon-release-card small { color: var(--muted); }
+.beacon-danger-zone { display: grid; gap: 4px; margin-top: 8px; padding-top: 10px; border-top: 1px solid #292822; }
+.beacon-danger-zone .danger { color: #eaa09a; }
+@media (max-width: 430px) {
+  .beacon-assets { grid-template-columns: 1fr; }
+  .beacon-status-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .beacon-status-strip span { font-size: 10px; }
+}

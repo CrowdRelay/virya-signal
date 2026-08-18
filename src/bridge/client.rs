@@ -125,6 +125,14 @@ pub fn set_fan_tab_state(value: &str) {
     write_fan_tab_js(value);
 }
 
+pub fn root_mode_state() -> String {
+    read_root_mode_js()
+}
+
+pub fn set_root_mode_state(value: &str) {
+    write_root_mode_js(value);
+}
+
 async fn promise_string(promise: js_sys::Promise) -> Result<String, String> {
     wasm_bindgen_futures::JsFuture::from(promise)
         .await
@@ -201,6 +209,34 @@ pub async fn scan_and_confirm_fan() -> Result<Option<crate::models::FanSessionSt
     }
 
     let value = scan_and_confirm_fan_js().await.map_err(js_error)?;
+    if value.is_null() || value.is_undefined() {
+        return Ok(None);
+    }
+    serde_wasm_bindgen::from_value(value)
+        .map(Some)
+        .map_err(decode_error)
+}
+
+pub async fn scan_and_confirm_beacon() -> Result<Option<crate::models::BeaconSessionStatus>, String> {
+    #[derive(Serialize)]
+    struct ScannedTokenArgs<'a> {
+        token: &'a str,
+    }
+
+    #[cfg(debug_assertions)]
+    if let Some(value) = option_env!("VIRYA_SIGNAL_E2E_QR_PAYLOAD") {
+        let value = value.trim();
+        if !value.is_empty() {
+            return invoke::<crate::models::BeaconSessionStatus, _>(
+                "beacon_confirm_scanned",
+                &ScannedTokenArgs { token: value },
+            )
+            .await
+            .map(Some);
+        }
+    }
+
+    let value = scan_and_confirm_beacon_js().await.map_err(js_error)?;
     if value.is_null() || value.is_undefined() {
         return Ok(None);
     }

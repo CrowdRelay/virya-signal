@@ -2,6 +2,7 @@
 //! `lib.rs` only wires these into `tauri::generate_handler!` and owns
 //! `AppState`; the actual request handling lives here.
 
+pub(crate) mod beacon;
 pub(crate) mod fan;
 pub(crate) mod misc;
 pub(crate) mod operator;

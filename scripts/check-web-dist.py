@@ -41,9 +41,9 @@ def wasm_budget_state(wasm_size: int, warn_wasm_kib: int, max_wasm_kib: int) -> 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Enforce Virya Signal frontend size budgets")
     parser.add_argument("dist", nargs="?", default="dist", type=Path)
-    parser.add_argument("--warn-wasm-kib", type=int, default=1400)
-    parser.add_argument("--max-wasm-kib", type=int, default=1536)
-    parser.add_argument("--max-total-kib", type=int, default=2048)
+    parser.add_argument("--warn-wasm-kib", type=int, default=1700)
+    parser.add_argument("--max-wasm-kib", type=int, default=1792)
+    parser.add_argument("--max-total-kib", type=int, default=2304)
     parser.add_argument("--min-hard-headroom-kib", type=int, default=8)
     args = parser.parse_args()
     if (

@@ -49,6 +49,8 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "device_person_name" => "Device / person name",
         "device_token" => "Device token",
         "save_manually" => "SAVE MANUALLY",
+        "cancel" => "CANCEL",
+        "save" => "SAVE",
         "app_unlock_pin" => "App unlock PIN",
         "enter_the_pin_created_when_this_device" => {
             "Enter the PIN created when this device was paired."
@@ -1119,6 +1121,138 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "checklist_post_show_reconciliation" => "Reconcile merch / tickets / cash after the show",
         "checklist_post_show_report" => "Record show result, media and improvements after the show",
         "checklist_unknown_item" => "Checklist item",
+        "latarnik_vault_failed" => "FAILED TO READ THE LATARNIK VAULT",
+        "latarnik_vault_checking" => "CHECKING LATARNIK VAULT",
+        "latarnik_native_label" => "VIRYA SIGNAL · LATARNIK",
+        "latarnik_private_network" => "A private network for people in the scene.",
+        "latarnik_access_pitch" => {
+            "Local shows, ready-to-use press assets, quick accreditation requests and direct contact — without newsletter noise."
+        }
+        "latarnik_invite_received" => "INVITATION RECEIVED",
+        "latarnik_invite_received_hint" => {
+            "The invitation link was securely picked up by the app. Set a PIN and activate Latarnik."
+        }
+        "latarnik_pin_create" => "Create a Latarnik PIN",
+        "latarnik_pin_hint" => {
+            "4–6 digits. This PIN encrypts a separate Latarnik profile on this device."
+        }
+        "latarnik_topic_shows" => "Shows",
+        "latarnik_topic_press" => "Press assets",
+        "latarnik_topic_releases" => "Releases",
+        "latarnik_topic_interviews" => "Interviews",
+        "latarnik_topic_accreditation" => "Accreditation",
+        "latarnik_activate_invite" => "ACTIVATE INVITATION",
+        "latarnik_scan_invite" => "SCAN INVITATION QR",
+        "latarnik_scan_hint" => "The same one-time link works in QR and in the browser.",
+        "latarnik_invite_link" => "Invitation link or code",
+        "latarnik_paste_invite" => "Paste the email link or one-time code",
+        "latarnik_activate_pasted" => "ACTIVATE PASTED INVITATION",
+        "latarnik_vault_locked" => "Your Latarnik profile is encrypted on this device.",
+        "latarnik_pin" => "Latarnik PIN",
+        "latarnik_unlock" => "OPEN LATARNIK",
+        "latarnik_use_new_invite" => "I HAVE A NEW INVITATION",
+        "latarnik_open_web" => "OPEN IN BROWSER ↗",
+        "latarnik_not_street_team" => {
+            "Latarnik is not a street team or a task-for-rewards program. Help and coverage are always voluntary."
+        }
+        "latarnik_name" => "Latarnik",
+        "latarnik_lock" => "Lock Latarnik",
+        "latarnik_my_signal" => "My Signal",
+        "latarnik_tab_briefing" => "Briefing",
+        "latarnik_tab_radar" => "Radar",
+        "latarnik_tab_press" => "Press Room",
+        "latarnik_tab_access" => "Access",
+        "latarnik_briefing_label" => "YOUR BRIEFING",
+        "latarnik_briefing_title" => "Only relevant signals.",
+        "latarnik_briefing_subtitle" => {
+            "What matters now: local shows, press assets and anything that needs your attention."
+        }
+        "latarnik_near_you" => "IN YOUR AREA",
+        "latarnik_open_radar" => "OPEN RADAR",
+        "latarnik_local_signals" => "local signals",
+        "latarnik_open_requests" => "open requests",
+        "latarnik_allocations" => "allocations",
+        "latarnik_news_label" => "VIRYA · NEWSROOM",
+        "latarnik_news_title" => "What is new",
+        "latarnik_read" => "READ ↗",
+        "latarnik_radar_label" => "LOCAL RADAR",
+        "latarnik_radar_title" => "Shows within your radius",
+        "latarnik_radar_subtitle" => "Choose only the events that are genuinely relevant to you.",
+        "latarnik_interested" => "I AM INTERESTED",
+        "latarnik_can_help" => "I CAN HELP",
+        "latarnik_not_this_time" => "NOT THIS TIME",
+        "latarnik_help_kind" => "How you can help",
+        "latarnik_help_article" => "Article / publication",
+        "latarnik_help_radio" => "Radio",
+        "latarnik_help_podcast" => "Podcast",
+        "latarnik_help_photos" => "Photos",
+        "latarnik_help_share" => "Share",
+        "latarnik_help_contact" => "Contact / introduction",
+        "latarnik_help_other" => "Other",
+        "latarnik_details_optional" => "Details — optional",
+        "latarnik_confirm_help" => "CONFIRM YOU CAN HELP",
+        "latarnik_open_press_room" => "OPEN PRESS ROOM",
+        "latarnik_press_label" => "PRESS ROOM",
+        "latarnik_press_title" => "Ready-to-use materials",
+        "latarnik_open_asset" => "OPEN ↗",
+        "latarnik_need_something" => "NEED SOMETHING?",
+        "latarnik_request_material" => "Ask the band for material",
+        "latarnik_request_accreditation" => "Accreditation / guest list",
+        "latarnik_request_photos" => "Press photos",
+        "latarnik_request_clean" => "Clean version",
+        "latarnik_request_interview" => "Interview",
+        "latarnik_request_other" => "Other material",
+        "latarnik_send_request" => "SEND REQUEST",
+        "latarnik_accreditation_note" => {
+            "Accreditation depends on organizer approval and available allocation. Coverage is never a condition of entry."
+        }
+        "latarnik_coverage_label" => "COLLABORATION RESULT",
+        "latarnik_coverage_title" => "Add published coverage",
+        "latarnik_coverage_hint" => {
+            "If you have already published something, you can add the link. This is voluntary and never a condition of accreditation or access."
+        }
+        "latarnik_coverage_kind" => "Coverage type",
+        "latarnik_coverage_video" => "Video",
+        "latarnik_coverage_social" => "Post / social",
+        "latarnik_coverage_url" => "HTTPS link",
+        "latarnik_coverage_title_optional" => "Title — optional",
+        "latarnik_coverage_submit" => "ADD COVERAGE",
+        "latarnik_coverage_saved" => "Coverage saved. Thank you.",
+        "latarnik_access_label" => "ACCESS",
+        "latarnik_access_title" => "Accreditation and allocations",
+        "latarnik_access_subtitle" => {
+            "Request status, guest list and selected physical promo allocations in one place."
+        }
+        "latarnik_requests" => "Your requests",
+        "latarnik_release_allocations" => "Selected releases",
+        "latarnik_claim_until" => "Confirm by",
+        "latarnik_confirm_delivery" => "CONFIRM DELIVERY",
+        "latarnik_decline" => "NOT THIS TIME",
+        "latarnik_decline_release_confirm_title" => "RELEASE THIS RESERVED COPY?",
+        "latarnik_decline_release_confirm_hint" => {
+            "{0} will return to the allocation pool. This action is never completed by a single accidental tap."
+        }
+        "latarnik_delivery_details" => "Delivery details",
+        "latarnik_phone" => "Phone",
+        "latarnik_recipient_name" => "Recipient name",
+        "latarnik_parcel_locker" => "Parcel locker code",
+        "latarnik_save_delivery" => "SAVE DETAILS",
+        "latarnik_settings" => "LATARNIK SETTINGS",
+        "latarnik_preferences" => "Radius and notifications",
+        "latarnik_nearby_push" => "Notify me about relevant nearby shows",
+        "latarnik_logout_device" => "Log Latarnik out on this device",
+        "latarnik_logout_confirm_hint" => {
+            "This revokes the current session and removes Latarnik access from this device. Returning will require a new invitation."
+        }
+        "latarnik_leave" => "Leave the Latarnik channel",
+        "latarnik_leave_confirm_hint" => {
+            "This disables the Latarnik channel and all of its sessions without setting a global do-not-contact preference for VIRYA."
+        }
+        "latarnik_do_not_contact" => "Do not contact me",
+        "latarnik_dnc_confirm_hint" => {
+            "This sets a global do-not-contact preference: Latarnik is disabled and VIRYA must not use this relationship for outreach."
+        }
+        "latarnik_confirm_action" => "CONFIRM",
         _ => key,
     }
 }

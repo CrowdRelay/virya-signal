@@ -64,14 +64,26 @@ class UiAsyncStabilityContracts(unittest.TestCase):
 
     def test_resume_listener_is_singleton_with_multiple_scoped_subscribers(self) -> None:
         app = (ROOT / "src/app.rs").read_text(encoding="utf-8")
-        body = function_body(app, "install_resume_refresh")
+        # The registry itself now lives in the shared installer; the two public
+        # entry points only choose whether bare focus counts as a wake-up.
+        body = function_body(app, "install_resume_subscriber")
         self.assertIn('"addEventListener"', body)
         self.assertIn('"removeEventListener"', app)
+        self.assertIn('JsValue::from_str("virya:resume")', body)
+        self.assertIn('JsValue::from_str("focus")', body)
         self.assertIn("thread_local!", app)
         self.assertIn("impl Drop for ResumeRefreshListener", app)
-        self.assertIn("subscribers: Vec<(u64, RwSignal<u32>)>", app)
+        self.assertIn("subscribers: Vec<(u64, RwSignal<u32>, bool)>", app)
+        # Bare window focus is a root-level signal for warm App Links. Mounted
+        # panels answer resume with real IPC, so focus alone must not wake them.
+        self.assertIn("fn install_root_resume_refresh(", app)
+        self.assertIn("install_root_resume_refresh(status_refresh);", app)
+        self.assertIn('.is_some_and(|value| value != "virya:resume")', app)
+        self.assertIn("filter(|(_, _, wants_focus)| !focus_only || *wants_focus)", app)
+        for panel in ("src/app/beacon.rs", "src/app/fan_home.rs", "src/app/operator/checklist.rs"):
+            self.assertNotIn("install_root_resume_refresh", (ROOT / panel).read_text(encoding="utf-8"))
         self.assertIn("RESUME_REFRESH_LISTENER.with(|slot|", body)
-        self.assertIn("listener.subscribers.push", body)
+        self.assertIn(".push((subscriber_id, status_refresh, wants_focus));", body)
         self.assertIn("on_cleanup(move || unregister_resume_refresh(subscriber_id))", body)
         self.assertNotIn("std::mem::forget(callback)", body)
 
@@ -95,7 +107,9 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         fan_shell = (ROOT / "src/app/fan/shell.rs").read_text(encoding="utf-8")
         operator_shell = (ROOT / "src/app/operator/shell.rs").read_text(encoding="utf-8")
         latarnik = fan_shell.split("let open_latarnik", 1)[1].split("let refresh_all", 1)[0]
-        self.assertLess(latarnik.index("spawn_local"), latarnik.index("menu_open.set(false)"))
+        self.assertIn("mode.set(RootMode::Latarnik)", latarnik)
+        self.assertNotIn("spawn_local", latarnik)
+        self.assertLess(latarnik.index("menu_open.set(false)"), latarnik.index("mode.set(RootMode::Latarnik)"))
         fan_refresh = fan_shell.split("let refresh_all", 1)[1].split("view!", 1)[0]
         self.assertIn("refresh_requested.update", fan_refresh)
         operator_refresh = operator_shell.split("let refresh_all", 1)[1].split("on_cleanup", 1)[0]

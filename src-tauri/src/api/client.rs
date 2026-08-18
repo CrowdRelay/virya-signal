@@ -20,8 +20,8 @@ use uuid::Uuid;
 use crate::{
     AppError,
     models::{
-        CitySignal, EcosystemMeta, FanHomeData, FanProfile, MerchCatalog, OperatorProfile,
-        PublicEvent, StaffPairingExchange,
+        BeaconProfile, CitySignal, EcosystemMeta, FanHomeData, FanProfile, MerchCatalog,
+        OperatorProfile, PublicEvent, StaffPairingExchange,
     },
 };
 
@@ -505,6 +505,41 @@ impl CrowdRelayClient {
                 .request(method.clone(), url.clone())
                 .header(ACCEPT, "application/json")
                 .header(COOKIE, cookie.as_str());
+            if let Some(ref key) = idempotency_key {
+                request = request.header("Idempotency-Key", key.as_str());
+            }
+            if let Some(body) = body {
+                request = request.json(body);
+            }
+            decode(request.send().await?).await
+        };
+        if is_read {
+            retry_idempotent(attempt).await
+        } else {
+            attempt().await
+        }
+    }
+
+    pub(super) async fn beacon_json<T, B>(
+        &self,
+        profile: &BeaconProfile,
+        method: Method,
+        path: &str,
+        body: Option<&B>,
+    ) -> Result<T, AppError>
+    where
+        T: DeserializeOwned,
+        B: Serialize + ?Sized,
+    {
+        let url = endpoint(&profile.api_base_url, path)?;
+        let is_read = method == Method::GET;
+        let idempotency_key = (!is_read).then(|| Uuid::new_v4().to_string());
+        let attempt = || async {
+            let mut request = self
+                .http
+                .request(method.clone(), url.clone())
+                .header(ACCEPT, "application/json")
+                .bearer_auth(profile.bearer_token.trim());
             if let Some(ref key) = idempotency_key {
                 request = request.header("Idempotency-Key", key.as_str());
             }

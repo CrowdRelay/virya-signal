@@ -248,3 +248,4 @@ include!("models/area.rs");
 include!("models/ops_signal.rs");
 include!("models/showmode_inputs.rs");
 include!("models/tests.rs");
+include!("models/beacon.rs");

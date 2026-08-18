@@ -19,8 +19,17 @@ pub(super) const POLICY_VERSION: &str = "2026-07";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum RootMode {
     Fan,
+    Latarnik,
     StaffGate,
     Team,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum BeaconTab {
+    Briefing,
+    Radar,
+    Press,
+    Access,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

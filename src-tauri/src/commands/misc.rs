@@ -8,7 +8,8 @@ use zeroize::Zeroizing;
 use crate::{
     AppError, AppState, feedback_queue, i18n,
     models::{
-        FanSessionStatus, LauncherStatus, RequestedCityInput, RequestedCityResult, SessionStatus,
+        BeaconSessionStatus, FanSessionStatus, LauncherStatus, RequestedCityInput,
+        RequestedCityResult, SessionStatus,
     },
     session::run_blocking,
     validation::clean_optional,
@@ -79,6 +80,7 @@ pub(crate) async fn launcher_status(
     i18n::set_language(&locale);
     let operator_session = state.session.read().await;
     let fan_session = state.fan_session.read().await;
+    let beacon_session = state.beacon_session.read().await;
     let status = LauncherStatus {
         operator: SessionStatus {
             configured: vault::exists(&state.app_data_dir),
@@ -92,9 +94,17 @@ pub(crate) async fn launcher_status(
             unlocked: fan_session.is_some(),
             session: fan_session.as_ref().map(|profile| profile.as_ref().into()),
         },
+        beacon: BeaconSessionStatus {
+            configured: vault::beacon_exists(&state.app_data_dir),
+            unlocked: beacon_session.is_some(),
+            session: beacon_session
+                .as_ref()
+                .map(|profile| profile.as_ref().into()),
+        },
     };
     drop(operator_session);
     drop(fan_session);
+    drop(beacon_session);
 
     // Anonymous feedback is maintenance work. A queued retry can involve disk
     // I/O plus up to three network requests and must never delay first render.

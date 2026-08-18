@@ -5,6 +5,8 @@
     "src-tauri/src/models.rs": 1708,
     "src/app/fan.rs": 1811,
     "src/app/operator.rs": 1515,
-    "src/models.rs": 1270
+    "src/models.rs": 1270,
+    "src/i18n/pl.rs": 1264,
+    "src/i18n/en.rs": 1258
   }
 }

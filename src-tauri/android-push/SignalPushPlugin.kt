@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.os.Build
+import android.net.Uri
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import app.tauri.PermissionState
@@ -19,6 +20,7 @@ import com.google.firebase.messaging.FirebaseMessaging
 
 private const val ALIAS_NOTIFICATION = "notification"
 private const val EXTRA_PUSH_TARGET_PATH = "virya_push_target_path"
+private const val MAX_APP_LINK_BYTES = 1024
 
 @TauriPlugin(
     permissions = [
@@ -27,9 +29,19 @@ private const val EXTRA_PUSH_TARGET_PATH = "virya_push_target_path"
 )
 class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
     private var pendingLaunchTarget: String? = null
+    private var pendingAppLink: String? = null
+    private var pendingAppLinkRejected = false
 
     override fun onNewIntent(intent: Intent) {
         launchTargetFrom(intent)?.let { pendingLaunchTarget = it }
+        // An intent aimed at a Latarnik path is always an answer, even when the
+        // capability inside it is malformed. Record the refusal so the shell can
+        // say so instead of leaving the user on an unchanged screen.
+        if (isLatarnikIntent(intent)) {
+            val link = appLinkFrom(intent)
+            pendingAppLink = link
+            pendingAppLinkRejected = link == null
+        }
     }
     @Command
     fun getToken(invoke: Invoke) {
@@ -80,6 +92,26 @@ class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
         invoke.resolve(result)
     }
 
+
+    @Command
+    fun takeAppLink(invoke: Invoke) {
+        val currentIsLatarnik = isLatarnikIntent(activity.intent)
+        val currentLink = appLinkFrom(activity.intent)
+        val link = pendingAppLink ?: currentLink
+        val rejected = pendingAppLinkRejected || (currentIsLatarnik && currentLink == null)
+        pendingAppLink = null
+        pendingAppLinkRejected = false
+        // One-time either way: a refused capability must not be re-offered on
+        // the next resume any more than an accepted one.
+        if (currentIsLatarnik && (currentLink == null || currentLink == link)) {
+            activity.intent.data = null
+        }
+        val result = JSObject()
+        result.put("appLink", link.orEmpty())
+        result.put("rejected", rejected)
+        invoke.resolve(result)
+    }
+
     @Command
     fun openNotificationSettings(invoke: Invoke) {
         val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
@@ -100,6 +132,37 @@ class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
             it.startsWith("/") && !it.startsWith("//") && it.length <= 512 &&
                 !it.any { character -> character.code < 0x20 || character.code == 0x7f }
         }
+    }
+
+
+    // Whether this intent was addressed to Latarnik at all, independent of the
+    // capability being well formed. Anything else is not our intent to answer.
+    private fun isLatarnikIntent(intent: Intent?): Boolean {
+        if (intent?.action != Intent.ACTION_VIEW) return false
+        val uri: Uri = intent.data ?: return false
+        if (uri.scheme != "https") return false
+        if (uri.host != "virya.music" && uri.host != "www.virya.music") return false
+        val path = uri.path?.trimEnd('/').orEmpty()
+        return path == "/latarnik" || path == "/pl/latarnik"
+    }
+
+    private fun isInviteChar(character: Char): Boolean =
+        character in 'A'..'Z' || character in 'a'..'z' || character in '0'..'9' ||
+            character == '-' || character == '_'
+
+    private fun appLinkFrom(intent: Intent?): String? {
+        if (!isLatarnikIntent(intent)) return null
+        val uri: Uri = intent?.data ?: return null
+        if (uri.fragment != null || uri.userInfo != null) return null
+        if (uri.queryParameterNames != setOf("invite")) return null
+        val values = uri.getQueryParameters("invite")
+        if (values.size != 1) return null
+        val invite = values.single().trim()
+        // ASCII only, matching the Rust capability grammar exactly. A wider
+        // Unicode class here would hand the shell a link it must reject anyway.
+        if (invite.length !in 24..128 || !invite.all { isInviteChar(it) }) return null
+        val link = uri.toString()
+        return link.takeIf { it.length <= MAX_APP_LINK_BYTES && !it.any { character -> character.code < 0x20 || character.code >= 0x7f } }
     }
 
     private fun permissionState(invoke: Invoke) {
