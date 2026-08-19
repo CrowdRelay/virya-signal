@@ -1,6 +1,9 @@
 name: Android Google Play
 
 on:
+  push:
+    branches: [main]
+    paths-ignore: ["**/*.md", "docs/**"]
   workflow_dispatch:
     inputs:
       version:
@@ -23,79 +26,208 @@ permissions:
   actions: read
 
 concurrency:
-  group: android-google-play
+  group: android-google-play-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    outputs:
+      should_publish: ${{ steps.gate.outputs.should_publish }}
+    steps:
+      - name: Wait for the exact main Check run
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "PLAY_GATE=PASS mode=manual sha=${GITHUB_SHA}"
+            exit 0
+          fi
+
+          echo "Waiting for Check on exact source SHA ${GITHUB_SHA}"
+          for attempt in $(seq 1 120); do
+            row="$(gh run list \
+              --repo "${GITHUB_REPOSITORY}" \
+              --workflow check.yml \
+              --commit "${GITHUB_SHA}" \
+              --limit 1 \
+              --json databaseId,status,conclusion,headSha \
+              --jq '.[0] // empty' 2>/dev/null || true)"
+
+            if [[ -z "${row}" ]]; then
+              sleep 15
+              continue
+            fi
+
+            head_sha="$(jq -r '.headSha // empty' <<<"${row}")"
+            status="$(jq -r '.status // empty' <<<"${row}")"
+            conclusion="$(jq -r '.conclusion // empty' <<<"${row}")"
+            run_id="$(jq -r '.databaseId // empty' <<<"${row}")"
+            [[ "${head_sha}" == "${GITHUB_SHA}" ]]
+
+            if [[ "${status}" != "completed" ]]; then
+              echo "PLAY_GATE=WAIT check_run=${run_id} status=${status} attempt=${attempt}"
+              sleep 15
+              continue
+            fi
+
+            case "${conclusion}" in
+              success)
+                echo "should_publish=true" >> "$GITHUB_OUTPUT"
+                echo "PLAY_GATE=PASS check_run=${run_id} sha=${GITHUB_SHA}"
+                exit 0
+                ;;
+              cancelled)
+                # Check uses cancel-in-progress on main. A superseded commit must
+                # not become a Play release and should not create a noisy red run.
+                echo "should_publish=false" >> "$GITHUB_OUTPUT"
+                echo "PLAY_GATE=SKIP reason=superseded check_run=${run_id} sha=${GITHUB_SHA}"
+                exit 0
+                ;;
+              *)
+                echo "PLAY_GATE=FAIL check_run=${run_id} conclusion=${conclusion} sha=${GITHUB_SHA}" >&2
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "PLAY_GATE=FAIL reason=check-timeout sha=${GITHUB_SHA}" >&2
+          exit 1
+
+  prepare:
+    needs: gate
+    if: needs.gate.outputs.should_publish == 'true'
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      play_track: ${{ steps.release.outputs.play_track }}
+      reuse_run_id: ${{ steps.release.outputs.reuse_run_id }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v7.0.1
+      - name: Resolve release request
+        id: release
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_TRACK: ${{ inputs.play_track }}
+          INPUT_REUSE_RUN_ID: ${{ inputs.reuse_run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            version="$(jq -r '.version' src-tauri/tauri.conf.json)"
+            play_track="internal"
+            reuse_run_id=""
+          else
+            version="${INPUT_VERSION}"
+            play_track="${INPUT_TRACK}"
+            reuse_run_id="${INPUT_REUSE_RUN_ID}"
+          fi
+
+          [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]
+          case "${play_track}" in internal|alpha|beta|production) ;; *) exit 2 ;; esac
+          if [[ -n "${reuse_run_id}" ]]; then
+            [[ "${reuse_run_id}" =~ ^[0-9]+$ ]]
+          fi
+
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "play_track=${play_track}" >> "$GITHUB_OUTPUT"
+          echo "reuse_run_id=${reuse_run_id}" >> "$GITHUB_OUTPUT"
+          echo "PLAY_RELEASE_REQUEST=PASS version=${version} track=${play_track} sha=${GITHUB_SHA}"
+
   build:
-    if: inputs.reuse_run_id == ''
+    needs: [gate, prepare]
+    if: needs.gate.outputs.should_publish == 'true' && needs.prepare.outputs.reuse_run_id == ''
     uses: ./.github/workflows/_android-build.yml
     with:
       build_kind: release-aab
-      version: ${{ inputs.version }}
-      artifact_name: virya-signal-google-play-${{ inputs.version }}
+      version: ${{ needs.prepare.outputs.version }}
+      artifact_name: virya-signal-google-play-${{ needs.prepare.outputs.version }}
       retention_days: 90
       signed: true
     secrets: inherit
 
   publish:
-    needs: build
-    if: ${{ always() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    needs: [gate, prepare, build]
+    if: >-
+      ${{ always() &&
+          needs.gate.outputs.should_publish == 'true' &&
+          needs.prepare.result == 'success' &&
+          (needs.build.result == 'success' || needs.build.result == 'skipped') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment:
-      name: ${{ inputs.play_track == 'production' && 'production' || 'store-testing' }}
+      name: ${{ needs.prepare.outputs.play_track == 'production' && 'production' || 'store-testing' }}
     steps:
       - name: Validate Google Play secret
         env:
           PLAY_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-        run: test -n "$PLAY_JSON" || { echo "Missing GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" >&2; exit 1; }
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${PLAY_JSON}" || { echo "Missing GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" >&2; exit 1; }
+          jq -e '.type == "service_account" and (.client_email | type == "string") and (.private_key | type == "string")' <<<"${PLAY_JSON}" >/dev/null
+          echo "GOOGLE_PLAY_CREDENTIALS=PASS"
       - name: Refuse production promotion from a non-main ref
-        if: inputs.play_track == 'production'
+        if: needs.prepare.outputs.play_track == 'production'
         shell: bash
         run: |
           set -euo pipefail
           [[ "$GITHUB_REF" == "refs/heads/main" ]]
       - name: Download AAB built in this run
-        if: inputs.reuse_run_id == ''
+        if: needs.prepare.outputs.reuse_run_id == ''
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: virya-signal-google-play-${{ inputs.version }}
+          name: virya-signal-google-play-${{ needs.prepare.outputs.version }}
           path: promoted
       - name: Reuse exact AAB from an earlier run
-        if: inputs.reuse_run_id != ''
+        if: needs.prepare.outputs.reuse_run_id != ''
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: virya-signal-google-play-${{ inputs.version }}
+          name: virya-signal-google-play-${{ needs.prepare.outputs.version }}
           path: promoted
-          run-id: ${{ inputs.reuse_run_id }}
+          run-id: ${{ needs.prepare.outputs.reuse_run_id }}
           github-token: ${{ github.token }}
       - name: Verify exact build artifact
         run: |
           set -euo pipefail
           python3 promoted/scripts/artifact_manifest.py verify promoted/artifacts promoted/android-artifact-manifest.json --source-sha "$GITHUB_SHA"
           test -s promoted/release-provenance.json
-          test -f "promoted/artifacts/virya-signal-${{ inputs.version }}.aab"
-          # Internal/alpha/beta are where push is tested, so they must have the
-          # same Firebase guarantee as production. Never upload a known-degraded
-          # signed AAB to any Play track.
+          test -f "promoted/artifacts/virya-signal-${{ needs.prepare.outputs.version }}.aab"
           jq -e '.firebaseConfigured == true and .analyticsIncluded == false and .crashlyticsIncluded == false' promoted/artifacts/push-build-config.json >/dev/null
           jq -e '.push.firebaseConfigured == true and (.push.firebaseConfigSha256 | test("^[0-9a-f]{64}$"))' promoted/release-provenance.json >/dev/null
+          echo "PLAY_ARTIFACT=PASS sha=${GITHUB_SHA} version=${{ needs.prepare.outputs.version }}"
       - name: Upload exact AAB to Google Play
-        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1
+        id: play
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: music.virya.signal
-          releaseFiles: promoted/artifacts/virya-signal-${{ inputs.version }}.aab
-          track: ${{ inputs.play_track }}
+          releaseFiles: promoted/artifacts/virya-signal-${{ needs.prepare.outputs.version }}.aab
+          tracks: ${{ needs.prepare.outputs.play_track }}
           status: completed
+          releaseName: Virya Signal ${{ needs.prepare.outputs.version }} · CI ${{ github.run_number }}
+      - name: Confirm committed Google Play edit
+        shell: bash
+        env:
+          COMMITTED_EDIT_ID: ${{ steps.play.outputs.committedEditId }}
+        run: |
+          set -euo pipefail
+          test -n "${COMMITTED_EDIT_ID}" || { echo "Google Play action returned no committed edit ID" >&2; exit 1; }
+          echo "GOOGLE_PLAY_UPLOAD=PASS track=${{ needs.prepare.outputs.play_track }} version=${{ needs.prepare.outputs.version }} sha=${GITHUB_SHA} edit=${COMMITTED_EDIT_ID}"
       - name: Report production Virya Signal release to CrowdRelay ledger
-        if: inputs.play_track == 'production'
+        if: needs.prepare.outputs.play_track == 'production'
         continue-on-error: true
         env:
           CROWDRELAY_BASE_URL: ${{ vars.CROWDRELAY_PRODUCTION_BASE_URL }}
           CROWDRELAY_COMMERCE_API_KEY: ${{ secrets.CROWDRELAY_COMMERCE_API_KEY }}
-          COMPONENT_VERSION: ${{ inputs.version }}
+          COMPONENT_VERSION: ${{ needs.prepare.outputs.version }}
         shell: bash
         run: |
           set -euo pipefail
