@@ -30,7 +30,7 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         # Successful native confirmation still adopts the authoritative session
         # and routes to Signal using the shared disposal-safe UI path.
         self.assertIn('adopt_fan_session(', scan)
-        adopt = src.split('fn adopt_fan_session(', 1)[1].split('\\nasync fn ', 1)[0]
+        adopt = src.split('fn adopt_fan_session(', 1)[1].split('\nasync fn ', 1)[0]
         self.assertIn('session.status.try_set(value)', adopt)
         self.assertIn('persist_fan_tab(FanTab::Signal);', adopt)
 
@@ -294,7 +294,11 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertIn('let _ = loading.try_set(false);', body)
         self.assertIn('focused_event_slug.set(None);', shell)
         self.assertIn('focused_event_preview.set(None);', shell)
-        self.assertIn('target != FanTab::Events && target != FanTab::Signal', home)
+        guard = home.split('let show_recommended =', 1)[1].split(';', 1)[0]
+        self.assertIn('FanTab::Events', guard)
+        self.assertIn('FanTab::Signal', guard)
+        self.assertGreaterEqual(guard.count('!='), 2)
+        self.assertIn('show_recommended.then', home)
 
     def test_android_device_e2e_is_manual_diagnostic_only(self):
         workflow = read('.github/workflows/android-e2e.yml')
