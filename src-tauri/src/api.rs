@@ -10,7 +10,10 @@ mod site;
 mod synesthesia;
 mod ticketing;
 
-use reqwest::{StatusCode, header::{ACCEPT, ORIGIN}};
+use reqwest::{
+    StatusCode,
+    header::{ACCEPT, ORIGIN},
+};
 use serde::Serialize;
 
 use crate::AppError;
