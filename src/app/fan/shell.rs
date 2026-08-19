@@ -221,7 +221,7 @@ fn FanApp(
         <section class="authenticated fan-authenticated">
             <header class="topbar fan-topbar">
                 <div><p class="eyebrow">{tr("virya_signal")}</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| tr("my_signal").to_owned())}</strong></div>
-                <div class="topbar-actions"><span class="live-dot"></span><button class="menu-trigger" aria-label=tr("open_menu") aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|value| *value = !*value)><i></i><i></i><i></i></button><button aria-label=tr("close_and_lock_signal") on:click=close>"×"</button></div>
+                <div class="topbar-actions"><button class="menu-trigger" aria-label=tr("open_menu") aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|value| *value = !*value)><i></i><i></i><i></i></button></div>
             </header>
             <Show when=move || menu_open.get()>
                 <div class="overflow-backdrop" on:click=move |_| menu_open.set(false)></div>
@@ -231,6 +231,7 @@ fn FanApp(
                     <button on:click=refresh_all><span>"↻"</span>{tr("refresh_all_data")}</button>
                     <button on:click=open_latarnik><span>"◉"</span>{tr("latarnik_zone")}</button>
                     <button on:click=move |_| { menu_open.set(false); mode.set(RootMode::StaffGate); }><span>"⌁"</span>{tr("staff_zone")}</button>
+                    <button on:click=close><span>"×"</span>{tr("close_and_lock_signal")}</button>
                 </nav>
             </Show>
             <div class="content">{move || match tab.get() {

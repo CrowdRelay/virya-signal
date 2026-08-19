@@ -13,6 +13,10 @@ on:
         type: choice
         default: internal
         options: [internal, alpha, beta, production]
+      reuse_run_id:
+        description: Optional previous Android Google Play workflow run ID to reuse an already-built AAB for this exact commit/version
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -24,6 +28,7 @@ concurrency:
 
 jobs:
   build:
+    if: inputs.reuse_run_id == ''
     uses: ./.github/workflows/_android-build.yml
     with:
       build_kind: release-aab
@@ -35,6 +40,7 @@ jobs:
 
   publish:
     needs: build
+    if: ${{ always() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment:
@@ -50,10 +56,20 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$GITHUB_REF" == "refs/heads/main" ]]
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - name: Download AAB built in this run
+        if: inputs.reuse_run_id == ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: virya-signal-google-play-${{ inputs.version }}
           path: promoted
+      - name: Reuse exact AAB from an earlier run
+        if: inputs.reuse_run_id != ''
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: virya-signal-google-play-${{ inputs.version }}
+          path: promoted
+          run-id: ${{ inputs.reuse_run_id }}
+          github-token: ${{ github.token }}
       - name: Verify exact build artifact
         run: |
           set -euo pipefail
