@@ -44,7 +44,10 @@ pub struct FanHomeData {
 
 impl FanHomeData {
     pub const SCHEMA_VERSION: u32 = 1;
-    pub fn has_supported_schema(&self) -> bool { self.schema_version == Self::SCHEMA_VERSION }
+
+    pub fn has_supported_schema(&self) -> bool {
+        self.schema_version == Self::SCHEMA_VERSION
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -86,7 +89,10 @@ pub struct FanHomeSynesthesia {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct FanHomeReferral { pub qualified: i64, pub pending: i64 }
+pub struct FanHomeReferral {
+    pub qualified: i64,
+    pub pending: i64,
+}
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct FanHomeCounts {
