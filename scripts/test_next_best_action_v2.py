@@ -19,13 +19,15 @@ class NextBestActionV2Contract(unittest.TestCase):
     def test_signal_uses_typed_recommended_targets(self) -> None:
         self.assertIn("snapshot.recommended.as_ref()", self.ui)
         self.assertIn("FanTarget::parse", self.ui)
-        self.assertIn('key == "event"', self.contract)
+        self.assertIn('strip_prefix("event=")', self.contract)
         self.assertIn("not_event", self.contract)
 
     def test_typed_target_slug_is_bounded_and_sanitized(self) -> None:
         self.assertIn("fn event_slug(value: &str)", self.contract)
-        self.assertIn("value.len() <= 128", self.contract)
+        self.assertIn("value.len() > 128", self.contract)
         self.assertIn("byte.is_ascii_lowercase()", self.contract)
+        self.assertIn("byte.is_ascii_digit()", self.contract)
+        self.assertIn("matches!(byte, b'-' | b'_')", self.contract)
 
     def test_backend_parity_when_ecosystem_checkout_is_available(self) -> None:
         # Standalone Signal CI intentionally checks out only this repository.
