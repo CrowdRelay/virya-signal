@@ -11,25 +11,15 @@ def kib(size: int) -> float:
     return size / 1024
 
 
-def inspect(
-    dist: Path,
-    max_wasm_kib: int,
-    max_total_kib: int,
-    max_code_gzip_kib: int,
-) -> tuple[int, int, int, list[tuple[Path, int]]]:
+def inspect(dist: Path, max_wasm_kib: int, max_total_kib: int) -> tuple[int, int, list[tuple[Path, int]]]:
+    """Validate raw safety ceilings while preserving the long-standing test API."""
     if not dist.is_dir():
         raise ValueError(f"frontend output does not exist: {dist}")
     files = sorted((path, path.stat().st_size) for path in dist.rglob("*") if path.is_file())
     if not files:
         raise ValueError("frontend output is empty")
-
     wasm_size = sum(size for path, size in files if path.suffix == ".wasm")
     total_size = sum(size for _, size in files)
-    code = [path for path, _ in files if path.suffix.lower() in CODE_SUFFIXES]
-    code_gzip_size = sum(
-        len(gzip.compress(path.read_bytes(), compresslevel=9, mtime=0)) for path in code
-    )
-
     if wasm_size == 0:
         raise ValueError("frontend output contains no WASM module")
     if wasm_size > max_wasm_kib * 1024:
@@ -40,12 +30,15 @@ def inspect(
         raise ValueError(
             f"frontend size {kib(total_size):.1f} KiB exceeds {max_total_kib} KiB safety ceiling"
         )
-    if code_gzip_size > max_code_gzip_kib * 1024:
-        raise ValueError(
-            f"compressed code projection {kib(code_gzip_size):.1f} KiB exceeds "
-            f"{max_code_gzip_kib} KiB transfer ceiling"
-        )
-    return wasm_size, total_size, code_gzip_size, files
+    return wasm_size, total_size, files
+
+
+def compressed_code_size(files: list[tuple[Path, int]]) -> int:
+    return sum(
+        len(gzip.compress(path.read_bytes(), compresslevel=9, mtime=0))
+        for path, _ in files
+        if path.suffix.lower() in CODE_SUFFIXES
+    )
 
 
 def wasm_budget_state(wasm_size: int, warn_wasm_kib: int, max_wasm_kib: int) -> str:
@@ -61,8 +54,8 @@ def main() -> int:
     parser.add_argument("dist", nargs="?", default="dist", type=Path)
     # Raw WASM is still bounded for parse/memory safety, but ordinary product
     # growth is governed by compare_web_metrics.py against the previous successful
-    # main. The transfer-aware compressed-code ceiling is the more meaningful
-    # absolute network guard than the old historical 1792 KiB raw limit.
+    # main. The compressed-code ceiling is the more meaningful absolute network
+    # guard than the old historical 1792 KiB raw limit.
     parser.add_argument("--warn-wasm-kib", type=int, default=2048)
     parser.add_argument("--max-wasm-kib", type=int, default=2304)
     parser.add_argument("--max-total-kib", type=int, default=3072)
@@ -82,14 +75,18 @@ def main() -> int:
         parser.error("WASM early-warning budget must stay below the hard limit")
 
     try:
-        wasm_size, total_size, code_gzip_size, files = inspect(
-            args.dist,
-            args.max_wasm_kib,
-            args.max_total_kib,
-            args.max_code_gzip_kib,
+        wasm_size, total_size, files = inspect(
+            args.dist, args.max_wasm_kib, args.max_total_kib
         )
     except ValueError as error:
         parser.error(str(error))
+
+    code_gzip_size = compressed_code_size(files)
+    if code_gzip_size > args.max_code_gzip_kib * 1024:
+        parser.error(
+            f"compressed code projection {kib(code_gzip_size):.1f} KiB exceeds "
+            f"{args.max_code_gzip_kib} KiB transfer ceiling"
+        )
 
     largest = sorted(files, key=lambda item: item[1], reverse=True)[:5]
     full_gzip_size = sum(
