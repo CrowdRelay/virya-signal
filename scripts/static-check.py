@@ -267,7 +267,6 @@ for contract in (
         raise SystemExit(f'staff four-tab navigation contract is missing: {contract}')
 css = (root / 'styles.css').read_text()
 for contract in (
-    '--control-radius: 6px',
     '.ghost { min-height: 48px;',
     '.advanced-config > .ghost { width: 100%; min-height: 54px;',
     'align-items: stretch',

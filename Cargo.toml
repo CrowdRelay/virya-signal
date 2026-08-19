@@ -36,8 +36,8 @@ opt-level = 3
 opt-level = 3
 
 [profile.release]
-codegen-units = 1
-lto = true
+codegen-units = 4
+lto = "thin"
 opt-level = "s"
 panic = "abort"
 strip = "symbols"
@@ -45,4 +45,4 @@ strip = "symbols"
 # WebAssembly is download/startup sensitive; the native shell remains opt=s.
 [profile.release.package.virya-signal-ui]
 opt-level = "z"
-codegen-units = 1
+codegen-units = 4

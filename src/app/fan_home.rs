@@ -8,39 +8,6 @@ fn event_phase_label(phase: &str) -> &'static str {
     }
 }
 
-fn tab_for_target(target: FanTarget) -> FanTab {
-    match target {
-        FanTarget::Wallet => FanTab::Wallet,
-        FanTarget::Merch => FanTab::Merch,
-        FanTarget::Area => FanTab::Game,
-        FanTarget::Profile => FanTab::Profile,
-        FanTarget::Event(_) => FanTab::Events,
-        FanTarget::Signal => FanTab::Signal,
-    }
-}
-
-fn recommended_tab(snapshot: &FanHomeData) -> FanTab {
-    if let Some(detail) = snapshot.recommended.as_ref() {
-        return tab_for_target(FanTarget::parse(&detail.target));
-    }
-    match snapshot.recommended_action {
-        FanRecommendedAction::OpenWallet => FanTab::Wallet,
-        FanRecommendedAction::SharePostShowFeedback => FanTab::Profile,
-        FanRecommendedAction::ContinueSynesthesia | FanRecommendedAction::ExploreSignal => FanTab::Signal,
-        _ => FanTab::Events,
-    }
-}
-
-fn recommended_label(action: &FanRecommendedAction) -> &'static str {
-    match action {
-        FanRecommendedAction::OpenWallet => tr("open_wallet_now"),
-        FanRecommendedAction::OpenLiveEvent => tr("open_live_signal"),
-        FanRecommendedAction::SharePostShowFeedback => tr("share_post_show_feedback"),
-        FanRecommendedAction::GetTicket => tr("get_ticket_now"),
-        FanRecommendedAction::FollowNextEvent => tr("follow_this_signal"),
-        _ => tr("show_details"),
-    }
-}
 
 #[component]
 fn FanHomeOverview(
@@ -60,15 +27,8 @@ fn FanHomeOverview(
                     let synesthesia = snapshot.synesthesia.clone();
                     let show_synesthesia = synesthesia.started || synesthesia.completed;
                     let synesthesia_summary = synesthesia_best_summary(&synesthesia);
-                    let counts = snapshot.counts.clone();
-                    let referral = snapshot.referral.clone();
                     let next_event = snapshot.next_event.clone();
                     let city = snapshot.profile.primary_city.clone();
-                    let generated_at = human_time(&snapshot.generated_at);
-                    let recommended_target = recommended_tab(&snapshot);
-                    let recommended_cta = recommended_label(&snapshot.recommended_action);
-                    let show_recommended =
-                        recommended_target != FanTab::Events && recommended_target != FanTab::Signal;
                     view! {
                         <header class="fan-home-header">
                             <div>
@@ -79,7 +39,6 @@ fn FanHomeOverview(
                             {stale.then(|| view! {
                                 <span class="cache-badge">{tr("cached_data")}</span>
                             })}
-                            <small>{i18n::format("signal_snapshot_updated", &[generated_at])}</small>
                         </header>
                         <div class="fan-home-grid">
                             // Synesthesia is a side album experiment, not a primary Home CTA.
@@ -189,9 +148,6 @@ fn FanHomeOverview(
                                                     tab.set(FanTab::Events);
                                                 }
                                             }>{tr("show_details")}</button>
-                                            {show_recommended.then(|| view! {
-                                                <button class="ghost" on:click=move |_| tab.set(recommended_target)>{recommended_cta}</button>
-                                            })}
                                             // First-party ticketing wins whenever the show has an
                                             // active sale: send the fan into the Events tab focused on
                                             // this show, where the in-app checkout lives, exactly like
@@ -217,26 +173,6 @@ fn FanHomeOverview(
                                 }
                             })}
                         </div>
-                        <div class="stats-grid fan-home-stats">
-                            <Metric value=counts.event_interests.to_string() label=tr("show_interests")/>
-                            <Metric value=counts.active_passes.to_string() label=tr("active_passes")/>
-                            <Metric value=counts.paid_orders.to_string() label=tr("paid_orders")/>
-                            <Metric value=counts.area_claims.to_string() label=tr("area_findings")/>
-                            <Metric value=referral.qualified.to_string() label=tr("confirmed_referrals")/>
-                            <Metric value=referral.pending.to_string() label=tr("pending_referrals")/>
-                        </div>
-                        <section class="participation-history" aria-label=tr("your_participation")>
-                            <div class="participation-history-heading">
-                                <div><p class="eyebrow">{tr("your_participation")}</p><strong>{tr("participation_history_title")}</strong></div>
-                                <small>{tr("participation_history_hint")}</small>
-                            </div>
-                            <div class="participation-history-grid">
-                                <article class:active=synesthesia.started><strong>{if synesthesia.completed { "✓".to_owned() } else { format!("{}/11", synesthesia.rooms_completed.clamp(0, 11)) }}</strong><span>{tr("synesthesia_journey")}</span></article>
-                                <article class:active={counts.area_claims > 0}><strong>{counts.area_claims.max(0)}</strong><span>{tr("area_discoveries")}</span></article>
-                                <article class:active={counts.paid_orders > 0}><strong>{counts.paid_orders.max(0)}</strong><span>{tr("concert_orders")}</span></article>
-                                <article class:active={counts.active_passes > 0}><strong>{counts.active_passes.max(0)}</strong><span>{tr("concert_passes")}</span></article>
-                            </div>
-                        </section>
                     }.into_any()
                 }).value_or_else(|| view! {
                     <div class="empty-state"><strong>{tr("signal_home_unavailable")}</strong><p>{tr("signal_home_fallback_hint")}</p></div>

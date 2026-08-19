@@ -70,9 +70,7 @@ pub struct PublicHomeData {
 // Fan Home DTOs are defined once in virya-signal-contracts and shared verbatim
 // by the WASM UI and the Tauri shell. Nested types travel through FanHomeData,
 // so only the names this crate spells out itself are re-exported here.
-pub use virya_signal_contracts::fan::{
-    FanHomeData, FanHomeSynesthesia, FanRecommendedAction, FanTarget,
-};
+pub use virya_signal_contracts::fan::{FanHomeData, FanHomeSynesthesia, FanTarget};
 
 // Decoded for contract parity with the staff dashboard; not rendered yet.
 #[allow(dead_code)]
