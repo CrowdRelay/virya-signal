@@ -65,10 +65,7 @@ pub(crate) async fn request_city(
             crate::i18n::tr("native_city_name_invalid").into(),
         ));
     }
-    state
-        .api
-        .request_city("https://signal-api.virya.music/v1/", &input)
-        .await
+    state.api.request_city(crate::tenant::API_BASE, &input).await
 }
 
 #[tauri::command]
