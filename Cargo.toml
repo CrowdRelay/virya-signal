@@ -46,8 +46,3 @@ strip = "symbols"
 [profile.release.package.virya-signal-ui]
 opt-level = "z"
 codegen-units = 1
-
-# Shared DTO/parsing code is part of the WebAssembly dependency graph too.
-# Keep it size-optimized without changing the native shell's release profile.
-[profile.release.package.virya-signal-contracts]
-opt-level = "z"
