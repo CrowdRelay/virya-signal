@@ -11,6 +11,11 @@ on:
         description: Semantic release version without tag prefix
         required: true
         type: string
+      android_version_code:
+        description: Android versionCode, or auto to derive from semantic version
+        required: false
+        type: string
+        default: auto
       artifact_name:
         description: GitHub artifact name
         required: true
@@ -59,6 +64,7 @@ jobs:
           SIGNED: ${{ inputs.signed }}
           TARGET_ARCH: ${{ inputs.target_arch }}
           E2E_API_BASE: ${{ inputs.e2e_api_base }}
+          ANDROID_VERSION_CODE: ${{ inputs.android_version_code }}
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
@@ -68,6 +74,10 @@ jobs:
           set -euo pipefail
           case "${BUILD_KIND}" in debug-apk|release-apk|release-aab) ;; *) echo "Invalid build_kind: ${BUILD_KIND}" >&2; exit 2 ;; esac
           case "${TARGET_ARCH}" in aarch64|x86_64) ;; *) echo "Invalid target_arch: ${TARGET_ARCH}" >&2; exit 2 ;; esac
+          if [[ "${ANDROID_VERSION_CODE}" != "auto" ]]; then
+            [[ "${ANDROID_VERSION_CODE}" =~ ^[0-9]+$ ]] || { echo "android_version_code must be auto or an integer" >&2; exit 2; }
+            (( ANDROID_VERSION_CODE >= 1 && ANDROID_VERSION_CODE <= 2100000000 )) || { echo "android_version_code outside Play range" >&2; exit 2; }
+          fi
           if [[ -n "${E2E_API_BASE}" && "${BUILD_KIND}" != "debug-apk" ]]; then
             echo "e2e_api_base is debug-only" >&2
             exit 2
@@ -114,7 +124,7 @@ jobs:
           tool: trunk@0.21.14,tauri-cli@2.11.4
       - name: Set release version
         if: inputs.build_kind != 'debug-apk'
-        run: python3 scripts/set-release-version.py "${{ inputs.version }}" --android-version-code auto
+        run: python3 scripts/set-release-version.py "${{ inputs.version }}" --android-version-code "${{ inputs.android_version_code }}"
       - name: Generate Android project
         run: cargo tauri android init --ci --skip-targets-install
       - name: Generate VIRYA V2 launcher icons
@@ -155,9 +165,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Empty GitHub input values must not become compile-time Some("") via option_env!.
-          # Ordinary debug/release builds therefore compile with production defaults; only
-          # the dedicated emulator E2E build keeps these overrides.
           if [[ -z "${VIRYA_SIGNAL_E2E_API_BASE:-}" ]]; then
             unset VIRYA_SIGNAL_E2E_API_BASE
             unset VIRYA_SIGNAL_E2E_QR_PAYLOAD
@@ -207,9 +214,6 @@ jobs:
           fi
           cp src-tauri/gen/android/push-build-config.json artifacts/push-build-config.json
           if [[ "${ext}" == "aab" ]]; then
-            # Inspect the exact artifact that will be uploaded to Play, not only
-            # generated Gradle/source state. This catches missing google-services
-            # processing and stale App Link manifest merges.
             python3 scripts/check-android-firebase-artifact.py "${package}"
             python3 scripts/check-android-app-links-artifact.py "${package}"
           fi
