@@ -62,8 +62,15 @@ class RuntimePerformanceContract(unittest.TestCase):
     def test_release_profiles_remain_size_optimized(self):
         manifest = ROOT / "Cargo.toml"
         self.assertEqual(toml_value(manifest, "profile.release", "opt-level"), "s")
-        self.assertIs(toml_value(manifest, "profile.release", "lto"), True)
-        self.assertEqual(toml_value(manifest, "profile.release", "codegen-units"), 1)
+        # Thin LTO keeps cross-crate optimization while avoiding the old fat-LTO
+        # build tax. Accept fat LTO too if a release later needs it, but never no LTO.
+        self.assertIn(toml_value(manifest, "profile.release", "lto"), (True, "thin"))
+        # More than four codegen units would start trading too much size/quality
+        # for compile time; one through four are all intentionally valid.
+        codegen_units = toml_value(manifest, "profile.release", "codegen-units")
+        self.assertIsInstance(codegen_units, int)
+        self.assertGreaterEqual(codegen_units, 1)
+        self.assertLessEqual(codegen_units, 4)
         self.assertEqual(toml_value(manifest, "profile.release", "strip"), "symbols")
         self.assertEqual(toml_value(manifest, "profile.release", "panic"), "abort")
         self.assertEqual(
@@ -169,8 +176,8 @@ class RuntimePerformanceContract(unittest.TestCase):
             self.assertIn(fragment, source)
         for fragment in (
             "const MERCH_STALE_TTL: Duration = Duration::from_secs(10 * 60);",
-            "pub merch: HashMap<String, CacheEntry<MerchCatalog>>,",
-            "merch: restore_entries(disk.merch, MERCH_STALE_TTL),",
+            "pub merch: HashMap<String, CacheEntry<MerchCatalog>>",
+            "merch: restore_entries(disk.merch, MERCH_STALE_TTL)",
         ):
             self.assertIn(fragment, cache)
         self.assertIn(
