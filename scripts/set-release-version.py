@@ -5,9 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import re
-from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -22,7 +20,7 @@ def normalize_version(raw: str) -> str:
     return version
 
 
-def derive_semver_android_version_code(version: str) -> int:
+def derive_android_version_code(version: str) -> int:
     stable = version.split("-", 1)[0].split("+", 1)[0]
     major, minor, patch = map(int, stable.split("."))
     if minor >= 1000 or patch >= 1000:
@@ -31,39 +29,6 @@ def derive_semver_android_version_code(version: str) -> int:
     if not 1 <= code <= 2_100_000_000:
         raise ValueError("derived Android version code is outside the supported range")
     return code
-
-
-def derive_github_android_version_code() -> int | None:
-    """Return a monotonic Play-safe code for the Google Play workflow.
-
-    Google Play requires every uploaded AAB to carry a previously unused,
-    increasing versionCode. Keeping versionName stable (for example 0.4.2)
-    while publishing each green main build therefore needs a CI build number.
-
-    Layout: 1_000_000_000 + YYDDD * 1000 + (workflow run number mod 1000).
-    This is monotonic across UTC days, supports up to 1000 runs/day and remains
-    below Android's 2.1B limit through 2099. Local builds and non-Play CI keep
-    the historical SemVer-derived code for reproducibility.
-    """
-
-    if os.environ.get("GITHUB_ACTIONS") != "true":
-        return None
-    if os.environ.get("GITHUB_WORKFLOW") != "Android Google Play":
-        return None
-    raw_run_number = os.environ.get("GITHUB_RUN_NUMBER", "").strip()
-    if not raw_run_number.isdigit():
-        raise ValueError("GITHUB_RUN_NUMBER must be numeric in GitHub Actions")
-    run_number = int(raw_run_number)
-    now = datetime.now(timezone.utc)
-    year_day = int(now.strftime("%y%j"))
-    code = 1_000_000_000 + year_day * 1_000 + (run_number % 1_000)
-    if not 1 <= code <= 2_100_000_000:
-        raise ValueError("GitHub-derived Android version code is outside the supported range")
-    return code
-
-
-def derive_android_version_code(version: str) -> int:
-    return derive_github_android_version_code() or derive_semver_android_version_code(version)
 
 
 def update_config(
