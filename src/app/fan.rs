@@ -467,7 +467,7 @@ fn FanAccess(
             <header class="fan-access-hero">
                 <p class="eyebrow">{tr("virya_signal")}</p>
                 <h1>{tr("shows_tickets")}<br/><em>{tr("and_rewards")}</em></h1>
-                <div class="signal-purpose-grid" aria-label=tr("what_virya_signal_gives_you")>
+                <div class="signal-purpose-grid" role="group" aria-label=tr("what_virya_signal_gives_you")>
                     <span><b aria-hidden="true">"⌁"</b>{tr("shows_near_you")}</span>
                     <span><b aria-hidden="true">"▣"</b>{tr("tickets_and_qr_codes_on_your_phone")}</span>
                     <span><b aria-hidden="true">"✦"</b>{tr("rewards_for_simple_actions")}</span>

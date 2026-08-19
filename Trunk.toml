@@ -1,6 +1,13 @@
 [build]
 target = "./index.html"
 dist = "dist"
+# Release CSS shipped unminified; this recovers 11.6 KiB of the 79 KiB.
+# Trunk's JS minifier cannot parse ES module syntax and logs a benign
+# "Failed to minify JS" warning, leaving the wasm-bindgen shim byte-identical;
+# `copy-file` assets (boot.js, runtime-i18n.js) are never processed either, so
+# the documented pre-WASM script execution order is untouched. WASM output is
+# unchanged — verified byte-identical against a minify=never build.
+minify = "on_release"
 
 [watch]
 ignore = ["./src-tauri", "./docs", "./scripts", "./artifacts"]

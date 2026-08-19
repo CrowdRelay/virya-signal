@@ -386,7 +386,7 @@ pub(super) fn AreaGameScreen(
                             <div class="area-stats"><span>{i18n::format("live_count_active_points", &[live_count.to_string()])}</span><span>{i18n::format("community_percent_community", &[wallet.community.percent.round().to_string()])}</span></div>
                         </div>
 
-                        <div class="area-native-map" aria-label=tr("area_game_tab")>
+                        <div class="area-native-map" role="group" aria-label=tr("area_game_tab")>
                             <svg class="area-map-silhouette" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
                                 <path class="area-map-country" d="M12 30 L16 23 L24 18 L30 13 L39 15 L48 10 L56 12 L62 17 L70 18 L78 23 L87 25 L92 32 L94 40 L91 48 L94 56 L90 63 L92 70 L88 79 L84 88 L76 92 L69 89 L61 94 L54 91 L47 95 L40 91 L32 91 L26 84 L19 82 L16 73 L11 68 L10 60 L7 54 L10 46 L8 39 Z"></path>
                                 <path class="area-map-river" d="M51 15 C49 27 55 35 52 45 C49 55 55 64 59 70 C63 76 65 83 64 90"></path>

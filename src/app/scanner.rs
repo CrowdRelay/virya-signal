@@ -254,7 +254,7 @@ fn Scanner(
                 <div class="section-head"><div><p class="eyebrow">OFFLINE SHOW MODE</p><h3>{move || if offline.get() { tr("gate_works_locally") } else { tr("works_without_lte") }}</h3></div><button type="button" class:active=move || offline.get() disabled=move || !show_mode.get().prepared || busy.get() on:click=move |_| offline.update(|value| *value = !*value)>{move || if offline.get() { tr("offline_on") } else { tr("offline_off") }}</button></div>
                 <p>{move || if show_mode.get().prepared { i18n::format("tickets_pending_conflicts", &[show_mode.get().eligible_passes.to_string(), show_mode.get().pending.to_string(), show_mode.get().conflicts.to_string()]) } else { tr("download_a_secure_snapshot_before_opening_the").to_owned() }}</p>
                 <Show when=move || show_mode.get().prepared>
-                    <div class="show-mode-status-grid" aria-label=tr("offline_show_mode_status")>
+                    <div class="show-mode-status-grid" role="group" aria-label=tr("offline_show_mode_status")>
                         <article><strong>{move || show_mode.get().eligible_passes}</strong><span>{tr("eligible_tickets")}</span></article>
                         <article><strong>{move || show_mode.get().pending}</strong><span>{tr("pending_scans")}</span></article>
                         <article><strong>{move || show_mode.get().synced}</strong><span>{tr("synced_scans")}</span></article>
