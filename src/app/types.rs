@@ -5,15 +5,7 @@ use crate::models::{
     IssuePassInput, OperatorProfileInput, RequestedCityInput, TicketCheckoutInput,
 };
 
-const PRODUCTION_API_BASE: &str = "https://signal-api.virya.music/v1/";
-#[cfg(debug_assertions)]
-pub(super) const API_BASE: &str = match option_env!("VIRYA_SIGNAL_E2E_API_BASE") {
-    Some(value) if value.is_empty() => PRODUCTION_API_BASE,
-    Some(value) => value,
-    None => PRODUCTION_API_BASE,
-};
-#[cfg(not(debug_assertions))]
-pub(super) const API_BASE: &str = PRODUCTION_API_BASE;
+pub(super) use crate::tenant::API_BASE;
 pub(super) const POLICY_VERSION: &str = "2026-07";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
