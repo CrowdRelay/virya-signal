@@ -1,6 +1,6 @@
 #[component]
 pub fn Skeleton(#[prop(default = 3)] rows: usize) -> impl IntoView {
-    view! { <div class="skeleton-stack" aria-label=tr("loading")>{(0..rows).map(|_| view! { <i></i> }).collect_view()}</div> }
+    view! { <div class="skeleton-stack" role="status" aria-label=tr("loading")>{(0..rows).map(|_| view! { <i></i> }).collect_view()}</div> }
 }
 
 #[component]
