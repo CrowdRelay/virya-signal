@@ -178,18 +178,27 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         self.assertIn("push_target=push_target", app)
         self.assertIn("push_target=push_target", fan)
         self.assertIn("fan_tab_for_push_target", shell)
-        self.assertIn('target.contains("event=")', shell)
+        # Routing moved from substring matching to typed FanTarget parsing, which
+        # matches the exact query key instead of letting "not_event=" through.
+        self.assertIn("FanTarget::parse(target)", shell)
+        self.assertIn("FanTarget::Event(_) => FanTab::Events", shell)
         self.assertIn("override fun onNewIntent", plugin)
         self.assertIn("takeLaunchTarget", plugin)
         self.assertIn('putExtra("virya_push_target_path", targetPath)', service)
 
     def test_fan_home_event_contract_keeps_slug_on_native_and_wasm_sides(self) -> None:
-        ui_models = (ROOT / "src/models.rs").read_text(encoding="utf-8")
-        native_models = (ROOT / "src-tauri/src/models/session_fan.rs").read_text(encoding="utf-8")
-        ui_event = ui_models.split("pub struct FanHomeEvent", 1)[1].split("}", 1)[0]
-        native_event = native_models.split("pub struct FanHomeEvent", 1)[1].split("}", 1)[0]
-        self.assertIn("pub slug: String", ui_event)
-        self.assertIn("pub slug: String", native_event)
+        # Both sides consume the same generated FanHomeEvent, so the slug only has
+        # to be asserted once; that they share it is covered by the parity test.
+        contract = (
+            ROOT / "crates/virya-signal-contracts/src/fan_wire.generated.rs"
+        ).read_text(encoding="utf-8")
+        event = contract.split("pub struct FanHomeEvent", 1)[1].split("}", 1)[0]
+        self.assertIn("pub slug: String", event)
+        for side in ("src/models.rs", "src-tauri/src/models/session_fan.rs"):
+            self.assertIn(
+                "virya_signal_contracts::fan",
+                (ROOT / side).read_text(encoding="utf-8"),
+            )
 
     def test_fan_home_details_and_referral_copy_have_real_targets(self) -> None:
         home = (ROOT / "src/app/fan_home.rs").read_text(encoding="utf-8")

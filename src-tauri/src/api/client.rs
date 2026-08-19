@@ -28,7 +28,7 @@ use crate::{
 use super::{
     cache::{
         self, CITIES_CACHE_TTL, CITIES_STALE_TTL, CacheEntry, CacheValidators, EVENTS_CACHE_TTL,
-        EVENTS_STALE_TTL, PublicCache,
+        EVENTS_STALE_TTL, MERCH_STALE_TTL, PublicCache,
     },
     http::{decode, endpoint},
     retry::retry_idempotent,
@@ -39,7 +39,6 @@ pub(super) const PASS_COOKIE: &str = "crowdrelay_pass_session";
 const MIN_ECOSYSTEM_SCHEMA_VERSION: u32 = 68;
 pub(super) const WALLET_REQUEST_TIMEOUT: Duration = Duration::from_secs(12);
 const MERCH_CACHE_TTL: Duration = Duration::from_secs(15);
-const MERCH_STALE_TTL: Duration = Duration::from_secs(10 * 60);
 pub(super) const FAN_HOME_CACHE_TTL: Duration = Duration::from_secs(20);
 pub(super) const FAN_HOME_STALE_TTL: Duration = Duration::from_secs(10 * 60);
 fn transient_public_status(status: reqwest::StatusCode) -> bool {
@@ -108,7 +107,6 @@ pub struct CrowdRelayClient {
     events_fetch: Arc<Mutex<()>>,
     cities_fetch: Arc<Mutex<()>>,
     merch_fetch: Arc<Mutex<()>>,
-    merch_cache: Arc<RwLock<HashMap<String, CacheEntry<MerchCatalog>>>>,
     meta_cache: Arc<RwLock<HashMap<String, EcosystemMeta>>>,
     pub(super) fan_home_fetch: Arc<Mutex<()>>,
     pub(super) fan_home_cache: Arc<RwLock<HashMap<String, CacheEntry<FanHomeData>>>>,
@@ -118,6 +116,8 @@ pub struct CrowdRelayClient {
     cache_dirty: Arc<AtomicBool>,
     started_at: Instant,
     rum_sampled: bool,
+    rum_cached_ready_reported: Arc<AtomicBool>,
+    rum_network_ready_reported: Arc<AtomicBool>,
 }
 
 fn should_sample_rum() -> bool {
@@ -146,7 +146,6 @@ impl CrowdRelayClient {
             events_fetch: Arc::new(Mutex::new(())),
             cities_fetch: Arc::new(Mutex::new(())),
             merch_fetch: Arc::new(Mutex::new(())),
-            merch_cache: Arc::new(RwLock::new(HashMap::new())),
             meta_cache: Arc::new(RwLock::new(HashMap::new())),
             fan_home_fetch: Arc::new(Mutex::new(())),
             fan_home_cache: Arc::new(RwLock::new(HashMap::new())),
@@ -156,10 +155,12 @@ impl CrowdRelayClient {
             cache_dirty: Arc::new(AtomicBool::new(false)),
             started_at: Instant::now(),
             rum_sampled: should_sample_rum(),
+            rum_cached_ready_reported: Arc::new(AtomicBool::new(false)),
+            rum_network_ready_reported: Arc::new(AtomicBool::new(false)),
         })
     }
 
-    fn report_rum_background(
+    pub(crate) fn report_rum_background(
         &self,
         api_base_url: &str,
         metric_key: &'static str,
@@ -221,6 +222,28 @@ impl CrowdRelayClient {
             .send()
             .await?;
         decode(response).await
+    }
+
+    pub(crate) fn report_signal_startup_ready_once(&self, api_base_url: &str, cached: bool) {
+        let gate = if cached {
+            &self.rum_cached_ready_reported
+        } else {
+            &self.rum_network_ready_reported
+        };
+        if gate.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        let metric_key = if cached {
+            "cached_content_ready_ms"
+        } else {
+            "network_content_ready_ms"
+        };
+        self.report_rum_background(
+            api_base_url,
+            metric_key,
+            self.started_at.elapsed().as_secs_f64() * 1_000.0,
+            "fan_home",
+        );
     }
 
     pub async fn ecosystem_meta(&self, api_base_url: &str) -> Result<EcosystemMeta, AppError> {
@@ -361,9 +384,9 @@ impl CrowdRelayClient {
 
         let (etag, last_modified) = cache::response_validators(response.headers());
         let catalog: MerchCatalog = decode(response).await?;
-        let mut cache = self.merch_cache.write().await;
-        cache::prune_cache(&mut cache, MERCH_STALE_TTL);
-        cache.insert(
+        let mut public_cache = self.public_cache.write().await;
+        cache::prune_cache(&mut public_cache.merch, MERCH_STALE_TTL);
+        public_cache.merch.insert(
             cache_key,
             CacheEntry {
                 value: catalog.clone(),
@@ -373,6 +396,8 @@ impl CrowdRelayClient {
                 last_modified,
             },
         );
+        drop(public_cache);
+        self.persist_public_cache_in_background();
         Ok(catalog)
     }
 
@@ -603,16 +628,18 @@ impl CrowdRelayClient {
     }
 
     async fn cached_merch(&self, cache_key: &str, max_age: Duration) -> Option<MerchCatalog> {
-        let cache = self.merch_cache.read().await;
+        let cache = self.public_cache.read().await;
         cache
+            .merch
             .get(cache_key)
             .filter(|entry| entry.fetched_at.elapsed() < max_age)
             .map(|entry| entry.value.clone())
     }
 
     async fn merch_cache_validators(&self, cache_key: &str) -> CacheValidators {
-        let cache = self.merch_cache.read().await;
+        let cache = self.public_cache.read().await;
         match cache
+            .merch
             .get(cache_key)
             .filter(|entry| entry.fetched_at.elapsed() < MERCH_STALE_TTL)
         {
@@ -625,10 +652,13 @@ impl CrowdRelayClient {
     }
 
     async fn touch_merch_cache(&self, cache_key: &str) {
-        if let Some(entry) = self.merch_cache.write().await.get_mut(cache_key) {
+        let mut cache = self.public_cache.write().await;
+        if let Some(entry) = cache.merch.get_mut(cache_key) {
             entry.fetched_at = Instant::now();
             entry.stored_at_unix_secs = cache::unix_now();
         }
+        drop(cache);
+        self.persist_public_cache_in_background();
     }
 
     async fn cached_events(&self, cache_key: &str, max_age: Duration) -> Option<Vec<PublicEvent>> {

@@ -19,9 +19,15 @@ pub(crate) async fn fan_unlock(
     let app_data_dir = state.app_data_dir.clone();
     let vault_pin = Zeroizing::new(pin);
     let pin_for_session = vault_pin.clone();
-    let profile = run_blocking(move || vault::load_fan(&app_data_dir, vault_pin.as_str())).await?;
+    let (profile, vault_password) = run_blocking(move || {
+        let password = vault::fan_password(&app_data_dir, vault_pin.as_str())?;
+        let profile = vault::load_fan_with_password(&app_data_dir, password.as_ref())?;
+        Ok((profile, password))
+    })
+    .await?;
     *state.fan_session.write().await = Some(Arc::new(profile));
     *state.fan_pin.write().await = Some(pin_for_session);
+    *state.fan_vault_password.write().await = Some(vault_password);
     *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
     drop(_mutation);
@@ -36,6 +42,7 @@ pub(crate) async fn fan_lock(state: State<'_, AppState>) -> Result<FanSessionSta
     let _mutation = state.fan_mutation.lock().await;
     *state.fan_session.write().await = None;
     *state.fan_pin.write().await = None;
+    *state.fan_vault_password.write().await = None;
     *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
     drop(_mutation);
@@ -60,6 +67,7 @@ pub(crate) async fn fan_delete_account(
     state.api.fan_delete_account(&profile).await?;
     *state.fan_session.write().await = None;
     *state.fan_pin.write().await = None;
+    *state.fan_vault_password.write().await = None;
     *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
     let app_data_dir = state.app_data_dir.clone();
@@ -96,6 +104,7 @@ pub(crate) async fn fan_forget(
     // needed to confirm remote audience cleanup before the vault is removed.
     *state.fan_session.write().await = None;
     *state.fan_pin.write().await = None;
+    *state.fan_vault_password.write().await = None;
     *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
     let app_data_dir = state.app_data_dir.clone();
@@ -127,10 +136,14 @@ async fn persist_confirmed_fan(
     let app_data_dir = state.app_data_dir.clone();
     let stored_profile = profile.clone();
     let vault_pin = pin.clone();
-    run_blocking(move || vault::replace_fan(&app_data_dir, vault_pin.as_str(), &stored_profile))
-        .await?;
+    let vault_password = run_blocking(move || {
+        vault::replace_fan(&app_data_dir, vault_pin.as_str(), &stored_profile)?;
+        vault::fan_password(&app_data_dir, vault_pin.as_str())
+    })
+    .await?;
     *state.fan_session.write().await = Some(Arc::new(profile));
     *state.fan_pin.write().await = Some(pin);
+    *state.fan_vault_password.write().await = Some(vault_password);
     state.wallet_qr_tokens.write().await.clear();
     Ok(())
 }
@@ -200,10 +213,14 @@ pub(crate) async fn fan_signup(
         let app_data_dir = state.app_data_dir.clone();
         let stored_profile = profile.clone();
         let vault_pin = pin.clone();
-        run_blocking(move || vault::save_fan(&app_data_dir, vault_pin.as_str(), &stored_profile))
-            .await?;
+        let vault_password = run_blocking(move || {
+            vault::save_fan(&app_data_dir, vault_pin.as_str(), &stored_profile)?;
+            vault::fan_password(&app_data_dir, vault_pin.as_str())
+        })
+        .await?;
         *state.fan_session.write().await = Some(Arc::new(profile));
         *state.fan_pin.write().await = Some(pin);
+        *state.fan_vault_password.write().await = Some(vault_password);
         *state.pending_fan_confirmation.lock().await = None;
         state.wallet_qr_tokens.write().await.clear();
     } else {
@@ -347,9 +364,66 @@ pub(crate) async fn fan_unpublish_synesthesia_leaderboard(
 }
 
 #[tauri::command]
+pub(crate) async fn fan_cached_home(
+    state: State<'_, AppState>,
+) -> Result<Option<FanHomeData>, AppError> {
+    let profile = fan_profile(&state).await?;
+    let password = state
+        .fan_vault_password
+        .read()
+        .await
+        .as_ref()
+        .map(|value| Zeroizing::new(value.to_vec()))
+        .ok_or(AppError::Locked)?;
+    let app_data_dir = state.app_data_dir.clone();
+    let snapshot = match run_blocking(move || {
+        vault::load_fan_home_cache_with_password(&app_data_dir, password.as_ref())
+    })
+    .await
+    {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            eprintln!("[virya:fan-cache] encrypted home snapshot ignored: {error}");
+            None
+        }
+    };
+    let Some(snapshot) = snapshot else { return Ok(None); };
+    let home = state
+        .api
+        .seed_fan_home_snapshot(&profile, snapshot.home, snapshot.stored_at_unix_secs)
+        .await;
+    if home.is_some() {
+        state.api.report_signal_startup_ready_once(&profile.api_base_url, true);
+    }
+    Ok(home)
+}
+
+#[tauri::command]
 pub(crate) async fn fan_home(state: State<'_, AppState>) -> Result<FanHomeData, AppError> {
     let profile = fan_profile(&state).await?;
-    state.api.fan_home(&profile).await
+    let home = state.api.fan_home(&profile).await?;
+    if !home.stale && home.has_supported_schema() {
+        state.api.report_signal_startup_ready_once(&profile.api_base_url, false);
+        if let Some(password) = state.fan_vault_password.read().await.as_ref() {
+            let snapshot = vault::FanHomeCacheSnapshot {
+                stored_at_unix_secs: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|value| value.as_secs())
+                    .unwrap_or(0),
+                home: home.clone(),
+            };
+            let password = Zeroizing::new(password.to_vec());
+            let app_data_dir = state.app_data_dir.clone();
+            if let Err(error) = run_blocking(move || {
+                vault::save_fan_home_cache_with_password(&app_data_dir, password.as_ref(), &snapshot)
+            })
+            .await
+            {
+                eprintln!("[virya:fan-cache] encrypted home snapshot save degraded: {error}");
+            }
+        }
+    }
+    Ok(home)
 }
 
 #[tauri::command]

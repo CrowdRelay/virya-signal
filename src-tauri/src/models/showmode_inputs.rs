@@ -58,6 +58,12 @@ pub struct ShowModeSession {
     pub snapshot: ShowModeSnapshot,
     #[serde(default)]
     pub scans: Vec<ShowModeQueuedScan>,
+    #[serde(default)]
+    pub checklist: Option<ShowChecklist>,
+    #[serde(default)]
+    pub commerce: Option<EventMerchSummary>,
+    #[serde(default)]
+    pub closed_at_unix_secs: Option<u64>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -82,6 +88,14 @@ pub struct ShowModeStatus {
     pub pending: usize,
     pub synced: usize,
     pub conflicts: usize,
+    pub checklist_loaded: bool,
+    pub checklist_pending: usize,
+    pub pickup_order_count: i64,
+    pub pickup_unit_count: i64,
+    #[serde(default)]
+    pub pickup_items: Vec<EventMerchPickupItem>,
+    pub close_ready: bool,
+    pub closed: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

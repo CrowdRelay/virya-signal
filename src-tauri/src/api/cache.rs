@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     AppError,
-    models::{CitySignal, PublicEvent},
+    models::{CitySignal, MerchCatalog, PublicEvent},
     util::OptionValueOrExt,
 };
 
@@ -19,8 +19,10 @@ pub(super) const EVENTS_CACHE_TTL: Duration = Duration::from_secs(30);
 pub(super) const CITIES_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
 pub(super) const EVENTS_STALE_TTL: Duration = Duration::from_secs(6 * 60 * 60);
 pub(super) const CITIES_STALE_TTL: Duration = Duration::from_secs(24 * 60 * 60);
+pub(super) const MERCH_STALE_TTL: Duration = Duration::from_secs(10 * 60);
 pub(super) const MAX_CACHE_ORIGINS: usize = 8;
 const PUBLIC_CACHE_VERSION: u8 = 1;
+const MAX_FUTURE_CLOCK_SKEW: Duration = Duration::from_secs(5 * 60);
 pub(super) const MAX_DISK_CACHE_BYTES: u64 = 2 * 1024 * 1024;
 
 pub(super) struct CacheEntry<T> {
@@ -35,6 +37,7 @@ pub(super) struct CacheEntry<T> {
 pub(super) struct PublicCache {
     pub events: HashMap<String, CacheEntry<Vec<PublicEvent>>>,
     pub cities: HashMap<String, CacheEntry<Vec<CitySignal>>>,
+    pub merch: HashMap<String, CacheEntry<MerchCatalog>>,
 }
 
 #[derive(Default)]
@@ -56,6 +59,8 @@ struct DiskPublicCache {
     version: u8,
     events: HashMap<String, DiskCacheEntry<Vec<PublicEvent>>>,
     cities: HashMap<String, DiskCacheEntry<Vec<CitySignal>>>,
+    #[serde(default)]
+    merch: HashMap<String, DiskCacheEntry<MerchCatalog>>,
 }
 
 pub(super) fn cache_key(api_base_url: &str) -> Result<String, AppError> {
@@ -143,6 +148,7 @@ pub(super) fn load_public_cache(path: &Path) -> Result<PublicCache, AppError> {
     Ok(PublicCache {
         events: restore_entries(disk.events, EVENTS_STALE_TTL),
         cities: restore_entries(disk.cities, CITIES_STALE_TTL),
+        merch: restore_entries(disk.merch, MERCH_STALE_TTL),
     })
 }
 
@@ -165,6 +171,11 @@ pub(super) fn serialize_cache(cache: &PublicCache) -> Option<Vec<u8>> {
             .collect(),
         cities: cache
             .cities
+            .iter()
+            .map(|(key, entry)| (key.clone(), disk_entry(entry)))
+            .collect(),
+        merch: cache
+            .merch
             .iter()
             .map(|(key, entry)| (key.clone(), disk_entry(entry)))
             .collect(),
@@ -194,6 +205,10 @@ fn restore_entries<T>(
     let mut entries = entries
         .into_iter()
         .filter_map(|(key, entry)| {
+            let future_skew = entry.stored_at_unix_secs.saturating_sub(now_unix);
+            if future_skew > MAX_FUTURE_CLOCK_SKEW.as_secs() {
+                return None;
+            }
             let age = Duration::from_secs(now_unix.saturating_sub(entry.stored_at_unix_secs));
             (age <= max_age).then_some((key, entry, age))
         })
@@ -309,6 +324,24 @@ mod tests {
         assert_eq!(restored.len(), 1);
         assert_eq!(restored["fresh"].value, vec![1]);
         assert_eq!(restored["fresh"].etag.as_deref(), Some("\"events-v2\""));
+    }
+
+    #[test]
+    fn disk_cache_rejects_entries_far_in_the_future() {
+        let now = unix_now();
+        let restored = restore_entries(
+            HashMap::from([(
+                "future".to_owned(),
+                DiskCacheEntry {
+                    value: vec![1_u8],
+                    stored_at_unix_secs: now + MAX_FUTURE_CLOCK_SKEW.as_secs() + 1,
+                    etag: None,
+                    last_modified: None,
+                },
+            )]),
+            Duration::from_secs(60),
+        );
+        assert!(restored.is_empty());
     }
 
     #[test]

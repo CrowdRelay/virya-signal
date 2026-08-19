@@ -945,7 +945,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "qualified_referrals" => "polecenia qualified",
         "ticket_revenue" => "przychód biletowy",
         "after_refunds" => "po refundach",
-        "paid_orders_count" => "{0} płatnych zamówień",
+        "paid_orders_count" => "{} płatnych zamówień",
         "direction_to_point" => "{arrow} {direction}",
         "direction_north" => "północ",
         "direction_northeast" => "północny wschód",
@@ -1093,6 +1093,26 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "gig_checklist_hint" => {
             "Jedna wspólna checklista dla całego staffu. Odhaczenie tutaj od razu synchronizuje się z panelem staff na virya.music."
         }
+        "push_what_you_want" => "Co chcesz dostawać",
+        "push_what_you_want_hint" => {
+            "Wybierz rodzaje wiadomości. Zmiany synchronizują się z Twoim Signalem."
+        }
+        "push_category_shows" => "Koncerty i bilety",
+        "push_category_releases" => "Premiery muzyki",
+        "push_category_community" => "Społeczność i Signal",
+        "push_category_merch" => "Merch",
+        "push_quiet_hours" => "Cisza nocna 22:00–08:00",
+        "push_essential_always" => {
+            "Ważne informacje o posiadanym bilecie lub zmianach organizacyjnych mogą przyjść także w ciszy nocnej."
+        }
+        "prepare_show" => "PRZYGOTUJ SHOW",
+        "close_show" => "ZAMKNIJ SHOW",
+        "show_closed_cleanly" => {
+            "Show zamknięty — skany zsynchronizowane i reconciliacja potwierdzona."
+        }
+        "show_close_blocked_scans" => "Nie można zamknąć: oczekujące skany {}, konflikty {}.",
+        "show_pack_checklist_pending" => "Show Pack: {} pozycji checklisty nadal wymaga uwagi.",
+        "pickup_pack_list" => "Odbiór merchu: {} szt. w {} zamówieniach",
         "team_push_notifications" => "Przypomnienia dla staffu",
         "team_push_notifications_hint" => {
             "Signal przypomni o przygotowaniu 7 i 2 dni przed koncertem."
@@ -1103,7 +1123,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         }
         "team_push_status_unknown" => "Nie udało się jeszcze odczytać stanu powiadomień.",
         "enable_notifications" => "WŁĄCZ POWIADOMIENIA",
-        "checklist_progress" => "Gotowe: {0}/{1}",
+        "checklist_progress" => "Gotowe: {}/{}",
         "checklist_section_show_files" => "SET / PLIKI",
         "checklist_section_gear" => "SPRZĘT",
         "checklist_section_media" => "MEDIA",
@@ -1254,7 +1274,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "latarnik_decline" => "NIE TYM RAZEM",
         "latarnik_decline_release_confirm_title" => "ODDAĆ ZAREZERWOWANĄ SZTUKĘ?",
         "latarnik_decline_release_confirm_hint" => {
-            "{0} wróci do puli. Tej akcji nie wykonujemy jednym przypadkowym tapnięciem."
+            "{} wróci do puli. Tej akcji nie wykonujemy jednym przypadkowym tapnięciem."
         }
         "latarnik_delivery_details" => "Dane do wysyłki",
         "latarnik_phone" => "Telefon",

@@ -6,12 +6,15 @@ use std::{
 
 use argon2::Argon2;
 use iota_stronghold::{KeyProvider, SnapshotPath, Stronghold};
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use zeroize::Zeroizing;
 
 use crate::{
     AppError,
-    models::{BeaconProfile, FanProfile, OperatorProfile, OperatorSignalOverview, ShowModeStore},
+    models::{
+        BeaconProfile, FanHomeData, FanProfile, OperatorProfile, OperatorSignalOverview,
+        ShowModeStore,
+    },
 };
 
 const OPERATOR_CLIENT_PATH: &[u8] = b"virya-control-device";
@@ -20,6 +23,7 @@ const SHOW_MODE_STORE_KEY: &[u8] = b"show-mode-store-v1";
 const OPERATOR_SIGNAL_CACHE_KEY: &[u8] = b"operator-signal-cache-v1";
 const FAN_CLIENT_PATH: &[u8] = b"virya-signal-fan";
 const FAN_PROFILE_KEY: &[u8] = b"fan-profile-v1";
+const FAN_HOME_CACHE_KEY: &[u8] = b"fan-home-cache-v1";
 const BEACON_CLIENT_PATH: &[u8] = b"virya-signal-beacon";
 const BEACON_PROFILE_KEY: &[u8] = b"beacon-profile-v1";
 const SALT_BYTES: usize = 16;
@@ -194,13 +198,55 @@ pub fn save_fan(app_data_dir: &Path, pin: &str, profile: &FanProfile) -> Result<
     )
 }
 
-pub fn load_fan(app_data_dir: &Path, pin: &str) -> Result<FanProfile, AppError> {
-    load_at(
+/// Derives the fan Stronghold password once for the unlocked session.
+pub fn fan_password(app_data_dir: &Path, pin: &str) -> Result<Zeroizing<Vec<u8>>, AppError> {
+    ensure_pin(pin)?;
+    let salt = read_salt(&fan_salt_path(app_data_dir))?;
+    Ok(Zeroizing::new(password(pin, &salt)?))
+}
+
+pub fn load_fan_with_password(
+    app_data_dir: &Path,
+    password: &[u8],
+) -> Result<FanProfile, AppError> {
+    load_required_with_password_at(
         &fan_vault_path(app_data_dir),
-        &fan_salt_path(app_data_dir),
         FAN_CLIENT_PATH,
         FAN_PROFILE_KEY,
-        pin,
+        password,
+    )
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct FanHomeCacheSnapshot {
+    pub stored_at_unix_secs: u64,
+    pub home: FanHomeData,
+}
+
+pub fn save_fan_home_cache_with_password(
+    app_data_dir: &Path,
+    password: &[u8],
+    snapshot: &FanHomeCacheSnapshot,
+) -> Result<(), AppError> {
+    let bytes = Zeroizing::new(serde_json::to_vec(snapshot)?);
+    save_bytes_with_password_at(
+        &fan_vault_path(app_data_dir),
+        FAN_CLIENT_PATH,
+        FAN_HOME_CACHE_KEY,
+        password,
+        bytes.as_ref(),
+    )
+}
+
+pub fn load_fan_home_cache_with_password(
+    app_data_dir: &Path,
+    password: &[u8],
+) -> Result<Option<FanHomeCacheSnapshot>, AppError> {
+    load_optional_with_password_at(
+        &fan_vault_path(app_data_dir),
+        FAN_CLIENT_PATH,
+        FAN_HOME_CACHE_KEY,
+        password,
     )
 }
 
@@ -453,6 +499,35 @@ fn load_at<T: DeserializeOwned>(
     }
     let salt = read_salt(salt_path)?;
     let key_provider = KeyProvider::try_from(Zeroizing::new(password(pin, &salt)?))
+        .map_err(|_| AppError::InvalidPin)?;
+    let snapshot_path = SnapshotPath::from_path(vault_path);
+    let stronghold = Stronghold::default();
+    let client = stronghold
+        .load_client_from_snapshot(client_path, &key_provider, &snapshot_path)
+        .map_err(|_| AppError::InvalidPin)?;
+    let bytes = Zeroizing::new(
+        client
+            .store()
+            .get(profile_key)
+            .map_err(|_| AppError::StrongholdClient)?
+            .ok_or(AppError::NotConfigured)?,
+    );
+    serde_json::from_slice(bytes.as_ref()).map_err(AppError::from)
+}
+
+fn load_required_with_password_at<T: DeserializeOwned>(
+    vault_path: &Path,
+    client_path: &[u8],
+    profile_key: &[u8],
+    password: &[u8],
+) -> Result<T, AppError> {
+    if !vault_path.exists() {
+        return Err(AppError::NotConfigured);
+    }
+    if password.len() != PASSWORD_BYTES {
+        return Err(AppError::InvalidPin);
+    }
+    let key_provider = KeyProvider::try_from(Zeroizing::new(password.to_vec()))
         .map_err(|_| AppError::InvalidPin)?;
     let snapshot_path = SnapshotPath::from_path(vault_path);
     let stronghold = Stronghold::default();

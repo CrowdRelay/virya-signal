@@ -238,6 +238,22 @@ fn refresh_fan_home(
 ) {
     loading.update(|state| state.home = true);
     spawn_local(async move {
+        // Native Signal can render the encrypted last-known-good snapshot before
+        // touching the network. It is always marked stale and never suppresses
+        // the revalidation below.
+        if bridge::native_available()
+            && let Ok(Some(value)) = bridge::invoke_timeout::<Option<FanHomeData>, _>(
+                "fan_cached_home",
+                &EmptyArgs {},
+                2_000,
+            )
+            .await
+            && value.has_supported_schema()
+        {
+            home.set(Some(value));
+            loading.update(|state| state.home = false);
+        }
+
         let result = bridge::invoke_latest::<FanHomeData, _>(
             "fan_home",
             &EmptyArgs {},
@@ -253,7 +269,8 @@ fn refresh_fan_home(
                 &[value.schema_version.to_string()],
             ))),
             Ok(None) => {}
-            Err(message) => error.set(Some(message)),
+            Err(message) if home.get_untracked().is_none() => error.set(Some(message)),
+            Err(_) => {}
         }
         if completed {
             loading.update(|state| state.home = false);

@@ -347,3 +347,22 @@ pub(crate) async fn fan_push_open_settings(
     )
     .await)
 }
+
+
+#[tauri::command]
+pub(crate) async fn fan_push_preferences(
+    state: State<'_, AppState>,
+) -> Result<FanPushPreferences, AppError> {
+    let profile = fan_profile(&state).await?;
+    state.api.fan_push_preferences(&profile).await
+}
+
+#[tauri::command]
+pub(crate) async fn fan_push_update_preferences(
+    state: State<'_, AppState>,
+    preferences: FanPushPreferencesUpdate,
+) -> Result<FanPushPreferences, AppError> {
+    let _mutation = state.fan_mutation.lock().await;
+    let profile = fan_profile(&state).await?;
+    state.api.fan_update_push_preferences(&profile, &preferences).await
+}

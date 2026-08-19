@@ -188,6 +188,40 @@ fn Scanner(
         });
     };
 
+    let close_show = move |_| {
+        let slug = event_slug.get();
+        if slug.is_empty() || busy.get_untracked() { return; }
+        busy.set(true);
+        show_message.set(String::new());
+        spawn_local(async move {
+            let sync_result = bridge::invoke::<ShowModeSyncResult, _>(
+                "show_mode_sync",
+                &EventArgs { event_slug: &slug },
+            ).await;
+            match sync_result {
+                Ok(sync) if sync.pending == 0 && sync.conflicts == 0 => {
+                    match bridge::invoke::<ShowModeStatus, _>(
+                        "show_mode_close",
+                        &EventArgs { event_slug: &slug },
+                    ).await {
+                        Ok(value) => {
+                            show_message.set(tr("show_closed_cleanly").to_owned());
+                            show_mode.set(value);
+                            offline.set(false);
+                        }
+                        Err(message) => error.set(Some(message)),
+                    }
+                }
+                Ok(sync) => show_message.set(i18n::format(
+                    "show_close_blocked_scans",
+                    &[sync.pending.to_string(), sync.conflicts.to_string()],
+                )),
+                Err(message) => error.set(Some(message)),
+            }
+            busy.set(false);
+        });
+    };
+
     let clear = move |_| {
         let slug = event_slug.get();
         if slug.is_empty() {
@@ -226,8 +260,19 @@ fn Scanner(
                         <article><strong>{move || show_mode.get().synced}</strong><span>{tr("synced_scans")}</span></article>
                         <article><strong>{move || show_mode.get().conflicts}</strong><span>{tr("scan_conflicts")}</span></article>
                     </div>
+                    <Show when=move || show_mode.get().checklist_loaded>
+                        <small>{move || i18n::format("show_pack_checklist_pending", &[show_mode.get().checklist_pending.to_string()])}</small>
+                    </Show>
+                    <Show when=move || { show_mode.get().pickup_unit_count > 0 }>
+                        <div class="pickup-pack-list">
+                            <strong>{move || i18n::format("pickup_pack_list", &[show_mode.get().pickup_unit_count.to_string(), show_mode.get().pickup_order_count.to_string()])}</strong>
+                            <For each=move || show_mode.get().pickup_items key=|item| format!("{}:{}", item.sku, item.variant_label) children=move |item| view! {
+                                <small>{format!("{} · {} · {} ×{}", item.product_name, item.variant_label, item.sku, item.quantity)}</small>
+                            } />
+                        </div>
+                    </Show>
                 </Show>
-                <div class="show-mode-actions"><button type="button" on:click=prepare disabled=move || busy.get() || event_slug.get().is_empty()>{tr("prepare_offline")}</button><button type="button" on:click=sync disabled=move || busy.get() || !show_mode.get().prepared>{tr("sync")}</button><button type="button" class="danger ghost" on:click=clear disabled=move || busy.get() || !show_mode.get().prepared>{tr("clear")}</button></div>
+                <div class="show-mode-actions"><button type="button" on:click=prepare disabled=move || busy.get() || event_slug.get().is_empty()>{tr("prepare_show")}</button><button type="button" on:click=sync disabled=move || busy.get() || !show_mode.get().prepared>{tr("sync")}</button><button type="button" class="ghost" on:click=close_show disabled=move || busy.get() || !show_mode.get().prepared || show_mode.get().closed>{tr("close_show")}</button><button type="button" class="danger ghost" on:click=clear disabled=move || busy.get() || !show_mode.get().prepared>{tr("clear")}</button></div>
                 <Show when=move || !show_message.get().is_empty()><small>{move || show_message.get()}</small></Show>
             </article>
             <button class="scanner-button" on:click=scan disabled=move || busy.get()><span class="scanner-frame"></span><strong>{move || if busy.get() { tr("verifying") } else if offline.get() { tr("scan_locally") } else { tr("open_camera") }}</strong><small>{move || if offline.get() { tr("durable_t1_ticket_qr_only") } else { tr("ticket_or_admission_pass_qr") }}</small></button>
