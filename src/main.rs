@@ -4,6 +4,7 @@ mod app;
 mod bridge;
 mod i18n;
 mod models;
+mod tenant;
 mod util;
 
 use app::App;
