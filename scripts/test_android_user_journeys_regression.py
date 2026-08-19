@@ -294,11 +294,12 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertIn('let _ = loading.try_set(false);', body)
         self.assertIn('focused_event_slug.set(None);', shell)
         self.assertIn('focused_event_preview.set(None);', shell)
-        guard = home.split('let show_recommended =', 1)[1].split(';', 1)[0]
-        self.assertIn('FanTab::Events', guard)
-        self.assertIn('FanTab::Signal', guard)
-        self.assertGreaterEqual(guard.count('!='), 2)
-        self.assertIn('show_recommended.then', home)
+        # Home is intentionally action-first now. Keep the lifetime/reset
+        # guarantees, and guard against the removed recommendation CTA creeping
+        # back into this hot path.
+        self.assertNotIn('let show_recommended =', home)
+        self.assertNotIn('show_recommended.then', home)
+        self.assertNotIn('snapshot.recommended.as_ref()', home)
 
     def test_android_device_e2e_is_manual_diagnostic_only(self):
         workflow = read('.github/workflows/android-e2e.yml')
