@@ -402,13 +402,85 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
 }
 
 
+const PUSH_PREF_SHOWS: u8 = 0;
+const PUSH_PREF_RELEASES: u8 = 1;
+const PUSH_PREF_COMMUNITY: u8 = 2;
+const PUSH_PREF_MERCH: u8 = 3;
+const PUSH_PREF_QUIET: u8 = 4;
+
+fn push_preference_enabled(value: &FanPushPreferences, key: u8) -> bool {
+    match key {
+        PUSH_PREF_SHOWS => value.shows,
+        PUSH_PREF_RELEASES => value.releases,
+        PUSH_PREF_COMMUNITY => value.community,
+        PUSH_PREF_MERCH => value.merch,
+        PUSH_PREF_QUIET => value.quiet_hours_enabled,
+        _ => false,
+    }
+}
+
+fn update_push_preference(
+    preferences: RwSignal<Option<FanPushPreferences>>,
+    busy: RwSignal<bool>,
+    error: RwSignal<Option<String>>,
+    key: u8,
+    checked: bool,
+) {
+    let Some(current) = preferences.get_untracked() else {
+        return;
+    };
+    if busy.get_untracked() {
+        return;
+    }
+
+    let mut next = FanPushPreferencesUpdate {
+        shows: current.shows,
+        releases: current.releases,
+        community: current.community,
+        merch: current.merch,
+        quiet_hours_enabled: current.quiet_hours_enabled,
+        quiet_start: current.quiet_start.clone(),
+        quiet_end: current.quiet_end.clone(),
+    };
+    match key {
+        PUSH_PREF_SHOWS => next.shows = checked,
+        PUSH_PREF_RELEASES => next.releases = checked,
+        PUSH_PREF_COMMUNITY => next.community = checked,
+        PUSH_PREF_MERCH => next.merch = checked,
+        PUSH_PREF_QUIET => next.quiet_hours_enabled = checked,
+        _ => return,
+    }
+
+    busy.set(true);
+    spawn_lifecycle_task(async move {
+        match bridge::invoke_timeout::<FanPushPreferences, _>(
+            "fan_push_update_preferences",
+            &FanPushPreferencesArgs { preferences: &next },
+            15_000,
+        )
+        .await
+        {
+            Ok(value) => {
+                let _ = preferences.try_set(Some(value));
+            }
+            Err(message) => {
+                let _ = error.try_set(Some(message));
+            }
+        }
+        let _ = busy.try_set(false);
+    });
+}
+
 #[component]
 fn PushPreferencesControl(error: RwSignal<Option<String>>) -> impl IntoView {
     let preferences = RwSignal::new(None::<FanPushPreferences>);
     let busy = RwSignal::new(false);
 
     Effect::new(move |_| {
-        if !bridge::native_available() || preferences.get_untracked().is_some() || busy.get_untracked() {
+        if !bridge::native_available()
+            || preferences.get_untracked().is_some()
+            || busy.get_untracked()
+        {
             return;
         }
         busy.set(true);
@@ -420,48 +492,24 @@ fn PushPreferencesControl(error: RwSignal<Option<String>>) -> impl IntoView {
             )
             .await
             {
-                Ok(value) => { let _ = preferences.try_set(Some(value)); }
-                Err(message) => { let _ = error.try_set(Some(message)); }
+                Ok(value) => {
+                    let _ = preferences.try_set(Some(value));
+                }
+                Err(message) => {
+                    let _ = error.try_set(Some(message));
+                }
             }
             let _ = busy.try_set(false);
         });
     });
 
-    let update = move |key: &'static str, checked: bool| {
-        let Some(current) = preferences.get_untracked() else { return; };
-        if busy.get_untracked() { return; }
-        let mut next = FanPushPreferencesUpdate {
-            shows: current.shows,
-            releases: current.releases,
-            community: current.community,
-            merch: current.merch,
-            quiet_hours_enabled: current.quiet_hours_enabled,
-            quiet_start: current.quiet_start.clone(),
-            quiet_end: current.quiet_end.clone(),
-        };
-        match key {
-            "shows" => next.shows = checked,
-            "releases" => next.releases = checked,
-            "community" => next.community = checked,
-            "merch" => next.merch = checked,
-            "quiet" => next.quiet_hours_enabled = checked,
-            _ => return,
-        }
-        busy.set(true);
-        spawn_lifecycle_task(async move {
-            match bridge::invoke_timeout::<FanPushPreferences, _>(
-                "fan_push_update_preferences",
-                &FanPushPreferencesArgs { preferences: &next },
-                15_000,
-            )
-            .await
-            {
-                Ok(value) => { let _ = preferences.try_set(Some(value)); }
-                Err(message) => { let _ = error.try_set(Some(message)); }
-            }
-            let _ = busy.try_set(false);
-        });
-    };
+    let items = [
+        (PUSH_PREF_SHOWS, tr("push_category_shows")),
+        (PUSH_PREF_RELEASES, tr("push_category_releases")),
+        (PUSH_PREF_COMMUNITY, tr("push_category_community")),
+        (PUSH_PREF_MERCH, tr("push_category_merch")),
+        (PUSH_PREF_QUIET, tr("push_quiet_hours")),
+    ];
 
     view! {
         <Show when=move || preferences.get().is_some()>
@@ -472,11 +520,28 @@ fn PushPreferencesControl(error: RwSignal<Option<String>>) -> impl IntoView {
                         <div><strong>{tr("push_what_you_want")}</strong><p>{tr("push_what_you_want_hint")}</p></div>
                     </div>
                     <div class="push-preference-grid">
-                        <label class="check-label"><input type="checkbox" disabled=move || busy.get() prop:checked=move || preferences.get().is_some_and(|v| v.shows) on:change=move |e| update("shows", event_target_checked(&e))/><span>{tr("push_category_shows")}</span></label>
-                        <label class="check-label"><input type="checkbox" disabled=move || busy.get() prop:checked=move || preferences.get().is_some_and(|v| v.releases) on:change=move |e| update("releases", event_target_checked(&e))/><span>{tr("push_category_releases")}</span></label>
-                        <label class="check-label"><input type="checkbox" disabled=move || busy.get() prop:checked=move || preferences.get().is_some_and(|v| v.community) on:change=move |e| update("community", event_target_checked(&e))/><span>{tr("push_category_community")}</span></label>
-                        <label class="check-label"><input type="checkbox" disabled=move || busy.get() prop:checked=move || preferences.get().is_some_and(|v| v.merch) on:change=move |e| update("merch", event_target_checked(&e))/><span>{tr("push_category_merch")}</span></label>
-                        <label class="check-label"><input type="checkbox" disabled=move || busy.get() prop:checked=move || preferences.get().is_some_and(|v| v.quiet_hours_enabled) on:change=move |e| update("quiet", event_target_checked(&e))/><span>{tr("push_quiet_hours")}</span></label>
+                        {items.into_iter().map(|(key, label)| view! {
+                            <label class="check-label">
+                                <input
+                                    type="checkbox"
+                                    disabled=move || busy.get()
+                                    prop:checked=move || preferences
+                                        .get()
+                                        .as_ref()
+                                        .is_some_and(|value| push_preference_enabled(value, key))
+                                    on:change=move |event| {
+                                        update_push_preference(
+                                            preferences,
+                                            busy,
+                                            error,
+                                            key,
+                                            event_target_checked(&event),
+                                        );
+                                    }
+                                />
+                                <span>{label}</span>
+                            </label>
+                        }).collect_view()}
                     </div>
                     <small>{tr("push_essential_always")}</small>
                 </div>
