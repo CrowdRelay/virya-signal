@@ -65,6 +65,10 @@ fn FanHomeOverview(
                     let next_event = snapshot.next_event.clone();
                     let city = snapshot.profile.primary_city.clone();
                     let generated_at = human_time(&snapshot.generated_at);
+                    let recommended_target = recommended_tab(&snapshot);
+                    let recommended_cta = recommended_label(&snapshot.recommended_action);
+                    let show_recommended =
+                        recommended_target != FanTab::Events && recommended_target != FanTab::Signal;
                     view! {
                         <header class="fan-home-header">
                             <div>
@@ -72,9 +76,9 @@ fn FanHomeOverview(
                                 <h2>{snapshot.profile.display_name.clone().value_or_else(|| tr("my_signal").to_owned())}</h2>
                                 <p>{city.map(|value| i18n::format("signal_city_context", &[value])).value_or_else(|| tr("signal_home_context").to_owned())}</p>
                             </div>
-                            <Show when=move || stale>
+                            {stale.then(|| view! {
                                 <span class="cache-badge">{tr("cached_data")}</span>
-                            </Show>
+                            })}
                             <small>{i18n::format("signal_snapshot_updated", &[generated_at])}</small>
                         </header>
                         <div class="fan-home-grid">
@@ -95,15 +99,15 @@ fn FanHomeOverview(
                                     {synesthesia_summary.clone().map(|summary| view! {
                                         <small class="synesthesia-best-summary">{summary}</small>
                                     })}
-                                    <Show when=move || synesthesia.reward_entered>
+                                    {synesthesia.reward_entered.then(|| view! {
                                         <span class="cache-badge">{tr("reward_entry_confirmed")}</span>
-                                    </Show>
-                                    <Show when=move || !synesthesia.completed>
+                                    })}
+                                    {(!synesthesia.completed).then(|| view! {
                                         <div class="progress-track"><span style=format!("width:{}%", (i32::from(synesthesia.rooms_completed).clamp(0, 11) * 100) / 11)></span></div>
                                         <small>{format!("{}/11", synesthesia.rooms_completed.clamp(0, 11))}</small>
-                                    </Show>
+                                    })}
                                     <ExternalLink url="https://synesthesia.virya.music/?source=signal-app&resume=1".to_owned() label=if synesthesia.started { tr("open_synesthesia") } else { tr("enter_synesthesia") } error=error />
-                                    <Show when=move || bridge::native_available() && synesthesia.leaderboard_published>
+                                    {(bridge::native_available() && synesthesia.leaderboard_published).then(|| view! {
                                         <button
                                             class="ghost"
                                             disabled=move || leaderboard_busy.get()
@@ -133,7 +137,7 @@ fn FanHomeOverview(
                                                 });
                                             }
                                         >{move || if leaderboard_busy.get() { tr("removing_from_leaderboard") } else { tr("remove_from_leaderboard") }}</button>
-                                    </Show>
+                                    })}
                                 </article>
                             </Show>
                             {next_event.map(|event| {
@@ -169,12 +173,12 @@ fn FanHomeOverview(
                                         {doors.map(|value| view! { <small>{i18n::format("doors_open_at", &[value])}</small> })}
                                         {ends.map(|value| view! { <small>{i18n::format("event_ends_at", &[value])}</small> })}
                                         <div class="home-card-statuses">
-                                            <Show when=move || admission_ready><span class="cache-badge">{tr("entry_ready")}</span></Show>
-                                            <Show when=move || interested><span class="cache-badge">{tr("following_event")}</span></Show>
-                                            <Show when=move || ticket_sale_active && !admission_ready><span class="cache-badge">{tr("tickets_on_sale")}</span></Show>
+                                            {admission_ready.then(|| view! { <span class="cache-badge">{tr("entry_ready")}</span> })}
+                                            {interested.then(|| view! { <span class="cache-badge">{tr("following_event")}</span> })}
+                                            {(ticket_sale_active && !admission_ready).then(|| view! { <span class="cache-badge">{tr("tickets_on_sale")}</span> })}
                                         </div>
-                                        <Show when=move || is_live><p class="signal-live-note">{tr("signal_live_note")}</p></Show>
-                                        <Show when=move || is_afterglow><p class="signal-afterglow-note">{tr("signal_afterglow_note")}</p></Show>
+                                        {is_live.then(|| view! { <p class="signal-live-note">{tr("signal_live_note")}</p> })}
+                                        {is_afterglow.then(|| view! { <p class="signal-afterglow-note">{tr("signal_afterglow_note")}</p> })}
                                         <div class="home-card-actions">
                                             <button class="ghost" on:click={
                                                 let event_slug = event_slug.clone();
@@ -185,18 +189,9 @@ fn FanHomeOverview(
                                                     tab.set(FanTab::Events);
                                                 }
                                             }>{tr("show_details")}</button>
-                                            <Show when={
-                                                let snapshot = snapshot.clone();
-                                                move || {
-                                                    let target = recommended_tab(&snapshot);
-                                                    target != FanTab::Events && target != FanTab::Signal
-                                                }
-                                            }>
-                                                <button class="ghost" on:click={
-                                                    let snapshot = snapshot.clone();
-                                                    move |_| tab.set(recommended_tab(&snapshot))
-                                                }>{recommended_label(&snapshot.recommended_action)}</button>
-                                            </Show>
+                                            {show_recommended.then(|| view! {
+                                                <button class="ghost" on:click=move |_| tab.set(recommended_target)>{recommended_cta}</button>
+                                            })}
                                             // First-party ticketing wins whenever the show has an
                                             // active sale: send the fan into the Events tab focused on
                                             // this show, where the in-app checkout lives, exactly like
