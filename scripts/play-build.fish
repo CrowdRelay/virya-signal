@@ -91,6 +91,12 @@ if not set -q VIRYA_SIGNAL_GOOGLE_SERVICES_JSON_B64; or test -z "$VIRYA_SIGNAL_G
     exit 1
 end
 
+fish scripts/regenerate-signal-icons.fish
+or begin
+    echo "ERROR: V2 icon generation failed" >&2
+    exit 1
+end
+
 python3 scripts/prepare-android.py --signing
 or begin
     echo "ERROR: canonical Android preparation failed" >&2
