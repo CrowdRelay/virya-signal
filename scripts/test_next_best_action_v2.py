@@ -16,11 +16,15 @@ class NextBestActionV2Contract(unittest.TestCase):
             ROOT / "crates/virya-signal-contracts/src/fan.rs"
         ).read_text(encoding="utf-8")
 
-    def test_signal_uses_typed_recommended_targets(self) -> None:
-        self.assertIn("snapshot.recommended.as_ref()", self.ui)
-        self.assertIn("FanTarget::parse", self.ui)
+    def test_typed_recommended_target_contract_survives_home_simplification(self) -> None:
+        # CrowdRelay may continue to send a typed recommendation for other
+        # clients/future surfaces, but the simplified Signal Home intentionally
+        # does not turn it into another competing CTA.
         self.assertIn('strip_prefix("event=")', self.contract)
         self.assertIn("not_event", self.contract)
+        self.assertNotIn("snapshot.recommended.as_ref()", self.ui)
+        self.assertNotIn("FanTarget::parse", self.ui)
+        self.assertNotIn("show_recommended.then", self.ui)
 
     def test_typed_target_slug_is_bounded_and_sanitized(self) -> None:
         self.assertIn("fn event_slug(value: &str)", self.contract)
