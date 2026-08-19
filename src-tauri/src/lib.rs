@@ -10,6 +10,7 @@ mod i18n;
 mod models;
 mod push_plugin;
 mod session;
+mod tenant;
 mod util;
 mod validation;
 mod vault;
