@@ -6,7 +6,10 @@ ROOT = Path(__file__).resolve().parents[1]
 APP = (ROOT / "src/app.rs").read_text()
 FAN = (ROOT / "src/app/fan.rs").read_text()
 SHELL = (ROOT / "src/app/fan/shell.rs").read_text()
-BEACON = (ROOT / "src/app/beacon.rs").read_text()
+BEACON = "\n".join(
+    [(ROOT / "src/app/beacon.rs").read_text()]
+    + [p.read_text() for p in sorted((ROOT / "src/app/beacon").glob("*.rs"))]
+)
 TYPES = (ROOT / "src/app/types.rs").read_text()
 PL = (ROOT / "src/i18n/pl.rs").read_text()
 EN = (ROOT / "src/i18n/en.rs").read_text()
@@ -55,7 +58,12 @@ class LatarnikSignalEntryContract(unittest.TestCase):
             self.assertIn(f'"{key}"', EN)
     def test_last_member_surface_is_remembered_without_persisting_staff_mode(self) -> None:
         app = (ROOT / "src/app.rs").read_text(encoding="utf-8")
-        ffi = (ROOT / "src/bridge/ffi.rs").read_text(encoding="utf-8")
+        # Root-mode/tab storage moved out of the monolithic ffi module into
+        # bridge/navigation.rs; the guarantees below are about the bridge surface.
+        ffi = "\n".join(
+            (ROOT / name).read_text(encoding="utf-8")
+            for name in ("src/bridge/ffi.rs", "src/bridge/navigation.rs")
+        )
         self.assertIn("persisted_root_mode()", app)
         self.assertIn('RootMode::Latarnik => bridge::set_root_mode_state("latarnik")', app)
         # Team is now restored across the i18n reload, so the old combined arm

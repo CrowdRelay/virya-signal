@@ -7,6 +7,19 @@ ROOT = Path(__file__).resolve().parents[1]
 def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
+
+def beacon_ui() -> str:
+    """The beacon UI is split across a module root and its submodules; assertions
+    are about the surface as a whole, not about which file currently holds it."""
+    root = ROOT / "src/app/beacon.rs"
+    parts = [root.read_text(encoding="utf-8")]
+    directory = ROOT / "src/app/beacon"
+    if directory.is_dir():
+        parts += [
+            path.read_text(encoding="utf-8") for path in sorted(directory.glob("*.rs"))
+        ]
+    return "\n".join(parts)
+
 class LatarnikNativeContracts(unittest.TestCase):
     def test_beacon_identity_never_reuses_fan_identity(self):
         native = read("src-tauri/src/models/beacon.rs")
@@ -33,10 +46,10 @@ class LatarnikNativeContracts(unittest.TestCase):
             body.index("vault::replace_beacon"),
             body.index("*state.beacon_session.write().await = Some(Arc::new(profile));"),
         )
-        self.assertNotIn("bearer_token", read("src/app/beacon.rs"))
+        self.assertNotIn("bearer_token", beacon_ui())
 
     def test_native_surface_covers_full_member_lifecycle(self):
-        ui = read("src/app/beacon.rs")
+        ui = beacon_ui()
         native = read("src-tauri/src/commands/beacon.rs")
         for command in (
             "beacon_home", "beacon_preferences_update", "beacon_press_room",
@@ -53,20 +66,20 @@ class LatarnikNativeContracts(unittest.TestCase):
 
     def test_public_news_is_native_fetched_not_bundled_into_wasm(self):
         api = read("src-tauri/src/api/beacon.rs")
-        ui = read("src/app/beacon.rs")
+        ui = beacon_ui()
         self.assertIn("pub async fn signal_news", api)
         self.assertIn("https://virya.music/news/feed.json", api)
         self.assertIn('"beacon_news"', ui)
 
     def test_new_invitation_can_replace_a_revoked_configured_vault(self) -> None:
-        ui = (ROOT / "src/app/beacon.rs").read_text(encoding="utf-8")
+        ui = beacon_ui()
         self.assertIn("status.get().configured && !pending_link.get() && !reactivation.get()", ui)
         self.assertIn('tr("latarnik_use_new_invite")', ui)
         self.assertIn("reactivation.set(true)", ui)
         self.assertIn("reactivation.set(false)", ui)
 
     def test_remote_session_and_relationship_exit_actions_require_confirmation(self) -> None:
-        ui = (ROOT / "src/app/beacon.rs").read_text(encoding="utf-8")
+        ui = beacon_ui()
         self.assertIn("danger_action.set(Some(1))", ui)
         self.assertIn("danger_action.set(Some(2))", ui)
         self.assertIn("danger_action.set(Some(3))", ui)
@@ -76,31 +89,31 @@ class LatarnikNativeContracts(unittest.TestCase):
         self.assertIn("run_danger_action(action)", ui)
 
     def test_access_deep_link_loads_profile_for_settings(self) -> None:
-        source = (ROOT / "src/app/beacon.rs").read_text()
+        source = beacon_ui()
         access_arm = source.split("BeaconTab::Access =>", 1)[1].split("}", 1)[0]
         self.assertIn("refresh_beacon_home(home, loading_home, error)", access_arm)
         self.assertIn("refresh_beacon_requests(requests, error)", access_arm)
         self.assertIn("refresh_beacon_releases(releases, error)", access_arm)
 
     def test_destructive_confirmation_reuses_panel_styling(self) -> None:
-        source = (ROOT / "src/app/beacon.rs").read_text()
+        source = beacon_ui()
         self.assertIn('class="beacon-delivery-form beacon-danger-confirm"', source)
 
     def test_release_delivery_does_not_label_required_recipient_name_optional(self) -> None:
-        ui = (ROOT / "src/app/beacon.rs").read_text(encoding="utf-8")
+        ui = beacon_ui()
         access = ui.split("fn BeaconAccessHub", 1)[1].split("fn BeaconSettings", 1)[0]
         self.assertIn('tr("latarnik_recipient_name")', access)
         self.assertNotIn('tr("name_optional")', access)
 
     def test_physical_release_decline_requires_a_second_explicit_action(self) -> None:
-        ui = (ROOT / "src/app/beacon.rs").read_text(encoding="utf-8")
+        ui = beacon_ui()
         self.assertIn("decline_candidate.set(Some", ui)
         self.assertIn("confirm_decline_release", ui)
         self.assertIn('tr("latarnik_decline_release_confirm_title")', ui)
         self.assertIn("decline_candidate.set(None)", ui)
 
     def test_leptos_handlers_do_not_reintroduce_known_fn_once_or_clippy_traps(self) -> None:
-        ui = read("src/app/beacon.rs")
+        ui = beacon_ui()
         self.assertNotIn("*v=!*v", ui)
         self.assertIn("*v = !*v", ui)
         self.assertNotIn("help_submit_id", ui)
@@ -146,7 +159,7 @@ class LatarnikNativeContracts(unittest.TestCase):
         self.assertIn("Ok(true) if !beacon_pending_link.get_untracked() =>", app)
 
     def test_press_room_is_fetched_once_per_entry(self) -> None:
-        ui = read("src/app/beacon.rs")
+        ui = beacon_ui()
         tab_effect = ui.split("BeaconTab::Radar =>", 1)[1].split("BeaconTab::Access =>", 1)[0]
         # invoke_latest is latest-wins dedup, not a cache, so a second call here
         # would be a second real round trip with its answer discarded.
@@ -156,7 +169,7 @@ class LatarnikNativeContracts(unittest.TestCase):
         self.assertIn("refresh.get();", press)
 
     def test_accreditation_is_always_event_scoped(self) -> None:
-        ui = (ROOT / "src/app/beacon.rs").read_text(encoding="utf-8")
+        ui = beacon_ui()
         self.assertIn('let request_kind = RwSignal::new("press_photo".to_owned())', ui)
         self.assertIn('event_selected && current_kind == "press_photo"', ui)
         self.assertIn('request_kind.get()=="accreditation" && selected_event.get().is_none()', ui)

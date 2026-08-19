@@ -11,7 +11,8 @@ use crate::{
     AppError,
     models::{
         AdmissionPass, FanAuthResult, FanConfirmationInput, FanEventInterest, FanHomeData,
-        FanProfile, FanSignupInput, PublicEvent, ReferralProgress,
+        FanProfile, FanPushPreferences, FanPushPreferencesUpdate, FanSignupInput, PublicEvent,
+        ReferralProgress,
     },
 };
 
@@ -96,6 +97,41 @@ impl super::CrowdRelayClient {
             },
             Err(error) => Err(error),
         }
+    }
+
+    pub async fn seed_fan_home_snapshot(
+        &self,
+        profile: &FanProfile,
+        mut home: FanHomeData,
+        stored_at_unix_secs: u64,
+    ) -> Option<FanHomeData> {
+        let now_unix = cache::unix_now();
+        let future_skew = stored_at_unix_secs.saturating_sub(now_unix);
+        if future_skew > 5 * 60 {
+            return None;
+        }
+        let age = std::time::Duration::from_secs(now_unix.saturating_sub(stored_at_unix_secs));
+        if age > FAN_HOME_STALE_TTL || !home.has_supported_schema() {
+            return None;
+        }
+        home.stale = true;
+        let effective_age = age.max(FAN_HOME_CACHE_TTL);
+        let now = Instant::now();
+        let fetched_at = now.checked_sub(effective_age).unwrap_or(now);
+        let key = fan_home_key(profile);
+        let mut cache_map = self.fan_home_cache.write().await;
+        cache::prune_cache(&mut cache_map, FAN_HOME_STALE_TTL);
+        cache_map.insert(
+            key,
+            CacheEntry {
+                value: home.clone(),
+                fetched_at,
+                stored_at_unix_secs,
+                etag: None,
+                last_modified: None,
+            },
+        );
+        Some(home)
     }
 
     async fn cached_fan_home(
@@ -352,6 +388,33 @@ pub struct FanPushMutationApi {
     pub registered: bool,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+struct FanPushPreferencesApi {
+    shows: bool,
+    releases: bool,
+    community: bool,
+    merch: bool,
+    quiet_hours_enabled: bool,
+    quiet_start: String,
+    quiet_end: String,
+    quiet_timezone: String,
+}
+
+impl From<FanPushPreferencesApi> for FanPushPreferences {
+    fn from(value: FanPushPreferencesApi) -> Self {
+        Self {
+            shows: value.shows,
+            releases: value.releases,
+            community: value.community,
+            merch: value.merch,
+            quiet_hours_enabled: value.quiet_hours_enabled,
+            quiet_start: value.quiet_start,
+            quiet_end: value.quiet_end,
+            quiet_timezone: value.quiet_timezone,
+        }
+    }
+}
+
 impl super::CrowdRelayClient {
     pub async fn fan_push_config(
         &self,
@@ -385,6 +448,41 @@ impl super::CrowdRelayClient {
         });
         self.fan_json(profile, Method::POST, "me/push/endpoints", Some(&body))
             .await
+    }
+
+    pub async fn fan_push_preferences(
+        &self,
+        profile: &FanProfile,
+    ) -> Result<FanPushPreferences, AppError> {
+        let wire = self
+            .fan_json::<FanPushPreferencesApi, ()>(
+                profile,
+                Method::GET,
+                "me/push/preferences",
+                None,
+            )
+            .await?;
+        Ok(wire.into())
+    }
+
+    pub async fn fan_update_push_preferences(
+        &self,
+        profile: &FanProfile,
+        value: &FanPushPreferencesUpdate,
+    ) -> Result<FanPushPreferences, AppError> {
+        let body = serde_json::json!({
+            "shows": value.shows,
+            "releases": value.releases,
+            "community": value.community,
+            "merch": value.merch,
+            "quiet_hours_enabled": value.quiet_hours_enabled,
+            "quiet_start": value.quiet_start,
+            "quiet_end": value.quiet_end,
+        });
+        let wire: FanPushPreferencesApi = self
+            .fan_json(profile, Method::POST, "me/push/preferences", Some(&body))
+            .await?;
+        Ok(wire.into())
     }
 
     pub async fn fan_disable_android_push(

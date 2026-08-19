@@ -153,18 +153,26 @@ class RuntimePerformanceContract(unittest.TestCase):
             self.assertIn(fragment, source)
 
     def test_merch_catalog_revalidates_with_bounded_memory_cache(self):
+        # The merch catalog moved from a standalone in-memory map into the shared,
+        # disk-backed PublicCache, so its stale bound now lives beside the other
+        # public TTLs in cache.rs and survives a restart instead of cold-starting.
         source = (ROOT / "src-tauri/src/api/client.rs").read_text()
+        cache = (ROOT / "src-tauri/src/api/cache.rs").read_text()
         for fragment in (
             "const MERCH_CACHE_TTL: Duration = Duration::from_secs(15);",
-            "const MERCH_STALE_TTL: Duration = Duration::from_secs(10 * 60);",
             "merch_fetch: Arc<Mutex<()>>",
-            "merch_cache: Arc<RwLock<HashMap<String, CacheEntry<MerchCatalog>>>>",
             "self.merch_fetch.lock().await",
             'public_response_base(api_base_url, "public/merch/catalog", validators)',
             "self.touch_merch_cache(&cache_key).await",
-            "cache::prune_cache(&mut cache, MERCH_STALE_TTL)",
+            "cache::prune_cache(&mut public_cache.merch, MERCH_STALE_TTL)",
         ):
             self.assertIn(fragment, source)
+        for fragment in (
+            "const MERCH_STALE_TTL: Duration = Duration::from_secs(10 * 60);",
+            "pub merch: HashMap<String, CacheEntry<MerchCatalog>>,",
+            "merch: restore_entries(disk.merch, MERCH_STALE_TTL),",
+        ):
+            self.assertIn(fragment, cache)
         self.assertIn(
             ".filter(|entry| entry.fetched_at.elapsed() < MERCH_STALE_TTL)",
             source,

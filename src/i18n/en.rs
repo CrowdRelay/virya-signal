@@ -941,7 +941,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "qualified_referrals" => "qualified referrals",
         "ticket_revenue" => "ticket revenue",
         "after_refunds" => "after refunds",
-        "paid_orders_count" => "{0} paid orders",
+        "paid_orders_count" => "{} paid orders",
         "direction_to_point" => "{arrow} {direction}",
         "direction_north" => "north",
         "direction_northeast" => "north-east",
@@ -1087,6 +1087,24 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "gig_checklist_hint" => {
             "One shared checklist for the whole staff. Ticking an item here immediately syncs with the staff panel on virya.music."
         }
+        "push_what_you_want" => "Choose what reaches you",
+        "push_what_you_want_hint" => {
+            "Pick the kinds of messages you want. Changes sync with your Signal."
+        }
+        "push_category_shows" => "Shows and tickets",
+        "push_category_releases" => "Music releases",
+        "push_category_community" => "Community and Signal",
+        "push_category_merch" => "Merch",
+        "push_quiet_hours" => "Quiet hours 22:00–08:00",
+        "push_essential_always" => {
+            "Important information about a ticket you hold or operational changes may still arrive during quiet hours."
+        }
+        "prepare_show" => "PREPARE SHOW",
+        "close_show" => "CLOSE SHOW",
+        "show_closed_cleanly" => "Show closed — scans are synced and reconciliation is confirmed.",
+        "show_close_blocked_scans" => "Cannot close: {} scans pending, {} conflicts.",
+        "show_pack_checklist_pending" => "Show Pack: {} checklist items still need attention.",
+        "pickup_pack_list" => "Merch pickup: {} units across {} orders",
         "team_push_notifications" => "Staff reminders",
         "team_push_notifications_hint" => {
             "Signal will remind the team 7 and 2 days before the show."
@@ -1097,7 +1115,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         }
         "team_push_status_unknown" => "Notification status is not available yet.",
         "enable_notifications" => "ENABLE NOTIFICATIONS",
-        "checklist_progress" => "Done: {0}/{1}",
+        "checklist_progress" => "Done: {}/{}",
         "checklist_section_show_files" => "SET / FILES",
         "checklist_section_gear" => "GEAR",
         "checklist_section_media" => "MEDIA",
@@ -1246,7 +1264,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "latarnik_decline" => "NOT THIS TIME",
         "latarnik_decline_release_confirm_title" => "RELEASE THIS RESERVED COPY?",
         "latarnik_decline_release_confirm_hint" => {
-            "{0} will return to the allocation pool. This action is never completed by a single accidental tap."
+            "{} will return to the allocation pool. This action is never completed by a single accidental tap."
         }
         "latarnik_delivery_details" => "Delivery details",
         "latarnik_phone" => "Phone",

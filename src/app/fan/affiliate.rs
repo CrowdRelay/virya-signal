@@ -1,6 +1,6 @@
-const THOMANN_QUAD_CORTEX_URL: &str = "https://www.thomann.pl/neural_dsp_quad_cortex.htm?offid=1&affid=4979&subid=signal&subid2=gear";
+const THOMANN_QUAD_CORTEX_URL: &str = "https://signal-api.virya.music/v1/go/thomann-qc-signal";
 const THOMANN_HOME_URL: &str =
-    "https://www.thomann.pl/?offid=1&affid=4979&subid=signal&subid2=shop";
+    "https://signal-api.virya.music/v1/go/thomann-shop-signal";
 
 #[component]
 fn FanAffiliateGear(error: RwSignal<Option<String>>) -> impl IntoView {

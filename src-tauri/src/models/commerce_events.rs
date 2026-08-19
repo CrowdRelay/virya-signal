@@ -33,6 +33,29 @@ pub struct ShowChecklist {
     pub items: Vec<ShowChecklistItem>,
 }
 
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct EventMerchPickupItem {
+    pub product_name: String,
+    pub variant_label: String,
+    pub sku: String,
+    pub quantity: i64,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct EventMerchSummary {
+    pub event_id: String,
+    pub order_count: i64,
+    pub pickup_order_count: i64,
+    pub pickup_unit_count: i64,
+    pub gross_minor: i64,
+    pub goods_minor: i64,
+    pub shipping_minor: i64,
+    pub currency: String,
+    #[serde(default)]
+    pub pickup_items: Vec<EventMerchPickupItem>,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct EventListResponse {
     pub events: Vec<PublicEvent>,

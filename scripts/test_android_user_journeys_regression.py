@@ -131,8 +131,10 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertIn('fan_unpublish_synesthesia_leaderboard,', lib)
 
     def test_fan_home_contract_keeps_locale_and_does_not_duplicate_live_note(self):
-        models = read('src/models.rs')
-        profile = models.split('pub struct FanHomeProfile', 1)[1].split('}', 1)[0]
+        # FanHomeProfile is now defined once in the shared generated contract and
+        # re-used by both sides; see test_fan_home_contract_parity.
+        contract = read('crates/virya-signal-contracts/src/fan_wire.generated.rs')
+        profile = contract.split('pub struct FanHomeProfile', 1)[1].split('}', 1)[0]
         self.assertIn('pub locale: Option<String>', profile)
         home = read('src/app/fan_home.rs')
         self.assertEqual(home.count('tr("signal_live_note")'), 1)

@@ -1,8 +1,8 @@
 use serde::Serialize;
 
 use crate::models::{
-    CreateQrCampaignInput, FanConfirmationInput, FanSignupInput, IssuePassInput,
-    OperatorProfileInput, RequestedCityInput, TicketCheckoutInput,
+    CreateQrCampaignInput, FanConfirmationInput, FanPushPreferencesUpdate, FanSignupInput,
+    IssuePassInput, OperatorProfileInput, RequestedCityInput, TicketCheckoutInput,
 };
 
 const PRODUCTION_API_BASE: &str = "https://signal-api.virya.music/v1/";
@@ -117,6 +117,12 @@ impl FanLoadingState {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct EmptyArgs {}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct FanPushPreferencesArgs<'a> {
+    pub preferences: &'a FanPushPreferencesUpdate,
+}
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]

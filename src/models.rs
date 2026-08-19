@@ -67,79 +67,20 @@ pub struct PublicHomeData {
     pub events: Vec<PublicEvent>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
-pub struct FanHomeData {
-    pub schema_version: u32,
-    pub generated_at: String,
-    pub profile: FanHomeProfile,
-    pub next_event: Option<FanHomeEvent>,
-    pub synesthesia: FanHomeSynesthesia,
-    pub referral: FanHomeReferral,
-    pub counts: FanHomeCounts,
-    pub recommended_action: String,
-    #[serde(default)]
-    pub stale: bool,
-}
+// Fan Home DTOs are defined once in virya-signal-contracts and shared verbatim
+// by the WASM UI and the Tauri shell. Nested types travel through FanHomeData,
+// so only the names this crate spells out itself are re-exported here.
+pub use virya_signal_contracts::fan::{
+    FanHomeData, FanHomeSynesthesia, FanRecommendedAction, FanTarget,
+};
 
-impl FanHomeData {
-    pub const SCHEMA_VERSION: u32 = 1;
-
-    pub fn has_supported_schema(&self) -> bool {
-        self.schema_version == Self::SCHEMA_VERSION
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize)]
-pub struct FanHomeProfile {
-    pub display_name: Option<String>,
-    #[allow(dead_code)]
-    pub locale: Option<String>,
-    pub primary_city: Option<String>,
-}
-
+// Decoded for contract parity with the staff dashboard; not rendered yet.
+#[allow(dead_code)]
 #[derive(Clone, Debug, Deserialize)]
-pub struct FanHomeEvent {
-    pub slug: String,
-    pub title: String,
-    pub venue: Option<String>,
-    pub city: Option<String>,
-    pub starts_at: String,
-    pub doors_at: Option<String>,
-    pub ends_at: Option<String>,
+pub struct ShowLifecycleView {
     pub phase: String,
-    pub ticket_url: Option<String>,
-    pub interested: bool,
-    pub has_pass: bool,
-    pub has_paid_ticket: bool,
-    pub ticket_sale_active: bool,
-}
-
-#[derive(Clone, Debug, Default, Deserialize)]
-pub struct FanHomeSynesthesia {
-    pub started: bool,
-    pub completed: bool,
-    pub rooms_completed: i16,
-    pub client_total_elapsed_ms: Option<i64>,
-    pub best_elapsed_ms: Option<i64>,
-    pub completed_runs: i64,
-    pub leaderboard_published: bool,
-    pub leaderboard_rank: Option<i64>,
-    pub linked_at: Option<String>,
-    pub reward_entered: bool,
-}
-
-#[derive(Clone, Debug, Default, Deserialize)]
-pub struct FanHomeReferral {
-    pub qualified: i64,
-    pub pending: i64,
-}
-
-#[derive(Clone, Debug, Default, Deserialize)]
-pub struct FanHomeCounts {
-    pub event_interests: i64,
-    pub active_passes: i64,
-    pub paid_orders: i64,
-    pub area_claims: i64,
+    pub next_milestone: Option<String>,
+    pub next_milestone_at: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -155,6 +96,9 @@ pub struct StaffEventDashboard {
     pub passes_issued: i64,
     pub passes_claimed: i64,
     pub passes_redeemed: i64,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub lifecycle: Option<ShowLifecycleView>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -886,6 +830,14 @@ pub struct OpsRetryResult {
     pub replayed: bool,
 }
 
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct EventMerchPickupItem {
+    pub product_name: String,
+    pub variant_label: String,
+    pub sku: String,
+    pub quantity: i64,
+}
+
 // Show mode keeps the complete native response for stable IPC compatibility.
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct ShowModeStatus {
@@ -901,6 +853,15 @@ pub struct ShowModeStatus {
     #[allow(dead_code)]
     pub synced: usize,
     pub conflicts: usize,
+    pub checklist_loaded: bool,
+    pub checklist_pending: usize,
+    pub pickup_order_count: i64,
+    pub pickup_unit_count: i64,
+    #[serde(default)]
+    pub pickup_items: Vec<EventMerchPickupItem>,
+    #[allow(dead_code)]
+    pub close_ready: bool,
+    pub closed: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq)]

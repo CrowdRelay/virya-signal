@@ -390,7 +390,7 @@ if 'RootMode::StaffGate => {}' not in ui:
 # guarantee. Assert the property instead: team lives in sessionStorage under its
 # own key so it dies with the WebView session, and the durable localStorage read
 # is clamped to fan/latarnik so a tampered value can never boot into operator.
-bridge_ffi = (root / 'src/bridge/ffi.rs').read_text()
+bridge_ffi = (root / 'src/bridge/ffi.rs').read_text() + (root / 'src/bridge/navigation.rs').read_text()
 for contract in (
     "window.sessionStorage?.setItem(VIRYA_TRANSIENT_ROOT_MODE_STORAGE_KEY, 'team')",
     "window.sessionStorage?.removeItem(VIRYA_TRANSIENT_ROOT_MODE_STORAGE_KEY)",
@@ -649,3 +649,19 @@ for promotion_name in ['android-play.yml', 'android-release-apk.yml', 'mobile-re
         raise SystemExit(f'{promotion_name} must reject production artifacts without Firebase push configuration')
 
 print(f'static configuration and IPC contract check: OK ({len(invoked)} active / {len(registered)} registered commands; {len(unreferenced)} compat-only)')
+
+# Show Pack state machine: prepare must construct exactly one copy of each
+# enrichment field, and a closed session must reject new offline scans. This
+# catches compile-time duplicate-field regressions even on hosts without Cargo.
+show_mode = (root / 'src-tauri/src/commands/show_mode.rs').read_text(encoding='utf-8')
+prepare_start = show_mode.index('store.sessions.insert(')
+prepare_end = show_mode.index('show_mode_status_for(event_slug, store)', prepare_start)
+prepare_block = show_mode[prepare_start:prepare_end]
+for field in ('checklist', 'commerce', 'closed_at_unix_secs'):
+    if len(re.findall(rf'^\s*{field}(?::|,)', prepare_block, flags=re.MULTILINE)) != 1:
+        raise SystemExit(f'show-mode prepare must initialize {field} exactly once')
+scan_start = show_mode.index('pub(crate) async fn show_mode_scan')
+scan_end = show_mode.index('pub(crate) async fn show_mode_sync', scan_start)
+scan_block = show_mode[scan_start:scan_end]
+if 'session.closed_at_unix_secs.is_some()' not in scan_block:
+    raise SystemExit('closed show-mode session must reject new scans')

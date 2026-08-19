@@ -114,6 +114,16 @@ impl super::CrowdRelayClient {
             .await
     }
 
+    pub async fn operator_event_merch_summary(
+        &self,
+        profile: &OperatorProfile,
+        event_id: &str,
+    ) -> Result<crate::models::EventMerchSummary, AppError> {
+        let path = format!("staff/events/{}/commerce-summary", segment(event_id)?);
+        self.auth_json::<crate::models::EventMerchSummary, ()>(profile, Method::GET, &path, None)
+            .await
+    }
+
     pub async fn operator_update_show_checklist(
         &self,
         profile: &OperatorProfile,

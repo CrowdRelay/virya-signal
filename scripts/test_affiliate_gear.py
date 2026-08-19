@@ -15,13 +15,18 @@ POLISH_DIACRITICS = re.compile(r"[ąćęłńóśźżĄĆĘŁŃÓŚŹŻ]")
 
 class AffiliateGearContracts(unittest.TestCase):
     def test_thomann_tracking_is_signal_scoped(self):
+        # Affiliate identifiers moved server-side into CrowdRelay smart links, so
+        # the shipped client carries first-party redirect URLs only. Tracking is
+        # still Signal-scoped, now through the slug rather than query parameters,
+        # and the partner ids can be rotated without releasing a new build.
         source = AFFILIATE.read_text(encoding="utf-8")
-        self.assertIn("offid=1", source)
-        self.assertIn("affid=4979", source)
-        self.assertIn("subid=signal&subid2=gear", source)
-        self.assertIn("subid=signal&subid2=shop", source)
-        self.assertEqual(source.count("https://www.thomann.pl/"), 2)
-        self.assertNotIn("clickfi.re", source)
+        for slug in ("thomann-qc-signal", "thomann-shop-signal"):
+            self.assertIn(f"https://signal-api.virya.music/v1/go/{slug}", source)
+            self.assertTrue(slug.endswith("-signal"), "smart link must stay Signal-scoped")
+        self.assertEqual(source.count("https://signal-api.virya.music/v1/go/"), 2)
+        # No affiliate identifier or partner endpoint may be embedded in the client.
+        for leaked in ("offid=", "affid=", "subid=", "thomann.pl", "clickfi.re"):
+            self.assertNotIn(leaked, source)
 
     def test_affiliate_copy_is_localized_and_transparent(self):
         ui = AFFILIATE.read_text(encoding="utf-8")

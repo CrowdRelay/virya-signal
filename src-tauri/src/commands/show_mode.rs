@@ -214,6 +214,35 @@ fn show_mode_status_for(event_slug: &str, store: &ShowModeStore) -> ShowModeStat
         pending,
         synced,
         conflicts,
+        checklist_loaded: session.checklist.is_some(),
+        checklist_pending: session.checklist.as_ref().map_or(0, |value| {
+            value
+                .items
+                .iter()
+                .filter(|item| item.status == "pending" || item.status == "blocked")
+                .count()
+        }),
+        pickup_order_count: session
+            .commerce
+            .as_ref()
+            .map_or(0, |value| value.pickup_order_count),
+        pickup_unit_count: session
+            .commerce
+            .as_ref()
+            .map_or(0, |value| value.pickup_unit_count),
+        pickup_items: session
+            .commerce
+            .as_ref()
+            .map_or_else(Vec::new, |value| value.pickup_items.clone()),
+        close_ready: pending == 0
+            && conflicts == 0
+            && session.checklist.as_ref().is_some_and(|value| {
+                value.items.iter().any(|item| {
+                    item.item_key == "post_show_reconciliation"
+                        && matches!(item.status.as_str(), "done" | "skipped")
+                })
+            }),
+        closed: session.closed_at_unix_secs.is_some(),
     }
 }
 
@@ -263,6 +292,19 @@ pub(crate) async fn show_mode_prepare(
             crate::i18n::tr("native_snapshot_integrity_failed").into(),
         ));
     }
+    let checklist = state
+        .api
+        .operator_show_checklist(&profile, event_slug)
+        .await
+        .ok();
+    let commerce = match checklist.as_ref() {
+        Some(value) => state
+            .api
+            .operator_event_merch_summary(&profile, &value.event_id)
+            .await
+            .ok(),
+        None => None,
+    };
     ensure_show_store_loaded(&state).await?;
     let status = {
         let mut cached = state.show_mode_store.write().await;
@@ -278,6 +320,9 @@ pub(crate) async fn show_mode_prepare(
             ShowModeSession {
                 snapshot,
                 scans: previous_scans,
+                checklist,
+                commerce,
+                closed_at_unix_secs: None,
             },
         );
         show_mode_status_for(event_slug, store)
@@ -321,6 +366,9 @@ pub(crate) async fn show_mode_scan(
         let session = store.sessions.get_mut(event_slug).ok_or_else(|| {
             AppError::Conflict(crate::i18n::tr("native_prepare_offline_event_first").into())
         })?;
+        if session.closed_at_unix_secs.is_some() {
+            return Err(AppError::Conflict("show_already_closed".to_owned()));
+        }
         if !snapshot_is_active(&session.snapshot) {
             return Err(AppError::Conflict(
                 crate::i18n::tr("native_snapshot_refresh_required").into(),
@@ -492,6 +540,72 @@ pub(crate) async fn show_mode_sync(
 }
 
 #[tauri::command]
+pub(crate) async fn show_mode_close(
+    state: State<'_, AppState>,
+    event_slug: String,
+) -> Result<ShowModeStatus, AppError> {
+    let _mutation = state.show_mode_mutation.lock().await;
+    let event_slug = event_slug.trim().to_owned();
+    ensure_show_store_loaded(&state).await?;
+
+    // Closing is locally idempotent. Once the durable encrypted session is
+    // closed, a repeated tap must not require network access just to return
+    // the already-established terminal state.
+    {
+        let cached = state.show_mode_store.read().await;
+        let store = cached.as_ref().ok_or(AppError::Locked)?;
+        let session = store.sessions.get(&event_slug).ok_or_else(|| {
+            AppError::Conflict(crate::i18n::tr("native_no_prepared_event").into())
+        })?;
+        if session.closed_at_unix_secs.is_some() {
+            return Ok(show_mode_status_for(&event_slug, store));
+        }
+    }
+
+    let profile = operator_profile(&state).await?;
+    let checklist = state
+        .api
+        .operator_show_checklist(&profile, &event_slug)
+        .await?;
+    let commerce = state
+        .api
+        .operator_event_merch_summary(&profile, &checklist.event_id)
+        .await
+        .ok();
+    {
+        let mut cached = state.show_mode_store.write().await;
+        let store = cached.as_mut().ok_or(AppError::Locked)?;
+        let session = store.sessions.get_mut(&event_slug).ok_or_else(|| {
+            AppError::Conflict(crate::i18n::tr("native_no_prepared_event").into())
+        })?;
+        session.checklist = Some(checklist);
+        session.commerce = commerce;
+        let has_pending = session
+            .scans
+            .iter()
+            .any(|scan| scan.state == ShowModeScanState::Pending);
+        let has_conflict = session
+            .scans
+            .iter()
+            .any(|scan| scan.state == ShowModeScanState::Conflict);
+        let reconciled = session.checklist.as_ref().is_some_and(|value| {
+            value.items.iter().any(|item| {
+                item.item_key == "post_show_reconciliation"
+                    && matches!(item.status.as_str(), "done" | "skipped")
+            })
+        });
+        if has_pending || has_conflict || !reconciled {
+            return Err(AppError::Conflict("show_not_ready_to_close".to_owned()));
+        }
+        session.closed_at_unix_secs = Some(unix_now_secs());
+    }
+    persist_show_store(&state).await?;
+    let cached = state.show_mode_store.read().await;
+    let store = cached.as_ref().ok_or(AppError::Locked)?;
+    Ok(show_mode_status_for(&event_slug, store))
+}
+
+#[tauri::command]
 pub(crate) async fn show_mode_clear(
     state: State<'_, AppState>,
     event_slug: String,
@@ -502,6 +616,15 @@ pub(crate) async fn show_mode_clear(
     {
         let mut cached = state.show_mode_store.write().await;
         let store = cached.as_mut().ok_or(AppError::Locked)?;
+        if let Some(session) = store.sessions.get(&event_slug) {
+            let has_unsynced_scans = session
+                .scans
+                .iter()
+                .any(|scan| scan.state != ShowModeScanState::Synced);
+            if has_unsynced_scans && session.closed_at_unix_secs.is_none() {
+                return Err(AppError::Conflict("show_has_unsynced_scans".to_owned()));
+            }
+        }
         store.sessions.remove(&event_slug);
     }
     persist_show_store(&state).await?;
@@ -604,6 +727,9 @@ mod tests {
                         result_status: None,
                     },
                 ],
+                checklist: None,
+                commerce: None,
+                closed_at_unix_secs: None,
             },
         );
         normalize_show_store(&mut store);
@@ -645,6 +771,9 @@ mod tests {
                     state: ShowModeScanState::Synced,
                     result_status: Some("redeemed".into()),
                 }],
+                checklist: None,
+                commerce: None,
+                closed_at_unix_secs: None,
             },
         );
         store.sessions.insert(
@@ -660,6 +789,9 @@ mod tests {
                     state: ShowModeScanState::Pending,
                     result_status: None,
                 }],
+                checklist: None,
+                commerce: None,
+                closed_at_unix_secs: None,
             },
         );
         normalize_show_store(&mut store);
