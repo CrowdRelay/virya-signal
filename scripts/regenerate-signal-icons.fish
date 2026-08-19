@@ -12,7 +12,7 @@ if not test -f branding/signal-v2.svg
     exit 1
 end
 
-cargo tauri icon branding/signal-v2.svg
+cargo tauri icon branding/signal-v2.svg --ios-color "#070908"
 or exit $status
 
 echo "SIGNAL_ICONSET=GENERATED source=branding/signal-v2.svg"
