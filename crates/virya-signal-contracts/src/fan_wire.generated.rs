@@ -101,3 +101,43 @@ pub struct FanHomeCounts {
     pub paid_orders: i64,
     pub area_claims: i64,
 }
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FanPushPreferences {
+    pub shows: bool,
+    pub releases: bool,
+    pub community: bool,
+    pub merch: bool,
+    pub quiet_hours_enabled: bool,
+    pub quiet_start: String,
+    pub quiet_end: String,
+    pub quiet_timezone: String,
+}
+
+impl Default for FanPushPreferences {
+    fn default() -> Self {
+        Self {
+            shows: true,
+            releases: true,
+            community: true,
+            merch: true,
+            quiet_hours_enabled: false,
+            quiet_start: "22:00".to_owned(),
+            quiet_end: "08:00".to_owned(),
+            quiet_timezone: "Europe/Warsaw".to_owned(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct FanPushPreferencesUpdate {
+    pub shows: bool,
+    pub releases: bool,
+    pub community: bool,
+    pub merch: bool,
+    pub quiet_hours_enabled: bool,
+    pub quiet_start: String,
+    pub quiet_end: String,
+}

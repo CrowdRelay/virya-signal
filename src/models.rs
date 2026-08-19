@@ -460,6 +460,8 @@ pub struct ReferralProgress {
     #[serde(default)]
     pub qualified_referrals: u32,
     #[serde(default)]
+    #[allow(dead_code)]
+    // CrowdRelay wire parity; V2 Home intentionally does not render pending-referral KPI.
     pub pending_referrals: u32,
     #[serde(default)]
     pub draw_entries: Vec<WeightedDrawEntry>,

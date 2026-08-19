@@ -12,44 +12,55 @@ pub struct FanPushStatus {
     pub detail: Option<String>,
 }
 
-/// Fan-controlled notification categories. Missing server state maps to all
-/// categories enabled and quiet hours disabled for backward compatibility.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct FanPushPreferences {
-    pub shows: bool,
-    pub releases: bool,
-    pub community: bool,
-    pub merch: bool,
-    pub quiet_hours_enabled: bool,
-    pub quiet_start: String,
-    pub quiet_end: String,
-    pub quiet_timezone: String,
-}
+/// Fan preference payloads are generated from CrowdRelay OpenAPI and
+/// re-exported here so the existing normalized IPC module path stays stable.
+pub use crate::fan::{FanPushPreferences, FanPushPreferencesUpdate};
 
-impl Default for FanPushPreferences {
-    fn default() -> Self {
-        Self {
+#[cfg(test)]
+mod tests {
+    use super::FanPushPreferencesUpdate;
+    use serde_json::json;
+
+    #[test]
+    fn generated_update_has_exact_canonical_fields() {
+        let value = FanPushPreferencesUpdate {
             shows: true,
-            releases: true,
+            releases: false,
             community: true,
-            merch: true,
-            quiet_hours_enabled: false,
-            quiet_start: "22:00".to_owned(),
-            quiet_end: "08:00".to_owned(),
-            quiet_timezone: "Europe/Warsaw".to_owned(),
+            merch: false,
+            quiet_hours_enabled: true,
+            quiet_start: "22:30".to_owned(),
+            quiet_end: "07:45".to_owned(),
+        };
+        let wire = serde_json::to_value(&value).expect("serialize push preferences");
+        let object = wire.as_object().expect("object");
+        assert_eq!(object.len(), 7);
+        for key in [
+            "shows",
+            "releases",
+            "community",
+            "merch",
+            "quietHoursEnabled",
+            "quietStart",
+            "quietEnd",
+        ] {
+            assert!(object.contains_key(key), "missing {key}");
         }
+        assert!(!object.contains_key("quietTimezone"));
     }
-}
 
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct FanPushPreferencesUpdate {
-    pub shows: bool,
-    pub releases: bool,
-    pub community: bool,
-    pub merch: bool,
-    pub quiet_hours_enabled: bool,
-    pub quiet_start: String,
-    pub quiet_end: String,
+    #[test]
+    fn generated_update_rejects_timezone_authority_from_client() {
+        let result = serde_json::from_value::<FanPushPreferencesUpdate>(json!({
+            "shows": true,
+            "releases": true,
+            "community": true,
+            "merch": true,
+            "quietHoursEnabled": false,
+            "quietStart": "22:00",
+            "quietEnd": "08:00",
+            "quietTimezone": "America/New_York"
+        }));
+        assert!(result.is_err());
+    }
 }

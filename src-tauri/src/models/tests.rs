@@ -241,5 +241,3 @@ mod compat_string_shape_tests {
         assert!(referral.referral_code.is_empty());
     }
 }
-
-pub use virya_signal_contracts::push::*;
