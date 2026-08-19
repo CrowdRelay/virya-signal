@@ -1,0 +1,173 @@
+name: Signal Web Lighthouse Watch
+
+on:
+  workflow_run:
+    workflows: ["Check"]
+    types: [completed]
+  schedule:
+    - cron: "17 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: signal-web-lighthouse-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lighthouse:
+    if: >-
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main') ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v7.0.1
+
+      - name: Resolve successful Check artifact
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+          UPSTREAM_SHA: ${{ github.event.workflow_run.head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_run" ]]; then
+            run_id="${UPSTREAM_RUN_ID}"
+            source_sha="${UPSTREAM_SHA}"
+          else
+            run_id="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/check.yml/runs?branch=main&status=success&per_page=1" --jq '.workflow_runs[0].id // empty')"
+            source_sha="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/check.yml/runs?branch=main&status=success&per_page=1" --jq '.workflow_runs[0].head_sha // empty')"
+          fi
+          if [[ -z "${run_id}" || -z "${source_sha}" ]]; then
+            echo "ERROR: no successful Check run on main is available" >&2
+            exit 1
+          fi
+          echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
+          echo "source_sha=${source_sha}" >> "$GITHUB_OUTPUT"
+          echo "Auditing Check run ${run_id} at ${source_sha}"
+
+      - name: Download exact release Web bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.source.outputs.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf audited-dist
+          mkdir -p audited-dist
+          gh run download "${RUN_ID}" --repo "${GITHUB_REPOSITORY}" -n virya-signal-web-dist -D audited-dist
+          test -s audited-dist/index.html
+          echo "SIGNAL_LIGHTHOUSE_DIST=READY sha=${{ steps.source.outputs.source_sha }}"
+
+      - name: Download previous successful Lighthouse baseline
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/previous
+          previous_run="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/signal-web-lighthouse.yml/runs?branch=main&status=success&per_page=10" --jq '.workflow_runs[0].id // empty' 2>/dev/null || true)"
+          if [[ -n "${previous_run}" ]]; then
+            gh run download "${previous_run}" --repo "${GITHUB_REPOSITORY}" -n virya-signal-lighthouse-baseline -D artifacts/previous >/dev/null 2>&1 || true
+          fi
+          if [[ -s artifacts/previous/lighthouse-summary.json ]]; then
+            echo "SIGNAL_LIGHTHOUSE_BASELINE=FOUND run=${previous_run}"
+          else
+            echo "SIGNAL_LIGHTHOUSE_BASELINE=PENDING"
+          fi
+
+      - name: Serve release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory audited-dist >/tmp/virya-signal-http.log 2>&1 &
+          echo $! > /tmp/virya-signal-http.pid
+          for attempt in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
+              echo "SIGNAL_LIGHTHOUSE_SERVER=READY"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/virya-signal-http.log >&2 || true
+          exit 1
+
+      - name: Lighthouse mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          npx --yes lighthouse@13.4.1 http://127.0.0.1:4173/ \
+            --quiet \
+            --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" \
+            --only-categories=performance,accessibility,best-practices \
+            --max-wait-for-load=20000 \
+            --output=json --output=html \
+            --output-path=artifacts/lighthouse-mobile
+
+      - name: Lighthouse desktop
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes lighthouse@13.4.1 http://127.0.0.1:4173/ \
+            --quiet \
+            --preset=desktop \
+            --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" \
+            --only-categories=performance,accessibility,best-practices \
+            --max-wait-for-load=20000 \
+            --output=json --output=html \
+            --output-path=artifacts/lighthouse-desktop
+
+      - name: Validate performance and accessibility regression budget
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/check-lighthouse.py \
+            --mobile artifacts/lighthouse-mobile.report.json \
+            --desktop artifacts/lighthouse-desktop.report.json \
+            --baseline artifacts/previous/lighthouse-summary.json \
+            --json-out artifacts/lighthouse-summary.json \
+            --markdown-out artifacts/lighthouse-summary.md
+
+      - name: Publish workflow summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -s artifacts/lighthouse-summary.md ]]; then
+            cat artifacts/lighthouse-summary.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "# Virya Signal · Lighthouse Watch" >> "$GITHUB_STEP_SUMMARY"
+            echo >> "$GITHUB_STEP_SUMMARY"
+            echo "Audit did not reach the summary step. Inspect the failed job and uploaded reports." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload complete Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: virya-signal-lighthouse-reports-${{ steps.source.outputs.source_sha }}
+          path: |
+            artifacts/lighthouse-mobile.report.json
+            artifacts/lighthouse-mobile.report.html
+            artifacts/lighthouse-desktop.report.json
+            artifacts/lighthouse-desktop.report.html
+            artifacts/lighthouse-summary.json
+            artifacts/lighthouse-summary.md
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Store successful regression baseline
+        if: success()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: virya-signal-lighthouse-baseline
+          path: artifacts/lighthouse-summary.json
+          if-no-files-found: error
+          retention-days: 90
