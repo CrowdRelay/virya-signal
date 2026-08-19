@@ -11,6 +11,9 @@ tauri = (ROOT / "src-tauri/tauri.conf.json").read_text(encoding="utf-8")
 
 assert 'fill="#070908"' in svg
 assert svg.count('fill="#93c6c0"') >= 3
+assert '<rect x="243" y="379" width="98" height="266" rx="14"' in svg
+assert '<rect x="463" y="251" width="98" height="522" rx="14"' in svg
+assert '<rect x="683" y="329" width="98" height="366" rx="14"' in svg
 assert "#f3c51a" not in svg.lower()
 assert 'branding/signal-v2.svg --ios-color "#070908"' in regen
 assert "regenerate-signal-icons.fish" in play
