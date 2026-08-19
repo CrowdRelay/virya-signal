@@ -36,6 +36,7 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     environment:
       name: ${{ inputs.play_track == 'production' && 'production' || 'store-testing' }}
     steps:
@@ -43,6 +44,12 @@ jobs:
         env:
           PLAY_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
         run: test -n "$PLAY_JSON" || { echo "Missing GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" >&2; exit 1; }
+      - name: Refuse production promotion from a non-main ref
+        if: inputs.play_track == 'production'
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]]
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: virya-signal-google-play-${{ inputs.version }}
