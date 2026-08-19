@@ -130,7 +130,10 @@ pub(crate) async fn verify_staff_access(
         ));
     }
     let password = Zeroizing::new(password);
-    state.api.verify_staff_access(password.as_str()).await
+    state
+        .api
+        .verify_tenant_staff_access(password.as_str())
+        .await
 }
 
 #[tauri::command]
