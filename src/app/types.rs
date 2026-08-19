@@ -5,8 +5,7 @@ use crate::models::{
     IssuePassInput, OperatorProfileInput, RequestedCityInput, TicketCheckoutInput,
 };
 
-pub(super) use crate::tenant::API_BASE;
-pub(super) const POLICY_VERSION: &str = "2026-07";
+pub(super) use crate::tenant::{API_BASE, POLICY_VERSION};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum RootMode {
