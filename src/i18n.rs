@@ -42,7 +42,7 @@ impl Language {
 
 #[wasm_bindgen(inline_js = r#"
 export function viryaStoredLanguage(key) {
-  try { return window.localStorage?.getItem(key) || 'pl'; } catch { return 'pl'; }
+  try { return window.localStorage?.getItem(key) || ''; } catch { return ''; }
 }
 export function viryaSetLanguage(key, value) {
   try { window.localStorage?.setItem(key, value); } catch {}
@@ -64,9 +64,13 @@ extern "C" {
 }
 
 pub fn initialize() {
-    set_current(Language::from_code(&stored_language_js(
-        LANGUAGE_STORAGE_KEY,
-    )));
+    let stored = stored_language_js(LANGUAGE_STORAGE_KEY);
+    let language = if stored.is_empty() {
+        Language::from_code(crate::tenant::DEFAULT_LANGUAGE)
+    } else {
+        Language::from_code(&stored)
+    };
+    set_current(language);
 }
 
 pub fn current() -> Language {
