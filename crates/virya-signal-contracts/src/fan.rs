@@ -36,18 +36,18 @@ impl FanTarget {
         };
 
         for pair in query.split('&') {
-            if let Some(value) = pair.strip_prefix("event=") {
-                if let Some(slug) = Self::event_slug(value) {
-                    return Self::Event(Some(slug));
-                }
+            if let Some(value) = pair.strip_prefix("event=")
+                && let Some(slug) = Self::event_slug(value)
+            {
+                return Self::Event(Some(slug));
             }
         }
 
         let clean = path.trim_end_matches('/');
-        if let Some(index) = clean.find("/live/") {
-            if let Some(slug) = Self::event_slug(&clean[index + 6..]) {
-                return Self::Event(Some(slug));
-            }
+        if let Some(index) = clean.find("/live/")
+            && let Some(slug) = Self::event_slug(&clean[index + 6..])
+        {
+            return Self::Event(Some(slug));
         }
 
         let leaf = clean.rfind('/').map_or(clean, |index| &clean[index + 1..]);
