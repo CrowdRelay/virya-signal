@@ -1,18 +1,51 @@
 #!/usr/bin/env python3
-from pathlib import Path
-ROOT=Path(__file__).resolve().parents[1]
-backend=(ROOT.parent/'crowdrelay/crates/crowdrelay-api/src/fan_context.rs').read_text()
-ui=(ROOT/'src/app/fan_home.rs').read_text()
-contract=(ROOT/'crates/virya-signal-contracts/src/fan.rs').read_text()
-required=['live_admission_ready','ticket_sale_active','FanRecommendedActionDetail','recommended_action_detail']
-assert all(x in backend for x in required)
-assert 'synesthesia_incomplete' not in backend and 'action("continue_synesthesia"' not in backend
-assert 'snapshot.recommended.as_ref()' in ui and 'FanTarget::parse' in ui
-assert 'key == "event"' in contract and 'not_event' in contract
-print('NEXT_BEST_ACTION_V2=PASS rolling=true typed_targets=true synesthesia=demoted')
+"""Keep Signal's typed next-best-action contract hermetic in standalone CI."""
 
-fan=(ROOT/'crates/virya-signal-contracts/src/fan.rs').read_text()
-assert 'fn event_slug(value: &str)' in fan
-assert 'value.len() <= 128' in fan
-assert "byte.is_ascii_lowercase()" in fan
-print('TYPED_TARGET_SLUG_GUARD=PASS')
+from pathlib import Path
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+BACKEND = ROOT.parent / "crowdrelay/crates/crowdrelay-api/src/fan_context.rs"
+
+
+class NextBestActionV2Contract(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.ui = (ROOT / "src/app/fan_home.rs").read_text(encoding="utf-8")
+        cls.contract = (
+            ROOT / "crates/virya-signal-contracts/src/fan.rs"
+        ).read_text(encoding="utf-8")
+
+    def test_signal_uses_typed_recommended_targets(self) -> None:
+        self.assertIn("snapshot.recommended.as_ref()", self.ui)
+        self.assertIn("FanTarget::parse", self.ui)
+        self.assertIn('key == "event"', self.contract)
+        self.assertIn("not_event", self.contract)
+
+    def test_typed_target_slug_is_bounded_and_sanitized(self) -> None:
+        self.assertIn("fn event_slug(value: &str)", self.contract)
+        self.assertIn("value.len() <= 128", self.contract)
+        self.assertIn("byte.is_ascii_lowercase()", self.contract)
+
+    def test_backend_parity_when_ecosystem_checkout_is_available(self) -> None:
+        # Standalone Signal CI intentionally checks out only this repository.
+        # Ecosystem worktrees place CrowdRelay next to Signal; when it is there,
+        # keep the cross-repo recommendation contract honest as an extra check.
+        if not BACKEND.exists():
+            return
+
+        backend = BACKEND.read_text(encoding="utf-8")
+        for token in (
+            "live_admission_ready",
+            "ticket_sale_active",
+            "FanRecommendedActionDetail",
+            "recommended_action_detail",
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, backend)
+        self.assertNotIn("synesthesia_incomplete", backend)
+        self.assertNotIn('action("continue_synesthesia"', backend)
+
+
+if __name__ == "__main__":
+    unittest.main()
