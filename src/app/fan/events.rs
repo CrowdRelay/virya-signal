@@ -519,7 +519,7 @@ fn FanTicketSale(
                             <strong>{money(ticket_type.price_gross_minor, &currency)}</strong>
                             <small>{i18n::format("available", &[ticket_type.available.max(0).to_string()])}</small>
                         </div>
-                        <div class="ticket-stepper" aria-label=tr("ticket_quantity")>
+                        <div class="ticket-stepper" role="group" aria-label=tr("ticket_quantity")>
                             <button type="button" aria-label=tr("decrease_ticket_quantity") on:click=decrement disabled=move || decrement_disabled.get()>"−"</button>
                             <output aria-live="polite">{move || quantity.get()}</output>
                             <button type="button" aria-label=tr("increase_ticket_quantity") on:click=increment disabled=move || increment_disabled.get()>"+"</button>

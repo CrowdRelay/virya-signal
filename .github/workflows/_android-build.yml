@@ -187,11 +187,11 @@ jobs:
           mkdir -p artifacts
           if [[ "${BUILD_KIND}" == "release-aab" ]]; then
             ext=aab
-            configuration=releaseRuntimeClasspath
+            configuration=armReleaseRuntimeClasspath
             max_size=150
           elif [[ "${BUILD_KIND}" == "release-apk" ]]; then
             ext=apk
-            configuration=releaseRuntimeClasspath
+            configuration=armReleaseRuntimeClasspath
             max_size=100
           else
             ext=apk
