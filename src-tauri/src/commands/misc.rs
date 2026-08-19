@@ -51,7 +51,13 @@ pub(crate) async fn request_city(
 ) -> Result<RequestedCityResult, AppError> {
     input.name = input.name.trim().to_owned();
     input.region = clean_optional(input.region.take());
-    input.country_code = input.country_code.trim().to_ascii_uppercase();
+    // The current mobile form asks for a city/region, not a country. Country is
+    // therefore a tenant property rather than a browser-supplied authority.
+    // This keeps branded DE/CZ/US builds inside their own regional namespace
+    // while VIRYA remains PL by default.
+    input.country_code = crate::tenant::DEFAULT_COUNTRY_CODE
+        .trim()
+        .to_ascii_uppercase();
     if input.name.chars().count() < 2
         || input.name.chars().count() > 120
         || input.name.chars().any(char::is_control)
