@@ -23,6 +23,12 @@ pub(crate) const API_BASE: &str = match option_env!("VIRYA_SIGNAL_E2E_API_BASE")
 #[cfg(not(debug_assertions))]
 pub(crate) const API_BASE: &str = TENANT_API_BASE;
 
+pub(crate) const DEFAULT_COUNTRY_CODE: &str =
+    match option_env!("VIRYA_SIGNAL_DEFAULT_COUNTRY_CODE") {
+        Some(value) if !value.is_empty() => value,
+        _ => "PL",
+    };
+
 #[cfg(debug_assertions)]
 pub(crate) const STAFF_GATE_URL: &str =
     match option_env!("VIRYA_SIGNAL_E2E_STAFF_GATE_URL") {
