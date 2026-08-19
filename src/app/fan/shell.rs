@@ -206,7 +206,10 @@ fn FanApp(
         });
     };
 
-    let open_latarnik = move |_| { menu_open.set(false); mode.set(RootMode::Latarnik); };
+    let open_latarnik = move |_| {
+        menu_open.set(false);
+        mode.set(RootMode::Latarnik);
+    };
 
     let refresh_all = move |_| {
         menu_open.set(false);
@@ -298,20 +301,9 @@ fn FanSignal(
     view! {
         <section class="screen fan-screen">
             <FanHomeOverview home=home loading=loading tab=tab focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview error=error />
-            <header class="signal-dashboard-hero compact-referral-hero">
-                <p class="eyebrow">{tr("your_impact")}</p>
-                <h2>{move || dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned())}</h2>
-                <strong>{tr("confirmed_referrals")}</strong>
-                <button class="referral-code-copy" type="button" on:click=copy_referral disabled=move || dashboard.with(|state| state.as_ref().is_none_or(|data| data.referral.referral_code.trim().is_empty()))>
-                    {move || dashboard.with(|state| state.as_ref().map(|d| i18n::format("code", std::slice::from_ref(&d.referral.referral_code)))).value_or_else(|| tr("loading_signal").to_owned())}
-                </button>
-                {move || share_status.get().map(|message| view! { <small class="success referral-copy-status">{message}</small> })}
-            </header>
             <Show when=move || !loading.get().referral fallback=move || view! { <Skeleton /> }>
             {move || dashboard.with(|state| state.as_ref().map(|data| data.referral.clone())).map(|referral| {
-                let entries_total = referral.draw_entries.iter().map(|draw| draw.total_entries).sum::<u32>();
                 let draw_count = referral.draw_entries.len();
-                let coupon_count = referral.coupons.len();
                 let referral_code = referral.referral_code.clone();
                 let share_url = (!referral_code.trim().is_empty()).then(|| {
                     format!("https://www.virya.music/r/{referral_code}")
@@ -332,7 +324,6 @@ fn FanSignal(
                     }).collect_view()}</div>
                 });
                 view! {
-                    <div class="stats-grid"><Metric value=referral.pending_referrals.to_string() label=tr("pending_2")/><Metric value=entries_total.to_string() label=tr("entries")/><Metric value=coupon_count.to_string() label=tr("coupons")/></div>
                     {share_url.map(|url| {
                         let share_url = url.clone();
                         view! {
@@ -340,6 +331,14 @@ fn FanSignal(
                                 <p class="eyebrow">{tr("carry_the_signal")}</p>
                                 <strong>{tr("invite_real_metalheads")}</strong>
                                 <p>{tr("invite_one_to_three_people_you_really_think_would_care")}</p>
+                                <button
+                                    class="referral-code-copy"
+                                    type="button"
+                                    on:click=copy_referral
+                                    disabled=move || dashboard.with(|state| state.as_ref().is_none_or(|data| data.referral.referral_code.trim().is_empty()))
+                                >
+                                    {move || dashboard.with(|state| state.as_ref().map(|d| i18n::format("code", std::slice::from_ref(&d.referral.referral_code))).value_or_else(|| tr("loading_signal").to_owned()))}
+                                </button>
                                 <button class="ghost" type="button" on:click=move |_| {
                                     let url = share_url.clone();
                                     share_status.set(None);

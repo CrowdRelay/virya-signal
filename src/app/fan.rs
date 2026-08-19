@@ -384,15 +384,7 @@ fn FanAccess(
     };
 
     let confirm = move |_| {
-        submit_fan_confirmation(
-            email,
-            name,
-            token,
-            pin,
-            busy,
-            confirmation_session,
-            error,
-        );
+        submit_fan_confirmation(email, name, token, pin, busy, confirmation_session, error);
     };
 
     let request_access = move |_| {
@@ -449,12 +441,7 @@ fn FanAccess(
             }
 
             match bridge::scan_and_confirm_fan().await {
-                Ok(Some(value)) => adopt_fan_session(
-                    value,
-                    token,
-                    pin,
-                    confirmation_session,
-                ),
+                Ok(Some(value)) => adopt_fan_session(value, token, pin, confirmation_session),
                 Ok(None) => {}
                 Err(message) => {
                     if let Ok(status) = bridge::invoke_timeout::<FanSessionStatus, _>(
@@ -465,12 +452,7 @@ fn FanAccess(
                     .await
                         && status.unlocked
                     {
-                        adopt_fan_session(
-                            status,
-                            token,
-                            pin,
-                            confirmation_session,
-                        );
+                        adopt_fan_session(status, token, pin, confirmation_session);
                     } else {
                         let _ = error.try_set(Some(message));
                     }
@@ -480,18 +462,11 @@ fn FanAccess(
         });
     };
 
-
     view! {
         <section class="fan-access">
             <header class="fan-access-hero">
                 <p class="eyebrow">{tr("virya_signal")}</p>
                 <h1>{tr("shows_tickets")}<br/><em>{tr("and_rewards")}</em></h1>
-                <p class="hero-subtitle">{tr("join_in_3_steps")}</p>
-                <ol class="signal-steps" aria-label=tr("how_to_join")>
-                    <li><span class="step-num">"1"</span>{tr("enter_your_email_and_city")}</li>
-                    <li><span class="step-num">"2"</span>{tr("confirm_the_code_from_the_message")}</li>
-                    <li><span class="step-num">"3"</span>{tr("discover_shows_near_you")}</li>
-                </ol>
                 <div class="signal-purpose-grid" aria-label=tr("what_virya_signal_gives_you")>
                     <span><b aria-hidden="true">"⌁"</b>{tr("shows_near_you")}</span>
                     <span><b aria-hidden="true">"▣"</b>{tr("tickets_and_qr_codes_on_your_phone")}</span>

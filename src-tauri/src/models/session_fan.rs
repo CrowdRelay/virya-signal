@@ -187,3 +187,6 @@ pub struct LauncherStatus {
 
 // Shared verbatim with the WASM UI; see virya-signal-contracts::fan.
 pub use virya_signal_contracts::fan::FanHomeData;
+pub use virya_signal_contracts::push::{
+    FanPushPreferences, FanPushPreferencesUpdate, FanPushStatus,
+};

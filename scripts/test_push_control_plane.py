@@ -28,8 +28,15 @@ fan_home = (ROOT / "src/app/fan_home.rs").read_text(encoding="utf-8")
 
 for needle in ("fan_push_status", "fan_push_enable", "fan_push_disable", "fan_push_open_settings", "fan_push_take_target", "sync_native_push_if_desired", "NATIVE_PUSH_INSTALLATION_FILE"):
     require(fan, needle, needle)
-for needle in ("virya_signal_contracts::push::*", "virya_signal_contracts::push"):
-    require(models, needle, needle)
+for needle in (
+    "virya_signal_contracts::push",
+    "FanPushPreferences",
+    "FanPushPreferencesUpdate",
+    "FanPushStatus",
+):
+    require(models, needle, f"shared-push-{needle}")
+if "virya_signal_contracts::push::*" in models:
+    raise SystemExit("SIGNAL_PUSH_CONTROL=FAIL wildcard-push-reexport")
 for needle in ("push.pending", "push.processing", "push.dead", "push.delivered_24h"):
     require(operator, needle, needle)
 require(contracts, "pub push: QueueSummary", "ops-push-summary")
