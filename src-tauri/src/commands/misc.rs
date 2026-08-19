@@ -71,7 +71,10 @@ pub(crate) async fn request_city(
             crate::i18n::tr("native_city_name_invalid").into(),
         ));
     }
-    state.api.request_city(crate::tenant::API_BASE, &input).await
+    state
+        .api
+        .request_city(crate::tenant::API_BASE, &input)
+        .await
 }
 
 #[tauri::command]
