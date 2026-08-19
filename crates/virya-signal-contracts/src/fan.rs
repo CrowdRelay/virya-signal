@@ -19,9 +19,7 @@ impl FanTarget {
             return None;
         }
         for byte in value.bytes() {
-            if !(byte.is_ascii_lowercase()
-                || byte.is_ascii_digit()
-                || matches!(byte, b'-' | b'_'))
+            if !(byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'_'))
             {
                 return None;
             }
@@ -31,9 +29,7 @@ impl FanTarget {
 
     pub fn parse(target: &str) -> Self {
         let target = target.trim();
-        let path_and_query = target
-            .find('#')
-            .map_or(target, |index| &target[..index]);
+        let path_and_query = target.find('#').map_or(target, |index| &target[..index]);
         let (path, query) = match path_and_query.find('?') {
             Some(index) => (&path_and_query[..index], &path_and_query[index + 1..]),
             None => (path_and_query, ""),
@@ -54,9 +50,7 @@ impl FanTarget {
             }
         }
 
-        let leaf = clean
-            .rfind('/')
-            .map_or(clean, |index| &clean[index + 1..]);
+        let leaf = clean.rfind('/').map_or(clean, |index| &clean[index + 1..]);
         match leaf {
             "area" => Self::Area,
             "merch" => Self::Merch,
