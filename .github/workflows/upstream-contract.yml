@@ -1,0 +1,50 @@
+name: Upstream contract
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "29 */6 * * *"
+  push:
+    branches: [main]
+    paths:
+      - "crates/virya-signal-contracts/**"
+      - "src-tauri/src/api/**"
+      - "src-tauri/src/models/**"
+      - "scripts/generate-crowdrelay-fan-contract.py"
+      - ".github/workflows/upstream-contract.yml"
+  pull_request:
+    paths:
+      - "crates/virya-signal-contracts/**"
+      - "src-tauri/src/api/**"
+      - "src-tauri/src/models/**"
+      - "scripts/generate-crowdrelay-fan-contract.py"
+      - ".github/workflows/upstream-contract.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: signal-upstream-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  crowdrelay:
+    name: CrowdRelay compatibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out Signal under canonical ecosystem layout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          path: virya-signal
+
+      - name: Check out current CrowdRelay main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          repository: wojciechbator/crowdrelay
+          ref: main
+          path: crowdrelay
+          persist-credentials: false
+
+      - name: Verify Signal against current upstream capabilities and schema
+        run: python3 crowdrelay/scripts/test-ecosystem-contract-v2.py
