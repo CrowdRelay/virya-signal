@@ -24,6 +24,7 @@ on:
 permissions:
   contents: read
   actions: read
+  id-token: write
 
 concurrency:
   group: android-google-play-${{ github.ref }}
@@ -36,20 +37,13 @@ jobs:
     outputs:
       should_publish: ${{ steps.gate.outputs.should_publish }}
     steps:
-      - name: Wait for the exact main Check run
+      - name: Wait for the exact source Check run
         id: gate
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-            echo "PLAY_GATE=PASS mode=manual sha=${GITHUB_SHA}"
-            exit 0
-          fi
-
           echo "Waiting for Check on exact source SHA ${GITHUB_SHA}"
           for attempt in $(seq 1 120); do
             row="$(gh run list \
@@ -80,13 +74,17 @@ jobs:
             case "${conclusion}" in
               success)
                 echo "should_publish=true" >> "$GITHUB_OUTPUT"
-                echo "PLAY_GATE=PASS check_run=${run_id} sha=${GITHUB_SHA}"
+                echo "PLAY_GATE=PASS check_run=${run_id} sha=${GITHUB_SHA} event=${GITHUB_EVENT_NAME}"
                 exit 0
                 ;;
               cancelled)
-                echo "should_publish=false" >> "$GITHUB_OUTPUT"
-                echo "PLAY_GATE=SKIP reason=superseded check_run=${run_id} sha=${GITHUB_SHA}"
-                exit 0
+                if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+                  echo "should_publish=false" >> "$GITHUB_OUTPUT"
+                  echo "PLAY_GATE=SKIP reason=superseded check_run=${run_id} sha=${GITHUB_SHA}"
+                  exit 0
+                fi
+                echo "PLAY_GATE=FAIL reason=cancelled-check check_run=${run_id} sha=${GITHUB_SHA}" >&2
+                exit 1
                 ;;
               *)
                 echo "PLAY_GATE=FAIL check_run=${run_id} conclusion=${conclusion} sha=${GITHUB_SHA}" >&2
@@ -107,6 +105,8 @@ jobs:
       play_track: ${{ steps.release.outputs.play_track }}
       reuse_run_id: ${{ steps.release.outputs.reuse_run_id }}
       android_version_code: ${{ steps.release.outputs.android_version_code }}
+      play_status: ${{ steps.release.outputs.play_status }}
+      user_fraction: ${{ steps.release.outputs.user_fraction }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Resolve release request
@@ -135,17 +135,23 @@ jobs:
             [[ "${reuse_run_id}" =~ ^[0-9]+$ ]]
           fi
 
-          # Google Play requires every uploaded AAB to carry a fresh versionCode.
-          # Keep versionName human-readable (e.g. 0.4.2) and reserve a high,
-          # monotonically increasing CI range for this workflow only.
           android_version_code=$((100000000 + GITHUB_RUN_NUMBER))
           (( android_version_code >= 1 && android_version_code <= 2100000000 ))
+          if [[ "${play_track}" == "production" ]]; then
+            play_status="inProgress"
+            user_fraction="0.10"
+          else
+            play_status="completed"
+            user_fraction=""
+          fi
 
           echo "version=${version}" >> "$GITHUB_OUTPUT"
           echo "play_track=${play_track}" >> "$GITHUB_OUTPUT"
           echo "reuse_run_id=${reuse_run_id}" >> "$GITHUB_OUTPUT"
           echo "android_version_code=${android_version_code}" >> "$GITHUB_OUTPUT"
-          echo "PLAY_RELEASE_REQUEST=PASS version=${version} versionCode=${android_version_code} track=${play_track} sha=${GITHUB_SHA}"
+          echo "play_status=${play_status}" >> "$GITHUB_OUTPUT"
+          echo "user_fraction=${user_fraction}" >> "$GITHUB_OUTPUT"
+          echo "PLAY_RELEASE_REQUEST=PASS version=${version} versionCode=${android_version_code} track=${play_track} status=${play_status} sha=${GITHUB_SHA}"
 
   build:
     needs: [gate, prepare]
@@ -172,57 +178,134 @@ jobs:
     environment:
       name: ${{ needs.prepare.outputs.play_track == 'production' && 'production' || 'store-testing' }}
     steps:
-      - name: Validate Google Play secret
-        env:
-          PLAY_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "${PLAY_JSON}" || { echo "Missing GOOGLE_PLAY_SERVICE_ACCOUNT_JSON" >&2; exit 1; }
-          jq -e '.type == "service_account" and (.client_email | type == "string") and (.private_key | type == "string")' <<<"${PLAY_JSON}" >/dev/null
-          echo "GOOGLE_PLAY_CREDENTIALS=PASS"
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
       - name: Refuse production promotion from a non-main ref
         if: needs.prepare.outputs.play_track == 'production'
         shell: bash
         run: |
           set -euo pipefail
           [[ "$GITHUB_REF" == "refs/heads/main" ]]
+
+      - name: Validate Google Play authentication policy
+        env:
+          PLAY_TRACK: ${{ needs.prepare.outputs.play_track }}
+          WIF_PROVIDER: ${{ vars.GOOGLE_PLAY_WIF_PROVIDER }}
+          WIF_SERVICE_ACCOUNT: ${{ vars.GOOGLE_PLAY_SERVICE_ACCOUNT }}
+          PLAY_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          wif=false
+          if [[ -n "${WIF_PROVIDER}" && -n "${WIF_SERVICE_ACCOUNT}" ]]; then
+            wif=true
+          elif [[ -n "${WIF_PROVIDER}" || -n "${WIF_SERVICE_ACCOUNT}" ]]; then
+            echo "GOOGLE_PLAY_AUTH=FAIL reason=partial-wif-configuration" >&2
+            exit 1
+          fi
+          if [[ "${PLAY_TRACK}" == "production" && "${wif}" != true ]]; then
+            echo "GOOGLE_PLAY_AUTH=FAIL reason=production-requires-wif" >&2
+            exit 1
+          fi
+          if [[ "${wif}" != true ]]; then
+            test -n "${PLAY_JSON}" || { echo "GOOGLE_PLAY_AUTH=FAIL reason=no-credentials" >&2; exit 1; }
+            jq -e '.type == "service_account" and (.client_email | type == "string") and (.private_key | type == "string")' <<<"${PLAY_JSON}" >/dev/null
+          fi
+          echo "GOOGLE_PLAY_AUTH=PASS mode=$([[ "${wif}" == true ]] && echo wif || echo json-fallback) track=${PLAY_TRACK}"
+
+      - name: Authenticate to Google Cloud with Workload Identity Federation
+        id: google-auth
+        if: vars.GOOGLE_PLAY_WIF_PROVIDER != '' && vars.GOOGLE_PLAY_SERVICE_ACCOUNT != ''
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GOOGLE_PLAY_WIF_PROVIDER }}
+          service_account: ${{ vars.GOOGLE_PLAY_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+
+      - name: Materialize legacy Play JSON for non-production fallback
+        id: play-json
+        if: vars.GOOGLE_PLAY_WIF_PROVIDER == '' && vars.GOOGLE_PLAY_SERVICE_ACCOUNT == ''
+        env:
+          PLAY_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          path="${RUNNER_TEMP}/google-play-service-account.json"
+          printf '%s' "${PLAY_JSON}" > "${path}"
+          chmod 600 "${path}"
+          jq -e '.type == "service_account"' "${path}" >/dev/null
+          echo "path=${path}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve Google Play credentials file
+        id: play-credentials
+        env:
+          WIF_PATH: ${{ steps.google-auth.outputs.credentials_file_path }}
+          JSON_PATH: ${{ steps.play-json.outputs.path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          path="${WIF_PATH:-${JSON_PATH:-}}"
+          test -n "${path}" && test -s "${path}"
+          echo "path=${path}" >> "$GITHUB_OUTPUT"
+
       - name: Download AAB built in this run
         if: needs.prepare.outputs.reuse_run_id == ''
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v7.0.1
         with:
           name: virya-signal-google-play-${{ needs.prepare.outputs.version }}
           path: promoted
+
       - name: Reuse exact AAB from an earlier run
         if: needs.prepare.outputs.reuse_run_id != ''
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v7.0.1
         with:
           name: virya-signal-google-play-${{ needs.prepare.outputs.version }}
           path: promoted
           run-id: ${{ needs.prepare.outputs.reuse_run_id }}
           github-token: ${{ github.token }}
-      - name: Verify exact build artifact
+
+      - name: Verify exact build artifact and release identity
+        env:
+          EXPECTED_VERSION: ${{ needs.prepare.outputs.version }}
+          EXPECTED_NEW_CODE: ${{ needs.prepare.outputs.android_version_code }}
+          REUSE_RUN_ID: ${{ needs.prepare.outputs.reuse_run_id }}
+        shell: bash
         run: |
           set -euo pipefail
           python3 promoted/scripts/artifact_manifest.py verify promoted/artifacts promoted/android-artifact-manifest.json --source-sha "$GITHUB_SHA"
           test -s promoted/release-provenance.json
-          test -f "promoted/artifacts/virya-signal-${{ needs.prepare.outputs.version }}.aab"
+          test -f "promoted/artifacts/virya-signal-${EXPECTED_VERSION}.aab"
           jq -e '.firebaseConfigured == true and .analyticsIncluded == false and .crashlyticsIncluded == false' promoted/artifacts/push-build-config.json >/dev/null
           jq -e '.push.firebaseConfigured == true and (.push.firebaseConfigSha256 | test("^[0-9a-f]{64}$"))' promoted/release-provenance.json >/dev/null
-          echo "PLAY_ARTIFACT=PASS sha=${GITHUB_SHA} version=${{ needs.prepare.outputs.version }} versionCode=${{ needs.prepare.outputs.android_version_code }}"
+          promoted_version="$(jq -er '.appVersion | select(type == "string")' promoted/release-provenance.json)"
+          promoted_code="$(jq -er '.androidVersionCode | select(type == "number")' promoted/release-provenance.json)"
+          [[ "${promoted_version}" == "${EXPECTED_VERSION}" ]]
+          if [[ -z "${REUSE_RUN_ID}" ]]; then
+            [[ "${promoted_code}" == "${EXPECTED_NEW_CODE}" ]]
+          fi
+          echo "PROMOTED_ANDROID_VERSION_CODE=${promoted_code}" >> "$GITHUB_ENV"
+          echo "PLAY_ARTIFACT=PASS sha=${GITHUB_SHA} version=${promoted_version} versionCode=${promoted_code} reused=$([[ -n "${REUSE_RUN_ID}" ]] && echo true || echo false)"
+
+      - name: Require live Android App Links before production rollout
+        if: needs.prepare.outputs.play_track == 'production'
+        run: python3 scripts/check-live-app-links.py
+
       - name: Upload exact AAB to Google Play
         uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
         with:
-          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          serviceAccountJson: ${{ steps.play-credentials.outputs.path }}
           packageName: music.virya.signal
           releaseFiles: promoted/artifacts/virya-signal-${{ needs.prepare.outputs.version }}.aab
-          track: ${{ needs.prepare.outputs.play_track }}
-          status: completed
+          tracks: ${{ needs.prepare.outputs.play_track }}
+          status: ${{ needs.prepare.outputs.play_status }}
+          userFraction: ${{ needs.prepare.outputs.user_fraction }}
           releaseName: Virya Signal ${{ needs.prepare.outputs.version }} · CI ${{ github.run_number }}
+
       - name: Publish receipt
         shell: bash
         run: |
-          echo "GOOGLE_PLAY_UPLOAD=PASS package=music.virya.signal track=${{ needs.prepare.outputs.play_track }} version=${{ needs.prepare.outputs.version }} versionCode=${{ needs.prepare.outputs.android_version_code }} sha=${GITHUB_SHA}"
+          echo "GOOGLE_PLAY_UPLOAD=PASS package=music.virya.signal track=${{ needs.prepare.outputs.play_track }} status=${{ needs.prepare.outputs.play_status }} version=${{ needs.prepare.outputs.version }} versionCode=${PROMOTED_ANDROID_VERSION_CODE} sha=${GITHUB_SHA}"
+
       - name: Report production Virya Signal release to CrowdRelay ledger
         if: needs.prepare.outputs.play_track == 'production'
         continue-on-error: true
@@ -230,6 +313,7 @@ jobs:
           CROWDRELAY_BASE_URL: ${{ vars.CROWDRELAY_PRODUCTION_BASE_URL }}
           CROWDRELAY_COMMERCE_API_KEY: ${{ secrets.CROWDRELAY_COMMERCE_API_KEY }}
           COMPONENT_VERSION: ${{ needs.prepare.outputs.version }}
+          PLAY_STATUS: ${{ needs.prepare.outputs.play_status }}
         shell: bash
         run: |
           set -euo pipefail
@@ -241,9 +325,17 @@ jobs:
           manifest_sha="$(jq -r '.artifactManifestSha256' promoted/release-provenance.json)"
           [[ "${lock_sha}" =~ ^[0-9a-f]{64}$ ]]
           [[ "${manifest_sha}" =~ ^[0-9a-f]{64}$ ]]
-          jq -n --arg sha "${GITHUB_SHA}" --arg ref "${GITHUB_RUN_ID}" --arg version "${COMPONENT_VERSION}" --arg lock "${lock_sha}" --arg artifact_manifest "${manifest_sha}" '{component_key:"virya-signal",environment:"production",source_sha:$sha,artifact_digest:("sha256:"+$artifact_manifest),deploy_ref:$ref,version:$version,manifest_sha:null,metadata:{reporter:"github-actions",channel:"google-play-production",dependency_lock_sha256:$lock,artifact_manifest_sha256:$artifact_manifest,push_firebase_configured:true},observed_at:(now|todateiso8601)}' | \
+          jq -n \
+            --arg sha "${GITHUB_SHA}" \
+            --arg ref "${GITHUB_RUN_ID}" \
+            --arg version "${COMPONENT_VERSION}" \
+            --arg lock "${lock_sha}" \
+            --arg artifact_manifest "${manifest_sha}" \
+            --arg rollout "${PLAY_STATUS}" \
+            --arg version_code "${PROMOTED_ANDROID_VERSION_CODE}" \
+            '{component_key:"virya-signal",environment:"production",source_sha:$sha,artifact_digest:("sha256:"+$artifact_manifest),deploy_ref:$ref,version:$version,manifest_sha:null,metadata:{reporter:"github-actions",channel:"google-play-production",rollout_status:$rollout,android_version_code:$version_code,dependency_lock_sha256:$lock,artifact_manifest_sha256:$artifact_manifest,push_firebase_configured:true},observed_at:(now|todateiso8601)}' | \
             curl --fail-with-body --silent --show-error --max-time 15 \
               -H 'content-type: application/json' \
               -H "Authorization: Bearer ${CROWDRELAY_COMMERCE_API_KEY}" \
               --data-binary @- "${CROWDRELAY_BASE_URL%/}/v1/internal/autopilot/release-components"
-          echo "VIRYA_SIGNAL_RELEASE_LEDGER=PASS sha=${GITHUB_SHA} version=${COMPONENT_VERSION} channel=google-play-production"
+          echo "VIRYA_SIGNAL_RELEASE_LEDGER=PASS sha=${GITHUB_SHA} version=${COMPONENT_VERSION} versionCode=${PROMOTED_ANDROID_VERSION_CODE} channel=google-play-production status=${PLAY_STATUS}"
