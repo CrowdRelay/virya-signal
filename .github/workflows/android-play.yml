@@ -108,7 +108,7 @@ jobs:
       play_status: ${{ steps.release.outputs.play_status }}
       user_fraction: ${{ steps.release.outputs.user_fraction }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Resolve release request
         id: release
         env:
@@ -178,7 +178,7 @@ jobs:
     environment:
       name: ${{ needs.prepare.outputs.play_track == 'production' && 'production' || 'store-testing' }}
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Refuse production promotion from a non-main ref
         if: needs.prepare.outputs.play_track == 'production'
@@ -250,14 +250,14 @@ jobs:
 
       - name: Download AAB built in this run
         if: needs.prepare.outputs.reuse_run_id == ''
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v7.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v7.0.1
         with:
           name: virya-signal-google-play-${{ needs.prepare.outputs.version }}
           path: promoted
 
       - name: Reuse exact AAB from an earlier run
         if: needs.prepare.outputs.reuse_run_id != ''
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v7.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v7.0.1
         with:
           name: virya-signal-google-play-${{ needs.prepare.outputs.version }}
           path: promoted
