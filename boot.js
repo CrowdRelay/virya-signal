@@ -3,6 +3,15 @@
 
   const READY_ATTRIBUTE = "data-virya-ready";
   const LANGUAGE_STORAGE_KEY = "virya:language:v1";
+  const activateDeferredStyles = () => {
+    const links = document.querySelectorAll?.("link[data-virya-deferred-style]") || [];
+    for (const link of links) {
+      const activate = () => { link.media = "all"; };
+      if (link.sheet) activate();
+      else link.addEventListener("load", activate, { once: true });
+    }
+  };
+  activateDeferredStyles();
   let language = "pl";
   try {
     language = window.localStorage?.getItem(LANGUAGE_STORAGE_KEY) === "en" ? "en" : "pl";

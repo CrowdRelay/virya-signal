@@ -307,17 +307,19 @@ if 'data-trunk rel="copy-dir" href="public"' in index:
     raise SystemExit('index.html references the optional public directory')
 if 'class="boot-signal"' not in index or '@keyframes boot-pulse' not in index:
     raise SystemExit('Virya Signal splash LED is missing or not animated')
-if '<script src="boot.js" defer>' in index:
-    raise SystemExit('boot listener must execute before the deferred WASM module')
-boot_i18n_tag = '<script src="boot-i18n.js?v=0.4.2-boot-i18n-v2"></script>'
-runtime_i18n_tag = '<script src="runtime-i18n.js?v=0.4.2-runtime-i18n-v1"></script>'
-boot_tag = '<script src="boot.js?v=0.4.2-startup-v8"></script>'
+boot_i18n_tag = '<script defer src="boot-i18n.js?v=0.4.2-boot-i18n-v3"></script>'
+runtime_i18n_tag = '<script defer src="runtime-i18n.js?v=0.4.2-runtime-i18n-v2"></script>'
+boot_tag = '<script defer src="boot.js?v=0.4.2-startup-v9"></script>'
 if boot_i18n_tag not in index or index.find(boot_i18n_tag) > index.find(boot_tag):
     raise SystemExit('boot translations must load before the boot listener')
 if boot_tag not in index or index.find(boot_tag) > index.find('data-trunk rel="rust"'):
     raise SystemExit('boot listener must be declared before the WASM entrypoint')
-if runtime_i18n_tag not in index or index.find(runtime_i18n_tag) < index.find('data-trunk rel="rust"'):
-    raise SystemExit('full runtime translations must be declared after the WASM entrypoint for early module discovery')
+if runtime_i18n_tag not in index or index.find(runtime_i18n_tag) > index.find('data-trunk rel="rust"'):
+    raise SystemExit('deferred runtime translations must execute before the WASM entrypoint')
+if index.count('data-virya-deferred-style') != 2 or 'activateDeferredStyles' not in boot:
+    raise SystemExit('app styles must load without blocking the inline splash')
+if 'rel="icon" type="image/svg+xml" href="/signal-v2.svg"' not in index:
+    raise SystemExit('canonical Signal favicon is missing')
 for contract in ['window.__VIRYA_BOOT__', 'data-virya-ready', '.app-shell .launcher', 'unhandledrejection', 'retry-blocked']:
     if contract not in boot:
         raise SystemExit(f'boot recovery contract is missing: {contract}')
