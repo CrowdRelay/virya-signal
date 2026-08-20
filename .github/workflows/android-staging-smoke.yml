@@ -1,0 +1,147 @@
+name: Android staging smoke
+
+on:
+  schedule:
+    - cron: "37 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: signal-android-staging-smoke
+  cancel-in-progress: true
+
+jobs:
+  build-staging:
+    if: vars.VIRYA_SIGNAL_STAGING_API_BASE != ''
+    uses: ./.github/workflows/_android-build.yml
+    with:
+      build_kind: debug-apk
+      version: 0.4.2-staging
+      artifact_name: virya-signal-android-staging-smoke
+      retention_days: 7
+      signed: false
+      target_arch: x86_64
+      e2e_api_base: ${{ vars.VIRYA_SIGNAL_STAGING_API_BASE }}
+    secrets: inherit
+
+  smoke:
+    needs: build-staging
+    if: needs.build-staging.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      ANDROID_API: "35"
+      AVD_NAME: virya-signal-staging
+      STAGING_API_BASE: ${{ vars.VIRYA_SIGNAL_STAGING_API_BASE }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v7.0.1
+        with:
+          name: virya-signal-android-staging-smoke
+          path: artifacts/build
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v7.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+
+      - name: Verify staging API contract before booting emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${STAGING_API_BASE}" == https://* ]]
+          meta_url="${STAGING_API_BASE%/}/meta"
+          curl --proto '=https' --tlsv1.2 --fail --silent --show-error --location \
+            --connect-timeout 4 --max-time 10 --retry 2 --retry-all-errors "${meta_url}" \
+            | jq -e '.apiVersion == "1" and .capabilities.signal_fan_context_v1 and .capabilities.signal_wallet_v1' >/dev/null
+          echo "SIGNAL_STAGING_API=PASS"
+
+      - name: Install emulator image
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "emulator" "platforms;android-${ANDROID_API}" "system-images;android-${ANDROID_API};google_apis;x86_64"
+          echo no | avdmanager create avd --force --name "${AVD_NAME}" \
+            --package "system-images;android-${ANDROID_API};google_apis;x86_64" --device "pixel_6"
+
+      - name: Enable KVM
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -w /dev/kvm
+
+      - name: Boot clean emulator
+        timeout-minutes: 12
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/android-staging
+          nohup emulator -avd "${AVD_NAME}" -no-window -no-audio -no-boot-anim -no-snapshot -accel on -gpu swiftshader \
+            > artifacts/android-staging/emulator.log 2>&1 &
+          emulator_pid=$!
+          attached=0
+          for _ in $(seq 1 60); do
+            kill -0 "${emulator_pid}" 2>/dev/null || { tail -n 200 artifacts/android-staging/emulator.log; exit 1; }
+            if timeout 5 adb wait-for-device >/dev/null 2>&1; then attached=1; break; fi
+          done
+          [[ "${attached}" == 1 ]]
+          booted=0
+          for _ in $(seq 1 120); do
+            kill -0 "${emulator_pid}" 2>/dev/null || exit 1
+            if [[ "$(timeout 10 adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == 1 ]]; then booted=1; break; fi
+            sleep 2
+          done
+          [[ "${booted}" == 1 ]]
+          adb shell settings put global window_animation_scale 0
+          adb shell settings put global transition_animation_scale 0
+          adb shell settings put global animator_duration_scale 0
+          adb logcat -c
+          echo "SIGNAL_STAGING_EMULATOR=PASS"
+
+      - name: Install and launch staging-connected APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="$(find artifacts/build -type f -name '*.apk' -print -quit)"
+          test -n "${apk}"
+          adb install -r -t "${apk}"
+          adb shell monkey -p music.virya.signal -c android.intent.category.LAUNCHER 1 >/dev/null
+          sleep 15
+          pid="$(adb shell pidof music.virya.signal | tr -d '\r')"
+          test -n "${pid}"
+          adb shell uiautomator dump /sdcard/window.xml >/dev/null 2>&1 || true
+          adb pull /sdcard/window.xml artifacts/android-staging/window.xml >/dev/null 2>&1 || true
+          adb exec-out screencap -p > artifacts/android-staging/screenshot.png || true
+          echo "SIGNAL_STAGING_APP=PASS pid=${pid}"
+
+      - name: Crash / ANR gate
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/android-staging
+          if ! timeout 15 adb get-state >/dev/null 2>&1; then
+            echo "SIGNAL_STAGING_CRASH_GATE=SKIP reason=no-device"
+            exit 0
+          fi
+          timeout 20 adb logcat -d > artifacts/android-staging/logcat.txt
+          if grep -E 'FATAL EXCEPTION|ANR in music\.virya\.signal|Render process gone' artifacts/android-staging/logcat.txt; then
+            echo "SIGNAL_STAGING_CRASH_GATE=FAIL" >&2
+            exit 1
+          fi
+          echo "SIGNAL_STAGING_CRASH_GATE=PASS"
+
+      - name: Upload staging smoke evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: virya-signal-android-staging-${{ github.run_id }}
+          path: artifacts/android-staging
+          if-no-files-found: warn
+          retention-days: 14
