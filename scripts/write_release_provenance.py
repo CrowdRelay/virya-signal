@@ -5,6 +5,16 @@ import argparse, hashlib, json, re
 from pathlib import Path
 
 GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
+OPENAPI_SHA = re.compile(r"^[0-9a-f]{64}$")
+ROOT = Path(__file__).resolve().parents[1]
+CONTRACT_SOURCE = ROOT / "crates/virya-signal-contracts/src/fan_wire.generated.rs"
+CONTRACT_RE = re.compile(r"@crowdrelay-openapi-sha256\s+([0-9a-f]{64})")
+REQUIRED_CAPABILITIES = [
+    "signal_fan_context_v1",
+    "synesthesia_rewards_v1",
+    "synesthesia_leaderboard_v1",
+    "ticketing_v1",
+]
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -12,6 +22,18 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+def crowdrelay_contract() -> dict[str, object]:
+    if not CONTRACT_SOURCE.is_file():
+        raise SystemExit(f"CrowdRelay generated contract source missing: {CONTRACT_SOURCE}")
+    match = CONTRACT_RE.search(CONTRACT_SOURCE.read_text())
+    if match is None or OPENAPI_SHA.fullmatch(match.group(1)) is None:
+        raise SystemExit("CrowdRelay OpenAPI fingerprint missing from generated Signal contract")
+    return {
+        "apiMajor": "1",
+        "openapiSha256": match.group(1),
+        "requiredCapabilities": REQUIRED_CAPABILITIES,
+    }
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -28,10 +50,11 @@ def main() -> int:
         if not path.is_file():
             raise SystemExit(f"required provenance input missing: {path}")
     receipt = {
-        "schema": 1,
+        "schema": 2,
         "sourceSha": args.source_sha,
         "dependencyLockSha256": sha256(args.lockfile),
         "artifactManifestSha256": sha256(args.artifact_manifest),
+        "crowdrelayContract": crowdrelay_contract(),
     }
     if args.tauri_config is not None:
         if not args.tauri_config.is_file():
@@ -57,6 +80,7 @@ def main() -> int:
     print(
         "RELEASE_PROVENANCE=PASS "
         f"source={receipt['sourceSha']} manifest={receipt['artifactManifestSha256']} "
+        f"crowdrelay={receipt['crowdrelayContract']['openapiSha256']} "
         f"version={receipt.get('appVersion', 'n/a')} code={receipt.get('androidVersionCode', 'n/a')} "
         f"firebase={receipt.get('push', {}).get('firebaseConfigured', 'n/a')}"
     )
