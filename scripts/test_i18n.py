@@ -100,9 +100,10 @@ class I18nContracts(unittest.TestCase):
     def test_runtime_catalog_does_not_delay_wasm_discovery(self):
         index = (ROOT / "index.html").read_text()
         rust_entry = index.index('data-trunk rel="rust"')
-        runtime_catalog = index.index('<script src="runtime-i18n.js')
-        self.assertLess(rust_entry, runtime_catalog)
-        self.assertLess(index.index('<script src="boot-i18n.js'), rust_entry)
+        runtime_catalog = index.index('<script defer src="runtime-i18n.js')
+        self.assertLess(runtime_catalog, rust_entry)
+        self.assertLess(index.index('<script defer src="boot-i18n.js'), rust_entry)
+        self.assertIn('<script defer src="runtime-i18n.js', index)
 
     def test_i18n_payloads_keep_boot_small_and_runtime_bounded(self):
         self.assertLessEqual((ROOT / "boot-i18n.js").stat().st_size, 4 * 1024)

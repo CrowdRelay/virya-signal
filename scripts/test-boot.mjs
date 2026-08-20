@@ -17,6 +17,10 @@ function runtime({ ready = false, mounted = false, retryCount = 0, language = "p
   const storage = new Map(retryCount ? [["virya-signal-boot-retry-v1", String(retryCount)]] : []);
   const localStorage = new Map([["virya:language:v1", language]]);
   const attributes = new Map(ready ? [["data-virya-ready", "true"]] : []);
+  const deferredStyles = [
+    { media: "print", sheet: {}, addEventListener() {} },
+    { media: "print", sheet: {}, addEventListener() {} },
+  ];
   const splash = {
     hidden: false,
     removed: false,
@@ -59,6 +63,9 @@ function runtime({ ready = false, mounted = false, retryCount = 0, language = "p
     },
     querySelector(selector) {
       return selector === ".app-shell .launcher" && mounted ? {} : null;
+    },
+    querySelectorAll(selector) {
+      return selector === "link[data-virya-deferred-style]" ? deferredStyles : [];
     },
   };
   const window = {
@@ -126,6 +133,7 @@ function runtime({ ready = false, mounted = false, retryCount = 0, language = "p
     status,
     detail,
     retry,
+    deferredStyles,
     reloads: () => reloads,
     dispatch(type, payload = {}) {
       for (const listener of windowListeners.get(type) ?? []) listener(payload);
@@ -166,6 +174,7 @@ function runtime({ ready = false, mounted = false, retryCount = 0, language = "p
 
 {
   const app = runtime();
+  assert.deepEqual(app.deferredStyles.map(link => link.media), ["all", "all"]);
   app.dispatch("virya:ready");
   assert.equal(app.splash.hidden, true);
 }
@@ -235,6 +244,8 @@ function runtime({ ready = false, mounted = false, retryCount = 0, language = "p
 
 assert.ok(!indexSource.includes("data-initializer="), "Android/WebView boot must use Trunk's native module loader");
 assert.ok(!indexSource.includes("boot-initializer.mjs"), "legacy custom initializer must not ship in the boot path");
+assert.ok(indexSource.includes('<script defer src="boot.js'), "boot scripts must not block first paint");
+assert.ok(indexSource.includes('data-virya-deferred-style'), "app CSS must load behind the inline splash");
 assert.ok(source.includes('window.addEventListener("error"'), "classic/module load failures must reach boot recovery UI");
 assert.ok(source.includes('window.addEventListener("unhandledrejection"'), "WASM module promise failures must reach boot recovery UI");
 

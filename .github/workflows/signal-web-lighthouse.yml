@@ -27,8 +27,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v7.0.1
-
       - name: Resolve successful Check artifact
         id: source
         env:
@@ -52,6 +50,11 @@ jobs:
           echo "run_id=${run_id}" >> "$GITHUB_OUTPUT"
           echo "source_sha=${source_sha}" >> "$GITHUB_OUTPUT"
           echo "Auditing Check run ${run_id} at ${source_sha}"
+
+      - name: Check out exact audited source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v7.0.1
+        with:
+          ref: ${{ steps.source.outputs.source_sha }}
 
       - name: Download exact release Web bundle
         env:
@@ -87,7 +90,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 -m http.server 4173 --bind 127.0.0.1 --directory audited-dist >/tmp/virya-signal-http.log 2>&1 &
+          python3 scripts/lighthouse_server.py --port 4173 --bind 127.0.0.1 --directory audited-dist >/tmp/virya-signal-http.log 2>&1 &
           echo $! > /tmp/virya-signal-http.pid
           for attempt in {1..30}; do
             if curl -fsS http://127.0.0.1:4173/ >/dev/null; then
