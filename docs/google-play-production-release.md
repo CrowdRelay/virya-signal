@@ -10,9 +10,10 @@ Complete these once before the first production rollout:
 2. Grant that service account access to `music.virya.signal` with permission to release to testing and production tracks, but no broader account permissions than required.
 3. Configure GitHub repository/environment variables `GOOGLE_PLAY_WIF_PROVIDER` and `GOOGLE_PLAY_SERVICE_ACCOUNT`. Production workflows intentionally fail closed without WIF.
 4. In Play Console, finish every required App content declaration: privacy policy, Data safety, Ads, Content rating, Target audience/content, App access, and any other dashboard item Play marks as required for this account/app.
-5. Complete the Main store listing: app name, short/long description, app icon, feature graphic, phone screenshots, category/contact details, and privacy-policy URL.
-6. Ensure Play App Signing is enabled and copy the Play app-signing SHA-256 certificate fingerprint into the Virya website App Links configuration. `https://virya.music/.well-known/assetlinks.json` must then validate before production publishing can run.
-7. If Play Console requires production-access approval/testing history for this developer account, complete that account-level flow. The repository cannot bypass Play policy/account eligibility.
+5. Use `https://virya.music/legal/privacy/` as the canonical privacy-policy URL and `https://virya.music/legal/data-deletion/` as the account/data-deletion reference where Play requests one.
+6. Complete the Main store listing: app name, short/long description, app icon, feature graphic, phone screenshots, category/contact details, and the privacy-policy URL above.
+7. Ensure Play App Signing is enabled and copy the Play app-signing SHA-256 certificate fingerprint into the Virya website App Links configuration. `https://virya.music/.well-known/assetlinks.json` must then validate before production publishing can run.
+8. If Play Console requires production-access approval/testing history for this developer account, complete that account-level flow. The repository cannot bypass Play policy/account eligibility.
 
 ## First production release
 
