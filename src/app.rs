@@ -427,11 +427,13 @@ pub fn App() -> impl IntoView {
             {
                 Ok(outcome) if outcome == "linked" => {
                     let _ = synesthesia_pending_link.try_set(false);
+                    status_refresh.update(|value| *value = value.wrapping_add(1));
                     let _ =
                         error.try_set(Some(tr("synesthesia_result_saved_in_signal").to_owned()));
                 }
                 Ok(outcome) if outcome == "expired" => {
                     let _ = synesthesia_pending_link.try_set(false);
+                    status_refresh.update(|value| *value = value.wrapping_add(1));
                     let _ = error.try_set(Some(tr("synesthesia_handoff_expired_retry").to_owned()));
                 }
                 Ok(_) => {

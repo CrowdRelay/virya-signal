@@ -207,10 +207,10 @@ def fan_recovery_qr(d: Device) -> None:
 
 def synesthesia_app_link_round_trip(d: Device) -> None:
     handoff = "a" * 64
-    url = f"https://virya.music/pl/my-signal/?source=synesthesia#handoff={handoff}"
-    # Package-scoped VIEW resolution still goes through Android intent-filter
-    # matching. If /my-signal disappeared from the merged manifest, am start
-    # fails before the app can receive the capability.
+    url = f"virya-signal://my-signal?source=synesthesia#handoff={handoff}"
+    # The custom scheme is the installed-app primary path and does not depend
+    # on Android domain verification. Package-scoped VIEW still exercises the
+    # merged intent filter before Signal can receive the capability.
     shell(
         "am", "start", "-W",
         "-a", "android.intent.action.VIEW",

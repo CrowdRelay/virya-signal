@@ -143,6 +143,8 @@ dependencies {
             self.assertIn('android:pathPrefix="/pl/latarnik"', manifest_text)
             self.assertIn('android:pathPrefix="/my-signal"', manifest_text)
             self.assertIn('android:pathPrefix="/pl/my-signal"', manifest_text)
+            self.assertIn('android:scheme="virya-signal"', manifest_text)
+            self.assertIn('android:host="my-signal"', manifest_text)
             push_receipt = json.loads((android / "push-build-config.json").read_text())
             self.assertFalse(push_receipt["firebaseConfigured"])
             self.assertEqual(push_receipt["firebaseMessagingVersion"], "25.1.1")
@@ -199,6 +201,8 @@ dependencies {
             manifest_text = manifest.read_text()
             for path in ("/latarnik", "/pl/latarnik", "/my-signal", "/pl/my-signal"):
                 self.assertEqual(manifest_text.count(f'android:pathPrefix="{path}"'), 1)
+            self.assertEqual(manifest_text.count('android:scheme="virya-signal"'), 1)
+            self.assertEqual(manifest_text.count('android:host="my-signal"'), 1)
 
             second = subprocess.run(
                 ["python3", str(scripts / SCRIPT.name)],
@@ -211,6 +215,8 @@ dependencies {
             manifest_text = manifest.read_text()
             for path in ("/latarnik", "/pl/latarnik", "/my-signal", "/pl/my-signal"):
                 self.assertEqual(manifest_text.count(f'android:pathPrefix="{path}"'), 1)
+            self.assertEqual(manifest_text.count('android:scheme="virya-signal"'), 1)
+            self.assertEqual(manifest_text.count('android:host="my-signal"'), 1)
 
     def test_configures_firebase_only_with_valid_secret(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

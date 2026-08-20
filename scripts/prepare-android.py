@@ -622,16 +622,16 @@ def _stage_android_push() -> bool:
             activity, "intent-filter", {f"{{{ANDROID_NS}}}autoVerify": "true"}
         )
 
-    def ensure_intent_child(tag: str, name: str) -> None:
+    def ensure_intent_child(intent_filter: ET.Element, tag: str, name: str) -> None:
         if not any(
             node.attrib.get(permission_name) == name
-            for node in app_link_filter.findall(tag)
+            for node in intent_filter.findall(tag)
         ):
-            ET.SubElement(app_link_filter, tag, {permission_name: name})
+            ET.SubElement(intent_filter, tag, {permission_name: name})
 
-    ensure_intent_child("action", "android.intent.action.VIEW")
-    ensure_intent_child("category", "android.intent.category.DEFAULT")
-    ensure_intent_child("category", "android.intent.category.BROWSABLE")
+    ensure_intent_child(app_link_filter, "action", "android.intent.action.VIEW")
+    ensure_intent_child(app_link_filter, "category", "android.intent.category.DEFAULT")
+    ensure_intent_child(app_link_filter, "category", "android.intent.category.BROWSABLE")
 
     # Verify only the canonical apex host. Android requires every declared host
     # to serve its own assetlinks.json without redirects. Reconcile each path on
@@ -648,6 +648,37 @@ def _stage_android_push() -> bool:
             for data in app_link_filter.findall("data")
         ):
             ET.SubElement(app_link_filter, "data", expected)
+
+    # Synesthesia completion uses an explicit app-owned scheme first. Unlike
+    # verified HTTPS App Links this does not depend on Android domain
+    # verification, so an installed Signal app is always the primary handoff
+    # target. HTTPS remains the browser/older-build fallback in Synesthesia.
+    native_scheme = "virya-signal"
+    native_host = "my-signal"
+    native_filter = next(
+        (node for node in activity.findall("intent-filter")
+         if any(
+             data.attrib.get(f"{{{ANDROID_NS}}}scheme") == native_scheme
+             and data.attrib.get(f"{{{ANDROID_NS}}}host") == native_host
+             for data in node.findall("data")
+         )),
+        None,
+    )
+    if native_filter is None:
+        native_filter = ET.SubElement(activity, "intent-filter")
+    ensure_intent_child(native_filter, "action", "android.intent.action.VIEW")
+    ensure_intent_child(native_filter, "category", "android.intent.category.DEFAULT")
+    ensure_intent_child(native_filter, "category", "android.intent.category.BROWSABLE")
+    native_expected = {
+        f"{{{ANDROID_NS}}}scheme": native_scheme,
+        f"{{{ANDROID_NS}}}host": native_host,
+    }
+    if not any(
+        all(data.attrib.get(key) == value for key, value in native_expected.items())
+        for data in native_filter.findall("data")
+    ):
+        ET.SubElement(native_filter, "data", native_expected)
+
     tree.write(manifest, encoding="utf-8", xml_declaration=True)
 
     gradle_text = gradle.read_text(encoding="utf-8")

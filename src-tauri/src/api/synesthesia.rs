@@ -33,6 +33,9 @@ impl super::CrowdRelayClient {
         let response: SynesthesiaLinkResponse = self
             .fan_json(profile, Method::POST, "me/synesthesia/link", Some(&body))
             .await?;
+        if response.linked {
+            self.invalidate_fan_home(profile).await;
+        }
         Ok(response.linked)
     }
     pub async fn fan_unpublish_synesthesia_leaderboard(
