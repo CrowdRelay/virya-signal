@@ -36,6 +36,7 @@ fn fan_tab_for_push_target(target: &str) -> FanTab {
 fn FanApp(
     mode: RwSignal<RootMode>,
     status: RwSignal<FanSessionStatus>,
+    status_refresh: RwSignal<u32>,
     public: RwSignal<Option<PublicHomeData>>,
     push_target: RwSignal<Option<String>>,
     error: RwSignal<Option<String>>,
@@ -59,6 +60,16 @@ fn FanApp(
 
     Effect::new(move |_| {
         persist_fan_tab(tab.get());
+    });
+
+    Effect::new(move |_| {
+        let generation = status_refresh.get();
+        if generation == 0 || !status.get_untracked().unlocked {
+            return;
+        }
+        bridge::invalidate_latest("fan:home");
+        loaded.update(|state| state.home = true);
+        refresh_fan_home(home, loading, error);
     });
 
     Effect::new(move |_| {

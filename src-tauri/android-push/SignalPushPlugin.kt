@@ -147,13 +147,26 @@ class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
             pendingSynesthesiaAppLinkRejected || (currentIsSynesthesia && currentLink == null)
         pendingSynesthesiaAppLink = null
         pendingSynesthesiaAppLinkRejected = false
-        if (currentIsSynesthesia && (currentLink == null || currentLink == link)) {
+        // Retain accepted data on Activity.intent until Rust acknowledges a
+        // terminal claim outcome. Android can then recreate the process and
+        // re-offer the short-lived capability after an auth transition.
+        if (currentIsSynesthesia && currentLink == null) {
             activity.intent.data = null
         }
         val result = JSObject()
         result.put("appLink", link.orEmpty())
         result.put("rejected", rejected)
         invoke.resolve(result)
+    }
+
+    @Command
+    fun clearSynesthesiaAppLink(invoke: Invoke) {
+        pendingSynesthesiaAppLink = null
+        pendingSynesthesiaAppLinkRejected = false
+        if (isSynesthesiaIntent(activity.intent)) {
+            activity.intent.data = null
+        }
+        invoke.resolve()
     }
 
     @Command
@@ -212,11 +225,17 @@ class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
     private fun isSynesthesiaIntent(intent: Intent?): Boolean {
         if (intent?.action != Intent.ACTION_VIEW) return false
         val uri: Uri = intent.data ?: return false
-        if (uri.scheme != "https") return false
-        if (uri.host != "virya.music" && uri.host != "www.virya.music") return false
-        if (uri.port != -1) return false
+        if (uri.port != -1 || uri.userInfo != null) return false
         val path = uri.path?.trimEnd('/').orEmpty()
-        return path == "/my-signal" || path == "/pl/my-signal"
+        val verifiedWeb =
+            uri.scheme == "https" &&
+                (uri.host == "virya.music" || uri.host == "www.virya.music") &&
+                (path == "/my-signal" || path == "/pl/my-signal")
+        val native =
+            uri.scheme == "virya-signal" &&
+                uri.host == "my-signal" &&
+                path.isEmpty()
+        return verifiedWeb || native
     }
 
     private fun isHexChar(character: Char): Boolean =

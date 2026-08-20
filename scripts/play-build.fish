@@ -40,10 +40,13 @@ if test -z "$JAVA21"; or not test -x "$JAVA21/bin/java"
 end
 
 set -gx JAVA_HOME "$JAVA21"
+# Trunk parses NO_COLOR as a boolean; some automation shells export `1`.
+# Normalize it so the canonical Play path is deterministic across callers.
+set -gx NO_COLOR true
 
 set -l JAVA_MAJOR ("$JAVA_HOME/bin/java" -version 2>&1 | string match -r 'version "[0-9]+' | string replace 'version "' '')
 
-if test "$JAVA_MAJOR" != "21"
+if test "$JAVA_MAJOR" != 21
     echo "ERROR: Signal requires JDK 21, found $JAVA_MAJOR" >&2
     "$JAVA_HOME/bin/java" -version >&2
     exit 1

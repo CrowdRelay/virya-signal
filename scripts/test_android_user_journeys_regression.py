@@ -204,10 +204,20 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertIn('synesthesia_app_link_round_trip(d)', journey)
         block = journey.split('def synesthesia_app_link_round_trip', 1)[1].split('def fan_event_details', 1)[0]
         self.assertIn('android.intent.action.VIEW', block)
-        self.assertIn('/pl/my-signal/', block)
+        self.assertIn('virya-signal://my-signal', block)
         self.assertIn('Synesthesia result saved in Signal.', block)
         self.assertIn('/v1/me/synesthesia/link', mock)
         self.assertIn('{"linked": True}', mock)
+
+        plugin = (ROOT / "src-tauri/android-push/SignalPushPlugin.kt").read_text()
+        native = (ROOT / "src-tauri/src/commands/synesthesia.rs").read_text()
+        take = plugin.split("fun takeSynesthesiaAppLink", 1)[1].split("@Command", 1)[0]
+        self.assertNotIn("activity.intent.data = null", take.split("if (currentIsSynesthesia && currentLink == null)", 1)[0])
+        self.assertIn("fun clearSynesthesiaAppLink", plugin)
+        self.assertIn("acknowledge_app_link", native)
+        self.assertIn("status_refresh.update", (ROOT / "src/app.rs").read_text())
+        self.assertIn('bridge::invalidate_latest("fan:home")', (ROOT / "src/app/fan/shell.rs").read_text())
+        self.assertIn("invalidate_fan_home(profile).await", (ROOT / "src-tauri/src/api/synesthesia.rs").read_text())
 
     def test_android_e2e_proves_staff_language_switch_keeps_session(self):
         journey = read('scripts/e2e/android_journeys.py')
