@@ -155,6 +155,14 @@ mod android {
         Ok(Some(link.to_owned()))
     }
 
+    pub fn clear_synesthesia_app_link<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+        handle(app)
+            .0
+            .run_mobile_plugin::<serde_json::Value>("clearSynesthesiaAppLink", ())
+            .map(|_| ())
+            .map_err(|error| error.to_string())
+    }
+
     pub fn open_notification_settings<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
         handle(app)
             .0

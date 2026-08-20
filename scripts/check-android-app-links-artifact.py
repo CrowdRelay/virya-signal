@@ -45,12 +45,14 @@ def verify(aab: Path, *, tauri_config_path: Path) -> dict[str, object]:
         ("autoVerify", "verified App Link attribute"),
         ("https", "https scheme"),
         ("virya.music", "Virya App Link host"),
+        ("virya-signal", "Signal native Synesthesia scheme"),
+        ("my-signal", "Signal native Synesthesia host"),
     ]:
         require_bytes(manifest, needle, label)
     for path in REQUIRED_PATHS:
         require_bytes(manifest, path, "required App Link pathPrefix")
 
-    return {"package": package_name, "host": "virya.music", "paths": list(REQUIRED_PATHS)}
+    return {"package": package_name, "host": "virya.music", "nativeScheme": "virya-signal", "paths": list(REQUIRED_PATHS)}
 
 
 def main() -> int:

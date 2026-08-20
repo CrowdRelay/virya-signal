@@ -29,6 +29,8 @@ class AppLinksArtifactTests(unittest.TestCase):
                 *( ["autoVerify"] if auto_verify else [] ),
                 "https",
                 "virya.music",
+                "virya-signal",
+                "my-signal",
                 *paths,
             ]
         )

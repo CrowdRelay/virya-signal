@@ -20,7 +20,7 @@ fn FanPortal(
         } else if status_loading.get() {
             view! { <AccessLoader mode=mode label=tr("checking_your_signal") show_back=false /> }.into_any()
         } else if status.get().unlocked {
-            view! { <FanApp mode=mode status=status public=public push_target=push_target error=error /> }.into_any()
+            view! { <FanApp mode=mode status=status status_refresh=status_refresh public=public push_target=push_target error=error /> }.into_any()
         } else {
             view! { <FanAccess mode=mode status=status status_refresh=status_refresh error=error /> }.into_any()
         }}

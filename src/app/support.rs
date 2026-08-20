@@ -30,6 +30,7 @@ fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
                     || lower.contains("zapisan")
                     || lower.contains(tr("sent"))
                     || lower.contains("sent")
+                    || lower.contains("saved")
                     || lower.contains(tr("revoked"))
                     || lower.contains("revoked")
                     || lower.contains("zrealizowan")
