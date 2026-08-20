@@ -2,8 +2,8 @@
 //!
 //! This path is intentionally independent from every QR/scanner parser. Android
 //! delivers a verified virya.music App Link, Rust re-validates it, and only the
-//! short-lived handoff capability is held in native memory until a fan session
-//! is unlocked.
+//! short-lived handoff capability remains recoverable from the Android launch
+//! intent until a fan session is unlocked and the claim reaches a terminal state.
 
 use tauri::{AppHandle, State};
 #[cfg(any(target_os = "android", test))]
@@ -22,18 +22,19 @@ fn handoff_from_app_link(value: &str) -> Result<Zeroizing<String>, AppError> {
         ));
     }
     let url = Url::parse(value)?;
-    if url.scheme() != "https"
-        || !matches!(
+    let path = url.path().trim_end_matches('/');
+    let verified_web = url.scheme() == "https"
+        && matches!(
             url.host_str(),
             Some("virya.music") | Some("www.virya.music")
         )
+        && matches!(path, "/my-signal" | "/pl/my-signal");
+    let native =
+        url.scheme() == "virya-signal" && url.host_str() == Some("my-signal") && path.is_empty();
+    if (!verified_web && !native)
         || url.port().is_some()
         || url.username() != ""
         || url.password().is_some()
-        || !matches!(
-            url.path().trim_end_matches('/'),
-            "/my-signal" | "/pl/my-signal"
-        )
     {
         return Err(AppError::InvalidInput(
             "invalid_synesthesia_app_link".to_owned(),
@@ -86,12 +87,20 @@ async fn clear_if_same(state: &AppState, expected: &str) {
     }
 }
 
+#[cfg(target_os = "android")]
+fn acknowledge_app_link(app: &AppHandle) {
+    if let Err(error) = crate::push_plugin::clear_synesthesia_app_link(app) {
+        eprintln!("[virya:synesthesia-link] terminal acknowledgement degraded: {error}");
+    }
+}
+
 /// Returns one of: "none", "linked", "expired".
 /// Retryable transport/session failures remain errors and keep the pending
 /// capability. Terminal invalid/expired/conflicting capabilities are retired.
 #[tauri::command]
 pub(crate) async fn fan_link_pending_synesthesia(
     state: State<'_, AppState>,
+    _app: AppHandle,
 ) -> Result<String, AppError> {
     let handoff = {
         let pending = state.pending_synesthesia_handoff.lock().await;
@@ -109,14 +118,20 @@ pub(crate) async fn fan_link_pending_synesthesia(
     {
         Ok(true) => {
             clear_if_same(&state, handoff.as_str()).await;
+            #[cfg(target_os = "android")]
+            acknowledge_app_link(&_app);
             Ok("linked".to_owned())
         }
         Ok(false) => {
             clear_if_same(&state, handoff.as_str()).await;
+            #[cfg(target_os = "android")]
+            acknowledge_app_link(&_app);
             Ok("expired".to_owned())
         }
         Err(AppError::Conflict(_)) | Err(AppError::InvalidInput(_)) | Err(AppError::NotFound) => {
             clear_if_same(&state, handoff.as_str()).await;
+            #[cfg(target_os = "android")]
+            acknowledge_app_link(&_app);
             Ok("expired".to_owned())
         }
         Err(error) => Err(error),
@@ -138,7 +153,16 @@ mod tests {
         };
         assert_eq!(handoff.as_str(), CODE);
 
+        let native = format!("virya-signal://my-signal?source=synesthesia#handoff={CODE}");
+        let native_handoff = match handoff_from_app_link(&native) {
+            Ok(handoff) => handoff,
+            Err(error) => panic!("valid native Synesthesia link was rejected: {error}"),
+        };
+        assert_eq!(native_handoff.as_str(), CODE);
+
         for invalid in [
+            format!("virya-signal://evil?source=synesthesia#handoff={CODE}"),
+            format!("virya-signal://my-signal/extra?source=synesthesia#handoff={CODE}"),
             format!("https://evil.example/pl/my-signal/?source=synesthesia#handoff={CODE}"),
             format!("https://virya.music/pl/my-signal/?source=qr#handoff={CODE}"),
             format!("https://virya.music/pl/my-signal/?source=synesthesia&x=1#handoff={CODE}"),
