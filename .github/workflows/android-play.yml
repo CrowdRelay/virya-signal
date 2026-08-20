@@ -300,6 +300,7 @@ jobs:
           status: ${{ needs.prepare.outputs.play_status }}
           userFraction: ${{ needs.prepare.outputs.user_fraction }}
           releaseName: Virya Signal ${{ needs.prepare.outputs.version }} · CI ${{ github.run_number }}
+          whatsNewDirectory: distribution/whatsnew
 
       - name: Publish receipt
         shell: bash
