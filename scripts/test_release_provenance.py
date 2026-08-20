@@ -5,9 +5,10 @@ import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+EXPECTED_OPENAPI_SHA = "556e3f0988de51a1d4f58b7d91f406d5b449ca0d730a01ebd5cce785c137de48"
 
 class ReleaseProvenanceTests(unittest.TestCase):
-    def test_android_receipt_binds_version_code_and_firebase_config_hash(self):
+    def test_android_receipt_binds_version_code_firebase_and_crowdrelay_contract(self):
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)
             lock = root / "Cargo.lock"; lock.write_text("lock")
@@ -26,11 +27,16 @@ class ReleaseProvenanceTests(unittest.TestCase):
                 "--output", str(output),
             ], check=True, stdout=subprocess.PIPE, text=True)
             receipt = json.loads(output.read_text())
+            self.assertEqual(receipt["schema"], 2)
             self.assertEqual(receipt["sourceSha"], "b" * 40)
             self.assertEqual(receipt["appVersion"], "0.4.2")
             self.assertEqual(receipt["androidVersionCode"], 2011)
             self.assertTrue(receipt["push"]["firebaseConfigured"])
             self.assertEqual(receipt["push"]["firebaseConfigSha256"], firebase_sha)
+            self.assertEqual(receipt["crowdrelayContract"]["apiMajor"], "1")
+            self.assertEqual(receipt["crowdrelayContract"]["openapiSha256"], EXPECTED_OPENAPI_SHA)
+            self.assertIn("signal_fan_context_v1", receipt["crowdrelayContract"]["requiredCapabilities"])
+            self.assertIn("synesthesia_rewards_v1", receipt["crowdrelayContract"]["requiredCapabilities"])
 
 if __name__ == "__main__":
     unittest.main()
