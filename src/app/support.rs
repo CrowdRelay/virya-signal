@@ -251,20 +251,26 @@ fn refresh_fan_home(
     error: RwSignal<Option<String>>,
 ) {
     blank_only_when_empty(loading, home.with_untracked(|value| value.is_some()), |state, value| state.home = value);
-    spawn_local(async move {
-        if bridge::native_available()
-            && let Ok(Some(value)) = bridge::invoke_timeout::<Option<FanHomeData>, _>(
+    // The cached snapshot used to be awaited before the live request even
+    // started, so a slow vault read delayed the network call it was supposed to
+    // cover for. Both run at once now and the live answer always wins.
+    if bridge::native_available() && home.with_untracked(|value| value.is_none()) {
+        spawn_local(async move {
+            if let Ok(Some(value)) = bridge::invoke_timeout::<Option<FanHomeData>, _>(
                 "fan_cached_home",
                 &EmptyArgs {},
                 2_000,
             )
             .await
-            && value.has_supported_schema()
-        {
-            home.set(Some(value));
-            loading.update(|state| state.home = false);
-        }
-
+                && value.has_supported_schema()
+                && home.get_untracked().is_none()
+            {
+                home.set(Some(value));
+                loading.update(|state| state.home = false);
+            }
+        });
+    }
+    spawn_local(async move {
         let result = bridge::invoke_latest::<FanHomeData, _>(
             "fan_home",
             &EmptyArgs {},

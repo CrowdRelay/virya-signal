@@ -425,13 +425,22 @@ pub(crate) async fn fan_home(state: State<'_, AppState>) -> Result<FanHomeData, 
             };
             let password = Zeroizing::new(password.to_vec());
             let app_data_dir = state.app_data_dir.clone();
-            if let Err(error) = run_blocking(move || {
-                vault::save_fan_home_cache_with_password(&app_data_dir, password.as_ref(), &snapshot)
-            })
-            .await
-            {
-                eprintln!("[virya:fan-cache] encrypted home snapshot save degraded: {error}");
-            }
+            // The snapshot only has to be on disk before the next cold start,
+            // not before Home paints. Encrypting and writing it inline added a
+            // blocking file write to every refresh the fan waited on.
+            tauri::async_runtime::spawn(async move {
+                if let Err(error) = run_blocking(move || {
+                    vault::save_fan_home_cache_with_password(
+                        &app_data_dir,
+                        password.as_ref(),
+                        &snapshot,
+                    )
+                })
+                .await
+                {
+                    eprintln!("[virya:fan-cache] encrypted home snapshot save degraded: {error}");
+                }
+            });
         }
     }
     Ok(home)
