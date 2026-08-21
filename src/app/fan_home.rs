@@ -450,11 +450,13 @@ fn PushPreferencesControl(error: RwSignal<Option<String>>) -> impl IntoView {
                         <span class="push-setting-icon" aria-hidden="true">"◎"</span>
                         <div><strong>{tr("push_what_you_want")}</strong><p>{tr("push_what_you_want_hint")}</p></div>
                     </div>
-                    <div class="push-preference-grid">
+                    <div class="pref-list">
                         {items.into_iter().map(|(key, label)| view! {
-                            <label class="check-label">
+                            <label class="pref-row">
+                                <span class="pref-row-label">{label}</span>
                                 <input
                                     type="checkbox"
+                                    class="pref-switch"
                                     disabled=move || busy.get()
                                     prop:checked=move || preferences
                                         .get()
@@ -470,7 +472,6 @@ fn PushPreferencesControl(error: RwSignal<Option<String>>) -> impl IntoView {
                                         );
                                     }
                                 />
-                                <span>{label}</span>
                             </label>
                         }).collect_view()}
                     </div>
