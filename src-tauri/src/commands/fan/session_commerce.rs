@@ -146,9 +146,11 @@ async fn persist_confirmed_fan(
     let app_data_dir = state.app_data_dir.clone();
     let stored_profile = profile.clone();
     let vault_pin = pin.clone();
+    // replace_fan already derived this password to encrypt the vault. Argon2
+    // dominates the confirm step, so deriving it a second time from the same
+    // pin and salt doubled the wait before the app could show anything.
     let vault_password = run_blocking(move || {
-        vault::replace_fan(&app_data_dir, vault_pin.as_str(), &stored_profile)?;
-        vault::fan_password(&app_data_dir, vault_pin.as_str())
+        vault::replace_fan(&app_data_dir, vault_pin.as_str(), &stored_profile)
     })
     .await?;
     *state.fan_session.write().await = Some(Arc::new(profile));
@@ -224,8 +226,7 @@ pub(crate) async fn fan_signup(
         let stored_profile = profile.clone();
         let vault_pin = pin.clone();
         let vault_password = run_blocking(move || {
-            vault::save_fan(&app_data_dir, vault_pin.as_str(), &stored_profile)?;
-            vault::fan_password(&app_data_dir, vault_pin.as_str())
+            vault::save_fan(&app_data_dir, vault_pin.as_str(), &stored_profile)
         })
         .await?;
         *state.fan_session.write().await = Some(Arc::new(profile));
