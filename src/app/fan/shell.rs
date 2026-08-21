@@ -168,7 +168,19 @@ fn FanApp(
         if generation == 0 {
             return;
         }
-        loaded.set(FanLoadedState::default());
+        // Every section below is refreshed in this generation. Mark the request
+        // ownership up front, just like tab-scoped loading does, so switching
+        // tabs while/after the full refresh cannot immediately issue duplicates.
+        loaded.set(FanLoadedState {
+            home: true,
+            referral: true,
+            events: true,
+            interests: true,
+            merch: true,
+            admission_pass: true,
+            wallets: true,
+            area: true,
+        });
         refresh_fan_home(home, loading, error);
         refresh_fan_parts(dashboard, loading, error);
         refresh_fan_merch(merch, loading, error);
