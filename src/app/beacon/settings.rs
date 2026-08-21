@@ -91,6 +91,14 @@ fn BeaconSettings(
         });
     };
 
+    // Same rule as the fan card: the choice is local and instant, so the card
+    // shows it now and the FCM/backend registration catches up in the task.
+    let desired_push = RwSignal::new(None::<bool>);
+    let shown_push_enabled = move || {
+        desired_push
+            .get()
+            .unwrap_or_else(|| push.get().is_some_and(|value| value.enabled))
+    };
     let toggle_push = move |_| {
         if busy.get_untracked() {
             return;
@@ -99,16 +107,19 @@ fn BeaconSettings(
         let opens_settings = current
             .as_ref()
             .is_some_and(|value| !value.enabled && value.permission == "denied");
-        let command = if current.as_ref().is_some_and(|value| value.enabled) {
-            "beacon_push_disable"
-        } else if opens_settings {
+        let want_enabled = !current.as_ref().is_some_and(|value| value.enabled);
+        let command = if opens_settings {
             "beacon_push_open_settings"
-        } else {
+        } else if want_enabled {
             "beacon_push_enable"
+        } else {
+            "beacon_push_disable"
         };
         busy.set(true);
         if opens_settings {
             resume_pending.set(true);
+        } else {
+            desired_push.set(Some(want_enabled));
         }
         spawn_lifecycle_task(async move {
             match bridge::invoke_timeout::<FanPushStatus, _>(command, &EmptyArgs {}, 45_000).await {
@@ -119,6 +130,7 @@ fn BeaconSettings(
                     let _ = error.try_set(Some(message));
                 }
             }
+            let _ = desired_push.try_set(None);
             finish_resumable_ui_task(busy, resume_pending, resume_refresh);
         });
     };
@@ -166,28 +178,27 @@ fn BeaconSettings(
                 <div class="push-setting-card beacon-push-setting">
                     <div class="push-setting-copy">
                         <strong>{tr("push_notifications")}</strong>
-                        {move || push.get().map(|current| {
-                            let message = if !current.supported {
-                                tr("push_notifications_degraded")
-                            } else if !current.backend_enabled {
-                                tr("push_notifications_waiting_backend")
-                            } else if current.permission == "denied" {
-                                tr("push_notifications_blocked")
-                            } else if current.enabled {
-                                tr("push_notifications_on")
-                            } else {
-                                tr("push_notifications_off")
+                        {move || {
+                            let on = shown_push_enabled();
+                            let message = match push.get() {
+                                _ if desired_push.get().is_some() => tr("syncing_push_notifications"),
+                                Some(current) if !current.supported => tr("push_notifications_degraded"),
+                                Some(current) if !current.backend_enabled => tr("push_notifications_waiting_backend"),
+                                Some(current) if current.permission == "denied" => tr("push_notifications_blocked"),
+                                Some(current) if current.enabled => tr("push_notifications_on"),
+                                Some(_) => tr("push_notifications_off"),
+                                None => tr("syncing_push_notifications"),
                             };
-                            view! { <small class:success=current.enabled class:warning=!current.enabled>{message}</small> }
-                        })}
+                            view! { <small class:success=on class:warning=!on>{message}</small> }
+                        }}
                     </div>
                     <button class="ghost" disabled=move || busy.get() on:click=toggle_push>
-                        {move || if busy.get() {
-                            tr("syncing_push_notifications")
-                        } else if push.get().is_some_and(|value| value.enabled) {
-                            tr("disable_push_notifications")
-                        } else if push.get().as_ref().is_some_and(|value| value.permission == "denied") {
+                        {move || if push.get().as_ref().is_some_and(|value| value.permission == "denied")
+                            && desired_push.get().is_none()
+                        {
                             tr("open_notification_settings")
+                        } else if shown_push_enabled() {
+                            tr("disable_push_notifications")
                         } else {
                             tr("enable_push_notifications")
                         }}

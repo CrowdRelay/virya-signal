@@ -108,6 +108,7 @@ pub struct CrowdRelayClient {
     cities_fetch: Arc<Mutex<()>>,
     merch_fetch: Arc<Mutex<()>>,
     meta_cache: Arc<RwLock<HashMap<String, EcosystemMeta>>>,
+    meta_fetch: Arc<Mutex<()>>,
     pub(super) fan_home_fetch: Arc<Mutex<()>>,
     pub(super) fan_home_cache: Arc<RwLock<HashMap<String, CacheEntry<FanHomeData>>>>,
     pub(super) cache_file: Arc<PathBuf>,
@@ -147,6 +148,7 @@ impl CrowdRelayClient {
             cities_fetch: Arc::new(Mutex::new(())),
             merch_fetch: Arc::new(Mutex::new(())),
             meta_cache: Arc::new(RwLock::new(HashMap::new())),
+            meta_fetch: Arc::new(Mutex::new(())),
             fan_home_fetch: Arc::new(Mutex::new(())),
             fan_home_cache: Arc::new(RwLock::new(HashMap::new())),
             cache_file: Arc::new(cache_file),
@@ -248,6 +250,13 @@ impl CrowdRelayClient {
 
     pub async fn ecosystem_meta(&self, api_base_url: &str) -> Result<EcosystemMeta, AppError> {
         let key = cache::cache_key(api_base_url)?;
+        if let Some(meta) = self.meta_cache.read().await.get(&key).cloned() {
+            return Ok(meta);
+        }
+        // Every capability gate goes through here, so a cold start had several
+        // commands racing to fetch the same /meta document. One wins, the rest
+        // read its answer out of the cache, exactly like public_events.
+        let _fetch = self.meta_fetch.lock().await;
         if let Some(meta) = self.meta_cache.read().await.get(&key).cloned() {
             return Ok(meta);
         }
