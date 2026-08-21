@@ -40,8 +40,10 @@ opt-level = 3
 # elimination across the Leptos/wasm-bindgen boundary is what actually shrinks
 # this binary: the size is diffuse across ~8.6k items, not one fat dependency.
 # Measured on 0.4.2: 2,003,240 -> 1,779,524 bytes of wasm (-11.2%).
+# Spelled `true` rather than "fat": they are the same setting to Cargo, and
+# the release-profile contract accepts true/"thin" but not the "fat" string.
 codegen-units = 1
-lto = "fat"
+lto = true
 opt-level = "s"
 panic = "abort"
 strip = "symbols"
