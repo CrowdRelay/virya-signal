@@ -28,14 +28,18 @@
     <link data-trunk rel="copy-file" href="boot-i18n.js" />
     <link data-trunk rel="copy-file" href="boot.js" />
     <link data-trunk rel="copy-file" href="runtime-i18n.js" />
+    <link data-trunk rel="copy-file" href="runtime-i18n-keys.json" />
+    <link data-trunk rel="copy-file" href="runtime-i18n-pl.json" />
+    <link data-trunk rel="copy-file" href="runtime-i18n-en.json" />
     <link data-trunk rel="copy-file" href="bundle-stage-pack.webp" />
     <link data-trunk rel="copy-file" href="branding/signal-v2.svg" />
     <link rel="icon" type="image/svg+xml" href="/signal-v2.svg" />
     <!-- Deferred classic scripts preserve document order without delaying the
-         inline splash: listener, runtime catalog, then Trunk's WASM module. -->
+         inline splash: listener, then the runtime catalog loader. The loader
+         fetches the selected language in parallel with WASM discovery. -->
     <script defer src="boot-i18n.js?v=0.4.2-boot-i18n-v3"></script>
     <script defer src="boot.js?v=0.4.2-startup-v9"></script>
-    <script defer src="runtime-i18n.js?v=0.4.2-runtime-i18n-v2"></script>
+    <script defer src="runtime-i18n.js?v=0.4.2-runtime-i18n-v3"></script>
     <link data-trunk rel="rust" data-wasm-opt="z" data-wasm-opt-params="--enable-bulk-memory --enable-bulk-memory-opt --enable-nontrapping-float-to-int" />
   </head>
   <body>
