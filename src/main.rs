@@ -6,8 +6,8 @@ mod i18n;
 mod models;
 mod util;
 
-use app::App;
 use crate::util::spawn_local;
+use app::App;
 use leptos::prelude::*;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
