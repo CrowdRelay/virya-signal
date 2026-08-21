@@ -939,7 +939,9 @@ html[data-virya-scanner-active] .app-shell {
 .home-action-card { min-height: 154px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); padding: 17px; display: flex; flex-direction: column; gap: 9px; }
 .home-action-card strong { font-size: 18px; line-height: 1.05; }
 .home-action-card > p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: var(--type-meta); }
-.synesthesia-home-card { background: linear-gradient(145deg, rgba(109,162,152,.08), var(--surface) 60%); border-color: color-mix(in srgb, var(--signal) 32%, var(--line)); }
+/* Side album experiment, so it sits after the cards people open Home for.
+   Ordered rather than moved in the markup to keep the Show block intact. */
+.synesthesia-home-card { order: 99; background: linear-gradient(145deg, rgba(109,162,152,.08), var(--surface) 60%); border-color: color-mix(in srgb, var(--signal) 32%, var(--line)); }
 .next-show-card { background: linear-gradient(145deg, rgba(132,180,172,.08), var(--surface) 60%); }
 .progress-track { width: 100%; height: 5px; overflow: hidden; background: #202020; margin-top: auto; }
 .progress-track > span { display: block; height: 100%; background: currentColor; min-width: 2px; }

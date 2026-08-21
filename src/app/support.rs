@@ -231,12 +231,26 @@ fn refresh_operator_ops(
     });
 }
 
+/// A section only drops to its skeleton when it has nothing to show. Refreshing
+/// over data that is already on screen stays silent and swaps the new value in
+/// when it lands, so switching tabs, reopening the app or resuming from the
+/// background no longer flashes placeholders over content we already hold.
+fn blank_only_when_empty(
+    loading: RwSignal<FanLoadingState>,
+    has_data: bool,
+    mark: impl Fn(&mut FanLoadingState, bool) + 'static,
+) {
+    if !has_data {
+        loading.update(|state| mark(state, true));
+    }
+}
+
 fn refresh_fan_home(
     home: RwSignal<Option<FanHomeData>>,
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) {
-    loading.update(|state| state.home = true);
+    blank_only_when_empty(loading, home.with_untracked(|value| value.is_some()), |state, value| state.home = value);
     spawn_local(async move {
         if bridge::native_available()
             && let Ok(Some(value)) = bridge::invoke_timeout::<Option<FanHomeData>, _>(
@@ -293,7 +307,7 @@ fn refresh_fan_events(
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) {
-    loading.update(|state| state.events = true);
+    blank_only_when_empty(loading, dashboard.with_untracked(|value| value.as_ref().is_some_and(|data| !data.events.is_empty())), |state, value| state.events = value);
     spawn_local(async move {
         let result = bridge::invoke_latest::<Vec<PublicEvent>, _>(
             "fan_events",
@@ -322,7 +336,7 @@ fn refresh_fan_merch(
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) {
-    loading.update(|state| state.merch = true);
+    blank_only_when_empty(loading, merch.with_untracked(|value| value.is_some()), |state, value| state.merch = value);
     spawn_local(async move {
         let result = bridge::invoke_latest::<MerchCatalog, _>(
             "fan_merch_catalog",
@@ -368,7 +382,7 @@ fn refresh_fan_referral(
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) {
-    loading.update(|state| state.referral = true);
+    blank_only_when_empty(loading, dashboard.with_untracked(|value| value.is_some()), |state, value| state.referral = value);
     spawn_local(async move {
         let result = bridge::invoke_latest::<ReferralProgress, _>(
             "fan_referral",
@@ -396,7 +410,7 @@ fn refresh_fan_interests(
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) {
-    loading.update(|state| state.interests = true);
+    blank_only_when_empty(loading, dashboard.with_untracked(|value| value.as_ref().is_some_and(|data| !data.interests.is_empty())), |state, value| state.interests = value);
     spawn_local(async move {
         let result = bridge::invoke_latest::<Vec<FanEventInterest>, _>(
             "fan_interests",
@@ -426,7 +440,7 @@ fn refresh_fan_admission_pass(
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) {
-    loading.update(|state| state.admission_pass = true);
+    blank_only_when_empty(loading, dashboard.with_untracked(|value| value.is_some()), |state, value| state.admission_pass = value);
     spawn_local(async move {
         let result = bridge::invoke_latest::<Option<AdmissionPass>, _>(
             "fan_admission_pass",
@@ -456,7 +470,7 @@ fn refresh_fan_area(
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) {
-    loading.update(|state| state.area = true);
+    blank_only_when_empty(loading, area.with_untracked(|value| value.is_some()), |state, value| state.area = value);
     spawn_local(async move {
         let result = bridge::invoke_latest::<AreaWallet, _>(
             "fan_area_wallet",
@@ -483,7 +497,11 @@ fn refresh_wallets(
     error: RwSignal<Option<String>>,
 ) {
     if let Some(loading) = loading {
-        loading.update(|state| state.wallets = true);
+        blank_only_when_empty(
+            loading,
+            wallets.with_untracked(|value| !value.is_empty()),
+            |state, value| state.wallets = value,
+        );
     }
     spawn_local(async move {
         let result = bridge::invoke_latest::<WalletBatch, _>(
