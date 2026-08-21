@@ -7,7 +7,7 @@ use std::{collections::HashMap, path::Path, sync::Arc};
 
 use futures_util::{StreamExt, stream};
 use qrcode::{QrCode, render::svg};
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use zeroize::Zeroizing;
 
 use crate::{

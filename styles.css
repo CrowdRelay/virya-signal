@@ -209,7 +209,7 @@ button:disabled { opacity: .48; cursor: default; }
 .settings-list article { display: flex; justify-content: space-between; gap: 12px; }
 .settings-list p { margin: 5px 0 0; color: var(--muted); font-size: var(--type-meta); word-break: break-all; }
 .security-note { margin-top: 18px; padding: 15px; border-left: 2px solid var(--signal-hot); color: var(--muted); font-size: var(--type-meta); line-height: 1.5; }
-.feedback-card { margin-top: 24px; border: 1px solid #4b411a; border-radius: 6px; background: linear-gradient(145deg, #181507, #111 66%); padding: 17px; display: grid; gap: 13px; box-shadow: 0 16px 46px #0005; }
+.feedback-card { margin-top: 24px; border: 1px solid color-mix(in srgb, var(--signal) 48%, var(--line)); border-radius: 6px; background: linear-gradient(145deg, rgba(132,180,172,.10), var(--surface) 66%); padding: 17px; display: grid; gap: 13px; box-shadow: 0 16px 46px #0005; }
 .feedback-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
 .feedback-heading p, .feedback-heading h3 { margin: 0; }
 .feedback-heading h3 { margin-top: 5px; font-size: 19px; text-transform: uppercase; line-height: 1.12; }
@@ -743,7 +743,7 @@ html[data-virya-scanner-active] .app-shell {
 #virya-runtime-failure .virya-runtime-failure-card {
   width: min(100%, 720px);
   padding: 24px;
-  border: 1px solid rgba(255, 194, 10, 0.55);
+  border: 1px solid rgba(147, 198, 192, 0.62);
   border-radius: 6px;
   background: #111;
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.65);
@@ -768,13 +768,13 @@ html[data-virya-scanner-active] .app-shell {
 #virya-runtime-failure button {
   min-height: 48px;
   border-radius: 6px;
-  border: 1px solid #ffc20a;
-  background: #ffc20a;
+  border: 1px solid var(--signal-hot);
+  background: var(--signal-hot);
   color: #080808;
   font-weight: 800;
 }
 #virya-runtime-failure button.ghost { background: transparent; color: #fff; border-color: rgba(255,255,255,.28); }
-#virya-runtime-failure .copy-status { display: block; min-height: 18px; margin-top: 10px; color: #ffc20a; }
+#virya-runtime-failure .copy-status { display: block; min-height: 18px; margin-top: 10px; color: var(--signal-hot); }
 .city-stable-entry { margin-top: 2px; }
 
 /* ecosystem-v13-signal-control-plane */

@@ -7,16 +7,16 @@
     <meta name="color-scheme" content="dark" />
     <title>Virya Signal</title>
     <style>
-      #boot-splash{position:fixed;inset:0;z-index:2147483647;display:grid;place-content:center;justify-items:center;gap:9px;padding:24px;background:radial-gradient(circle at 50% 35%,#2b2409 0,#080808 38%);color:#f5f5ef;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;text-align:center;transition:opacity .18s ease}
+      #boot-splash{position:fixed;inset:0;z-index:2147483647;display:grid;place-content:center;justify-items:center;gap:9px;padding:24px;background:radial-gradient(circle at 50% 35%,#122724 0,#080808 38%);color:#f5f5ef;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;text-align:center;transition:opacity .18s ease}
       #boot-splash[aria-hidden="true"]{opacity:0;pointer-events:none}
       .boot-signal{height:36px;display:flex;align-items:center;gap:5px}
-      .boot-signal i{display:block;width:4px;border-radius:2px;background:#f3c51a;box-shadow:0 0 10px #f3c51aaa,0 0 28px #f3c51a55;animation:boot-pulse .8s ease-in-out infinite alternate;transform-origin:center}
+      .boot-signal i{display:block;width:4px;border-radius:2px;background:#93c6c0;box-shadow:0 0 10px #93c6c0aa,0 0 28px #93c6c055;animation:boot-pulse .8s ease-in-out infinite alternate;transform-origin:center}
       .boot-signal i:nth-child(1){height:10px}.boot-signal i:nth-child(2){height:28px;animation-delay:.18s}.boot-signal i:nth-child(3){height:17px;animation-delay:.36s}
       #boot-splash strong{margin-top:7px;font-size:clamp(42px,14vw,64px);line-height:.85;letter-spacing:-.075em}
-      #boot-splash strong span{color:#f3c51a}
+      #boot-splash strong span{color:#93c6c0}
       #boot-status{margin:3px 0 0;color:#a9a89f;font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase}
       #boot-detail{max-width:320px;margin:2px 0 0;color:#d6d4c8;font-size:11px;line-height:1.45;overflow-wrap:anywhere}
-      #boot-retry{margin-top:10px;border:1px solid #f3c51a;background:transparent;color:#f3c51a;padding:10px 14px;font:800 12px/1 ui-sans-serif,system-ui,-apple-system,sans-serif;letter-spacing:.16em;text-transform:uppercase}
+      #boot-retry{margin-top:10px;border:1px solid #84b4ac;background:transparent;color:#93c6c0;padding:10px 14px;font:800 12px/1 ui-sans-serif,system-ui,-apple-system,sans-serif;letter-spacing:.16em;text-transform:uppercase}
       #boot-retry[hidden]{display:none}
       @keyframes boot-pulse{to{opacity:.3;transform:scaleY(.55)}}
       @media(prefers-reduced-motion:reduce){.boot-signal i{animation:none}}
