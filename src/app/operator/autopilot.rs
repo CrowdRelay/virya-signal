@@ -58,7 +58,7 @@ fn AutopilotPanel(
                     }
                 })}
             </Show>
-            <Show when=move || !loading.get() fallback=move || view! { <Skeleton rows=3 /> }>
+            <Show when=move || !loading.get() || overview.with(|value| value.is_some()) fallback=move || view! { <Skeleton rows=3 /> }>
                 {move || overview.get().map(|data| {
                     let runtime_enabled = data.runtime_enabled;
                     let policies = data.policies;

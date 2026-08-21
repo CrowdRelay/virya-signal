@@ -519,7 +519,7 @@ fn BeaconBriefing(
     view! {
         <section class="screen beacon-screen">
             <header class="screen-title beacon-hero"><p class="eyebrow">{tr("latarnik_briefing_label")}</p><h2>{tr("latarnik_briefing_title")}</h2><p>{tr("latarnik_briefing_subtitle")}</p></header>
-            <Show when=move || !loading.get() fallback=move || view! { <Skeleton rows=3/> }>
+            <Show when=move || !loading.get() || home.with(|value| value.is_some()) fallback=move || view! { <Skeleton rows=3/> }>
                 {move || home.get().and_then(|data| data.nearby_events.first().cloned()).map(|event| {
                     let id=event.id.clone(); let title=event.title.clone();
                     view! { <article class="beacon-feature-card"><p class="eyebrow">{tr("latarnik_near_you")}</p><h3>{title}</h3><p>{format!("{} · {} km", event.city, event.distance_km)}</p><button class="primary" on:click=move |_| { selected_event.set(Some(id.clone())); tab.set(BeaconTab::Radar); }>{tr("latarnik_open_radar")}</button></article> }
@@ -591,7 +591,7 @@ fn BeaconRadar(
                 <h2>{tr("latarnik_radar_title")}</h2>
                 <p>{tr("latarnik_radar_subtitle")}</p>
             </header>
-            <Show when=move || !loading.get() fallback=move || view! { <Skeleton rows=4/> }>
+            <Show when=move || !loading.get() || home.with(|value| value.is_some()) fallback=move || view! { <Skeleton rows=4/> }>
                 <div class="card-list beacon-event-list">
                     {move || home.get().map(|data| data.nearby_events.into_iter().map(|event| {
                         let event_id = event.id.clone();
