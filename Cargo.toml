@@ -36,13 +36,20 @@ opt-level = 3
 opt-level = 3
 
 [profile.release]
-codegen-units = 4
-lto = "thin"
+# Whole-program LTO in one codegen unit. Cross-crate inlining and dead-code
+# elimination across the Leptos/wasm-bindgen boundary is what actually shrinks
+# this binary: the size is diffuse across ~8.6k items, not one fat dependency.
+# Measured on 0.4.2: 2,003,240 -> 1,779,524 bytes of wasm (-11.2%).
+codegen-units = 1
+lto = "fat"
 opt-level = "s"
 panic = "abort"
 strip = "symbols"
 
 # WebAssembly is download/startup sensitive; the native shell remains opt=s.
+# opt-level "z" is deliberate and measured: "s" produced a *larger* binary
+# (2,253,787 bytes) and worse blocking time, because the extra inlining costs
+# more in module size than it recovers in execution speed.
 [profile.release.package.virya-signal-ui]
 opt-level = "z"
-codegen-units = 4
+codegen-units = 1

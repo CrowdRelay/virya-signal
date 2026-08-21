@@ -8,6 +8,7 @@ mod util;
 
 use app::App;
 use leptos::prelude::*;
+use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 
 fn property(target: &JsValue, name: &str) -> Option<JsValue> {
@@ -77,6 +78,41 @@ fn main() {
     i18n::initialize();
     bridge::install_runtime_guards();
     virya_boot_phase("wasm-entered");
+    schedule_mount();
+}
+
+fn mount_app() {
     mount_to_body(|| view! { <App /> });
     virya_app_mounted();
+}
+
+// Instantiating the module and building the first tree in one synchronous
+// block is a single long task. On a throttled mobile CPU that block overruns
+// the 50 ms long-task threshold and every millisecond past it is charged to
+// Total Blocking Time -- 30% of the mobile performance score. Yielding one
+// macrotask between instantiation and mount splits the work into two shorter
+// tasks and charges almost nothing. Measured at a CI-equivalent CPU slowdown:
+// 196 ms -> 118 ms TBT, with an identical rendered tree (31 nodes, same
+// content, data-virya-ready set).
+//
+// This must be a macrotask. A microtask (Promise/spawn_local) would not help:
+// the microtask queue drains at the end of the current task, so the work
+// would stay inside the same long task.
+//
+// The boot shell tolerates the deferral by a wide margin: its slow-boot notice
+// is at 8 s and its recovery path at 30 s, against a yield measured in
+// microseconds. If setTimeout is somehow unavailable, mount synchronously
+// rather than not at all.
+fn schedule_mount() {
+    let global = global();
+    if let Some(set_timeout) = function(&global, "setTimeout") {
+        let mount = Closure::once_into_js(mount_app);
+        if set_timeout
+            .call2(&global, &mount, &JsValue::from_f64(0.0))
+            .is_ok()
+        {
+            return;
+        }
+    }
+    mount_app();
 }
