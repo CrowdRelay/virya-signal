@@ -31,10 +31,20 @@ pub(crate) async fn fan_unlock(
     *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
     drop(_mutation);
-    if let Err(error) = sync_native_push_if_desired(&state, &app).await {
-        eprintln!("[virya:push-sync] unlock reconciliation degraded: {error}");
-    }
-    fan_status(state).await
+    let status = fan_status(state).await?;
+
+    // The encrypted profile is already unlocked and safe to render. Push
+    // reconciliation can perform several network requests, so it must not
+    // hold the login screen hostage. The mutation lock still serializes the
+    // background task with an immediate user-requested lock/forget action.
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        let _mutation = state.fan_mutation.lock().await;
+        if let Err(error) = sync_native_push_if_desired(&state, &app).await {
+            eprintln!("[virya:push-sync] unlock reconciliation degraded: {error}");
+        }
+    });
+    Ok(status)
 }
 
 #[tauri::command]

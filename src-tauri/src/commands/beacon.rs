@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use url::Url;
 use zeroize::Zeroizing;
 
@@ -418,10 +418,19 @@ pub(crate) async fn beacon_unlock(
     *state.beacon_session.write().await = Some(Arc::new(profile));
     *state.beacon_pin.write().await = Some(pin);
     drop(_mutation);
-    if let Err(error) = sync_native_push_if_desired(&state, &app).await {
-        eprintln!("[virya:beacon-push-sync] unlock reconciliation degraded: {error}");
-    }
-    beacon_status(state).await
+    let status = beacon_status(state).await?;
+
+    // Unlock is a local vault operation. Do not delay the first usable screen
+    // on backend push configuration/token registration; reconcile it in the
+    // background while keeping session mutations serialized.
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        let _mutation = state.beacon_mutation.lock().await;
+        if let Err(error) = sync_native_push_if_desired(&state, &app).await {
+            eprintln!("[virya:beacon-push-sync] unlock reconciliation degraded: {error}");
+        }
+    });
+    Ok(status)
 }
 
 #[tauri::command]
