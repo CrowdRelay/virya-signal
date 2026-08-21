@@ -69,6 +69,11 @@ def main() -> int:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(chosen[2], args.out)
 
+    # Keep the human-readable report of the same run, not of some other one.
+    chosen_html = Path(str(chosen[2]).replace(".report.json", ".report.html"))
+    if chosen_html.is_file():
+        shutil.copyfile(chosen_html, Path(str(args.out).replace(".report.json", ".report.html")))
+
     scores = [f"{run[0] * 100:.0f}" for run in runs]
     tbts = [f"{run[1]:.0f}" for run in runs]
     print(

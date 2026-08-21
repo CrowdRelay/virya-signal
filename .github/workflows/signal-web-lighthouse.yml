@@ -104,29 +104,50 @@ jobs:
 
       - name: Lighthouse mobile
         shell: bash
+        env:
+          LIGHTHOUSE_RUNS: "3"
         run: |
           set -euo pipefail
-          mkdir -p artifacts
-          npx --yes lighthouse@13.4.1 http://127.0.0.1:4173/ \
-            --quiet \
-            --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" \
-            --only-categories=performance,accessibility,best-practices \
-            --max-wait-for-load=20000 \
-            --output=json --output=html \
-            --output-path=artifacts/lighthouse-mobile
+          # One run measures the site plus whatever else the runner was doing.
+          # Observed spread here across commits with no frontend change was
+          # mobile TBT 194-1200 ms. Take the median of several runs instead.
+          mkdir -p artifacts/runs
+          for run in $(seq 1 "${LIGHTHOUSE_RUNS}"); do
+            npx --yes lighthouse@13.4.1 http://127.0.0.1:4173/ \
+              --quiet \
+              --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" \
+              --only-categories=performance,accessibility,best-practices \
+              --max-wait-for-load=20000 \
+              --output=json --output=html \
+              --output-path="artifacts/runs/mobile-${run}.report.json"
+          done
+          python3 scripts/lighthouse_median.py --label mobile \
+            $(for run in $(seq 1 "${LIGHTHOUSE_RUNS}"); do printf -- '--report artifacts/runs/mobile-%s.report.json ' "$run"; done) \
+            --out artifacts/lighthouse-mobile.report.json
 
       - name: Lighthouse desktop
         shell: bash
+        env:
+          LIGHTHOUSE_RUNS: "3"
         run: |
           set -euo pipefail
-          npx --yes lighthouse@13.4.1 http://127.0.0.1:4173/ \
-            --quiet \
-            --preset=desktop \
-            --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" \
-            --only-categories=performance,accessibility,best-practices \
-            --max-wait-for-load=20000 \
-            --output=json --output=html \
-            --output-path=artifacts/lighthouse-desktop
+          # One run measures the site plus whatever else the runner was doing.
+          # Observed spread here across commits with no frontend change was
+          # mobile TBT 194-1200 ms. Take the median of several runs instead.
+          mkdir -p artifacts/runs
+          for run in $(seq 1 "${LIGHTHOUSE_RUNS}"); do
+            npx --yes lighthouse@13.4.1 http://127.0.0.1:4173/ \
+              --quiet \
+              --preset=desktop \
+              --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" \
+              --only-categories=performance,accessibility,best-practices \
+              --max-wait-for-load=20000 \
+              --output=json --output=html \
+              --output-path="artifacts/runs/desktop-${run}.report.json"
+          done
+          python3 scripts/lighthouse_median.py --label desktop \
+            $(for run in $(seq 1 "${LIGHTHOUSE_RUNS}"); do printf -- '--report artifacts/runs/desktop-%s.report.json ' "$run"; done) \
+            --out artifacts/lighthouse-desktop.report.json
 
       - name: Validate performance and accessibility regression budget
         shell: bash
