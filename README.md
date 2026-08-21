@@ -1,27 +1,39 @@
 # Virya Signal
 
-Tauri 2 / Rust / Leptos mobile client for the VIRYA fan and staff ecosystem. The WebView owns presentation; the native shell owns credentials, bounded network access, encrypted local state and privileged operator actions.
+**Rust / Tauri 2 / Leptos mobile client** for the VIRYA fan and staff ecosystem.
+
+The WebView owns presentation. The native shell owns credentials, bounded network access, encrypted local state and privileged operator actions. CrowdRelay remains authoritative for fan, event, ticket, draw and inventory state.
+
+## Engineering snapshot
+
+- **Deliberate trust boundary:** Stronghold-backed profiles and credentials stay native; secrets do not live in the WebView.
+- **Bounded networking:** response/token/input sizes and external origins are constrained before privileged native operations proceed.
+- **Concurrency discipline:** read refreshes are cancellable/latest-wins; mutations are serialized instead of racing optimistic client state.
+- **Capability separation:** fan and staff flows use separate local profiles and backend authorities; ticket QR secrets are retained natively and rendered only when needed.
+- **Offline/degraded behavior:** public event/city data uses bounded caches and can degrade independently from private state.
+- **Contract-first ecosystem:** the app follows CrowdRelay's canonical API instead of re-implementing Stripe, consent, winner selection, fulfillment or inventory policy.
+- **Release discipline:** CI validates native Rust, wasm32/Leptos, Trunk output, Android package identity, package size/alignment and production release plumbing.
+
+This repo is intentionally a client boundary, not a second backend. Business decisions remain in CrowdRelay domain/application code.
 
 ## Product boundary
 
-Fan surfaces: Signal identity/recovery, concerts, tickets, merch, AREA and Synesthesia entry. Staff surfaces: operational overview, ticket/admission scanning, campaigns, commerce, diagnostics, and the ViryaOS Autopilot exception cockpit / Chief of Staff. The app exposes approvals, cancellations, authority and measured effects, but business decisions remain in CrowdRelay domain code.
+Fan surfaces include Signal identity/recovery, concerts, tickets, merch, AREA and Synesthesia entry. Staff surfaces include operational overview, ticket/admission scanning, campaigns, commerce, diagnostics and the ViryaOS Autopilot exception cockpit / Chief of Staff.
 
-CrowdRelay remains authoritative for fan/event/ticket/draw/inventory state. The app does not duplicate Stripe, fulfillment, winner selection or consent logic. Synesthesia is launched as an external first-party album experience at `https://synesthesia.virya.music/?source=signal-app`.
+Synesthesia launches as a separate first-party experience at `https://synesthesia.virya.music/?source=signal-app`.
 
-## Security
+## Security and state
 
-- Stronghold stores profiles/credentials; secrets do not live in the WebView.
+- Stronghold stores profiles/credentials;
 - fan and staff PINs accept 4–6 digits and protect only local profile unlock;
-- staff pairing validates expiry and stores the imported profile natively;
-- response/token/input sizes and external URL origins are bounded;
-- ticket QR secrets are retained natively and rendered only on demand;
-- read refreshes are cancellable/latest-wins; mutations are serialized;
-- public event/city data uses bounded caches and degrades independently;
-- anonymous feedback contains category, message and a random idempotency ID only.
+- staff pairing validates expiry before importing the profile natively;
+- ticket QR secrets never become general WebView state;
+- anonymous feedback carries only category, message and a random idempotency ID;
+- public caches are bounded and private refreshes remain generation-aware.
 
 ## Toolchain
 
-Pinned Rust is in `rust-toolchain.toml`. CI uses Tauri 2, Trunk, Java 21, Android API 36 and ARM64 Android output.
+Pinned Rust is declared in `rust-toolchain.toml`. CI uses Tauri 2, Trunk, Java 21, Android API 36 and ARM64 Android output.
 
 ## Local gates
 
@@ -50,6 +62,6 @@ cargo tauri android dev
 
 CI builds ARM64 debug/signed artifacts and enforces package-size/alignment contracts. Build outputs belong in CI artifacts or local `/artifacts`, never in source control.
 
-The Android application ID is `music.virya.signal`, declared once as the `identifier` in `src-tauri/tauri.conf.json`. Every script, workflow and Play upload derives it from there rather than repeating the literal, and `scripts/test_android_application_id.py` fails the build if a copy drifts. Google Play treats the application ID as permanent identity from the first upload onwards, so it must not be changed after the first release; the push transport lives in the `music.virya.signal.push` sub-package and follows it automatically.
+The Android application ID is `music.virya.signal`, declared once as the `identifier` in `src-tauri/tauri.conf.json`. Scripts, workflows and Play upload derive it from that source; `scripts/test_android_application_id.py` fails if a copy drifts. Google Play treats the application ID as permanent identity after first upload.
 
 Translations are compile-time catalogs in `src/i18n/{pl,en}.rs`; regenerate the pre-WASM boot catalog with `python3 scripts/generate-boot-i18n.py` after changing boot-visible copy.
