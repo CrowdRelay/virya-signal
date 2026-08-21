@@ -187,7 +187,11 @@ pub fn fan_exists(app_data_dir: &Path) -> bool {
     exists_at(&fan_vault_path(app_data_dir), &fan_salt_path(app_data_dir))
 }
 
-pub fn save_fan(app_data_dir: &Path, pin: &str, profile: &FanProfile) -> Result<(), AppError> {
+pub fn save_fan(
+    app_data_dir: &Path,
+    pin: &str,
+    profile: &FanProfile,
+) -> Result<Zeroizing<Vec<u8>>, AppError> {
     save_at(
         &fan_vault_path(app_data_dir),
         &fan_salt_path(app_data_dir),
@@ -253,7 +257,11 @@ pub fn load_fan_home_cache_with_password(
 /// Replaces an existing fan vault after a server-verified recovery flow.
 /// The previous encrypted files are kept as sibling backups until the new
 /// profile is committed, then removed. A failed write restores the old pair.
-pub fn replace_fan(app_data_dir: &Path, pin: &str, profile: &FanProfile) -> Result<(), AppError> {
+pub fn replace_fan(
+    app_data_dir: &Path,
+    pin: &str,
+    profile: &FanProfile,
+) -> Result<Zeroizing<Vec<u8>>, AppError> {
     let vault_path = fan_vault_path(app_data_dir);
     let salt_path = fan_salt_path(app_data_dir);
     let vault_backup = backup_path(&vault_path);
@@ -275,10 +283,10 @@ pub fn replace_fan(app_data_dir: &Path, pin: &str, profile: &FanProfile) -> Resu
         pin,
         profile,
     ) {
-        Ok(()) => {
+        Ok(password) => {
             let _ = remove_if_present(&vault_backup);
             let _ = remove_if_present(&salt_backup);
-            Ok(())
+            Ok(password)
         }
         Err(error) => {
             let _ = remove_pair(&vault_path, &salt_path);
@@ -312,7 +320,8 @@ pub fn save_beacon(
         BEACON_PROFILE_KEY,
         pin,
         profile,
-    )
+    )?;
+    Ok(())
 }
 
 pub fn load_beacon(app_data_dir: &Path, pin: &str) -> Result<BeaconProfile, AppError> {
@@ -349,7 +358,7 @@ pub fn replace_beacon(
         pin,
         profile,
     ) {
-        Ok(()) => {
+        Ok(_) => {
             let _ = remove_if_present(&vault_backup);
             let _ = remove_if_present(&salt_backup);
             Ok(())
@@ -405,7 +414,7 @@ fn save_at<T: Serialize>(
     profile_key: &[u8],
     pin: &str,
     profile: &T,
-) -> Result<(), AppError> {
+) -> Result<Zeroizing<Vec<u8>>, AppError> {
     let bytes = Zeroizing::new(serde_json::to_vec(profile)?);
     save_bytes_at(
         vault_path,
@@ -417,6 +426,9 @@ fn save_at<T: Serialize>(
     )
 }
 
+/// Returns the derived vault password. Argon2 is the dominant cost of a save,
+/// so a caller that also needs the password must reuse this one rather than
+/// derive it again from the same pin and salt.
 fn save_bytes_at(
     vault_path: &Path,
     salt_path: &Path,
@@ -424,7 +436,7 @@ fn save_bytes_at(
     profile_key: &[u8],
     pin: &str,
     bytes: &[u8],
-) -> Result<(), AppError> {
+) -> Result<Zeroizing<Vec<u8>>, AppError> {
     ensure_pin(pin)?;
     if let Some(parent) = vault_path.parent() {
         std::fs::create_dir_all(parent)?;
@@ -437,7 +449,8 @@ fn save_bytes_at(
         profile_key,
         password.as_ref(),
         bytes,
-    )
+    )?;
+    Ok(password)
 }
 
 fn save_bytes_with_password_at(

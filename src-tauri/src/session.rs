@@ -74,7 +74,8 @@ pub(crate) async fn persist_fan(
     let pin = state.fan_pin.read().await.clone().ok_or(AppError::Locked)?;
     let app_data_dir = state.app_data_dir.clone();
     let profile = profile.clone();
-    run_blocking(move || vault::save_fan(&app_data_dir, pin.as_str(), &profile)).await
+    run_blocking(move || vault::save_fan(&app_data_dir, pin.as_str(), &profile)).await?;
+    Ok(())
 }
 
 pub(crate) async fn persist_beacon(
