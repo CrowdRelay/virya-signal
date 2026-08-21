@@ -33,7 +33,7 @@ fn OperatorSignal(
                         {move || if loading.get() { tr("refreshing") } else { tr("refresh") }}
                     </button>
                 </div>
-                <Show when=move || !loading.get() fallback=move || view! { <Skeleton rows=4 /> }>
+                <Show when=move || !loading.get() || overview.with(|value| value.is_some()) fallback=move || view! { <Skeleton rows=4 /> }>
                     {move || {
                         overview
                             .get()
