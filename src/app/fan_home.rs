@@ -342,7 +342,7 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
                     }}
                 </button>
             </article>
-            <PushPreferencesControl error=error />
+            <PushPreferencesControl status=status error=error />
         </Show>
     }
 }
@@ -436,7 +436,10 @@ fn update_push_preference(
 }
 
 #[component]
-fn PushPreferencesControl(error: RwSignal<Option<String>>) -> impl IntoView {
+fn PushPreferencesControl(
+    status: RwSignal<Option<FanPushStatus>>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
     // The list used to appear only after the backend answered, so a slow or
     // unreachable preferences call left the fan staring at the bare toggle.
     // Defaults render immediately and the backend value replaces them silently.
@@ -474,8 +477,17 @@ fn PushPreferencesControl(error: RwSignal<Option<String>>) -> impl IntoView {
         (PUSH_PREF_QUIET, tr("push_quiet_hours")),
     ];
 
+    // Shown until the backend says push is unavailable, so the list is there on
+    // the first frame instead of waiting for a status round trip to allow it.
+    let available = move || {
+        bridge::native_available()
+            && status
+                .get()
+                .is_none_or(|value| value.supported && value.backend_enabled)
+    };
+
     view! {
-        <Show when=move || bridge::native_available()>
+        <Show when=available>
             <article class="push-setting-card push-preferences-card">
                 <div class="push-setting-copy">
                     <div class="push-setting-heading">
