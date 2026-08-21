@@ -144,7 +144,6 @@ fn refresh_operator_signal(
     });
 }
 
-
 fn refresh_operator_autopilot(
     overview: RwSignal<Option<OperatorAutopilotOverview>>,
     loading: RwSignal<bool>,
@@ -239,9 +238,6 @@ fn refresh_fan_home(
 ) {
     loading.update(|state| state.home = true);
     spawn_local(async move {
-        // Native Signal can render the encrypted last-known-good snapshot before
-        // touching the network. It is always marked stale and never suppresses
-        // the revalidation below.
         if bridge::native_available()
             && let Ok(Some(value)) = bridge::invoke_timeout::<Option<FanHomeData>, _>(
                 "fan_cached_home",
@@ -284,7 +280,8 @@ fn refresh_fan_parts(
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) {
-    loading.set(FanLoadingState::all());
+    // Each child request owns exactly one loading bit. Do not mark unrelated
+    // home/merch/wallet/AREA sections busy when refreshing dashboard fragments.
     refresh_fan_events(dashboard, loading, error);
     refresh_fan_referral(dashboard, loading, error);
     refresh_fan_interests(dashboard, loading, error);
