@@ -189,6 +189,13 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
     let resume_refresh = RwSignal::new(0_u32);
     let resume_pending = RwSignal::new(false);
     let enable_after_settings = RwSignal::new(false);
+    // What the fan just asked for, held until the native command confirms it.
+    let desired = RwSignal::new(None::<bool>);
+    let shown_enabled = move || {
+        desired
+            .get()
+            .unwrap_or_else(|| status.get().is_some_and(|value| value.enabled))
+    };
     install_resume_refresh(resume_refresh);
 
     Effect::new(move |_| {
@@ -251,6 +258,9 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
         });
     });
 
+    // The switch used to sit on "Synchronizing…" until FCM registration and the
+    // backend round trip both came back. The decision is local and instant, so
+    // the card commits to it now and the registration catches up in the task.
     let toggle = move |_| {
         if busy.get_untracked() {
             return;
@@ -259,16 +269,19 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
         let opens_settings = current
             .as_ref()
             .is_some_and(|value| !value.enabled && value.permission == "denied");
-        let command = if current.as_ref().is_some_and(|value| value.enabled) {
-            "fan_push_disable"
-        } else if opens_settings {
+        let want_enabled = !current.as_ref().is_some_and(|value| value.enabled);
+        let command = if opens_settings {
             "fan_push_open_settings"
-        } else {
+        } else if want_enabled {
             "fan_push_enable"
+        } else {
+            "fan_push_disable"
         };
         busy.set(true);
         if opens_settings {
             enable_after_settings.set(true);
+        } else {
+            desired.set(Some(want_enabled));
         }
         spawn_lifecycle_task(async move {
             match bridge::invoke_timeout::<FanPushStatus, _>(command, &EmptyArgs {}, 45_000).await {
@@ -279,6 +292,7 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
                     let _ = error.try_set(Some(message));
                 }
             }
+            let _ = desired.try_set(None);
             finish_resumable_ui_task(busy, resume_pending, resume_refresh);
         });
     };
@@ -291,24 +305,25 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
                         <span class="push-setting-icon" aria-hidden="true">"◉"</span>
                         <div><strong>{tr("push_notifications")}</strong><p>{tr("push_notifications_hint")}</p></div>
                     </div>
-                    {move || status.get().map(|current| {
-                        let message = if !current.supported {
-                            tr("push_notifications_degraded")
-                        } else if current.detail.as_deref() == Some("firebase_not_configured") {
-                            tr("push_firebase_not_configured")
-                        } else if !current.backend_enabled {
-                            tr("push_notifications_waiting_backend")
-                        } else if current.permission == "denied" {
-                            tr("push_notifications_blocked")
-                        } else if current.enabled {
-                            tr("push_notifications_on")
-                        } else if current.detail.is_some() {
-                            tr("push_notifications_degraded")
-                        } else {
-                            tr("push_notifications_off")
+                    {move || {
+                        let on = shown_enabled();
+                        let syncing = busy.get();
+                        let message = match status.get() {
+                            _ if desired.get().is_some() => tr("syncing_push_notifications"),
+                            Some(current) if !current.supported => tr("push_notifications_degraded"),
+                            Some(current) if current.detail.as_deref() == Some("firebase_not_configured") => {
+                                tr("push_firebase_not_configured")
+                            }
+                            Some(current) if !current.backend_enabled => tr("push_notifications_waiting_backend"),
+                            Some(current) if current.permission == "denied" => tr("push_notifications_blocked"),
+                            Some(current) if current.enabled => tr("push_notifications_on"),
+                            Some(current) if current.detail.is_some() => tr("push_notifications_degraded"),
+                            Some(_) => tr("push_notifications_off"),
+                            None if syncing => tr("syncing_push_notifications"),
+                            None => tr("push_notifications_off"),
                         };
-                        view! { <small class:success=current.enabled class:warning=!current.enabled>{message}</small> }
-                    })}
+                        view! { <small class:success=on class:warning=!on>{message}</small> }
+                    }}
                 </div>
                 <button
                     type="button"
@@ -316,12 +331,12 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
                     disabled=move || busy.get()
                     on:click=toggle
                 >
-                    {move || if busy.get() {
-                        tr("syncing_push_notifications")
-                    } else if status.get().is_some_and(|value| value.enabled) {
-                        tr("disable_push_notifications")
-                    } else if status.get().as_ref().is_some_and(|value| value.permission == "denied") {
+                    {move || if status.get().as_ref().is_some_and(|value| value.permission == "denied")
+                        && desired.get().is_none()
+                    {
                         tr("open_notification_settings")
+                    } else if shown_enabled() {
+                        tr("disable_push_notifications")
                     } else {
                         tr("enable_push_notifications")
                     }}
@@ -350,87 +365,104 @@ fn push_preference_enabled(value: &FanPushPreferences, key: u8) -> bool {
     }
 }
 
+fn push_preferences_update(value: &FanPushPreferences) -> FanPushPreferencesUpdate {
+    FanPushPreferencesUpdate {
+        shows: value.shows,
+        releases: value.releases,
+        community: value.community,
+        merch: value.merch,
+        quiet_hours_enabled: value.quiet_hours_enabled,
+        quiet_start: value.quiet_start.clone(),
+        quiet_end: value.quiet_end.clone(),
+    }
+}
+
+/// Flip the switch now and let the write catch up. A write already in flight
+/// re-reads the newest state before it finishes, so rapid taps coalesce into
+/// one final round trip instead of racing each other.
 fn update_push_preference(
-    preferences: RwSignal<Option<FanPushPreferences>>,
-    busy: RwSignal<bool>,
+    preferences: RwSignal<FanPushPreferences>,
+    confirmed: RwSignal<Option<FanPushPreferences>>,
+    writing: RwSignal<bool>,
     error: RwSignal<Option<String>>,
     key: u8,
     checked: bool,
 ) {
-    let Some(current) = preferences.get_untracked() else {
-        return;
-    };
-    if busy.get_untracked() {
+    preferences.update(|value| match key {
+        PUSH_PREF_SHOWS => value.shows = checked,
+        PUSH_PREF_RELEASES => value.releases = checked,
+        PUSH_PREF_COMMUNITY => value.community = checked,
+        PUSH_PREF_MERCH => value.merch = checked,
+        PUSH_PREF_QUIET => value.quiet_hours_enabled = checked,
+        _ => {}
+    });
+    if writing.get_untracked() {
         return;
     }
-
-    let mut next = FanPushPreferencesUpdate {
-        shows: current.shows,
-        releases: current.releases,
-        community: current.community,
-        merch: current.merch,
-        quiet_hours_enabled: current.quiet_hours_enabled,
-        quiet_start: current.quiet_start.clone(),
-        quiet_end: current.quiet_end.clone(),
-    };
-    match key {
-        PUSH_PREF_SHOWS => next.shows = checked,
-        PUSH_PREF_RELEASES => next.releases = checked,
-        PUSH_PREF_COMMUNITY => next.community = checked,
-        PUSH_PREF_MERCH => next.merch = checked,
-        PUSH_PREF_QUIET => next.quiet_hours_enabled = checked,
-        _ => return,
-    }
-
-    busy.set(true);
+    writing.set(true);
     spawn_lifecycle_task(async move {
-        match bridge::invoke_timeout::<FanPushPreferences, _>(
-            "fan_push_update_preferences",
-            &FanPushPreferencesArgs { preferences: &next },
-            15_000,
-        )
-        .await
-        {
-            Ok(value) => {
-                let _ = preferences.try_set(Some(value));
-            }
-            Err(message) => {
-                let _ = error.try_set(Some(message));
+        loop {
+            let sent = push_preferences_update(&preferences.get_untracked());
+            match bridge::invoke_timeout::<FanPushPreferences, _>(
+                "fan_push_update_preferences",
+                &FanPushPreferencesArgs { preferences: &sent },
+                15_000,
+            )
+            .await
+            {
+                Ok(value) => {
+                    let _ = confirmed.try_set(Some(value.clone()));
+                    let latest = preferences
+                        .try_get_untracked()
+                        .map(|current| push_preferences_update(&current));
+                    if latest.as_ref() == Some(&sent) {
+                        let _ = preferences.try_set(value);
+                        break;
+                    }
+                }
+                Err(message) => {
+                    // Put the switches back where the backend last confirmed them
+                    // instead of leaving the fan with a setting that never landed.
+                    if let Some(previous) = confirmed.try_get_untracked().flatten() {
+                        let _ = preferences.try_set(previous);
+                    }
+                    let _ = error.try_set(Some(message));
+                    break;
+                }
             }
         }
-        let _ = busy.try_set(false);
+        let _ = writing.try_set(false);
     });
 }
 
 #[component]
 fn PushPreferencesControl(error: RwSignal<Option<String>>) -> impl IntoView {
-    let preferences = RwSignal::new(None::<FanPushPreferences>);
-    let busy = RwSignal::new(false);
+    // The list used to appear only after the backend answered, so a slow or
+    // unreachable preferences call left the fan staring at the bare toggle.
+    // Defaults render immediately and the backend value replaces them silently.
+    let preferences = RwSignal::new(FanPushPreferences::default());
+    let confirmed = RwSignal::new(None::<FanPushPreferences>);
+    let writing = RwSignal::new(false);
+    let loaded = RwSignal::new(false);
 
     Effect::new(move |_| {
-        if !bridge::native_available()
-            || preferences.get_untracked().is_some()
-            || busy.get_untracked()
-        {
+        if !bridge::native_available() || loaded.get_untracked() {
             return;
         }
-        busy.set(true);
+        loaded.set(true);
         spawn_lifecycle_task(async move {
-            match bridge::invoke_timeout::<FanPushPreferences, _>(
+            if let Ok(value) = bridge::invoke_timeout::<FanPushPreferences, _>(
                 "fan_push_preferences",
                 &EmptyArgs {},
                 15_000,
             )
             .await
             {
-                Ok(value) => {
-                    let _ = preferences.try_set(Some(value));
+                if !writing.get_untracked() {
+                    let _ = preferences.try_set(value.clone());
                 }
-                Err(message) => {
-                    let _ = error.try_set(Some(message));
-                }
+                let _ = confirmed.try_set(Some(value));
             }
-            let _ = busy.try_set(false);
         });
     });
 
@@ -443,7 +475,7 @@ fn PushPreferencesControl(error: RwSignal<Option<String>>) -> impl IntoView {
     ];
 
     view! {
-        <Show when=move || preferences.get().is_some()>
+        <Show when=move || bridge::native_available()>
             <article class="push-setting-card push-preferences-card">
                 <div class="push-setting-copy">
                     <div class="push-setting-heading">
@@ -457,15 +489,12 @@ fn PushPreferencesControl(error: RwSignal<Option<String>>) -> impl IntoView {
                                 <input
                                     type="checkbox"
                                     class="pref-switch"
-                                    disabled=move || busy.get()
-                                    prop:checked=move || preferences
-                                        .get()
-                                        .as_ref()
-                                        .is_some_and(|value| push_preference_enabled(value, key))
+                                    prop:checked=move || push_preference_enabled(&preferences.get(), key)
                                     on:change=move |event| {
                                         update_push_preference(
                                             preferences,
-                                            busy,
+                                            confirmed,
+                                            writing,
                                             error,
                                             key,
                                             event_target_checked(&event),
