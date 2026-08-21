@@ -46,12 +46,16 @@ export function viryaStoredLanguage(key) {
 }
 export function viryaSetLanguage(key, value) {
   try { window.localStorage?.setItem(key, value); } catch {}
-  try { window.dispatchEvent(new CustomEvent('virya:language-change', { detail: { language: value } })); } catch {}
+  const runtime = globalThis.__VIRYA_RUNTIME_I18N__;
+  if (runtime?.requestLanguage) runtime.requestLanguage(value);
+  else try { window.dispatchEvent(new CustomEvent('virya:language-change')); } catch {}
 }
 export function viryaRuntimeText(language, key) {
-  const catalogs = globalThis.__VIRYA_RUNTIME_I18N__;
-  const value = catalogs?.[language]?.[key] ?? catalogs?.pl?.[key];
+  const value = globalThis.__VIRYA_RUNTIME_I18N__?.text?.(language, key);
   return typeof value === 'string' ? value : key;
+}
+export function viryaRuntimeI18nReady() {
+  return globalThis.__VIRYA_RUNTIME_I18N__?.ready?.() ?? Promise.resolve();
 }
 "#)]
 extern "C" {
@@ -61,12 +65,22 @@ extern "C" {
     fn set_language_js(key: &str, value: &str);
     #[wasm_bindgen(js_name = viryaRuntimeText)]
     fn runtime_text_js(language: &str, key: &str) -> String;
+    #[wasm_bindgen(catch, js_name = viryaRuntimeI18nReady)]
+    async fn runtime_i18n_ready_js() -> Result<JsValue, JsValue>;
 }
 
 pub fn initialize() {
     set_current(Language::from_code(&stored_language_js(
         LANGUAGE_STORAGE_KEY,
     )));
+}
+
+/// The selected catalog is a JSON asset, kept outside the WASM module. Mount
+/// only after it has arrived so English users never see a Polish/key fallback
+/// during the first render; a failed non-default fetch falls back in the
+/// loader before this promise resolves.
+pub async fn wait_for_runtime_catalog() {
+    let _ = runtime_i18n_ready_js().await;
 }
 
 pub fn current() -> Language {

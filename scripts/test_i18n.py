@@ -64,6 +64,7 @@ class I18nContracts(unittest.TestCase):
             "runtime-i18n.js: " + ", ".join(copy_modules),
         )
         self.assertIn("viryaRuntimeText", source)
+        self.assertIn("viryaRuntimeI18nReady", source)
         self.assertIn("TRANSLATION_CACHE", source)
         self.assertIn("Box::leak", source)
         self.assertIn("RefCell<Vec<((&'static str, &'static str), &'static str)>>", source)
@@ -74,8 +75,11 @@ class I18nContracts(unittest.TestCase):
         runtime = (ROOT / "runtime-i18n.js").read_text()
         self.assertIn('"boot_initial_status"', boot)
         self.assertNotIn('"back_signal"', boot)
-        for key in ("back_signal", "stale_ticket_leases", "boot_initial_status"):
-            self.assertIn(f'"{key}"', runtime)
+        self.assertIn('readJson("runtime-i18n-keys.json")', runtime)
+        self.assertIn('readJson(`runtime-i18n-${selected}.json`)', runtime)
+        self.assertIn("response.json()", runtime)
+        self.assertIn("requestLanguage", runtime)
+        self.assertNotIn('"back_signal"', runtime)
         self.assertIn("__VIRYA_RUNTIME_I18N__", source)
 
     def test_selected_language_crosses_the_first_native_ipc(self):
@@ -87,6 +91,14 @@ class I18nContracts(unittest.TestCase):
     def test_boot_catalog_is_generated_and_valid_javascript(self):
         before = (ROOT / "boot-i18n.js").read_text()
         runtime_before = (ROOT / "runtime-i18n.js").read_text()
+        runtime_json_before = {
+            name: (ROOT / name).read_text()
+            for name in (
+                "runtime-i18n-keys.json",
+                "runtime-i18n-pl.json",
+                "runtime-i18n-en.json",
+            )
+        }
         subprocess.run(
             ["python3", str(ROOT / "scripts/generate-boot-i18n.py")],
             check=True,
@@ -94,8 +106,25 @@ class I18nContracts(unittest.TestCase):
         )
         self.assertEqual((ROOT / "boot-i18n.js").read_text(), before)
         self.assertEqual((ROOT / "runtime-i18n.js").read_text(), runtime_before)
+        self.assertEqual(
+            {
+                name: (ROOT / name).read_text()
+                for name in runtime_json_before
+            },
+            runtime_json_before,
+        )
         subprocess.run(["node", "--check", "boot-i18n.js"], check=True, cwd=ROOT)
         subprocess.run(["node", "--check", "runtime-i18n.js"], check=True, cwd=ROOT)
+
+    def test_runtime_catalog_arrays_keep_keys_once_and_values_exact(self):
+        import json
+
+        keys = json.loads((ROOT / "runtime-i18n-keys.json").read_text())
+        self.assertEqual(keys, sorted(self.pl))
+        self.assertEqual(len(keys), len(set(keys)))
+        for language, expected in (("pl", self.pl), ("en", self.en)):
+            values = json.loads((ROOT / f"runtime-i18n-{language}.json").read_text())
+            self.assertEqual(values, [expected[key] for key in keys])
 
     def test_runtime_catalog_does_not_delay_wasm_discovery(self):
         index = (ROOT / "index.html").read_text()
@@ -104,10 +133,19 @@ class I18nContracts(unittest.TestCase):
         self.assertLess(runtime_catalog, rust_entry)
         self.assertLess(index.index('<script defer src="boot-i18n.js'), rust_entry)
         self.assertIn('<script defer src="runtime-i18n.js', index)
+        for name in (
+            "runtime-i18n-keys.json",
+            "runtime-i18n-pl.json",
+            "runtime-i18n-en.json",
+        ):
+            self.assertIn(f'<link data-trunk rel="copy-file" href="{name}" />', index)
 
     def test_i18n_payloads_keep_boot_small_and_runtime_bounded(self):
         self.assertLessEqual((ROOT / "boot-i18n.js").stat().st_size, 4 * 1024)
-        self.assertLessEqual((ROOT / "runtime-i18n.js").stat().st_size, 128 * 1024)
+        self.assertLessEqual((ROOT / "runtime-i18n.js").stat().st_size, 4 * 1024)
+        self.assertLessEqual((ROOT / "runtime-i18n-keys.json").stat().st_size, 32 * 1024)
+        for language in ("pl", "en"):
+            self.assertLessEqual((ROOT / f"runtime-i18n-{language}.json").stat().st_size, 48 * 1024)
 
     def test_runtime_copy_is_not_hardcoded_in_polish(self):
         for relative in ("src/app.rs", "src/app/area.rs", "src/bridge.rs", "boot.js", "index.html"):
@@ -128,6 +166,8 @@ class I18nContracts(unittest.TestCase):
         app = (ROOT / "src/app.rs").read_text()
         self.assertNotIn("window.location.reload()", source)
         self.assertIn("virya:language-change", source)
+        self.assertIn("requestLanguage", source)
+        self.assertIn("wait_for_runtime_catalog", source)
         self.assertIn("install_language_refresh(language_refresh)", app)
         self.assertIn("language_refresh.get();", app)
         self.assertIn("dashboard=operator_dashboard", app)

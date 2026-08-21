@@ -55,6 +55,7 @@ required = [
     'src/app.rs', 'src/app/area.rs', 'src/bridge.rs', 'src-tauri/capabilities/mobile.json',
     '.github/workflows/check.yml', '.github/workflows/mobile-smoke.yml',
     'rust-toolchain.toml', '.cargo/config.toml', 'scripts/collect-mobile-artifact.py', 'boot.js', 'boot-i18n.js', 'runtime-i18n.js',
+    'runtime-i18n-keys.json', 'runtime-i18n-pl.json', 'runtime-i18n-en.json',
     'bundle-stage-pack.webp', 'scripts/generate-boot-i18n.py',
     'scripts/test-boot.mjs', 'scripts/check-web-dist.py',
     'scripts/configure-android-signing.py',
@@ -308,7 +309,7 @@ if 'data-trunk rel="copy-dir" href="public"' in index:
 if 'class="boot-signal"' not in index or '@keyframes boot-pulse' not in index:
     raise SystemExit('Virya Signal splash LED is missing or not animated')
 boot_i18n_tag = '<script defer src="boot-i18n.js?v=0.4.2-boot-i18n-v3"></script>'
-runtime_i18n_tag = '<script defer src="runtime-i18n.js?v=0.4.2-runtime-i18n-v2"></script>'
+runtime_i18n_tag = '<script defer src="runtime-i18n.js?v=0.4.2-runtime-i18n-v3"></script>'
 boot_tag = '<script defer src="boot.js?v=0.4.2-startup-v9"></script>'
 if boot_i18n_tag not in index or index.find(boot_i18n_tag) > index.find(boot_tag):
     raise SystemExit('boot translations must load before the boot listener')
@@ -316,6 +317,9 @@ if boot_tag not in index or index.find(boot_tag) > index.find('data-trunk rel="r
     raise SystemExit('boot listener must be declared before the WASM entrypoint')
 if runtime_i18n_tag not in index or index.find(runtime_i18n_tag) > index.find('data-trunk rel="rust"'):
     raise SystemExit('deferred runtime translations must execute before the WASM entrypoint')
+for runtime_i18n_asset in ('runtime-i18n-keys.json', 'runtime-i18n-pl.json', 'runtime-i18n-en.json'):
+    if f'<link data-trunk rel="copy-file" href="{runtime_i18n_asset}" />' not in index:
+        raise SystemExit(f'runtime i18n asset missing from Trunk copy set: {runtime_i18n_asset}')
 if index.count('data-virya-deferred-style') != 2 or 'activateDeferredStyles' not in boot:
     raise SystemExit('app styles must load without blocking the inline splash')
 if 'rel="icon" type="image/svg+xml" href="/signal-v2.svg"' not in index:

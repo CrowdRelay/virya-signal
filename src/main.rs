@@ -7,6 +7,7 @@ mod models;
 mod util;
 
 use app::App;
+use crate::util::spawn_local;
 use leptos::prelude::*;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
@@ -78,7 +79,13 @@ fn main() {
     i18n::initialize();
     bridge::install_runtime_guards();
     virya_boot_phase("wasm-entered");
-    schedule_mount();
+    // The catalog loader starts while the browser fetches/instantiates WASM.
+    // Waiting here keeps the first rendered tree in the selected language
+    // without putting the full PL+EN dictionaries on the parser path.
+    spawn_local(async {
+        i18n::wait_for_runtime_catalog().await;
+        schedule_mount();
+    });
 }
 
 fn mount_app() {
