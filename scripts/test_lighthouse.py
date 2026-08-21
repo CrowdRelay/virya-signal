@@ -11,7 +11,7 @@ CHECKER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECKER)
 
 
-def report(*, score: float = 0.63, observed_lcp: float = 1_215.0) -> dict:
+def report(*, score: float = 0.97, observed_lcp: float = 1_215.0) -> dict:
     simulated = {
         "first-contentful-paint": 2_673.0,
         "largest-contentful-paint": 12_456.0,
@@ -53,13 +53,41 @@ class LighthouseCheckerTests(unittest.TestCase):
         self.assertEqual(current["metric_source"], "observed-trace-v1")
         self.assertEqual(current["audits"]["largest-contentful-paint"], 1_215.0)
         self.assertEqual(current["simulated_audits"]["largest-contentful-paint"], 12_456.0)
-        self.assertEqual(CHECKER.validate("mobile", current, None), [])
+        failures, advisories = CHECKER.validate("mobile", current, None)
+        self.assertEqual(failures, [])
+        self.assertEqual(advisories, [])
 
-    def test_observed_lcp_and_category_safety_floor_still_fail_closed(self) -> None:
+    def test_observed_lcp_and_category_floor_still_fail_closed(self) -> None:
         slow = self.load(report(observed_lcp=3_100.0))
-        self.assertTrue(any("largest-contentful-paint" in item for item in CHECKER.validate("mobile", slow, None)))
-        low_score = self.load(report(score=0.59))
-        self.assertTrue(any("performance" in item for item in CHECKER.validate("mobile", low_score, None)))
+        failures, _ = CHECKER.validate("mobile", slow, None)
+        self.assertTrue(any("largest-contentful-paint" in item for item in failures))
+
+    def test_category_floor_is_an_honest_ninety_five(self) -> None:
+        # 0.94 must fail and 0.95 must pass: the gate is the number it claims
+        # to be, which is only defensible because the reported value is a
+        # median of several runs rather than a single noisy sample.
+        below = self.load(report(score=0.94))
+        failures, _ = CHECKER.validate("mobile", below, None)
+        self.assertTrue(any("performance" in item for item in failures))
+        at_floor = self.load(report(score=0.95))
+        failures, _ = CHECKER.validate("mobile", at_floor, None)
+        self.assertEqual(failures, [])
+
+    def test_baseline_drift_is_advisory_and_never_blocks(self) -> None:
+        # A run that is comfortably inside every absolute gate must stay green
+        # even when it is slower than the previous green run. Blocking on this
+        # is what made the audit fail on runner contention rather than on code.
+        # 0.95 clears the floor exactly, while sitting far enough below a
+        # previous perfect run to trip the drift rule.
+        current = self.load(report(score=0.95))
+        baseline = {
+            "metric_source": CHECKER.METRIC_SOURCE,
+            "scores": {"performance": 1.0, "accessibility": 1.0, "best-practices": 1.0},
+            "audits": dict(current["audits"]),
+        }
+        failures, advisories = CHECKER.validate("mobile", current, baseline)
+        self.assertEqual(failures, [])
+        self.assertTrue(advisories, "drift should still be reported")
 
 
 if __name__ == "__main__":
