@@ -141,11 +141,11 @@ jobs:
           sudo apt-get -o Acquire::Retries=5 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 -o Dpkg::Lock::Timeout=120 install -y --no-install-recommends libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - name: Native tests and lint
         run: |
-          cargo test --locked -p virya-signal
-          cargo clippy --locked -p virya-signal --all-targets -- -D warnings
+          cargo test --locked -p virya-signal -p virya-signal-contracts
+          cargo clippy --locked -p virya-signal -p virya-signal-contracts --all-targets -- -D warnings
       - name: Release-mode lint
         if: github.event_name != 'pull_request'
-        run: cargo clippy --locked --release -p virya-signal --all-targets -- -D warnings
+        run: cargo clippy --locked --release -p virya-signal -p virya-signal-contracts --all-targets -- -D warnings
       - name: Compiler cache statistics
         if: always()
         run: sccache --show-stats

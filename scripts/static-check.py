@@ -440,6 +440,23 @@ if 'node scripts/test-boot.mjs' not in (root / '.github/workflows/check.yml').re
 check_workflow = (root / '.github/workflows/check.yml').read_text()
 if 'trunk build --release' not in check_workflow or 'scripts/check-web-dist.py dist' not in check_workflow:
     raise SystemExit('CI must enforce the optimized frontend size budget')
+# The WASM UI is linted on its own target in the webassembly job. Every other
+# workspace member must be reachable from `cargo test`, or its tests silently
+# stop running: the autopilot payload wire contract guards a hand-written
+# Deserialize and lived outside CI entirely.
+workspace_members = re.findall(r'^\s*members\s*=\s*\[(.*?)\]', (root / 'Cargo.toml').read_text(), re.S | re.M)
+member_paths = re.findall(r'"([^"]+)"', workspace_members[0]) if workspace_members else []
+tested_packages = set(re.findall(r'-p\s+([a-z0-9-]+)', check_workflow))
+for member_path in member_paths:
+    member_manifest = (root / member_path / 'Cargo.toml').read_text()
+    member_name = re.search(r'^\s*name\s*=\s*"([^"]+)"', member_manifest, re.M)
+    if member_name is None:
+        raise SystemExit(f'workspace member has no package name: {member_path}')
+    member_name = member_name.group(1)
+    if member_name == 'virya-signal-ui':
+        continue
+    if f'cargo test --locked' not in check_workflow or member_name not in tested_packages:
+        raise SystemExit(f'CI must run cargo test for workspace member: {member_name}')
 for wasm_feature in ['--enable-bulk-memory', '--enable-bulk-memory-opt', '--enable-nontrapping-float-to-int']:
     if wasm_feature not in index:
         raise SystemExit(f'Rust 1.97 wasm-opt compatibility flag is missing: {wasm_feature}')
