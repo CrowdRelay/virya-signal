@@ -134,10 +134,6 @@ fn OperatorApp(
         // and let the native lock land behind us instead of holding an
         // authenticated screen open until it replies.
         dashboard.set(None);
-        loading.set(OperatorLoadingState::all());
-        signal_overview.set(None);
-        signal_loading.set(false);
-        signal_requested.set(false);
         status.set(SessionStatus {
             configured: status.get_untracked().configured,
             unlocked: false,
