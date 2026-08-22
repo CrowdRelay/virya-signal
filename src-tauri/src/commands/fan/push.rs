@@ -99,6 +99,47 @@ async fn persist_push_state(
     Ok(updated)
 }
 
+async fn session_is_current(
+    state: &State<'_, AppState>,
+    expected: Option<&Arc<FanProfile>>,
+) -> bool {
+    match expected {
+        Some(expected) => state
+            .fan_session
+            .read()
+            .await
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(current, expected)),
+        None => true,
+    }
+}
+
+async fn persist_push_state_if_current(
+    state: &State<'_, AppState>,
+    expected: Option<&Arc<FanProfile>>,
+    profile: &FanProfile,
+    desired: bool,
+    sync_ok: bool,
+) -> Result<(), AppError> {
+    let Some(expected) = expected else {
+        persist_push_state(state, profile, desired, sync_ok).await?;
+        return Ok(());
+    };
+
+    let _mutation = state.fan_mutation.lock().await;
+    let current = state
+        .fan_session
+        .read()
+        .await
+        .clone()
+        .ok_or(AppError::Locked)?;
+    if !Arc::ptr_eq(&current, expected) {
+        return Ok(());
+    }
+    persist_push_state(state, profile, desired, sync_ok).await?;
+    Ok(())
+}
+
 pub(crate) async fn current_native_push_status(
     state: &State<'_, AppState>,
     app: &AppHandle,
@@ -149,8 +190,13 @@ pub(crate) async fn current_native_push_status(
 async fn sync_native_push_if_desired(
     state: &State<'_, AppState>,
     app: &AppHandle,
+    expected: Option<Arc<FanProfile>>,
 ) -> Result<(), AppError> {
     let profile = fan_profile(state).await?;
+    let expected_ref = expected.as_ref();
+    if !session_is_current(state, expected_ref).await {
+        return Ok(());
+    }
     if !state.native_push_available || !cfg!(target_os = "android") {
         return Ok(());
     }
@@ -159,6 +205,9 @@ async fn sync_native_push_if_desired(
             return Ok(());
         }
         if let Some(installation_id) = read_native_push_installation_id(&state.app_data_dir) {
+            if !session_is_current(state, expected_ref).await {
+                return Ok(());
+            }
             let response = state
                 .api
                 .fan_disable_android_push(&profile, &installation_id)
@@ -172,32 +221,41 @@ async fn sync_native_push_if_desired(
         // FCM tokens are device-scoped and shared by fan/staff audiences.
         // Disabling the fan audience must never delete the provider token, or
         // staff reminders on the same installation would silently break.
-        persist_push_state(state, &profile, false, true).await?;
+        persist_push_state_if_current(state, expected_ref, &profile, false, true).await?;
+        return Ok(());
+    }
+    if !session_is_current(state, expected_ref).await {
         return Ok(());
     }
     let config = state.api.fan_push_config(&profile).await?;
+    if !session_is_current(state, expected_ref).await {
+        return Ok(());
+    }
     if !config.enabled || !config.android_fcm {
-        let _ = persist_push_state(state, &profile, true, false).await;
+        let _ = persist_push_state_if_current(state, expected_ref, &profile, true, false).await;
         return Err(AppError::Conflict("push_delivery_not_live".to_owned()));
     }
     let permission = native_push_permission(app).map_err(AppError::InvalidInput)?;
     if permission != "granted" {
-        let _ = persist_push_state(state, &profile, true, false).await;
+        let _ = persist_push_state_if_current(state, expected_ref, &profile, true, false).await;
         return Err(AppError::Forbidden);
     }
     let token = native_push_token(app).map_err(AppError::InvalidInput)?;
     let installation_id = ensure_native_push_installation_id(&state.app_data_dir)?;
+    if !session_is_current(state, expected_ref).await {
+        return Ok(());
+    }
     let response = state
         .api
         .fan_register_android_push(&profile, &installation_id, &token)
         .await?;
     if !response.registered {
-        let _ = persist_push_state(state, &profile, true, false).await;
+        let _ = persist_push_state_if_current(state, expected_ref, &profile, true, false).await;
         return Err(AppError::Conflict(
             "push_registration_not_confirmed".to_owned(),
         ));
     }
-    persist_push_state(state, &profile, true, true).await?;
+    persist_push_state_if_current(state, expected_ref, &profile, true, true).await?;
     Ok(())
 }
 
@@ -207,7 +265,7 @@ pub(crate) async fn fan_push_sync(
     app: AppHandle,
 ) -> Result<FanPushStatus, AppError> {
     let _mutation = state.fan_mutation.lock().await;
-    match sync_native_push_if_desired(&state, &app).await {
+    match sync_native_push_if_desired(&state, &app, None).await {
         Ok(()) => Ok(current_native_push_status(&state, &app, None).await),
         Err(AppError::Forbidden) => Ok(current_native_push_status(
             &state,
