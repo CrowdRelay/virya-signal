@@ -84,6 +84,17 @@ pub(super) struct FanLoadedState {
     pub area: bool,
 }
 
+/// Which refresh generation each Latarnik section was last loaded at. Entering
+/// a tab that is already current must not refetch it; an explicit refresh bumps
+/// the generation and every section becomes claimable again.
+#[derive(Clone, Copy, Debug, Default)]
+pub(super) struct BeaconLoadedState {
+    pub home: u32,
+    pub news: u32,
+    pub requests: u32,
+    pub releases: u32,
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(super) struct OperatorLoadingState {
     pub events: bool,
