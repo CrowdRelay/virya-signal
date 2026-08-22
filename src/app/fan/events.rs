@@ -110,13 +110,25 @@ fn FanEventCard(
         })
     });
     let interest_slug = event.slug.clone();
+    let interest_event = event.clone();
     let busy = RwSignal::new(false);
+    // Saving used to take two round trips before the button changed: the write,
+    // then a full re-read of the interest list. The row shows as saved now and
+    // both happen behind it; a failed write takes the row back out.
     let interest = move |_| {
         if interested.get_untracked() || busy.get_untracked() {
             return;
         }
         let event_slug = interest_slug.clone();
         busy.set(true);
+        dashboard.update(|state| {
+            let data = state.get_or_insert_with(FanDashboardData::default);
+            let mut next = std::mem::take(&mut data.interests);
+            next.push(FanEventInterest {
+                event: interest_event.clone(),
+            });
+            data.interests = stable_fan_interests(next);
+        });
         spawn_local(async move {
             match bridge::invoke_unit(
                 "fan_register_interest",
@@ -130,7 +142,15 @@ fn FanEventCard(
                     error.set(Some(tr("show_saved_to_your_signal").to_owned()));
                     refresh_fan_interests(dashboard, loading, error);
                 }
-                Err(message) => error.set(Some(message)),
+                Err(message) => {
+                    dashboard.update(|state| {
+                        if let Some(data) = state.as_mut() {
+                            data.interests
+                                .retain(|item| item.event.slug != event_slug);
+                        }
+                    });
+                    error.set(Some(message));
+                }
             }
             busy.set(false);
         });

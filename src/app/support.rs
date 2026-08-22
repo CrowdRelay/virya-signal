@@ -295,6 +295,22 @@ fn refresh_fan_home(
     });
 }
 
+/// Claim a fan section for exactly one loader. The tab effect and the
+/// background warm-up both reach for the same sections, and neither should
+/// issue a request the other already owns.
+fn claim_fan_section(
+    loaded: RwSignal<FanLoadedState>,
+    pick: fn(&mut FanLoadedState) -> &mut bool,
+) -> bool {
+    let mut first = false;
+    loaded.update(|state| {
+        let slot = pick(state);
+        first = !*slot;
+        *slot = true;
+    });
+    first
+}
+
 fn refresh_fan_parts(
     dashboard: RwSignal<Option<FanDashboardData>>,
     loading: RwSignal<FanLoadingState>,
@@ -313,7 +329,29 @@ fn refresh_fan_events(
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) {
-    blank_only_when_empty(loading, dashboard.with_untracked(|value| value.as_ref().is_some_and(|data| !data.events.is_empty())), |state, value| state.events = value);
+    let has_events = dashboard.with_untracked(|value| value.as_ref().is_some_and(|data| !data.events.is_empty()));
+    blank_only_when_empty(loading, has_events, |state, value| state.events = value);
+    // The last successful list is already on disk. Paint it beside the live
+    // request instead of showing a skeleton until the network answers.
+    if !has_events && bridge::native_available() {
+        spawn_local(async move {
+            if let Ok(value) = bridge::invoke_timeout::<Vec<PublicEvent>, _>(
+                "fan_cached_events",
+                &EmptyArgs {},
+                2_000,
+            )
+            .await
+                && !value.is_empty()
+                && dashboard.with_untracked(|state| state.as_ref().is_none_or(|data| data.events.is_empty()))
+            {
+                dashboard.update(|state| {
+                    state.get_or_insert_with(FanDashboardData::default).events =
+                        stable_fan_events(value);
+                });
+                loading.update(|state| state.events = false);
+            }
+        });
+    }
     spawn_local(async move {
         let result = bridge::invoke_latest::<Vec<PublicEvent>, _>(
             "fan_events",
@@ -342,7 +380,25 @@ fn refresh_fan_merch(
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) {
-    blank_only_when_empty(loading, merch.with_untracked(|value| value.is_some()), |state, value| state.merch = value);
+    let has_merch = merch.with_untracked(|value| value.is_some());
+    blank_only_when_empty(loading, has_merch, |state, value| state.merch = value);
+    // See refresh_fan_events: the storefront paints from the last snapshot and
+    // is replaced silently when the live catalog lands.
+    if !has_merch && bridge::native_available() {
+        spawn_local(async move {
+            if let Ok(Some(value)) = bridge::invoke_timeout::<Option<MerchCatalog>, _>(
+                "fan_cached_merch_catalog",
+                &EmptyArgs {},
+                2_000,
+            )
+            .await
+                && merch.get_untracked().is_none()
+            {
+                merch.set(Some(value));
+                loading.update(|state| state.merch = false);
+            }
+        });
+    }
     spawn_local(async move {
         let result = bridge::invoke_latest::<MerchCatalog, _>(
             "fan_merch_catalog",

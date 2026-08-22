@@ -354,6 +354,24 @@ impl CrowdRelayClient {
         Ok(events)
     }
 
+    /// The last successful snapshot, read without touching the network. The UI
+    /// paints this while the live request is still in flight, so a warm cold
+    /// start shows real content instead of a skeleton.
+    pub async fn public_events_snapshot(&self, api_base_url: &str) -> Vec<PublicEvent> {
+        let Ok(key) = cache::cache_key(api_base_url) else {
+            return Vec::new();
+        };
+        self.cached_events(&key, EVENTS_STALE_TTL)
+            .await
+            .unwrap_or_default()
+    }
+
+    /// See [`Self::public_events_snapshot`].
+    pub async fn public_merch_snapshot(&self, api_base_url: &str) -> Option<MerchCatalog> {
+        let key = cache::cache_key(api_base_url).ok()?;
+        self.cached_merch(&key, MERCH_STALE_TTL).await
+    }
+
     pub async fn public_merch_catalog(&self, api_base_url: &str) -> Result<MerchCatalog, AppError> {
         let cache_key = cache::cache_key(api_base_url)?;
         if let Some(catalog) = self.cached_merch(&cache_key, MERCH_CACHE_TTL).await {

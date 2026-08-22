@@ -447,6 +447,22 @@ pub(crate) async fn fan_home(state: State<'_, AppState>) -> Result<FanHomeData, 
 }
 
 #[tauri::command]
+pub(crate) async fn fan_cached_events(
+    state: State<'_, AppState>,
+) -> Result<Vec<PublicEvent>, AppError> {
+    let profile = fan_profile(&state).await?;
+    Ok(state.api.public_events_snapshot(&profile.api_base_url).await)
+}
+
+#[tauri::command]
+pub(crate) async fn fan_cached_merch_catalog(
+    state: State<'_, AppState>,
+) -> Result<Option<MerchCatalog>, AppError> {
+    let profile = fan_profile(&state).await?;
+    Ok(state.api.public_merch_snapshot(&profile.api_base_url).await)
+}
+
+#[tauri::command]
 pub(crate) async fn fan_events(state: State<'_, AppState>) -> Result<Vec<PublicEvent>, AppError> {
     let profile = fan_profile(&state).await?;
     state.api.fan_events(&profile).await
