@@ -104,22 +104,27 @@ fn write_and_verify_operator(
     Ok(persisted)
 }
 
-pub fn load(app_data_dir: &Path, pin: &str) -> Result<OperatorProfile, AppError> {
-    load_at(
-        &operator_vault_path(app_data_dir),
-        &operator_salt_path(app_data_dir),
-        OPERATOR_CLIENT_PATH,
-        OPERATOR_PROFILE_KEY,
-        pin,
-    )
-}
-
 /// Derives the Stronghold password once per unlocked operator session. The
 /// caller keeps it in a Zeroizing buffer and drops it on lock.
 pub fn operator_password(app_data_dir: &Path, pin: &str) -> Result<Zeroizing<Vec<u8>>, AppError> {
     ensure_pin(pin)?;
     let salt = read_salt(&operator_salt_path(app_data_dir))?;
     Ok(Zeroizing::new(password(pin, &salt)?))
+}
+
+/// Opens the operator profile with an already derived password. An unlock that
+/// also keeps the password for the session must use this instead of `load`, or
+/// it pays the dominant Argon2 cost twice for the same pin and salt.
+pub fn load_operator_with_password(
+    app_data_dir: &Path,
+    password: &[u8],
+) -> Result<OperatorProfile, AppError> {
+    load_required_with_password_at(
+        &operator_vault_path(app_data_dir),
+        OPERATOR_CLIENT_PATH,
+        OPERATOR_PROFILE_KEY,
+        password,
+    )
 }
 
 pub fn remove(app_data_dir: &Path) -> Result<(), AppError> {
@@ -809,14 +814,12 @@ mod tests {
             .expect("operator profile should persist and reopen");
         assert_eq!(persisted, expected);
         assert!(exists(&directory));
-        assert_eq!(
-            load(&directory, "1234").expect("same PIN should unlock"),
-            expected
-        );
-        assert!(matches!(
-            load(&directory, "4321"),
-            Err(AppError::InvalidPin)
-        ));
+        let open = |pin: &str| {
+            let password = operator_password(&directory, pin)?;
+            load_operator_with_password(&directory, password.as_ref())
+        };
+        assert_eq!(open("1234").expect("same PIN should unlock"), expected);
+        assert!(matches!(open("4321"), Err(AppError::InvalidPin)));
         let _ = std::fs::remove_dir_all(directory);
     }
 

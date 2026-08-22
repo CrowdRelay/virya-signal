@@ -516,9 +516,17 @@ fn BeaconApp(
 
     let lock = move |_| {
         bridge::invalidate_latest("beacon:");
+        // Optimistic on purpose: locking is local, so leave the Latarnik surface
+        // now and reconcile with native state when the command replies.
+        status.set(BeaconSessionStatus {
+            configured: status.get_untracked().configured,
+            unlocked: false,
+            session: None,
+        });
         spawn_local(async move {
             match bridge::invoke::<BeaconSessionStatus, _>("beacon_lock", &EmptyArgs {}).await {
-                Ok(value) => status.set(value), Err(message) => error.set(Some(message)),
+                Ok(value) => { let _ = status.try_set(value); }
+                Err(message) => { let _ = error.try_set(Some(message)); }
             }
         });
     };

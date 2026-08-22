@@ -202,16 +202,25 @@ fn FanProfileScreen(
         refresh_fan_area(area, loading, error);
     };
     let lock = move |_| {
+        // Optimistic on purpose: the vault lock has no remote leg, so drop the
+        // session material here and reconcile with native state when it replies.
+        dashboard.set(None);
+        wallets.set(Vec::new());
+        area.set(None);
+        loading.set(FanLoadingState::all());
+        status.set(FanSessionStatus {
+            configured: status.get_untracked().configured,
+            unlocked: false,
+            session: None,
+        });
         spawn_local(async move {
             match bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
                 Ok(value) => {
-                    dashboard.set(None);
-                    wallets.set(Vec::new());
-                    area.set(None);
-                    loading.set(FanLoadingState::all());
-                    status.set(value);
+                    let _ = status.try_set(value);
                 }
-                Err(message) => error.set(Some(message)),
+                Err(message) => {
+                    let _ = error.try_set(Some(message));
+                }
             }
         })
     };
