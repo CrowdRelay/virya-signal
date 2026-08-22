@@ -162,7 +162,7 @@ fn OperatorApp(
                 <div><p class="eyebrow">{tr("virya_control")}</p><strong>{move || status.get().session.map(|s| s.display_name).value_or_else(Default::default)}</strong></div>
                 <div class="topbar-actions">
                     <span class="role-pill">{move || role().label()}</span>
-                    <button class="menu-trigger" aria-label=tr("open_menu") aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|v| *v = !*v)><i></i><i></i><i></i></button>
+                    <button class="menu-trigger" aria-label=tr("open_menu") aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|v| !*v)><i></i><i></i><i></i></button>
                     <button aria-label=tr("close_and_lock_panel") on:click=close>"×"</button>
                 </div>
             </header>
@@ -260,32 +260,61 @@ fn OperatorHome(
         <section class="screen">
             <header class="screen-title"><p class="eyebrow">LIVE OPERATIONS</p><h2>{tr("today_under_control")}</h2></header>
             <Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }>
-            {move || dashboard.with(|state| state.as_ref().map(|data| {
-                let next = data.events.first().cloned();
-                let event_count = data.events.len();
-                let events = data.events.iter().take(8).cloned().collect::<Vec<_>>();
-                let active = data.qr.as_ref().map(|q| q.campaigns.iter().filter(|c| c.active).count()).value_or(0);
-                let checkins = data.qr.as_ref().map(|q| q.campaigns.iter().map(|c| c.checkin_count).sum::<u64>()).value_or(0);
-                let qr_loading = loading.get().qr;
-                view! {
-                    {next.map(|event| {
-                        let location = event_location(&event);
-                        let time = human_time(&event.starts_at);
-                        let title = event.title;
-                        view! {
-                            <article class="hero-card"><p class="eyebrow">{tr("next_show")}</p><h3>{title}</h3><p>{location}</p><time>{time}</time></article>
-                        }
-                    })}
-                    <div class="stats-grid"><Metric value=event_count.to_string() label=tr("shows_count_label")/><Metric value=if qr_loading { "…".to_owned() } else { active.to_string() } label=tr("active_qr")/><Metric value=if qr_loading { "…".to_owned() } else { checkins.to_string() } label=tr("check_ins")/></div>
-                    <div class="section-head"><h3>{tr("upcoming")}</h3><span>{event_count}</span></div>
-                    {if events.is_empty() {
-                        view! { <div class="empty-state"><strong>{tr("no_upcoming_shows")}</strong><p>{tr("new_events_will_appear_here")}</p></div> }.into_any()
-                    } else {
-                        view! { <div class="card-list">{events.into_iter().map(|event| view! { <EventCard event=event /> }).collect_view()}</div> }.into_any()
-                    }}
-                }
-            }.into_any())).value_or_else(|| view! { <Skeleton /> }.into_any())}
+                {move || dashboard.with(|state| state.as_ref().map(|data| {
+                    let next = data.events.first().cloned();
+                    let event_count = data.events.len();
+                    let events = data.events.iter().take(8).cloned().collect::<Vec<_>>();
+                    view! {
+                        {next.map(|event| {
+                            let location = event_location(&event);
+                            let time = human_time(&event.starts_at);
+                            let title = event.title;
+                            view! {
+                                <article class="hero-card"><p class="eyebrow">{tr("next_show")}</p><h3>{title}</h3><p>{location}</p><time>{time}</time></article>
+                            }
+                        })}
+                        <Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }>
+                            <div class="stats-grid">
+                                <Metric value=event_count.to_string() label=tr("shows_count_label")/>
+                            </div>
+                        </Show>
+                        <div class="section-head"><h3>{tr("upcoming")}</h3><span>{event_count}</span></div>
+                        {if events.is_empty() {
+                            view! { <div class="empty-state"><strong>{tr("no_upcoming_shows")}</strong><p>{tr("new_events_will_appear_here")}</p></div> }.into_any()
+                        } else {
+                            view! { <div class="card-list">{events.into_iter().map(|event| view! { <EventCard event=event /> }).collect_view()}</div> }.into_any()
+                        }}
+                    }
+                }.into_any())).value_or_else(|| view! { <Skeleton /> }.into_any())}
             </Show>
+            <div class="stats-grid">
+                <Show when=move || !loading.get().qr fallback=move || view! { <Metric value="…".to_owned() label=tr("active_qr") /> }>
+                    {move || {
+                        let value = dashboard.with(|state| {
+                            state
+                                .as_ref()
+                                .and_then(|data| data.qr.as_ref())
+                                .map(|qr| qr.campaigns.iter().filter(|campaign| campaign.active).count())
+                                .value_or(0)
+                                .to_string()
+                        });
+                        view! { <Metric value=value label=tr("active_qr") /> }
+                    }}
+                </Show>
+                <Show when=move || !loading.get().qr fallback=move || view! { <Metric value="…".to_owned() label=tr("check_ins") /> }>
+                    {move || {
+                        let value = dashboard.with(|state| {
+                            state
+                                .as_ref()
+                                .and_then(|data| data.qr.as_ref())
+                                .map(|qr| qr.campaigns.iter().map(|campaign| campaign.checkin_count).sum::<u64>())
+                                .value_or(0)
+                                .to_string()
+                        });
+                        view! { <Metric value=value label=tr("check_ins") /> }
+                    }}
+                </Show>
+            </div>
         </section>
     }
 }
