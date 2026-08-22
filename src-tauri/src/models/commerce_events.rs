@@ -77,6 +77,8 @@ pub struct MerchProduct {
     pub description: Option<String>,
     #[serde(default, deserialize_with = "deserialize_optional_string_or_bytes")]
     pub image_url: Option<String>,
+    #[serde(default)]
+    pub placeholder_image_url: Option<String>,
     #[serde(deserialize_with = "deserialize_string_or_default")]
     pub currency: String,
     pub price_gross_minor: i64,

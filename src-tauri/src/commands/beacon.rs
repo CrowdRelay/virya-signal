@@ -219,11 +219,14 @@ async fn persist_exchanged_beacon(
     let app_data_dir = state.app_data_dir.clone();
     let stored = profile.clone();
     let vault_pin = pin.clone();
-    run_blocking(move || vault::replace_beacon(&app_data_dir, vault_pin.as_str(), &stored)).await?;
+    let vault_password =
+        run_blocking(move || vault::replace_beacon(&app_data_dir, vault_pin.as_str(), &stored))
+            .await?;
     // Native storage is authoritative. UI state is unlocked only after the
     // Stronghold write has succeeded and can be reopened with this PIN.
     *state.beacon_session.write().await = Some(Arc::new(profile));
     *state.beacon_pin.write().await = Some(pin);
+    *state.beacon_vault_password.write().await = Some(vault_password);
     Ok(())
 }
 
@@ -413,10 +416,15 @@ pub(crate) async fn beacon_unlock(
     let pin = Zeroizing::new(pin);
     let app_data_dir = state.app_data_dir.clone();
     let vault_pin = pin.clone();
-    let profile =
-        run_blocking(move || vault::load_beacon(&app_data_dir, vault_pin.as_str())).await?;
+    let (profile, vault_password) = run_blocking(move || {
+        let password = vault::beacon_password(&app_data_dir, vault_pin.as_str())?;
+        let profile = vault::load_beacon_with_password(&app_data_dir, password.as_ref())?;
+        Ok((profile, password))
+    })
+    .await?;
     *state.beacon_session.write().await = Some(Arc::new(profile));
     *state.beacon_pin.write().await = Some(pin);
+    *state.beacon_vault_password.write().await = Some(vault_password);
     drop(_mutation);
     let status = beacon_status(state).await?;
 
@@ -444,6 +452,7 @@ pub(crate) async fn beacon_lock(
     // profile; anything starting after this point sees a locked session.
     *state.beacon_session.write().await = None;
     *state.beacon_pin.write().await = None;
+    *state.beacon_vault_password.write().await = None;
     *state.pending_beacon_confirmation.lock().await = None;
     beacon_status(state).await
 }
@@ -678,6 +687,7 @@ pub(crate) async fn beacon_logout(
     run_blocking(move || vault::remove_beacon(&app_data_dir)).await?;
     *state.beacon_session.write().await = None;
     *state.beacon_pin.write().await = None;
+    *state.beacon_vault_password.write().await = None;
     drop(_mutation);
     beacon_status(state).await
 }
@@ -694,6 +704,7 @@ pub(crate) async fn beacon_leave(
     run_blocking(move || vault::remove_beacon(&app_data_dir)).await?;
     *state.beacon_session.write().await = None;
     *state.beacon_pin.write().await = None;
+    *state.beacon_vault_password.write().await = None;
     drop(_mutation);
     beacon_status(state).await
 }

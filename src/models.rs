@@ -148,6 +148,8 @@ pub struct FanMerchBundle {
     #[serde(default)]
     pub includes: Vec<String>,
     pub image_url: Option<String>,
+    #[serde(default)]
+    pub placeholder_image_url: Option<String>,
     #[allow(dead_code)]
     pub secondary_image_url: Option<String>,
     pub product_url: String,
@@ -174,6 +176,8 @@ pub struct MerchProduct {
     pub name: String,
     pub description: Option<String>,
     pub image_url: Option<String>,
+    #[serde(default)]
+    pub placeholder_image_url: Option<String>,
     pub currency: String,
     pub price_gross_minor: i64,
     pub active: bool,

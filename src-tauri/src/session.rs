@@ -91,14 +91,22 @@ pub(crate) async fn persist_beacon(
     state: &State<'_, AppState>,
     profile: &BeaconProfile,
 ) -> Result<(), AppError> {
+    let app_data_dir = state.app_data_dir.clone();
+    let profile = profile.clone();
+    // Reuse the password derived at unlock. Falling back to the PIN re-runs
+    // Argon2, which costs more than the snapshot write itself.
+    if let Some(password) = state.beacon_vault_password.read().await.as_ref().cloned() {
+        return run_blocking(move || {
+            vault::save_beacon_with_password(&app_data_dir, password.as_ref(), &profile)
+        })
+        .await;
+    }
     let pin = state
         .beacon_pin
         .read()
         .await
         .clone()
         .ok_or(AppError::Locked)?;
-    let app_data_dir = state.app_data_dir.clone();
-    let profile = profile.clone();
     run_blocking(move || vault::save_beacon(&app_data_dir, pin.as_str(), &profile)).await
 }
 

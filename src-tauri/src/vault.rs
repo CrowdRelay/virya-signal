@@ -504,21 +504,53 @@ pub fn save_beacon(
     Ok(())
 }
 
-pub fn load_beacon(app_data_dir: &Path, pin: &str) -> Result<BeaconProfile, AppError> {
-    load_at(
+/// Saves the Beacon profile with the password derived at unlock.
+///
+/// `save_beacon` re-runs Argon2 over the PIN for every write. Callers holding
+/// the unlocked session password must use this instead.
+pub fn save_beacon_with_password(
+    app_data_dir: &Path,
+    password: &[u8],
+    profile: &BeaconProfile,
+) -> Result<(), AppError> {
+    let bytes = Zeroizing::new(serde_json::to_vec(profile)?);
+    save_bytes_with_password_at(
         &beacon_vault_path(app_data_dir),
-        &beacon_salt_path(app_data_dir),
         BEACON_CLIENT_PATH,
         BEACON_PROFILE_KEY,
-        pin,
+        password,
+        bytes.as_ref(),
     )
 }
 
+/// Derives the Beacon Stronghold password once for the unlocked session.
+pub fn beacon_password(app_data_dir: &Path, pin: &str) -> Result<Zeroizing<Vec<u8>>, AppError> {
+    ensure_pin(pin)?;
+    let salt = read_salt(&beacon_salt_path(app_data_dir))?;
+    Ok(Zeroizing::new(password(pin, &salt)?))
+}
+
+/// Opens the Beacon profile with an already derived password, so an unlock that
+/// keeps the password for the session pays Argon2 once rather than twice.
+pub fn load_beacon_with_password(
+    app_data_dir: &Path,
+    password: &[u8],
+) -> Result<BeaconProfile, AppError> {
+    load_required_with_password_at(
+        &beacon_vault_path(app_data_dir),
+        BEACON_CLIENT_PATH,
+        BEACON_PROFILE_KEY,
+        password,
+    )
+}
+
+/// Returns the derived vault password so a caller that keeps the session open
+/// does not derive it a second time from the same pin and salt.
 pub fn replace_beacon(
     app_data_dir: &Path,
     pin: &str,
     profile: &BeaconProfile,
-) -> Result<(), AppError> {
+) -> Result<Zeroizing<Vec<u8>>, AppError> {
     let vault_path = beacon_vault_path(app_data_dir);
     let salt_path = beacon_salt_path(app_data_dir);
     let vault_backup = backup_path(&vault_path);
@@ -538,10 +570,10 @@ pub fn replace_beacon(
         pin,
         profile,
     ) {
-        Ok(_) => {
+        Ok(password) => {
             let _ = remove_if_present(&vault_backup);
             let _ = remove_if_present(&salt_backup);
-            Ok(())
+            Ok(password)
         }
         Err(error) => {
             let _ = remove_pair(&vault_path, &salt_path);

@@ -75,6 +75,7 @@ fn FanMerch(
                                     } else {
                                         product.image_url
                                     };
+                                    let placeholder = placeholder_style(product.placeholder_image_url);
                                     let product_name = product.name;
                                     let image_alt = i18n::format(
                                         "value_merch_virya",
@@ -93,7 +94,7 @@ fn FanMerch(
                                     view! {
                                         <article class="fan-merch-card">
                                             {image_url.map(|url| view! {
-                                                <img src=url alt=image_alt width="600" height="600" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+                                                <img src=url alt=image_alt style=placeholder width="600" height="600" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
                                             })}
                                             <div class="fan-merch-body">
                                                 <div class="fan-merch-heading">
@@ -164,6 +165,7 @@ fn FanMerchBundles(
                     } else {
                         bundle.image_url
                     };
+                    let placeholder = placeholder_style(bundle.placeholder_image_url);
                     let bundle_name = bundle.name;
                     let image_alt = i18n::format(
                         "value_zestaw_merchu_virya",
@@ -189,7 +191,7 @@ fn FanMerchBundles(
                         <article class="fan-merch-card fan-merch-bundle">
                             <div class="bundle-badge">"BUNDLE"</div>
                             {image_url.map(|url| view! {
-                                <img src=url alt=image_alt width="600" height="600" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+                                <img src=url alt=image_alt style=placeholder width="600" height="600" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
                             })}
                             <div class="fan-merch-body">
                                 <div class="fan-merch-heading">
@@ -224,4 +226,14 @@ fn FanMerchBundles(
             </div>
         }.into_any())
     }
+}
+
+/// Paints the 16px variant of the same art behind the image element. The card
+/// shows it upscaled — blurred by the browser's own smoothing — until the real
+/// image decodes, instead of a flat block. Costs under a kilobyte per card and
+/// nothing at all when the catalog carries no placeholder.
+fn placeholder_style(placeholder_image_url: Option<String>) -> String {
+    placeholder_image_url
+        .map(|url| format!("background-image:url({url})"))
+        .unwrap_or_default()
 }
