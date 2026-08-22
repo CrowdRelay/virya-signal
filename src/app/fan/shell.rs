@@ -163,6 +163,65 @@ fn FanApp(
             }
         }
     });
+    // Sections used to wait for the first visit to their own tab, so the first
+    // tap on Bilety, Merch or AREA always cost a full round trip with a
+    // skeleton on screen. Once Home has painted, the rest is fetched behind it
+    // in two waves: the dashboard fragments the fan is most likely to open
+    // next, then the heavier catalogs a moment later so the warm-up never
+    // competes with what is actually being read.
+    let warmed = RwSignal::new(false);
+    Effect::new(move |_| {
+        if warmed.get_untracked()
+            || !status.get().unlocked
+            || loading.get().home
+            || home.get_untracked().is_none()
+        {
+            return;
+        }
+        warmed.set(true);
+        if claim_fan_section(loaded, |state| &mut state.events) {
+            refresh_fan_events(dashboard, loading, error);
+        }
+        if claim_fan_section(loaded, |state| &mut state.referral) {
+            refresh_fan_referral(dashboard, loading, error);
+        }
+        if claim_fan_section(loaded, |state| &mut state.interests) {
+            refresh_fan_interests(dashboard, loading, error);
+        }
+        set_timeout(
+            move || {
+                // The fan can lock the app or leave the portal inside the delay.
+                // A disposed owner reads as None, a locked one as !unlocked.
+                if status
+                    .try_get_untracked()
+                    .is_none_or(|value| !value.unlocked)
+                {
+                    return;
+                }
+                if claim_fan_section(loaded, |state| &mut state.admission_pass) {
+                    refresh_fan_admission_pass(dashboard, loading, error);
+                }
+                if claim_fan_section(loaded, |state| &mut state.merch) {
+                    refresh_fan_merch(merch, loading, error);
+                    refresh_fan_merch_bundles(merch_bundles);
+                }
+                if claim_fan_section(loaded, |state| &mut state.area) {
+                    refresh_fan_area(area, loading, error);
+                }
+                // One request per stored order, so warm it only when the
+                // profile says there is something to warm.
+                let has_orders = status
+                    .try_get_untracked()
+                    .and_then(|value| value.session)
+                    .is_some_and(|profile| profile.wallet_count > 0);
+                if has_orders && claim_fan_section(loaded, |state| &mut state.wallets) {
+                    refresh_wallets(wallets, Some(loading), error);
+                }
+            },
+            std::time::Duration::from_millis(900),
+        );
+    });
+
     Effect::new(move |_| {
         let generation = refresh_requested.get();
         if generation == 0 {
