@@ -410,7 +410,14 @@ impl CrowdRelayClient {
         }
 
         let (etag, last_modified) = cache::response_validators(response.headers());
-        let catalog: MerchCatalog = decode(response).await?;
+        let mut catalog: MerchCatalog = decode(response).await?;
+        // Rewrite once, before the catalog is cached, so every later read of the
+        // snapshot already points at the card-sized image.
+        for product in &mut catalog.products {
+            if let Some(url) = product.image_url.take() {
+                product.image_url = Some(super::site::merch_preview_image_url(&url));
+            }
+        }
         let mut public_cache = self.public_cache.write().await;
         cache::prune_cache(&mut public_cache.merch, MERCH_STALE_TTL);
         public_cache.merch.insert(

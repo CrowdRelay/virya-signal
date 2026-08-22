@@ -878,9 +878,6 @@ html[data-virya-scanner-active] .app-shell {
 .merch-screen .screen-title > p:last-child { color: var(--muted); line-height: 1.5; }
 .merch-screen .empty-state .ghost { min-height: 50px; padding-top: 13px; padding-bottom: 13px; }
 .fan-merch-card .ghost { width: 100%; min-height: 52px; margin-top: auto; padding: 14px 10px; font-size: var(--type-micro); font-weight: 850; }
-@media (max-width: 520px) {
-  .fan-merch-list { grid-template-columns: 1fr; }
-}
 
 @media (max-width: 420px) {
   .ticket-type-card { grid-template-columns: 1fr; }

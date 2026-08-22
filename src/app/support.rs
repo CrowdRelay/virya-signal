@@ -485,7 +485,14 @@ fn refresh_fan_merch(
         .await;
         let completed = latest_request_completed(&result);
         match result {
-            Ok(Some(value)) => merch.set(Some(value)),
+            // The cached snapshot painted first and the live catalog is usually
+            // identical to it. Setting it anyway would tear down and rebuild
+            // every product card and product image for no visible change.
+            Ok(Some(value)) => {
+                if merch.with_untracked(|current| current.as_ref() != Some(&value)) {
+                    merch.set(Some(value));
+                }
+            }
             Ok(None) => {}
             Err(message) => {
                 merch.set(None);
@@ -508,7 +515,11 @@ fn refresh_fan_merch_bundles(bundles: RwSignal<Option<FanMerchBundleCatalog>>) {
         )
         .await
         {
-            Ok(Some(value)) => bundles.set(Some(value)),
+            Ok(Some(value)) => {
+                if bundles.with_untracked(|current| current.as_ref() != Some(&value)) {
+                    bundles.set(Some(value));
+                }
+            }
             Ok(None) => {}
             Err(_) => bundles.set(None),
         }

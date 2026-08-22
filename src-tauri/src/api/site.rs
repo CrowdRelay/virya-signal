@@ -11,6 +11,8 @@ use super::{client::CrowdRelayClient, http::decode};
 const MERCH_INVENTORY_URL: &str = "https://virya.music/api/merch/inventory";
 const SIGNAL_FEEDBACK_URL: &str = "https://virya.music/api/signal-feedback";
 const VIRYA_SITE_ORIGIN: &str = "https://virya.music";
+const NETLIFY_IMAGE_PATH: &str = "/.netlify/images";
+const MERCH_PREVIEW_IMAGE_WIDTH: u32 = 600;
 const SITE_READ_TIMEOUT: Duration = Duration::from_secs(8);
 const FEEDBACK_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_BUNDLES: usize = 8;
@@ -118,6 +120,36 @@ fn validated_site_url(value: &str, label: &str) -> Result<String, AppError> {
     Ok(parsed.to_string())
 }
 
+/// Rewrites a virya.music image URL to a card-sized variant served by the
+/// Netlify Image CDN.
+///
+/// The store art is 1200x1200 and the fan storefront paints it into a card
+/// roughly 190 CSS px wide. Decoding the original costs about 5.8 MB of bitmap
+/// per image, and a screenful of them is what makes the merch tab heavy on
+/// Android. Anything not served from the site is returned untouched.
+pub(super) fn merch_preview_image_url(value: &str) -> String {
+    let Ok(parsed) = Url::parse(value) else {
+        return value.to_owned();
+    };
+    if parsed.scheme() != "https"
+        || !matches!(parsed.host_str(), Some("virya.music" | "www.virya.music"))
+        || parsed.path().starts_with(NETLIFY_IMAGE_PATH)
+    {
+        return value.to_owned();
+    }
+    let Ok(mut resized) = Url::parse(VIRYA_SITE_ORIGIN) else {
+        return value.to_owned();
+    };
+    resized.set_path(NETLIFY_IMAGE_PATH);
+    resized
+        .query_pairs_mut()
+        .append_pair("url", parsed.path())
+        .append_pair("w", &MERCH_PREVIEW_IMAGE_WIDTH.to_string())
+        .append_pair("fm", "webp")
+        .append_pair("q", "72");
+    resized.to_string()
+}
+
 fn validated_store_url(value: &str) -> Result<String, AppError> {
     let value = validated_site_url(value, crate::i18n::tr("native_store_url_label"))?;
     let parsed = Url::parse(&value)?;
@@ -172,12 +204,14 @@ impl SignalMerchBundleCatalog {
                 .image_url
                 .take()
                 .map(|url| validated_site_url(&url, crate::i18n::tr("native_image_url_label")))
-                .transpose()?;
+                .transpose()?
+                .map(|url| merch_preview_image_url(&url));
             bundle.secondary_image_url = bundle
                 .secondary_image_url
                 .take()
                 .map(|url| validated_site_url(&url, crate::i18n::tr("native_image_url_label")))
-                .transpose()?;
+                .transpose()?
+                .map(|url| merch_preview_image_url(&url));
             bundle.product_url = validated_store_url(&bundle.product_url)?;
             bundle.currency = bundle.currency.trim().to_ascii_uppercase();
             if bundle.currency != "PLN"
@@ -307,6 +341,26 @@ mod tests {
         let mut catalog = valid_catalog();
         catalog.bundles[0].product_url = "https://example.com/store".into();
         assert!(catalog.validate().is_err());
+    }
+
+    #[test]
+    fn rewrites_site_images_to_card_sized_previews() {
+        let catalog = valid_catalog().validate().expect("valid catalog");
+        let image = catalog.bundles[0]
+            .image_url
+            .as_deref()
+            .expect("bundle image url");
+        assert!(image.starts_with("https://virya.music/.netlify/images?"));
+        assert!(image.contains("w=600"));
+        assert!(image.contains("url=%2Fimages%2Fmerch%2Fechoes.webp"));
+    }
+
+    #[test]
+    fn leaves_already_resized_and_foreign_images_alone() {
+        let resized = "https://virya.music/.netlify/images?url=%2Fa.webp&w=600";
+        assert_eq!(merch_preview_image_url(resized), resized);
+        let foreign = "https://cdn.example.com/a.webp";
+        assert_eq!(merch_preview_image_url(foreign), foreign);
     }
 
     #[test]
