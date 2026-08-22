@@ -266,25 +266,37 @@ fn FanApp(
 
     let close = move |_| {
         bridge::invalidate_latest("fan:");
+        // Locking is an in-memory native operation with nothing to confirm
+        // remotely, so leave the session now and let it land behind us. Waiting
+        // for the reply held the fan on an authenticated screen for as long as
+        // whatever else the native side happened to be doing.
+        home.set(None);
+        dashboard.set(None);
+        merch.set(None);
+        merch_bundles.set(None);
+        wallets.set(Vec::new());
+        checkout_event.set(None);
+        focused_event_slug.set(None);
+        focused_event_preview.set(None);
+        admission_qr.set(None);
+        area.set(None);
+        loading.set(FanLoadingState::all());
+        status.set(FanSessionStatus {
+            configured: status.get_untracked().configured,
+            unlocked: false,
+            session: None,
+        });
+        persist_fan_tab(FanTab::Signal);
+        mode.set(RootMode::Fan);
         spawn_local(async move {
             match bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
+                // Native state stays authoritative: adopt whatever it reports.
                 Ok(value) => {
-                    home.set(None);
-                    dashboard.set(None);
-                    merch.set(None);
-                    merch_bundles.set(None);
-                    wallets.set(Vec::new());
-                    checkout_event.set(None);
-                    focused_event_slug.set(None);
-                    focused_event_preview.set(None);
-                    admission_qr.set(None);
-                    area.set(None);
-                    loading.set(FanLoadingState::all());
-                    status.set(value);
-                    persist_fan_tab(FanTab::Signal);
-                    mode.set(RootMode::Fan);
+                    let _ = status.try_set(value);
                 }
-                Err(message) => error.set(Some(message)),
+                Err(message) => {
+                    let _ = error.try_set(Some(message));
+                }
             }
         });
     };

@@ -437,11 +437,14 @@ pub(crate) async fn beacon_unlock(
 pub(crate) async fn beacon_lock(
     state: State<'_, AppState>,
 ) -> Result<BeaconSessionStatus, AppError> {
-    let _mutation = state.beacon_mutation.lock().await;
+    // Locking only drops in-memory session material, so it deliberately does not
+    // queue behind `beacon_mutation`. The push reconciliation spawned by unlock
+    // can hold that lock for the length of several network calls, and "log me
+    // out" must not wait for it. An in-flight mutation already owns a cloned
+    // profile; anything starting after this point sees a locked session.
     *state.beacon_session.write().await = None;
     *state.beacon_pin.write().await = None;
     *state.pending_beacon_confirmation.lock().await = None;
-    drop(_mutation);
     beacon_status(state).await
 }
 

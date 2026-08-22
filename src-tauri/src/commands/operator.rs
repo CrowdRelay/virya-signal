@@ -134,15 +134,21 @@ pub(crate) async fn unlock(
 ) -> Result<SessionStatus, AppError> {
     let _mutation = state.operator_mutation.lock().await;
     validate_pin(&pin)?;
+    if !vault::exists(&state.app_data_dir) {
+        return Err(AppError::NotConfigured);
+    }
     let app_data_dir = state.app_data_dir.clone();
     let pin = Zeroizing::new(pin);
     let vault_pin = pin.clone();
-    let profile = run_blocking(move || vault::load(&app_data_dir, vault_pin.as_str())).await?;
-    let password_dir = state.app_data_dir.clone();
-    let password_pin = pin.clone();
-    let vault_password =
-        run_blocking(move || vault::operator_password(&password_dir, password_pin.as_str()))
-            .await?;
+    // Argon2 is the whole cost of a staff unlock. Derive the vault password
+    // once and open the profile with it: deriving it a second time from the
+    // same pin and salt doubled the wait on the login screen for nothing.
+    let (profile, vault_password) = run_blocking(move || {
+        let password = vault::operator_password(&app_data_dir, vault_pin.as_str())?;
+        let profile = vault::load_operator_with_password(&app_data_dir, password.as_ref())?;
+        Ok((profile, password))
+    })
+    .await?;
     let _show_mutation = state.show_mode_mutation.lock().await;
     *state.session.write().await = Some(Arc::new(profile));
     *state.operator_pin.write().await = Some(pin);
@@ -155,15 +161,16 @@ pub(crate) async fn unlock(
 
 #[tauri::command]
 pub(crate) async fn lock(state: State<'_, AppState>) -> Result<SessionStatus, AppError> {
-    let _mutation = state.operator_mutation.lock().await;
-    let _show_mutation = state.show_mode_mutation.lock().await;
+    // Locking only drops in-memory session material, so it deliberately does not
+    // queue behind the mutation locks. A background reconciliation can hold those
+    // for the length of a network call, and "log me out" must not wait for it.
+    // An in-flight mutation already owns a cloned profile; anything starting
+    // after this point sees a locked session.
     *state.session.write().await = None;
     *state.operator_pin.write().await = None;
     *state.operator_vault_password.write().await = None;
     *state.show_mode_store.write().await = None;
     *state.operator_sections_cache.write().await = None;
-    drop(_show_mutation);
-    drop(_mutation);
     session_status(state).await
 }
 
