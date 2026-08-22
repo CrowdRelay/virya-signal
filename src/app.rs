@@ -258,9 +258,11 @@ fn install_resume_subscriber(status_refresh: RwSignal<u32>, wants_focus: bool) {
     }
 }
 
-fn spawn_lifecycle_task(future: impl std::future::Future<Output = ()> + 'static) {
+pub(crate) fn spawn_lifecycle_task(future: impl std::future::Future<Output = ()> + 'static) {
     // Normal UI work is owner-scoped. Only native operations that must survive
-    // Android pause/resume or a reactive Effect rerun use this explicit escape hatch.
+    // Android pause/resume or a reactive Effect rerun use this explicit escape
+    // hatch — plus the pre-mount bootstrap in `main`, which runs before any
+    // reactive owner or executor exists at all.
     wasm_bindgen_futures::spawn_local(future);
 }
 
