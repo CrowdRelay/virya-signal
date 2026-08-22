@@ -91,9 +91,14 @@ class LatarnikNativeContracts(unittest.TestCase):
     def test_access_deep_link_loads_profile_for_settings(self) -> None:
         source = beacon_ui()
         access_arm = source.split("BeaconTab::Access =>", 1)[1].split("}", 1)[0]
-        self.assertIn("refresh_beacon_home(home, loading_home, error)", access_arm)
-        self.assertIn("refresh_beacon_requests(requests, error)", access_arm)
-        self.assertIn("refresh_beacon_releases(releases, error)", access_arm)
+        # The arm asks for the sections through the claim-guarded loaders; the
+        # loaders themselves are what call the refreshes.
+        self.assertIn("load_home()", access_arm)
+        self.assertIn("load_requests()", access_arm)
+        self.assertIn("load_releases()", access_arm)
+        self.assertIn("refresh_beacon_home(home, loading_home, error)", source)
+        self.assertIn("refresh_beacon_requests(requests, error)", source)
+        self.assertIn("refresh_beacon_releases(releases, error)", source)
 
     def test_destructive_confirmation_reuses_panel_styling(self) -> None:
         source = beacon_ui()
