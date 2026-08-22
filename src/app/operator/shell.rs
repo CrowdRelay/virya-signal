@@ -273,11 +273,9 @@ fn OperatorHome(
                                 <article class="hero-card"><p class="eyebrow">{tr("next_show")}</p><h3>{title}</h3><p>{location}</p><time>{time}</time></article>
                             }
                         })}
-                        <Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }>
-                            <div class="stats-grid">
-                                <Metric value=event_count.to_string() label=tr("shows_count_label")/>
-                            </div>
-                        </Show>
+                        <div class="stats-grid">
+                            <Metric value=event_count.to_string() label=tr("shows_count_label")/>
+                        </div>
                         <div class="section-head"><h3>{tr("upcoming")}</h3><span>{event_count}</span></div>
                         {if events.is_empty() {
                             view! { <div class="empty-state"><strong>{tr("no_upcoming_shows")}</strong><p>{tr("new_events_will_appear_here")}</p></div> }.into_any()
