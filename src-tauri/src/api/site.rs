@@ -345,11 +345,12 @@ mod tests {
 
     #[test]
     fn rewrites_site_images_to_card_sized_previews() {
-        let catalog = valid_catalog().validate().expect("valid catalog");
-        let image = catalog.bundles[0]
-            .image_url
-            .as_deref()
-            .expect("bundle image url");
+        let image = valid_catalog()
+            .validate()
+            .ok()
+            .and_then(|catalog| catalog.bundles.into_iter().next())
+            .and_then(|bundle| bundle.image_url)
+            .unwrap_or_default();
         assert!(image.starts_with("https://virya.music/.netlify/images?"));
         assert!(image.contains("w=600"));
         assert!(image.contains("url=%2Fimages%2Fmerch%2Fechoes.webp"));

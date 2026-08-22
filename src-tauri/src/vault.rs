@@ -2,6 +2,7 @@ use std::{
     fs::OpenOptions,
     io::Write,
     path::{Path, PathBuf},
+    sync::{Mutex, MutexGuard},
 };
 
 use argon2::Argon2;
@@ -17,6 +18,26 @@ use crate::{
         OperatorProfile, OperatorSignalOverview, PublicEvent, ReferralProgress, ShowModeStore,
     },
 };
+
+/// Serializes every snapshot open and commit.
+///
+/// Stronghold seals snapshots with age, whose scrypt work factor is 2^19: one
+/// operation needs a 512 MiB arena. The shell opens or refreshes several
+/// sections at once, so unserialized vault work held one arena per in-flight
+/// operation — measured at 3.2 GB of native heap immediately after a fan login,
+/// which is enough for Android's low-memory killer to evict every other app on
+/// the device, background media included. One at a time caps the peak at a
+/// single arena, which the allocator then reuses.
+static SNAPSHOT_LOCK: Mutex<()> = Mutex::new(());
+
+/// A poisoned lock only means an earlier snapshot operation panicked. This lock
+/// guards peak memory rather than shared state, so stepping over the poison is
+/// safe and is preferable to failing an unlock the user can still complete.
+fn lock_snapshot() -> MutexGuard<'static, ()> {
+    SNAPSHOT_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 const OPERATOR_CLIENT_PATH: &[u8] = b"virya-control-device";
 const OPERATOR_PROFILE_KEY: &[u8] = b"operator-profile-v1";
@@ -571,6 +592,7 @@ fn save_bytes_with_password_at(
     let snapshot_path = SnapshotPath::from_path(vault_path);
     let key_provider = KeyProvider::try_from(Zeroizing::new(password.to_vec()))
         .map_err(|_| AppError::StrongholdClient)?;
+    let _snapshot = lock_snapshot();
     let stronghold = Stronghold::default();
     let client = if vault_path.exists() {
         stronghold
@@ -615,6 +637,7 @@ fn load_at<T: DeserializeOwned>(
     let key_provider = KeyProvider::try_from(Zeroizing::new(password(pin, &salt)?))
         .map_err(|_| AppError::InvalidPin)?;
     let snapshot_path = SnapshotPath::from_path(vault_path);
+    let _snapshot = lock_snapshot();
     let stronghold = Stronghold::default();
     let client = stronghold
         .load_client_from_snapshot(client_path, &key_provider, &snapshot_path)
@@ -644,6 +667,7 @@ fn load_required_with_password_at<T: DeserializeOwned>(
     let key_provider = KeyProvider::try_from(Zeroizing::new(password.to_vec()))
         .map_err(|_| AppError::InvalidPin)?;
     let snapshot_path = SnapshotPath::from_path(vault_path);
+    let _snapshot = lock_snapshot();
     let stronghold = Stronghold::default();
     let client = stronghold
         .load_client_from_snapshot(client_path, &key_provider, &snapshot_path)
@@ -673,6 +697,7 @@ fn load_optional_with_password_at<T: DeserializeOwned + Default>(
     let key_provider = KeyProvider::try_from(Zeroizing::new(password.to_vec()))
         .map_err(|_| AppError::InvalidPin)?;
     let snapshot_path = SnapshotPath::from_path(vault_path);
+    let _snapshot = lock_snapshot();
     let stronghold = Stronghold::default();
     let client = stronghold
         .load_client_from_snapshot(client_path, &key_provider, &snapshot_path)
