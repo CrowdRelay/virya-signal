@@ -8,6 +8,7 @@ use std::{collections::HashMap, path::Path, sync::Arc};
 use futures_util::{StreamExt, stream};
 use qrcode::{QrCode, render::svg};
 use tauri::{AppHandle, Manager, State};
+use tokio::sync::MutexGuard;
 use zeroize::Zeroizing;
 
 use crate::{

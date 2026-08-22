@@ -40,8 +40,14 @@ pub(crate) async fn fan_unlock(
     let session = state.fan_session.read().await.clone();
     tauri::async_runtime::spawn(async move {
         let state = app.state::<AppState>();
-        if let Err(error) = sync_native_push_if_desired(&state, &app, session).await {
-            eprintln!("[virya:push-sync] unlock reconciliation degraded: {error}");
+        match sync_native_push_if_desired(&state, &app, session).await {
+            // `Locked` here only means the fan logged out before reconciliation
+            // finished, which is the expected outcome of a fast logout, not a
+            // degraded sync.
+            Ok(()) | Err(AppError::Locked) => {}
+            Err(error) => {
+                eprintln!("[virya:push-sync] unlock reconciliation degraded: {error}");
+            }
         }
     });
     Ok(status)
