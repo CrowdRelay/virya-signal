@@ -55,6 +55,7 @@ pub(crate) async fn fan_lock(state: State<'_, AppState>) -> Result<FanSessionSta
     *state.fan_vault_password.write().await = None;
     *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
+    *state.fan_sections_cache.write().await = None;
     drop(_mutation);
     fan_status(state).await
 }
@@ -80,6 +81,7 @@ pub(crate) async fn fan_delete_account(
     *state.fan_vault_password.write().await = None;
     *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
+    *state.fan_sections_cache.write().await = None;
     let app_data_dir = state.app_data_dir.clone();
     run_blocking(move || vault::remove_fan(&app_data_dir)).await?;
     drop(_mutation);
@@ -117,6 +119,7 @@ pub(crate) async fn fan_forget(
     *state.fan_vault_password.write().await = None;
     *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
+    *state.fan_sections_cache.write().await = None;
     let app_data_dir = state.app_data_dir.clone();
     run_blocking(move || vault::remove_fan(&app_data_dir)).await?;
     drop(_mutation);
@@ -157,6 +160,9 @@ async fn persist_confirmed_fan(
     *state.fan_pin.write().await = Some(pin);
     *state.fan_vault_password.write().await = Some(vault_password);
     state.wallet_qr_tokens.write().await.clear();
+    // A different fan now owns this vault; the previous fan's panels must not
+    // paint under the new session.
+    *state.fan_sections_cache.write().await = None;
     Ok(())
 }
 
@@ -318,10 +324,16 @@ pub(crate) async fn fan_request_access(
 
 #[tauri::command]
 pub(crate) async fn fan_area_wallet(
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<crate::models::AreaWallet, AppError> {
     let profile = fan_profile(&state).await?;
-    state.api.fan_area_wallet(&profile).await
+    let wallet = state.api.fan_area_wallet(&profile).await?;
+    remember_fan_sections(app, {
+        let wallet = wallet.clone();
+        move |snapshot| snapshot.area = Some(wallet)
+    });
+    Ok(wallet)
 }
 
 #[tauri::command]
@@ -446,6 +458,91 @@ pub(crate) async fn fan_home(state: State<'_, AppState>) -> Result<FanHomeData, 
     Ok(home)
 }
 
+/// Returns the last known referral, interests, admission pass and AREA wallet
+/// without touching the network, so those panels paint from disk on a cold
+/// start instead of holding a skeleton for the length of a live request.
+#[tauri::command]
+pub(crate) async fn fan_cached_sections(
+    state: State<'_, AppState>,
+) -> Result<Option<vault::FanSectionsCacheSnapshot>, AppError> {
+    // Prove the session is unlocked before the in-memory mirror is served.
+    // Locking clears the vault password, and a decrypted mirror must never
+    // outlive it.
+    let password = state
+        .fan_vault_password
+        .read()
+        .await
+        .as_ref()
+        .map(|value| Zeroizing::new(value.to_vec()))
+        .ok_or(AppError::Locked)?;
+    if let Some(snapshot) = state.fan_sections_cache.read().await.clone() {
+        return Ok(Some(snapshot));
+    }
+    let app_data_dir = state.app_data_dir.clone();
+    let snapshot = match run_blocking(move || {
+        vault::load_fan_sections_cache_with_password(&app_data_dir, password.as_ref())
+    })
+    .await
+    {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            eprintln!("[virya:fan-cache] encrypted dashboard snapshot ignored: {error}");
+            None
+        }
+    };
+    if let Some(snapshot) = snapshot.clone() {
+        *state.fan_sections_cache.write().await = Some(snapshot);
+    }
+    Ok(snapshot)
+}
+
+/// Folds one refreshed section into the encrypted dashboard snapshot. The write
+/// is spawned and serialized behind its own mutation lock: the snapshot only has
+/// to be on disk before the next cold start, never before the fan sees the
+/// section it came from.
+fn remember_fan_sections(
+    app: AppHandle,
+    apply: impl FnOnce(&mut vault::FanSectionsCacheSnapshot) + Send + 'static,
+) {
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        let _mutation = state.fan_sections_cache_mutation.lock().await;
+        let Some(password) = state
+            .fan_vault_password
+            .read()
+            .await
+            .as_ref()
+            .map(|value| Zeroizing::new(value.to_vec()))
+        else {
+            return;
+        };
+        let mut snapshot = state
+            .fan_sections_cache
+            .read()
+            .await
+            .clone()
+            .unwrap_or_default();
+        apply(&mut snapshot);
+        snapshot.stored_at_unix_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|value| value.as_secs())
+            .unwrap_or(0);
+        *state.fan_sections_cache.write().await = Some(snapshot.clone());
+        let app_data_dir = state.app_data_dir.clone();
+        if let Err(error) = run_blocking(move || {
+            vault::save_fan_sections_cache_with_password(
+                &app_data_dir,
+                password.as_ref(),
+                &snapshot,
+            )
+        })
+        .await
+        {
+            eprintln!("[virya:fan-cache] encrypted dashboard snapshot save degraded: {error}");
+        }
+    });
+}
+
 #[tauri::command]
 pub(crate) async fn fan_cached_events(
     state: State<'_, AppState>,
@@ -542,31 +639,54 @@ pub(crate) async fn fan_start_ticket_checkout(
 }
 
 #[tauri::command]
-pub(crate) async fn fan_referral(state: State<'_, AppState>) -> Result<ReferralProgress, AppError> {
+pub(crate) async fn fan_referral(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<ReferralProgress, AppError> {
     let profile = fan_profile(&state).await?;
-    state.api.fan_referral(&profile).await
+    let referral = state.api.fan_referral(&profile).await?;
+    remember_fan_sections(app, {
+        let referral = referral.clone();
+        move |snapshot| snapshot.referral = Some(referral)
+    });
+    Ok(referral)
 }
 
 #[tauri::command]
 pub(crate) async fn fan_interests(
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Vec<FanEventInterest>, AppError> {
     let profile = fan_profile(&state).await?;
-    state.api.fan_interests(&profile).await
+    let interests = state.api.fan_interests(&profile).await?;
+    remember_fan_sections(app, {
+        let interests = interests.clone();
+        move |snapshot| snapshot.interests = interests
+    });
+    Ok(interests)
 }
 
 #[tauri::command]
 pub(crate) async fn fan_admission_pass(
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Option<AdmissionPass>, AppError> {
     let _mutation = state.fan_mutation.lock().await;
     let mut profile = fan_profile(&state).await?.as_ref().clone();
     match state.api.fan_admission_pass(&profile).await {
-        Ok(value) => Ok(value),
+        Ok(value) => {
+            remember_fan_sections(app, {
+                let value = value.clone();
+                move |snapshot| snapshot.admission_pass = value
+            });
+            Ok(value)
+        }
         Err(AppError::Unauthorized | AppError::NotFound) => {
             profile.pass_session_token = None;
             persist_fan(&state, &profile).await?;
             *state.fan_session.write().await = Some(Arc::new(profile));
+            // The pass is gone server-side; the cached copy must not outlive it.
+            remember_fan_sections(app, |snapshot| snapshot.admission_pass = None);
             Ok(None)
         }
         Err(error) => Err(error),

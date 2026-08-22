@@ -32,15 +32,15 @@ use commands::{
     },
     fan::{
         fan_admission_pass, fan_admission_qr, fan_area_challenge, fan_area_claim, fan_area_wallet,
-        fan_cached_events, fan_cached_home, fan_cached_merch_catalog, fan_claim_pass,
-        fan_clear_pending_confirmation, fan_confirm, fan_confirm_scanned, fan_delete_account,
-        fan_events, fan_forget, fan_home, fan_import_wallet, fan_interests, fan_lock,
-        fan_merch_bundles, fan_merch_catalog, fan_prepare_confirmation, fan_push_disable,
-        fan_push_enable, fan_push_open_settings, fan_push_preferences, fan_push_status,
-        fan_push_sync, fan_push_take_target, fan_push_update_preferences, fan_referral,
-        fan_register_interest, fan_request_access, fan_request_delivery, fan_signup,
-        fan_start_ticket_checkout, fan_status, fan_ticket_sale, fan_unlock,
-        fan_unpublish_synesthesia_leaderboard, fan_wallets, render_wallet_qr,
+        fan_cached_events, fan_cached_home, fan_cached_merch_catalog, fan_cached_sections,
+        fan_cached_wallets, fan_claim_pass, fan_clear_pending_confirmation, fan_confirm,
+        fan_confirm_scanned, fan_delete_account, fan_events, fan_forget, fan_home,
+        fan_import_wallet, fan_interests, fan_lock, fan_merch_bundles, fan_merch_catalog,
+        fan_prepare_confirmation, fan_push_disable, fan_push_enable, fan_push_open_settings,
+        fan_push_preferences, fan_push_status, fan_push_sync, fan_push_take_target,
+        fan_push_update_preferences, fan_referral, fan_register_interest, fan_request_access,
+        fan_request_delivery, fan_signup, fan_start_ticket_checkout, fan_status, fan_ticket_sale,
+        fan_unlock, fan_unpublish_synesthesia_leaderboard, fan_wallets, render_wallet_qr,
     },
     misc::{
         launcher_status, open_external_url, request_city, submit_anonymous_feedback,
@@ -49,8 +49,8 @@ use commands::{
     operator::{
         configure, create_qr_campaign, forget_device, issue_pass, lock, operator_autopilot_approve,
         operator_autopilot_assign, operator_autopilot_cancel, operator_autopilot_chief_of_staff,
-        operator_autopilot_overview, operator_autopilot_set_authority, operator_events,
-        operator_ops_overview, operator_push_disable, operator_push_enable,
+        operator_autopilot_overview, operator_autopilot_set_authority, operator_cached_sections,
+        operator_events, operator_ops_overview, operator_push_disable, operator_push_enable,
         operator_push_open_settings, operator_push_sync, operator_qr, operator_retry,
         operator_show_checklist, operator_signal_overview, operator_update_show_checklist,
         public_cities, public_events, redeem_admission, redeem_coupon, revoke_pass,
@@ -90,6 +90,11 @@ pub struct AppState {
     operator_vault_password: RwLock<Option<Zeroizing<Vec<u8>>>>,
     operator_mutation: Mutex<()>,
     operator_push_mutation: Mutex<()>,
+    /// In-memory mirror of the encrypted operator-panel snapshot, for the same
+    /// reason as `fan_sections_cache`: six panels refresh independently and
+    /// none of them should have to decrypt the other five back first.
+    operator_sections_cache: RwLock<Option<vault::OperatorSectionsCacheSnapshot>>,
+    operator_sections_cache_mutation: Mutex<()>,
     show_mode_mutation: Mutex<()>,
     show_mode_store: RwLock<Option<ShowModeStore>>,
     fan_session: RwLock<Option<Arc<FanProfile>>>,
@@ -98,6 +103,12 @@ pub struct AppState {
     pending_fan_confirmation: Mutex<Option<PendingFanConfirmation>>,
     pending_synesthesia_handoff: Mutex<Option<Zeroizing<String>>>,
     fan_mutation: Mutex<()>,
+    /// In-memory mirror of the encrypted dashboard-fragment snapshot. Each
+    /// section refreshes on its own schedule, so the mirror lets a single
+    /// section update the record without decrypting the vault to read the
+    /// other three back first.
+    fan_sections_cache: RwLock<Option<vault::FanSectionsCacheSnapshot>>,
+    fan_sections_cache_mutation: Mutex<()>,
     beacon_session: RwLock<Option<Arc<BeaconProfile>>>,
     beacon_pin: RwLock<Option<Zeroizing<String>>>,
     beacon_mutation: Mutex<()>,
@@ -171,6 +182,8 @@ pub fn run() {
                 operator_vault_password: RwLock::new(None),
                 operator_mutation: Mutex::new(()),
                 operator_push_mutation: Mutex::new(()),
+                operator_sections_cache: RwLock::new(None),
+                operator_sections_cache_mutation: Mutex::new(()),
                 show_mode_mutation: Mutex::new(()),
                 show_mode_store: RwLock::new(None),
                 fan_session: RwLock::new(None),
@@ -178,6 +191,8 @@ pub fn run() {
                 fan_vault_password: RwLock::new(None),
                 pending_fan_confirmation: Mutex::new(None),
                 pending_synesthesia_handoff: Mutex::new(None),
+                fan_sections_cache: RwLock::new(None),
+                fan_sections_cache_mutation: Mutex::new(()),
                 fan_mutation: Mutex::new(()),
                 beacon_session: RwLock::new(None),
                 beacon_pin: RwLock::new(None),
@@ -279,6 +294,9 @@ pub fn run() {
             fan_push_open_settings,
             fan_cached_events,
             fan_cached_merch_catalog,
+            fan_cached_sections,
+            fan_cached_wallets,
+            operator_cached_sections,
             fan_push_preferences,
             fan_push_update_preferences,
             fan_push_take_target,

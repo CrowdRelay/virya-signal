@@ -328,6 +328,19 @@ fn OperatorSettings(
         refresh_operator_autopilot(autopilot, autopilot_loading, error);
         refresh_operator_chief(autopilot_chief, autopilot_chief_loading, error);
         refresh_operator_ops(ops, ops_loading, error);
+        // Paint the control-plane panels from the last session's snapshot while
+        // the three live reads run, and only where nothing newer has landed.
+        with_operator_cached_sections(move |snapshot| {
+            if snapshot.autopilot.is_some() && autopilot.get_untracked().is_none() {
+                autopilot.set(snapshot.autopilot);
+            }
+            if snapshot.chief.is_some() && autopilot_chief.get_untracked().is_none() {
+                autopilot_chief.set(snapshot.chief);
+            }
+            if snapshot.ops.is_some() && ops.get_untracked().is_none() {
+                ops.set(snapshot.ops);
+            }
+        });
     });
     Effect::new(move |_| {
         let generation = autopilot_refresh_requested.get();

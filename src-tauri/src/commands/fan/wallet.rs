@@ -140,6 +140,41 @@ pub(crate) async fn fan_wallets(state: State<'_, AppState>) -> Result<WalletBatc
     })
 }
 
+/// Paints the wallet tab from the snapshot the last successful refresh left in
+/// the vault. `fan_wallets` fans out over every order under a 35 s budget, so
+/// without this the tab held a skeleton for the whole cold start even though
+/// the tickets were already on disk. Returned wallets are marked `cached` and
+/// only advertise a QR whose stored credential is still valid.
+#[tauri::command]
+pub(crate) async fn fan_cached_wallets(
+    state: State<'_, AppState>,
+) -> Result<Vec<TicketWallet>, AppError> {
+    let profile = fan_profile(&state).await?;
+    let configured = profile
+        .wallets
+        .iter()
+        .map(|wallet| wallet.order_id.clone())
+        .collect::<std::collections::HashSet<_>>();
+    let mut wallets = profile
+        .cached_wallets
+        .iter()
+        .filter(|wallet| configured.contains(&wallet.order.order_id))
+        .cloned()
+        .collect::<Vec<_>>();
+    for wallet in &mut wallets {
+        wallet.cached = true;
+        let order_id = wallet.order.order_id.clone();
+        for ticket in &mut wallet.tickets {
+            ticket.qr_available = profile.cached_wallet_qr.iter().any(|entry| {
+                entry.order_id.as_str() == order_id.as_str()
+                    && entry.public_reference.as_str() == ticket.public_reference.as_str()
+                    && wallet_qr_credential_valid(entry)
+            });
+        }
+    }
+    Ok(wallets)
+}
+
 #[tauri::command]
 pub(crate) async fn render_wallet_qr(
     state: State<'_, AppState>,

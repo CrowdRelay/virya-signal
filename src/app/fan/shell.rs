@@ -165,20 +165,21 @@ fn FanApp(
     });
     // Sections used to wait for the first visit to their own tab, so the first
     // tap on Bilety, Merch or AREA always cost a full round trip with a
-    // skeleton on screen. Once Home has painted, the rest is fetched behind it
-    // in two waves: the dashboard fragments the fan is most likely to open
-    // next, then the heavier catalogs a moment later so the warm-up never
-    // competes with what is actually being read.
+    // skeleton on screen. The warm-up now starts as soon as the fan is
+    // unlocked, in two waves: the dashboard fragments the fan is most likely to
+    // open next, then the heavier catalogs a moment later. It used to wait for
+    // Home to land first, which meant one slow home request — up to its 12 s
+    // timeout — held back sections that already had a snapshot to paint from.
     let warmed = RwSignal::new(false);
     Effect::new(move |_| {
-        if warmed.get_untracked()
-            || !status.get().unlocked
-            || loading.get().home
-            || home.get_untracked().is_none()
-        {
+        if warmed.get_untracked() || !status.get().unlocked {
             return;
         }
         warmed.set(true);
+        // Disk first, network behind it. The snapshot read is issued before the
+        // live requests so the panels that have one paint immediately instead
+        // of showing a skeleton until their own round trip answers.
+        prime_fan_sections(dashboard, area, loading);
         if claim_fan_section(loaded, |state| &mut state.events) {
             refresh_fan_events(dashboard, loading, error);
         }
