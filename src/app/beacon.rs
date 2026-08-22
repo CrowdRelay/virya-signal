@@ -221,10 +221,7 @@ fn BeaconAccess(
     let reactivation = RwSignal::new(false);
 
     let adopt = move |value: BeaconSessionStatus| {
-        pin.set(String::new());
-        invite.set(String::new());
         pending_link.set(false);
-        reactivation.set(false);
         status.set(value);
         status_refresh.update(|value| *value = value.wrapping_add(1));
     };
