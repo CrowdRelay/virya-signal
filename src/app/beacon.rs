@@ -100,12 +100,30 @@ fn beacon_open_url(url: String, error: RwSignal<Option<String>>) {
     });
 }
 
+fn claim_beacon_section(
+    loaded: RwSignal<BeaconLoadedState>,
+    generation: u32,
+    pick: fn(&mut BeaconLoadedState) -> &mut u32,
+) -> bool {
+    let mut first = false;
+    loaded.update(|state| {
+        let slot = pick(state);
+        first = *slot != generation;
+        *slot = generation;
+    });
+    first
+}
+
 fn refresh_beacon_home(
     home: RwSignal<Option<BeaconHomeData>>,
     loading: RwSignal<bool>,
     error: RwSignal<Option<String>>,
 ) {
-    loading.set(true);
+    // Keep whatever is already on screen. Only an empty briefing is worth a
+    // skeleton; a refresh behind real content should be invisible.
+    if home.with_untracked(|value| value.is_none()) {
+        loading.set(true);
+    }
     spawn_local(async move {
         match bridge::invoke_latest::<BeaconHomeData, _>("beacon_home", &EmptyArgs {}, 15_000, "beacon:home").await {
             Ok(Some(value)) => home.set(Some(value)),
@@ -412,22 +430,47 @@ fn BeaconApp(
     let selected_event = RwSignal::new(None::<String>);
     let loading_home = RwSignal::new(true);
     let refresh = RwSignal::new(1_u32);
+    let loaded = RwSignal::new(BeaconLoadedState::default());
     let menu_open = RwSignal::new(false);
 
+    // Every tab entry used to refire the same reads, so moving between Briefing,
+    // Radar and Access paid for the profile three times over. A section is
+    // claimed once per refresh generation; whichever tab asks first owns it.
     Effect::new(move |_| {
-        refresh.get();
-        match tab.get() {
-            BeaconTab::Briefing => {
+        let generation = refresh.get();
+        let load_home = move || {
+            if claim_beacon_section(loaded, generation, |state| &mut state.home) {
                 refresh_beacon_home(home, loading_home, error);
-                spawn_local(async move {
-                    match bridge::invoke_latest::<SignalNewsFeed, _>("beacon_news", &EmptyArgs {}, 15_000, "beacon:news").await {
-                        Ok(Some(value)) => news.set(Some(value)), Ok(None) => {}, Err(message) => error.set(Some(message)),
-                    }
-                });
+            }
+        };
+        let load_news = move || {
+            if !claim_beacon_section(loaded, generation, |state| &mut state.news) {
+                return;
+            }
+            spawn_local(async move {
+                match bridge::invoke_latest::<SignalNewsFeed, _>("beacon_news", &EmptyArgs {}, 15_000, "beacon:news").await {
+                    Ok(Some(value)) => news.set(Some(value)), Ok(None) => {}, Err(message) => error.set(Some(message)),
+                }
+            });
+        };
+        let load_requests = move || {
+            if claim_beacon_section(loaded, generation, |state| &mut state.requests) {
                 refresh_beacon_requests(requests, error);
+            }
+        };
+        let load_releases = move || {
+            if claim_beacon_section(loaded, generation, |state| &mut state.releases) {
                 refresh_beacon_releases(releases, error);
             }
-            BeaconTab::Radar => refresh_beacon_home(home, loading_home, error),
+        };
+        match tab.get() {
+            BeaconTab::Briefing => {
+                load_home();
+                load_news();
+                load_requests();
+                load_releases();
+            }
+            BeaconTab::Radar => load_home(),
             // BeaconPressRoom owns this fetch: it already reacts to both the
             // refresh counter and the selected event, so firing here too would
             // just duplicate the request on every entry into the tab.
@@ -435,11 +478,25 @@ fn BeaconApp(
             BeaconTab::Access => {
                 // Access contains Beacon preferences/settings as well as requests/releases.
                 // Load the authoritative profile even when a push deep-links straight here.
-                refresh_beacon_home(home, loading_home, error);
-                refresh_beacon_requests(requests, error);
-                refresh_beacon_releases(releases, error);
+                load_home();
+                load_requests();
+                load_releases();
             }
         }
+        // Whatever this tab did not need is fetched behind it, so the next tab
+        // is already populated. Claims make a repeat pass a no-op.
+        set_timeout(
+            move || {
+                if refresh.try_get_untracked() != Some(generation) {
+                    return;
+                }
+                load_home();
+                load_news();
+                load_requests();
+                load_releases();
+            },
+            std::time::Duration::from_millis(700),
+        );
     });
 
     Effect::new(move |_| {
