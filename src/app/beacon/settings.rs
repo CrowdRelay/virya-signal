@@ -172,7 +172,7 @@ fn BeaconSettings(
                 <button type="button" class:active=move || topics.get().iter().any(|value| value == "interviews") on:click=move |_| toggle_topic("interviews")>{tr("latarnik_topic_interviews")}</button>
                 <button type="button" class:active=move || topics.get().iter().any(|value| value == "accreditation") on:click=move |_| toggle_topic("accreditation")>{tr("latarnik_topic_accreditation")}</button>
             </div>
-            <label class="check-label"><input type="checkbox" prop:checked=move || nearby.get() on:change=move |e| nearby.set(event_target_checked(&e))/><span>{tr("latarnik_nearby_push")}</span></label>
+            <div class="pref-list"><label class="pref-row"><span class="pref-row-label">{tr("latarnik_nearby_push")}</span><input type="checkbox" class="pref-switch" prop:checked=move || nearby.get() on:change=move |e| nearby.set(event_target_checked(&e))/></label></div>
             <button class="ghost" disabled=move || busy.get() on:click=save>{tr("save")}</button>
             <Show when=move || bridge::native_available()>
                 <div class="push-setting-card beacon-push-setting">

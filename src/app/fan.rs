@@ -512,7 +512,7 @@ fn FanAccess(
                                     <p class="inline-note">{tr("enter_your_city_manually_we_will_match")}</p>
                                 </div>
                                 <div class="nearby-pref">
-                                    <label class="check-label"><input type="checkbox" prop:checked=move || nearby_enabled.get() on:change=move |e| nearby_enabled.set(event_target_checked(&e))/><span>{tr("notify_me_about_nearby_shows")}</span></label>
+                                    <label class="pref-row pref-row-inline"><span class="pref-row-label">{tr("notify_me_about_nearby_shows")}</span><input type="checkbox" class="pref-switch" prop:checked=move || nearby_enabled.get() on:change=move |e| nearby_enabled.set(event_target_checked(&e))/></label>
                                     <Show when=move || nearby_enabled.get()>
                                         <div class="radius-picker">
                                             <button type="button" class:active=move || radius_km.get()==50 on:click=move |_| radius_km.set(50)>"50 km"</button>
@@ -528,7 +528,7 @@ fn FanAccess(
                                     <small id="fan-signup-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
                                     <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-signup-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e)))/>
                                 </label>
-                                <label class="check-label"><input type="checkbox" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/><span>{tr("i_want_to_receive_information_about_virya")}</span></label>
+                                <div class="pref-list"><label class="pref-row"><span class="pref-row-label">{tr("i_want_to_receive_information_about_virya")}</span><input type="checkbox" class="pref-switch" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/></label></div>
                                 <button class="primary" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=signup>{tr("join_signal")}</button>
                             </>
                         </Show>

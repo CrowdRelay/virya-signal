@@ -85,8 +85,6 @@ input:hover, textarea:hover, select:hover { border-color: #444; background: #111
 select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' fill='none' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
 textarea { resize: vertical; }
 input:focus, textarea:focus, select:focus { border-color: var(--signal-hot); box-shadow: 0 0 0 1px var(--signal-hot); background: #0b100f; }
-.check-label { grid-template-columns: 24px 1fr !important; align-items: center; line-height: 1.45; }
-.check-label input { width: 20px; height: 20px; padding: 0; accent-color: var(--signal-hot); }
 .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: #080808; padding: 3px; }
 .segmented button { min-height: 44px; border: 0; border-radius: calc(var(--control-radius) - 2px); background: transparent; color: #98a5a0; padding: 12px; font-weight: 900; }
 .segmented button.active { background: var(--signal-hot); color: #07100e; }
@@ -1029,6 +1027,12 @@ html[data-virya-scanner-active] .app-shell {
   flex: 0 0 auto;
   width: 46px;
   height: 28px;
+  /* The global `input` rule sets min-height: 48px for tap targets, and
+     min-height beats height -- which rendered the track 46x48 and turned the
+     pill into a blob with the knob adrift in it. The row itself is the tap
+     target: it is a label, 52px tall and full width, so the control stays
+     comfortably reachable at the size it is actually drawn. */
+  min-height: 28px;
   margin: 0;
   padding: 0;
   border: 1px solid var(--line);
@@ -1070,6 +1074,17 @@ html[data-virya-scanner-active] .app-shell {
 @media (prefers-reduced-motion: reduce) {
   .pref-switch,
   .pref-switch::after { transition: none; }
+}
+
+/* A single toggle that already sits inside a bordered card. It keeps the row
+   geometry -- label leading, switch trailing, one full-width tap target -- but
+   drops the list chrome, because the surrounding card already draws the border
+   and owns the horizontal padding. */
+.pref-row-inline {
+  min-height: 44px;
+  padding-right: 0;
+  padding-left: 0;
+  border-bottom: 0;
 }
 
 .push-setting-card {
