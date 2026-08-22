@@ -84,19 +84,50 @@ pub(crate) fn open_native_push_settings(_app: &AppHandle) -> Result<(), String> 
 }
 
 
+/// Writes the new push state to the vault and publishes it as the live fan
+/// session. Returns `Ok(None)` when the session moved on while the vault write
+/// was in flight, meaning nothing was published.
+///
+/// `expected` is the session the caller reconciles for, or `None` for a
+/// user-initiated command that reconciles whatever is live.
 async fn persist_push_state(
     state: &State<'_, AppState>,
+    expected: Option<&Arc<FanProfile>>,
     profile: &FanProfile,
     desired: bool,
     sync_ok: bool,
-) -> Result<Arc<FanProfile>, AppError> {
+) -> Result<Option<Arc<FanProfile>>, AppError> {
     let mut updated = profile.clone();
     updated.push_enabled = desired;
     updated.push_last_sync_ok = sync_ok;
     persist_fan(state, &updated).await?;
     let updated = Arc::new(updated);
-    *state.fan_session.write().await = Some(updated.clone());
-    Ok(updated)
+    // `fan_lock` deliberately does not queue behind `fan_mutation`, so the fan
+    // can log out while the vault write above is running. Publishing
+    // unconditionally here would put the session back and silently undo that
+    // logout, so the live slot is re-checked under its own write guard.
+    let mut session = state.fan_session.write().await;
+    let still_current = session
+        .as_ref()
+        .is_some_and(|current| expected.is_none_or(|expected| Arc::ptr_eq(current, expected)));
+    if !still_current {
+        return Ok(None);
+    }
+    *session = Some(updated.clone());
+    Ok(Some(updated))
+}
+
+/// `persist_push_state` for user-initiated commands, where a session that
+/// disappeared mid-command is a real failure the caller must surface.
+async fn persist_push_state_now(
+    state: &State<'_, AppState>,
+    profile: &FanProfile,
+    desired: bool,
+    sync_ok: bool,
+) -> Result<Arc<FanProfile>, AppError> {
+    persist_push_state(state, None, profile, desired, sync_ok)
+        .await?
+        .ok_or(AppError::Locked)
 }
 
 async fn session_is_current(
@@ -114,30 +145,29 @@ async fn session_is_current(
     }
 }
 
-async fn persist_push_state_if_current(
-    state: &State<'_, AppState>,
+/// Takes `fan_mutation` for the legs of reconciliation that write push state,
+/// locally or remotely, so a user-initiated sync can never interleave its
+/// remote call with a background one and leave the two sides disagreeing.
+///
+/// Returns `None` when the session the caller reconciles for is no longer the
+/// live one and the leg must be abandoned. The inner `Option` is the guard:
+/// user-initiated callers pass `expected == None` because they already own the
+/// lock, which is not reentrant.
+async fn lock_for_push_mutation<'a>(
+    state: &'a State<'_, AppState>,
     expected: Option<&Arc<FanProfile>>,
-    profile: &FanProfile,
-    desired: bool,
-    sync_ok: bool,
-) -> Result<(), AppError> {
+) -> Option<Option<MutexGuard<'a, ()>>> {
     let Some(expected) = expected else {
-        persist_push_state(state, profile, desired, sync_ok).await?;
-        return Ok(());
+        return Some(None);
     };
-
-    let _mutation = state.fan_mutation.lock().await;
-    let current = state
+    let guard = state.fan_mutation.lock().await;
+    state
         .fan_session
         .read()
         .await
-        .clone()
-        .ok_or(AppError::Locked)?;
-    if !Arc::ptr_eq(&current, expected) {
-        return Ok(());
-    }
-    persist_push_state(state, profile, desired, sync_ok).await?;
-    Ok(())
+        .as_ref()
+        .is_some_and(|current| Arc::ptr_eq(current, expected))
+        .then_some(Some(guard))
 }
 
 pub(crate) async fn current_native_push_status(
@@ -204,10 +234,10 @@ async fn sync_native_push_if_desired(
         if profile.push_last_sync_ok {
             return Ok(());
         }
+        let Some(_mutation) = lock_for_push_mutation(state, expected_ref).await else {
+            return Ok(());
+        };
         if let Some(installation_id) = read_native_push_installation_id(&state.app_data_dir) {
-            if !session_is_current(state, expected_ref).await {
-                return Ok(());
-            }
             let response = state
                 .api
                 .fan_disable_android_push(&profile, &installation_id)
@@ -221,41 +251,41 @@ async fn sync_native_push_if_desired(
         // FCM tokens are device-scoped and shared by fan/staff audiences.
         // Disabling the fan audience must never delete the provider token, or
         // staff reminders on the same installation would silently break.
-        persist_push_state_if_current(state, expected_ref, &profile, false, true).await?;
+        persist_push_state(state, expected_ref, &profile, false, true).await?;
         return Ok(());
     }
     if !session_is_current(state, expected_ref).await {
         return Ok(());
     }
     let config = state.api.fan_push_config(&profile).await?;
-    if !session_is_current(state, expected_ref).await {
+    // The config read above is the only remaining lock-free network leg. Past
+    // this point every branch writes push state, so the rest runs under one
+    // `fan_mutation` hold; the local Android calls in between do not block.
+    let Some(_mutation) = lock_for_push_mutation(state, expected_ref).await else {
         return Ok(());
-    }
+    };
     if !config.enabled || !config.android_fcm {
-        let _ = persist_push_state_if_current(state, expected_ref, &profile, true, false).await;
+        let _ = persist_push_state(state, expected_ref, &profile, true, false).await;
         return Err(AppError::Conflict("push_delivery_not_live".to_owned()));
     }
     let permission = native_push_permission(app).map_err(AppError::InvalidInput)?;
     if permission != "granted" {
-        let _ = persist_push_state_if_current(state, expected_ref, &profile, true, false).await;
+        let _ = persist_push_state(state, expected_ref, &profile, true, false).await;
         return Err(AppError::Forbidden);
     }
     let token = native_push_token(app).map_err(AppError::InvalidInput)?;
     let installation_id = ensure_native_push_installation_id(&state.app_data_dir)?;
-    if !session_is_current(state, expected_ref).await {
-        return Ok(());
-    }
     let response = state
         .api
         .fan_register_android_push(&profile, &installation_id, &token)
         .await?;
     if !response.registered {
-        let _ = persist_push_state_if_current(state, expected_ref, &profile, true, false).await;
+        let _ = persist_push_state(state, expected_ref, &profile, true, false).await;
         return Err(AppError::Conflict(
             "push_registration_not_confirmed".to_owned(),
         ));
     }
-    persist_push_state_if_current(state, expected_ref, &profile, true, true).await?;
+    persist_push_state(state, expected_ref, &profile, true, true).await?;
     Ok(())
 }
 
@@ -323,7 +353,7 @@ pub(crate) async fn fan_push_enable(
     }
     // Persist desired intent before the remote write. If the network response is
     // lost, the next unlock retries registration with the current FCM token.
-    let profile = persist_push_state(&state, &profile, true, false).await?;
+    let profile = persist_push_state_now(&state, &profile, true, false).await?;
     let token = native_push_token(&app).map_err(AppError::InvalidInput)?;
     let installation_id = ensure_native_push_installation_id(&state.app_data_dir)?;
     let response = state
@@ -335,7 +365,7 @@ pub(crate) async fn fan_push_enable(
             "push_registration_not_confirmed".to_owned(),
         ));
     }
-    persist_push_state(&state, &profile, true, true).await?;
+    persist_push_state_now(&state, &profile, true, true).await?;
     Ok(current_native_push_status(&state, &app, None).await)
 }
 
@@ -346,7 +376,7 @@ pub(crate) async fn fan_push_disable(
 ) -> Result<FanPushStatus, AppError> {
     let _mutation = state.fan_mutation.lock().await;
     let profile = fan_profile(&state).await?;
-    let profile = persist_push_state(&state, &profile, false, false).await?;
+    let profile = persist_push_state_now(&state, &profile, false, false).await?;
     let detail = match read_native_push_installation_id(&state.app_data_dir) {
         Some(installation_id) => match state
             .api
@@ -354,14 +384,14 @@ pub(crate) async fn fan_push_disable(
             .await
         {
             Ok(response) if !response.registered => {
-                persist_push_state(&state, &profile, false, true).await?;
+                persist_push_state_now(&state, &profile, false, true).await?;
                 None
             }
             Ok(_) => Some("fan_push_disable_not_confirmed".to_owned()),
             Err(error) => Some(format!("remote_disable_unconfirmed:{error}")),
         },
         None => {
-            persist_push_state(&state, &profile, false, true).await?;
+            persist_push_state_now(&state, &profile, false, true).await?;
             None
         }
     };
@@ -396,7 +426,7 @@ pub(crate) async fn fan_push_open_settings(
     let profile = fan_profile(&state).await?;
     // Persist the user's desired state before Android backgrounds/remounts the
     // WebView. fan_push_sync will reconcile FCM/backend registration on resume.
-    let _ = persist_push_state(&state, &profile, true, false).await?;
+    let _ = persist_push_state_now(&state, &profile, true, false).await?;
     open_native_push_settings(&app).map_err(AppError::InvalidInput)?;
     Ok(current_native_push_status(
         &state,
