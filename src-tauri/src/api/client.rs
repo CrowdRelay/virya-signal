@@ -415,6 +415,7 @@ impl CrowdRelayClient {
         // snapshot already points at the card-sized image.
         for product in &mut catalog.products {
             if let Some(url) = product.image_url.take() {
+                product.placeholder_image_url = super::site::merch_placeholder_image_url(&url);
                 product.image_url = Some(super::site::merch_preview_image_url(&url));
             }
         }

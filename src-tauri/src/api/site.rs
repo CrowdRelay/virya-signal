@@ -13,6 +13,7 @@ const SIGNAL_FEEDBACK_URL: &str = "https://virya.music/api/signal-feedback";
 const VIRYA_SITE_ORIGIN: &str = "https://virya.music";
 const NETLIFY_IMAGE_PATH: &str = "/.netlify/images";
 const MERCH_PREVIEW_IMAGE_WIDTH: u32 = 600;
+const MERCH_PLACEHOLDER_IMAGE_WIDTH: u32 = 16;
 const SITE_READ_TIMEOUT: Duration = Duration::from_secs(8);
 const FEEDBACK_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_BUNDLES: usize = 8;
@@ -34,6 +35,8 @@ pub(crate) struct SignalMerchBundle {
     #[serde(default)]
     pub includes: Vec<String>,
     pub image_url: Option<String>,
+    #[serde(default)]
+    pub placeholder_image_url: Option<String>,
     pub secondary_image_url: Option<String>,
     pub product_url: String,
     pub currency: String,
@@ -128,26 +131,33 @@ fn validated_site_url(value: &str, label: &str) -> Result<String, AppError> {
 /// per image, and a screenful of them is what makes the merch tab heavy on
 /// Android. Anything not served from the site is returned untouched.
 pub(super) fn merch_preview_image_url(value: &str) -> String {
-    let Ok(parsed) = Url::parse(value) else {
-        return value.to_owned();
-    };
+    resized_site_image_url(value, MERCH_PREVIEW_IMAGE_WIDTH, 72).unwrap_or_else(|| value.to_owned())
+}
+
+/// A 16px variant of the same art, under a kilobyte, used as the blurred
+/// placeholder a card paints while the real image streams in. Returns `None`
+/// for anything not served from the site, where no variant can be produced.
+pub(super) fn merch_placeholder_image_url(value: &str) -> Option<String> {
+    resized_site_image_url(value, MERCH_PLACEHOLDER_IMAGE_WIDTH, 40)
+}
+
+fn resized_site_image_url(value: &str, width: u32, quality: u32) -> Option<String> {
+    let parsed = Url::parse(value).ok()?;
     if parsed.scheme() != "https"
         || !matches!(parsed.host_str(), Some("virya.music" | "www.virya.music"))
         || parsed.path().starts_with(NETLIFY_IMAGE_PATH)
     {
-        return value.to_owned();
+        return None;
     }
-    let Ok(mut resized) = Url::parse(VIRYA_SITE_ORIGIN) else {
-        return value.to_owned();
-    };
+    let mut resized = Url::parse(VIRYA_SITE_ORIGIN).ok()?;
     resized.set_path(NETLIFY_IMAGE_PATH);
     resized
         .query_pairs_mut()
         .append_pair("url", parsed.path())
-        .append_pair("w", &MERCH_PREVIEW_IMAGE_WIDTH.to_string())
+        .append_pair("w", &width.to_string())
         .append_pair("fm", "webp")
-        .append_pair("q", "72");
-    resized.to_string()
+        .append_pair("q", &quality.to_string());
+    Some(resized.to_string())
 }
 
 fn validated_store_url(value: &str) -> Result<String, AppError> {
@@ -200,12 +210,14 @@ impl SignalMerchBundleCatalog {
             for include in &mut bundle.includes {
                 *include = bounded(include, crate::i18n::tr("native_bundle_item_label"), 120)?;
             }
-            bundle.image_url = bundle
+            let image_url = bundle
                 .image_url
                 .take()
                 .map(|url| validated_site_url(&url, crate::i18n::tr("native_image_url_label")))
-                .transpose()?
-                .map(|url| merch_preview_image_url(&url));
+                .transpose()?;
+            bundle.placeholder_image_url =
+                image_url.as_deref().and_then(merch_placeholder_image_url);
+            bundle.image_url = image_url.map(|url| merch_preview_image_url(&url));
             bundle.secondary_image_url = bundle
                 .secondary_image_url
                 .take()
@@ -315,6 +327,7 @@ mod tests {
                 description: Some("Koszulka i album w jednym zestawie.".into()),
                 includes: vec!["Koszulka".into(), "Album".into()],
                 image_url: Some("https://virya.music/images/merch/echoes.webp".into()),
+                placeholder_image_url: None,
                 secondary_image_url: None,
                 product_url: "https://virya.music/pl/merch/?product=bundle-stage-pack".into(),
                 currency: "PLN".into(),
@@ -354,6 +367,22 @@ mod tests {
         assert!(image.starts_with("https://virya.music/.netlify/images?"));
         assert!(image.contains("w=600"));
         assert!(image.contains("url=%2Fimages%2Fmerch%2Fechoes.webp"));
+    }
+
+    #[test]
+    fn derives_a_sub_kilobyte_placeholder_for_site_images() {
+        let placeholder = valid_catalog()
+            .validate()
+            .ok()
+            .and_then(|catalog| catalog.bundles.into_iter().next())
+            .and_then(|bundle| bundle.placeholder_image_url)
+            .unwrap_or_default();
+        assert!(placeholder.starts_with("https://virya.music/.netlify/images?"));
+        assert!(placeholder.contains("w=16"));
+        assert_eq!(
+            merch_placeholder_image_url("https://cdn.example.com/a.webp"),
+            None
+        );
     }
 
     #[test]
