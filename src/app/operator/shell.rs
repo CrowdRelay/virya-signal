@@ -162,7 +162,7 @@ fn OperatorApp(
                 <div><p class="eyebrow">{tr("virya_control")}</p><strong>{move || status.get().session.map(|s| s.display_name).value_or_else(Default::default)}</strong></div>
                 <div class="topbar-actions">
                     <span class="role-pill">{move || role().label()}</span>
-                    <button class="menu-trigger" aria-label=tr("open_menu") aria-expanded=move || menu_open.get() on:click=move |_| { let _ = menu_open.update(|v| !*v); }><i></i><i></i><i></i></button>
+                    <button class="menu-trigger" aria-label=tr("open_menu") aria-expanded=move || menu_open.get() on:click=move |_| menu_open.set(!menu_open.get_untracked())><i></i><i></i><i></i></button>
                     <button aria-label=tr("close_and_lock_panel") on:click=close>"×"</button>
                 </div>
             </header>
@@ -237,7 +237,7 @@ fn NavGlyph(icon: &'static str) -> impl IntoView {
         .into_any(),
         "ticket" => view! {
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4V6Z"/>
+                <path d="M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0-2-4V6Z"/>
                 <path d="M9 9v6"/>
             </svg>
         }
