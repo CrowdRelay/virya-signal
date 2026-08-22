@@ -31,7 +31,7 @@ pub(crate) async fn fan_unlock(
     *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
     drop(_mutation);
-    let status = fan_status(state).await?;
+    let status = fan_status(state.clone()).await?;
 
     // The encrypted profile is already unlocked and safe to render. Push
     // reconciliation can perform several network requests, so it must not
