@@ -106,12 +106,15 @@ fn OperatorPortal(
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     view! {
-        {move || if status_failed.get() {
+        {move || if status.get().unlocked {
+            // Auth is the only blocking step. Once the native session is
+            // confirmed, render the operator shell immediately; individual
+            // sections can continue loading behind their own skeletons.
+            view! { <OperatorApp mode=mode status=status dashboard=dashboard tab=tab push_target=push_target error=error /> }.into_any()
+        } else if status_failed.get() {
             view! { <StatusFailure mode=mode status_refresh=status_refresh label=tr("failed_to_read_the_staff_vault") show_back=true /> }.into_any()
         } else if status_loading.get() {
             view! { <AccessLoader mode=mode label=tr("checking_the_secure_vault") show_back=true /> }.into_any()
-        } else if status.get().unlocked {
-            view! { <OperatorApp mode=mode status=status dashboard=dashboard tab=tab push_target=push_target error=error /> }.into_any()
         } else {
             view! { <OperatorAccess mode=mode status=status error=error /> }.into_any()
         }}
