@@ -71,9 +71,18 @@ pub(crate) async fn persist_fan(
     state: &State<'_, AppState>,
     profile: &FanProfile,
 ) -> Result<(), AppError> {
-    let pin = state.fan_pin.read().await.clone().ok_or(AppError::Locked)?;
     let app_data_dir = state.app_data_dir.clone();
     let profile = profile.clone();
+    // Reuse the password derived at unlock. Falling back to the PIN re-runs
+    // Argon2, which costs more than the snapshot write itself.
+    if let Some(password) = state.fan_vault_password.read().await.as_ref().cloned() {
+        run_blocking(move || {
+            vault::save_fan_with_password(&app_data_dir, password.as_ref(), &profile)
+        })
+        .await?;
+        return Ok(());
+    }
+    let pin = state.fan_pin.read().await.clone().ok_or(AppError::Locked)?;
     run_blocking(move || vault::save_fan(&app_data_dir, pin.as_str(), &profile)).await?;
     Ok(())
 }
