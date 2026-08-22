@@ -815,10 +815,15 @@ function viryaShowRuntimeFailure(report, previous = false) {
   node.id = 'virya-runtime-failure';
   node.setAttribute('role', 'alertdialog');
   node.setAttribute('aria-modal', 'true');
+  // A dialog role without an accessible name is announced as an unlabelled
+  // group, which is exactly the wrong outcome for the panel that only appears
+  // when something already went wrong. Name it from its own visible heading so
+  // the two can never drift apart.
+  node.setAttribute('aria-labelledby', 'virya-runtime-failure-title');
   node.innerHTML = `
     <div class="virya-runtime-failure-card">
       <p class="eyebrow">${viryaTexts.diagnostics}</p>
-      <h2>${previous ? viryaTexts.previousFailure : viryaTexts.currentFailure}</h2>
+      <h2 id="virya-runtime-failure-title">${previous ? viryaTexts.previousFailure : viryaTexts.currentFailure}</h2>
       <p>${viryaTexts.reportHelp}</p>
       <pre></pre>
       <div class="virya-runtime-failure-actions">
