@@ -266,21 +266,6 @@ fn FanApp(
 
     let close = move |_| {
         bridge::invalidate_latest("fan:");
-        // Locking is an in-memory native operation with nothing to confirm
-        // remotely, so leave the session now and let it land behind us. Waiting
-        // for the reply held the fan on an authenticated screen for as long as
-        // whatever else the native side happened to be doing.
-        home.set(None);
-        dashboard.set(None);
-        merch.set(None);
-        merch_bundles.set(None);
-        wallets.set(Vec::new());
-        checkout_event.set(None);
-        focused_event_slug.set(None);
-        focused_event_preview.set(None);
-        admission_qr.set(None);
-        area.set(None);
-        loading.set(FanLoadingState::all());
         status.set(FanSessionStatus {
             configured: status.get_untracked().configured,
             unlocked: false,
