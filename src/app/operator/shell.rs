@@ -237,7 +237,7 @@ fn NavGlyph(icon: &'static str) -> impl IntoView {
         .into_any(),
         "ticket" => view! {
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0-2-4V6Z"/>
+                <path d="M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4V6Z"/>
                 <path d="M9 9v6"/>
             </svg>
         }
