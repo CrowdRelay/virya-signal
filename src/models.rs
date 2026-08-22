@@ -127,19 +127,19 @@ impl StaffEventDashboard {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct MerchCatalog {
     #[serde(default)]
     pub products: Vec<MerchProduct>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct FanMerchBundleCatalog {
     #[serde(default)]
     pub bundles: Vec<FanMerchBundle>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct FanMerchBundle {
     #[allow(dead_code)]
     pub slug: String,
@@ -160,7 +160,7 @@ pub struct FanMerchBundle {
     pub variants: Vec<FanMerchBundleVariant>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct FanMerchBundleVariant {
     pub label: String,
     pub available: bool,
@@ -168,7 +168,7 @@ pub struct FanMerchBundleVariant {
     pub availability: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct MerchProduct {
     pub slug: String,
     pub name: String,
@@ -182,7 +182,7 @@ pub struct MerchProduct {
     pub variants: Vec<MerchVariant>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct MerchVariant {
     #[allow(dead_code)]
     pub sku: String,
