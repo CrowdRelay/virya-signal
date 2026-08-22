@@ -81,14 +81,14 @@ fn main() {
     // The catalog loader starts while the browser fetches/instantiates WASM.
     // Waiting here keeps the first rendered tree in the selected language
     // without putting the full PL+EN dictionaries on the parser path.
-    // Deliberately the wasm-bindgen executor rather than `util::spawn_local`.
-    // The scoped spawner requires the global reactive executor, which is only
-    // installed by `mount_to_body` — and this is the future that decides when
-    // to mount, so it necessarily runs first. Using the scoped spawner here
-    // aborted the module during init, so the app never mounted and the boot
-    // shell's runtime-failure panel was all that ever rendered. This future
-    // also has no reactive owner to be scoped to, so nothing is lost.
-    wasm_bindgen_futures::spawn_local(async {
+    // The sanctioned lifecycle spawner, not the owner-scoped one. The scoped
+    // spawner needs the global reactive executor, which `mount_to_body`
+    // installs — and this is the future that decides when to mount, so it
+    // necessarily runs first. Spawning it scoped aborted the module during
+    // init, so the app never mounted and the boot shell's runtime-failure
+    // panel was all that ever rendered. There is no owner to scope it to yet,
+    // so nothing is given up.
+    app::spawn_lifecycle_task(async {
         i18n::wait_for_runtime_catalog().await;
         schedule_mount();
     });
