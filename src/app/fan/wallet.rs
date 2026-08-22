@@ -204,10 +204,6 @@ fn FanProfileScreen(
     let lock = move |_| {
         // Optimistic on purpose: the vault lock has no remote leg, so drop the
         // session material here and reconcile with native state when it replies.
-        dashboard.set(None);
-        wallets.set(Vec::new());
-        area.set(None);
-        loading.set(FanLoadingState::all());
         status.set(FanSessionStatus {
             configured: status.get_untracked().configured,
             unlocked: false,

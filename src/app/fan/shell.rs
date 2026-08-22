@@ -272,7 +272,6 @@ fn FanApp(
             session: None,
         });
         persist_fan_tab(FanTab::Signal);
-        mode.set(RootMode::Fan);
         spawn_local(async move {
             match bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
                 // Native state stays authoritative: adopt whatever it reports.
