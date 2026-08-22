@@ -2,7 +2,7 @@ use std::{
     fs::OpenOptions,
     io::Write,
     path::{Path, PathBuf},
-    sync::{Mutex, MutexGuard},
+    sync::{Mutex, MutexGuard, Once},
 };
 
 use argon2::Argon2;
@@ -30,10 +30,47 @@ use crate::{
 /// single arena, which the allocator then reuses.
 static SNAPSHOT_LOCK: Mutex<()> = Mutex::new(());
 
+/// age work factor used when sealing a snapshot.
+///
+/// Stronghold defaults to 19, so scrypt allocates 128 * 2^19 * 8 = 512 MiB and
+/// runs for about a second on a desktop, several on a phone. That default is
+/// sized for a raw password being the only thing between an attacker and the
+/// contents. That is not the situation here: the key handed to Stronghold is
+/// already Argon2id output over the PIN and a per-device salt, so the scrypt
+/// pass is a second stretch layered on the first, and it was costing a 512 MiB
+/// arena and a multi-second stall on every read and write.
+///
+/// 10 puts that second stretch at 1 MiB and a few milliseconds. Argon2id stays
+/// the real protection for the snapshot, and the deliberate trade is that a
+/// stolen snapshot is 2^9 cheaper to attack than it was. This is a fan client
+/// holding a session token and cached listings on a device the owner already
+/// unlocks with a PIN, so responsiveness wins over a second KDF.
+///
+/// Only writes are affected. `decrypt_content_with_work_factor` treats its work
+/// factor as a maximum and reads the real one from the file header, so snapshots
+/// already sealed at 19 keep opening, and the first save after this rewrites
+/// them at the lower factor.
+const SNAPSHOT_WORK_FACTOR: u8 = 10;
+
+static SNAPSHOT_WORK_FACTOR_APPLIED: Once = Once::new();
+
 /// A poisoned lock only means an earlier snapshot operation panicked. This lock
 /// guards peak memory rather than shared state, so stepping over the poison is
 /// safe and is preferable to failing an unlock the user can still complete.
+///
+/// Doubles as the single point where the work factor is applied: every snapshot
+/// operation passes through here, so no caller can open or seal a snapshot
+/// before the setting lands.
 fn lock_snapshot() -> MutexGuard<'static, ()> {
+    SNAPSHOT_WORK_FACTOR_APPLIED.call_once(|| {
+        if iota_stronghold::engine::snapshot::try_set_encrypt_work_factor(SNAPSHOT_WORK_FACTOR)
+            .is_err()
+        {
+            // Stronghold keeps its own default, so snapshots stay readable and
+            // secure; they just stay expensive to write.
+            eprintln!("[virya:vault] snapshot work factor {SNAPSHOT_WORK_FACTOR} was rejected");
+        }
+    });
     SNAPSHOT_LOCK
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -276,6 +313,27 @@ pub fn save_fan(
         FAN_PROFILE_KEY,
         pin,
         profile,
+    )
+}
+
+/// Saves the fan profile with the password derived at unlock.
+///
+/// `save_fan` re-runs Argon2 over the PIN for every write, which the session
+/// already paid for once. Callers that hold the unlocked session password must
+/// use this: push state and wallet updates persist often enough that the extra
+/// derivation was the dominant cost of a write.
+pub fn save_fan_with_password(
+    app_data_dir: &Path,
+    password: &[u8],
+    profile: &FanProfile,
+) -> Result<(), AppError> {
+    let bytes = Zeroizing::new(serde_json::to_vec(profile)?);
+    save_bytes_with_password_at(
+        &fan_vault_path(app_data_dir),
+        FAN_CLIENT_PATH,
+        FAN_PROFILE_KEY,
+        password,
+        bytes.as_ref(),
     )
 }
 
