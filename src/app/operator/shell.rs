@@ -31,6 +31,32 @@ fn OperatorApp(
         // after the placeholder was created and otherwise leave the connection state stuck forever.
         bootstrap_requested.set(true);
         refresh_operator_parts(dashboard, loading, error);
+        // Disk first, network behind it. Each panel is gated on its own loading
+        // bit so a live answer that already landed is never overwritten by the
+        // older snapshot.
+        with_operator_cached_sections(move |snapshot| {
+            let crate::models::OperatorSectionsSnapshot {
+                events, qr, signal, ..
+            } = snapshot;
+            if !events.is_empty() && loading.get_untracked().events {
+                dashboard.update(|state| {
+                    state.get_or_insert_with(DashboardData::default).events = events;
+                });
+                loading.update(|state| state.events = false);
+            }
+            if qr.is_some() && loading.get_untracked().qr {
+                dashboard.update(|state| {
+                    state.get_or_insert_with(DashboardData::default).qr = qr;
+                });
+                loading.update(|state| state.qr = false);
+            }
+            if signal.is_some()
+                && !signal_loading.get_untracked()
+                && signal_overview.get_untracked().is_none()
+            {
+                signal_overview.set(signal);
+            }
+        });
     });
 
     Effect::new(move |_| {

@@ -12,8 +12,9 @@ use zeroize::Zeroizing;
 use crate::{
     AppError,
     models::{
-        BeaconProfile, FanHomeData, FanProfile, OperatorProfile, OperatorSignalOverview,
-        ShowModeStore,
+        AdmissionPass, AreaWallet, AutopilotChiefOfStaff, BeaconProfile, ConcertQrOverview,
+        FanEventInterest, FanHomeData, FanProfile, OperatorAutopilotOverview, OperatorOpsOverview,
+        OperatorProfile, OperatorSignalOverview, PublicEvent, ReferralProgress, ShowModeStore,
     },
 };
 
@@ -21,9 +22,11 @@ const OPERATOR_CLIENT_PATH: &[u8] = b"virya-control-device";
 const OPERATOR_PROFILE_KEY: &[u8] = b"operator-profile-v1";
 const SHOW_MODE_STORE_KEY: &[u8] = b"show-mode-store-v1";
 const OPERATOR_SIGNAL_CACHE_KEY: &[u8] = b"operator-signal-cache-v1";
+const OPERATOR_SECTIONS_CACHE_KEY: &[u8] = b"operator-sections-cache-v1";
 const FAN_CLIENT_PATH: &[u8] = b"virya-signal-fan";
 const FAN_PROFILE_KEY: &[u8] = b"fan-profile-v1";
 const FAN_HOME_CACHE_KEY: &[u8] = b"fan-home-cache-v1";
+const FAN_SECTIONS_CACHE_KEY: &[u8] = b"fan-sections-cache-v1";
 const BEACON_CLIENT_PATH: &[u8] = b"virya-signal-beacon";
 const BEACON_PROFILE_KEY: &[u8] = b"beacon-profile-v1";
 const SALT_BYTES: usize = 16;
@@ -183,6 +186,54 @@ pub fn load_operator_signal_cache_with_password(
     )
 }
 
+/// Every operator panel that had no cold-start path of its own. The signal
+/// aggregate keeps its separate key because that one is also a network-failure
+/// fallback; this record exists purely so a cold Latarnik paints from disk
+/// instead of holding six skeletons until six requests answer.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct OperatorSectionsCacheSnapshot {
+    pub stored_at_unix_secs: u64,
+    #[serde(default)]
+    pub events: Vec<PublicEvent>,
+    #[serde(default)]
+    pub qr: Option<ConcertQrOverview>,
+    #[serde(default)]
+    pub signal: Option<OperatorSignalOverview>,
+    #[serde(default)]
+    pub autopilot: Option<OperatorAutopilotOverview>,
+    #[serde(default)]
+    pub chief: Option<AutopilotChiefOfStaff>,
+    #[serde(default)]
+    pub ops: Option<OperatorOpsOverview>,
+}
+
+pub fn save_operator_sections_cache_with_password(
+    app_data_dir: &Path,
+    password: &[u8],
+    snapshot: &OperatorSectionsCacheSnapshot,
+) -> Result<(), AppError> {
+    let bytes = Zeroizing::new(serde_json::to_vec(snapshot)?);
+    save_bytes_with_password_at(
+        &operator_vault_path(app_data_dir),
+        OPERATOR_CLIENT_PATH,
+        OPERATOR_SECTIONS_CACHE_KEY,
+        password,
+        bytes.as_ref(),
+    )
+}
+
+pub fn load_operator_sections_cache_with_password(
+    app_data_dir: &Path,
+    password: &[u8],
+) -> Result<Option<OperatorSectionsCacheSnapshot>, AppError> {
+    load_optional_with_password_at(
+        &operator_vault_path(app_data_dir),
+        OPERATOR_CLIENT_PATH,
+        OPERATOR_SECTIONS_CACHE_KEY,
+        password,
+    )
+}
+
 pub fn fan_exists(app_data_dir: &Path) -> bool {
     exists_at(&fan_vault_path(app_data_dir), &fan_salt_path(app_data_dir))
 }
@@ -250,6 +301,51 @@ pub fn load_fan_home_cache_with_password(
         &fan_vault_path(app_data_dir),
         FAN_CLIENT_PATH,
         FAN_HOME_CACHE_KEY,
+        password,
+    )
+}
+
+/// The dashboard fragments that have no public cache to fall back on. Home
+/// already had its own encrypted snapshot; these four used to drop to a
+/// skeleton on every cold start even though the answer had not changed since
+/// the last session. They travel as one record so a cold start decrypts the
+/// vault once instead of four times.
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct FanSectionsCacheSnapshot {
+    pub stored_at_unix_secs: u64,
+    #[serde(default)]
+    pub referral: Option<ReferralProgress>,
+    #[serde(default)]
+    pub interests: Vec<FanEventInterest>,
+    #[serde(default)]
+    pub admission_pass: Option<AdmissionPass>,
+    #[serde(default)]
+    pub area: Option<AreaWallet>,
+}
+
+pub fn save_fan_sections_cache_with_password(
+    app_data_dir: &Path,
+    password: &[u8],
+    snapshot: &FanSectionsCacheSnapshot,
+) -> Result<(), AppError> {
+    let bytes = Zeroizing::new(serde_json::to_vec(snapshot)?);
+    save_bytes_with_password_at(
+        &fan_vault_path(app_data_dir),
+        FAN_CLIENT_PATH,
+        FAN_SECTIONS_CACHE_KEY,
+        password,
+        bytes.as_ref(),
+    )
+}
+
+pub fn load_fan_sections_cache_with_password(
+    app_data_dir: &Path,
+    password: &[u8],
+) -> Result<Option<FanSectionsCacheSnapshot>, AppError> {
+    load_optional_with_password_at(
+        &fan_vault_path(app_data_dir),
+        FAN_CLIENT_PATH,
+        FAN_SECTIONS_CACHE_KEY,
         password,
     )
 }

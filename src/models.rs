@@ -447,6 +447,40 @@ pub struct FanDashboardData {
     pub admission_pass: Option<AdmissionPass>,
 }
 
+/// The operator panels the native side keeps in its encrypted snapshot. Read
+/// once when Latarnik unlocks so events, QR, Signal, autopilot, chief of staff
+/// and ops paint from disk while their live requests are still in flight.
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct OperatorSectionsSnapshot {
+    #[serde(default)]
+    pub events: Vec<PublicEvent>,
+    #[serde(default)]
+    pub qr: Option<ConcertQrOverview>,
+    #[serde(default)]
+    pub signal: Option<OperatorSignalOverview>,
+    #[serde(default)]
+    pub autopilot: Option<OperatorAutopilotOverview>,
+    #[serde(default)]
+    pub chief: Option<AutopilotChiefOfStaff>,
+    #[serde(default)]
+    pub ops: Option<OperatorOpsOverview>,
+}
+
+/// The dashboard fragments the native side keeps in its encrypted snapshot.
+/// Read once on a cold start so referral, interests, the admission pass and the
+/// AREA wallet paint from disk while their live requests are still in flight.
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct FanSectionsSnapshot {
+    #[serde(default)]
+    pub referral: Option<ReferralProgress>,
+    #[serde(default)]
+    pub interests: Vec<FanEventInterest>,
+    #[serde(default)]
+    pub admission_pass: Option<AdmissionPass>,
+    #[serde(default)]
+    pub area: Option<AreaWallet>,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct FanEventInterest {
     pub event: PublicEvent,

@@ -3,7 +3,7 @@
 
 use std::{path::Path, sync::Arc};
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Manager, State};
 use zeroize::Zeroizing;
 
 use crate::{
@@ -161,6 +161,7 @@ pub(crate) async fn lock(state: State<'_, AppState>) -> Result<SessionStatus, Ap
     *state.operator_pin.write().await = None;
     *state.operator_vault_password.write().await = None;
     *state.show_mode_store.write().await = None;
+    *state.operator_sections_cache.write().await = None;
     drop(_show_mutation);
     drop(_mutation);
     session_status(state).await
@@ -195,6 +196,7 @@ pub(crate) async fn forget_device(state: State<'_, AppState>) -> Result<SessionS
     *state.operator_pin.write().await = None;
     *state.operator_vault_password.write().await = None;
     *state.show_mode_store.write().await = None;
+    *state.operator_sections_cache.write().await = None;
     let app_data_dir = state.app_data_dir.clone();
     run_blocking(move || vault::remove(&app_data_dir)).await?;
     drop(_show_mutation);
@@ -205,10 +207,16 @@ pub(crate) async fn forget_device(state: State<'_, AppState>) -> Result<SessionS
 
 #[tauri::command]
 pub(crate) async fn operator_events(
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Vec<PublicEvent>, AppError> {
     let profile = operator_profile(&state).await?;
-    state.api.operator_events(&profile).await
+    let events = state.api.operator_events(&profile).await?;
+    remember_operator_sections(app, {
+        let events = events.clone();
+        move |snapshot| snapshot.events = events
+    });
+    Ok(events)
 }
 
 #[tauri::command]
@@ -467,9 +475,17 @@ pub(crate) async fn operator_push_disable(
 }
 
 #[tauri::command]
-pub(crate) async fn operator_qr(state: State<'_, AppState>) -> Result<ConcertQrOverview, AppError> {
+pub(crate) async fn operator_qr(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<ConcertQrOverview, AppError> {
     let profile = operator_profile(&state).await?;
-    state.api.operator_qr(&profile).await
+    let overview = state.api.operator_qr(&profile).await?;
+    remember_operator_sections(app, {
+        let overview = overview.clone();
+        move |snapshot| snapshot.qr = Some(overview)
+    });
+    Ok(overview)
 }
 
 #[tauri::command]
@@ -573,8 +589,93 @@ pub(crate) async fn public_cities(
     serde_json::to_string(&cities).map_err(AppError::from)
 }
 
+/// Returns every operator panel's last known value straight from the vault, so
+/// a cold Latarnik paints from disk while its six live requests are still in
+/// flight instead of holding six skeletons.
+#[tauri::command]
+pub(crate) async fn operator_cached_sections(
+    state: State<'_, AppState>,
+) -> Result<Option<vault::OperatorSectionsCacheSnapshot>, AppError> {
+    // Prove the session is unlocked before the in-memory mirror is served.
+    // Locking clears the vault password, and a decrypted mirror must never
+    // outlive it.
+    let password = state
+        .operator_vault_password
+        .read()
+        .await
+        .as_ref()
+        .map(|value| Zeroizing::new(value.to_vec()))
+        .ok_or(AppError::Locked)?;
+    if let Some(snapshot) = state.operator_sections_cache.read().await.clone() {
+        return Ok(Some(snapshot));
+    }
+    let app_data_dir = state.app_data_dir.clone();
+    let snapshot = match run_blocking(move || {
+        vault::load_operator_sections_cache_with_password(&app_data_dir, password.as_ref())
+    })
+    .await
+    {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            eprintln!("[virya:operator-cache] encrypted panel snapshot ignored: {error}");
+            None
+        }
+    };
+    if let Some(snapshot) = snapshot.clone() {
+        *state.operator_sections_cache.write().await = Some(snapshot);
+    }
+    Ok(snapshot)
+}
+
+/// Folds one refreshed panel into the encrypted operator snapshot. Spawned and
+/// serialized behind its own lock, for the same reason as the fan equivalent:
+/// the write only has to land before the next cold start.
+fn remember_operator_sections(
+    app: AppHandle,
+    apply: impl FnOnce(&mut vault::OperatorSectionsCacheSnapshot) + Send + 'static,
+) {
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AppState>();
+        let _mutation = state.operator_sections_cache_mutation.lock().await;
+        let Some(password) = state
+            .operator_vault_password
+            .read()
+            .await
+            .as_ref()
+            .map(|value| Zeroizing::new(value.to_vec()))
+        else {
+            return;
+        };
+        let mut snapshot = state
+            .operator_sections_cache
+            .read()
+            .await
+            .clone()
+            .unwrap_or_default();
+        apply(&mut snapshot);
+        snapshot.stored_at_unix_secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|value| value.as_secs())
+            .unwrap_or(0);
+        *state.operator_sections_cache.write().await = Some(snapshot.clone());
+        let app_data_dir = state.app_data_dir.clone();
+        if let Err(error) = run_blocking(move || {
+            vault::save_operator_sections_cache_with_password(
+                &app_data_dir,
+                password.as_ref(),
+                &snapshot,
+            )
+        })
+        .await
+        {
+            eprintln!("[virya:operator-cache] encrypted panel snapshot save degraded: {error}");
+        }
+    });
+}
+
 #[tauri::command]
 pub(crate) async fn operator_signal_overview(
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<OperatorSignalOverview, AppError> {
     let profile = operator_profile(&state).await?;
@@ -583,6 +684,10 @@ pub(crate) async fn operator_signal_overview(
             if let Err(error) = persist_operator_signal_cache(&state, &overview).await {
                 eprintln!("[virya:operator-cache] could not persist Signal overview: {error}");
             }
+            remember_operator_sections(app, {
+                let overview = overview.clone();
+                move |snapshot| snapshot.signal = Some(overview)
+            });
             Ok(overview)
         }
         Err(network_error) if operator_signal_cache_fallback_allowed(&network_error) => {
@@ -606,26 +711,47 @@ pub(crate) async fn operator_signal_overview(
 
 #[tauri::command]
 pub(crate) async fn operator_ops_overview(
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<OperatorOpsOverview, AppError> {
     let profile = operator_profile(&state).await?;
-    state.api.operator_ops_overview(&profile).await
+    let overview = state.api.operator_ops_overview(&profile).await?;
+    remember_operator_sections(app, {
+        let overview = overview.clone();
+        move |snapshot| snapshot.ops = Some(overview)
+    });
+    Ok(overview)
 }
 
 #[tauri::command]
 pub(crate) async fn operator_autopilot_overview(
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<OperatorAutopilotOverview, AppError> {
     let profile = operator_profile(&state).await?;
-    state.api.operator_autopilot_overview(&profile).await
+    let overview = state.api.operator_autopilot_overview(&profile).await?;
+    remember_operator_sections(app, {
+        let overview = overview.clone();
+        move |snapshot| snapshot.autopilot = Some(overview)
+    });
+    Ok(overview)
 }
 
 #[tauri::command]
 pub(crate) async fn operator_autopilot_chief_of_staff(
+    app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<AutopilotChiefOfStaff, AppError> {
     let profile = operator_profile(&state).await?;
-    state.api.operator_autopilot_chief_of_staff(&profile).await
+    let chief = state
+        .api
+        .operator_autopilot_chief_of_staff(&profile)
+        .await?;
+    remember_operator_sections(app, {
+        let chief = chief.clone();
+        move |snapshot| snapshot.chief = Some(chief)
+    });
+    Ok(chief)
 }
 
 #[tauri::command]

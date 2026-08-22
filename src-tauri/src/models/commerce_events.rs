@@ -176,7 +176,7 @@ pub struct TicketOrderSummary {
     pub amount_gross_minor: i64,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ConcertQrOverview {
     #[serde(default)]
     pub events: Vec<StaffEventSummary>,
@@ -184,13 +184,13 @@ pub struct ConcertQrOverview {
     pub campaigns: Vec<QrCampaignSummary>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct StaffEventSummary {
     pub slug: String,
     pub title: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct QrCampaignSummary {
     pub id: String,
     pub event_title: String,

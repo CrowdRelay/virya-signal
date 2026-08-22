@@ -51,6 +51,28 @@ fn latest_request_completed<T>(result: &Result<Option<T>, String>) -> bool {
     !matches!(result, Ok(None))
 }
 
+/// Hands the operator's cached panel snapshot to a caller that owns some of
+/// those panels. The panels are split across two components, and the native
+/// side keeps the decrypted record in memory after the first read, so each
+/// caller can ask for it without paying for a second vault decrypt.
+fn with_operator_cached_sections(
+    apply: impl FnOnce(crate::models::OperatorSectionsSnapshot) + 'static,
+) {
+    if !bridge::native_available() {
+        return;
+    }
+    spawn_local(async move {
+        if let Ok(Some(snapshot)) = bridge::invoke_timeout::<
+            Option<crate::models::OperatorSectionsSnapshot>,
+            _,
+        >("operator_cached_sections", &EmptyArgs {}, 2_000)
+        .await
+        {
+            apply(snapshot);
+        }
+    });
+}
+
 fn refresh_operator_parts(
     dashboard: RwSignal<Option<DashboardData>>,
     loading: RwSignal<OperatorLoadingState>,
@@ -291,6 +313,60 @@ fn refresh_fan_home(
         }
         if completed {
             loading.update(|state| state.home = false);
+        }
+    });
+}
+
+/// Paints referral, interests, the admission pass and the AREA wallet from the
+/// native encrypted snapshot. One bridge call covers all four, and every slot is
+/// gated on its own loading bit: a section whose live answer already landed has
+/// its bit cleared, so a stale snapshot can never overwrite fresh data.
+fn prime_fan_sections(
+    dashboard: RwSignal<Option<FanDashboardData>>,
+    area: RwSignal<Option<AreaWallet>>,
+    loading: RwSignal<FanLoadingState>,
+) {
+    if !bridge::native_available() {
+        return;
+    }
+    spawn_local(async move {
+        let Ok(Some(snapshot)) =
+            bridge::invoke_timeout::<Option<crate::models::FanSectionsSnapshot>, _>(
+                "fan_cached_sections",
+                &EmptyArgs {},
+                2_000,
+            )
+            .await
+        else {
+            return;
+        };
+        if let Some(referral) = snapshot.referral
+            && loading.get_untracked().referral
+        {
+            dashboard.update(|state| {
+                state.get_or_insert_with(FanDashboardData::default).referral = referral;
+            });
+            loading.update(|state| state.referral = false);
+        }
+        if !snapshot.interests.is_empty() && loading.get_untracked().interests {
+            dashboard.update(|state| {
+                state
+                    .get_or_insert_with(FanDashboardData::default)
+                    .interests = stable_fan_interests(snapshot.interests);
+            });
+            loading.update(|state| state.interests = false);
+        }
+        if snapshot.admission_pass.is_some() && loading.get_untracked().admission_pass {
+            dashboard.update(|state| {
+                state
+                    .get_or_insert_with(FanDashboardData::default)
+                    .admission_pass = snapshot.admission_pass;
+            });
+            loading.update(|state| state.admission_pass = false);
+        }
+        if snapshot.area.is_some() && loading.get_untracked().area {
+            area.set(snapshot.area);
+            loading.update(|state| state.area = false);
         }
     });
 }
@@ -564,6 +640,24 @@ fn refresh_wallets(
             wallets.with_untracked(|value| !value.is_empty()),
             |state, value| state.wallets = value,
         );
+    }
+    // One live request per stored order under a 35 s budget. The last public
+    // snapshot is already in the vault, so paint it beside the refresh instead
+    // of holding a skeleton for the whole fan-out.
+    if bridge::native_available() && wallets.with_untracked(|value| value.is_empty()) {
+        spawn_local(async move {
+            if let Ok(value) =
+                bridge::invoke_timeout::<Vec<TicketWallet>, _>("fan_cached_wallets", &EmptyArgs {}, 2_000)
+                    .await
+                && !value.is_empty()
+                && wallets.with_untracked(|state| state.is_empty())
+            {
+                wallets.set(stable_wallets(value));
+                if let Some(loading) = loading {
+                    loading.update(|state| state.wallets = false);
+                }
+            }
+        });
     }
     spawn_local(async move {
         let result = bridge::invoke_latest::<WalletBatch, _>(
