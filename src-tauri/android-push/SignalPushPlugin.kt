@@ -33,6 +33,8 @@ class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
     private var pendingAppLinkRejected = false
     private var pendingSynesthesiaAppLink: String? = null
     private var pendingSynesthesiaAppLinkRejected = false
+    private var pendingFanConfirmAppLink: String? = null
+    private var pendingFanConfirmAppLinkRejected = false
 
     override fun onNewIntent(intent: Intent) {
         launchTargetFrom(intent)?.let { pendingLaunchTarget = it }
@@ -48,6 +50,11 @@ class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
             val link = synesthesiaAppLinkFrom(intent)
             pendingSynesthesiaAppLink = link
             pendingSynesthesiaAppLinkRejected = link == null
+        }
+        if (isFanConfirmIntent(intent)) {
+            val link = fanConfirmAppLinkFrom(intent)
+            pendingFanConfirmAppLink = link
+            pendingFanConfirmAppLinkRejected = link == null
         }
     }
     private fun ensureFirebaseInitialized(): Boolean {
@@ -160,6 +167,25 @@ class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     @Command
+    fun takeFanConfirmAppLink(invoke: Invoke) {
+        val currentIsFanConfirm = isFanConfirmIntent(activity.intent)
+        val currentLink = fanConfirmAppLinkFrom(activity.intent)
+        val link = pendingFanConfirmAppLink ?: currentLink
+        val rejected = pendingFanConfirmAppLinkRejected || (currentIsFanConfirm && currentLink == null)
+        pendingFanConfirmAppLink = null
+        pendingFanConfirmAppLinkRejected = false
+        // One-time either way. The mailed token is spent by the exchange that
+        // follows, so re-offering it on the next resume could only fail.
+        if (currentIsFanConfirm) {
+            activity.intent.data = null
+        }
+        val result = JSObject()
+        result.put("appLink", link.orEmpty())
+        result.put("rejected", rejected)
+        invoke.resolve(result)
+    }
+
+    @Command
     fun clearSynesthesiaAppLink(invoke: Invoke) {
         pendingSynesthesiaAppLink = null
         pendingSynesthesiaAppLinkRejected = false
@@ -236,6 +262,39 @@ class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
                 uri.host == "my-signal" &&
                 path.isEmpty()
         return verifiedWeb || native
+    }
+
+    // Whether this intent was addressed to fan confirmation at all, independent
+    // of the token being well formed.
+    private fun isFanConfirmIntent(intent: Intent?): Boolean {
+        if (intent?.action != Intent.ACTION_VIEW) return false
+        val uri: Uri = intent.data ?: return false
+        if (uri.port != -1 || uri.userInfo != null) return false
+        val path = uri.path?.trimEnd('/').orEmpty()
+        val verifiedWeb =
+            uri.scheme == "https" &&
+                (uri.host == "virya.music" || uri.host == "www.virya.music") &&
+                (path == "/signal/confirm" || path == "/pl/signal/confirm")
+        val native =
+            uri.scheme == "virya-signal" && uri.host == "fan" && path == "/confirm"
+        return verifiedWeb || native
+    }
+
+    // CrowdRelay mails the token either as a query parameter or in the fragment.
+    // The fragment form never reaches the site's server, so both are accepted
+    // here and normalised to the same 64 hex characters the native side expects.
+    private fun fanConfirmAppLinkFrom(intent: Intent?): String? {
+        if (!isFanConfirmIntent(intent)) return null
+        val uri: Uri = intent?.data ?: return null
+        val fromQuery = runCatching { uri.getQueryParameter("token") }.getOrNull()
+        val fromFragment = uri.fragment
+            ?.split('&')
+            ?.firstNotNullOfOrNull { part ->
+                part.removePrefix("token=").takeIf { it != part }
+            }
+        val token = (fromQuery ?: fromFragment)?.trim().orEmpty()
+        if (token.length != 64 || !token.all { isHexChar(it) }) return null
+        return token.lowercase()
     }
 
     private fun isHexChar(character: Char): Boolean =

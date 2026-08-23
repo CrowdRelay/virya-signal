@@ -272,6 +272,65 @@ pub(crate) async fn fan_confirm(
     fan_status(state).await
 }
 
+/// Picks up a confirmation link Android delivered to the app instead of the
+/// browser, and reports whether one is now waiting.
+///
+/// The token stays native: the WebView only learns that a mailed capability is
+/// pending, the same way a scanned QR never reaches it. `fan_confirm_link`
+/// spends it once the fan has entered the PIN.
+#[tauri::command]
+pub(crate) async fn fan_take_confirm_link(
+    state: State<'_, AppState>,
+    _app: AppHandle,
+) -> Result<bool, AppError> {
+    #[cfg(target_os = "android")]
+    if let Some(token) =
+        crate::push_plugin::take_fan_confirm_app_link(&_app).map_err(AppError::InvalidInput)?
+    {
+        *state.pending_fan_confirm_token.lock().await = Some(Zeroizing::new(token));
+    }
+    Ok(state.pending_fan_confirm_token.lock().await.is_some())
+}
+
+/// Spends the token a confirmation link delivered, with the PIN the fan just
+/// chose. Mirrors `fan_confirm_scanned`, except the capability came from the
+/// mailed link rather than the camera.
+#[tauri::command]
+pub(crate) async fn fan_confirm_link(
+    state: State<'_, AppState>,
+    mut api_base_url: String,
+    pin: String,
+) -> Result<FanSessionStatus, AppError> {
+    let _mutation = state.fan_mutation.lock().await;
+    if state.fan_session.read().await.is_some() {
+        drop(_mutation);
+        return fan_status(state).await;
+    }
+    let token = state
+        .pending_fan_confirm_token
+        .lock()
+        .await
+        .clone()
+        .ok_or(AppError::NotConfigured)?;
+    // A confirmation started on this device already knows where it is talking
+    // to; a link opened on a fresh install carries the shell's own base URL.
+    if let Some(pending) = state.pending_fan_confirmation.lock().await.as_ref() {
+        api_base_url = pending.api_base_url.clone();
+    }
+    let mut input = FanConfirmationInput {
+        api_base_url,
+        email: String::new(),
+        display_name: None,
+        token: token.to_string(),
+    };
+    validate_fan_confirmation(&mut input, &pin)?;
+    persist_confirmed_fan(&state, input, Zeroizing::new(pin)).await?;
+    *state.pending_fan_confirm_token.lock().await = None;
+    *state.pending_fan_confirmation.lock().await = None;
+    drop(_mutation);
+    fan_status(state).await
+}
+
 #[tauri::command]
 pub(crate) async fn fan_confirm_scanned(
     state: State<'_, AppState>,

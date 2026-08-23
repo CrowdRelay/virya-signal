@@ -31,6 +31,7 @@ class AppLinksArtifactTests(unittest.TestCase):
                 "virya.music",
                 "virya-signal",
                 "my-signal",
+                "fan",
                 *paths,
             ]
         )
@@ -44,7 +45,7 @@ class AppLinksArtifactTests(unittest.TestCase):
             aab, tauri = self.fixture(Path(directory))
             report = MODULE.verify(aab, tauri_config_path=tauri)
             self.assertEqual(report["host"], "virya.music")
-            self.assertEqual(len(report["paths"]), 4)
+            self.assertEqual(len(report["paths"]), 6)
 
     def test_rejects_old_latarnik_only_manifest(self):
         with tempfile.TemporaryDirectory() as directory:

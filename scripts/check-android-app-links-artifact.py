@@ -6,7 +6,14 @@ import json
 import zipfile
 from pathlib import Path
 
-REQUIRED_PATHS = ("/latarnik", "/pl/latarnik", "/my-signal", "/pl/my-signal")
+REQUIRED_PATHS = (
+    "/latarnik",
+    "/pl/latarnik",
+    "/my-signal",
+    "/pl/my-signal",
+    "/signal/confirm",
+    "/pl/signal/confirm",
+)
 
 
 def require_bytes(haystack: bytes, needle: str, label: str) -> None:

@@ -637,7 +637,14 @@ def _stage_android_push() -> bool:
     # to serve its own assetlinks.json without redirects. Reconcile each path on
     # every run because generated Android trees can survive across source
     # upgrades and may already contain an older Latarnik-only verified filter.
-    for path_prefix in ("/latarnik", "/pl/latarnik", "/my-signal", "/pl/my-signal"):
+    for path_prefix in (
+        "/latarnik",
+        "/pl/latarnik",
+        "/my-signal",
+        "/pl/my-signal",
+        "/signal/confirm",
+        "/pl/signal/confirm",
+    ):
         expected = {
             f"{{{ANDROID_NS}}}scheme": "https",
             f"{{{ANDROID_NS}}}host": "virya.music",
@@ -654,30 +661,30 @@ def _stage_android_push() -> bool:
     # verification, so an installed Signal app is always the primary handoff
     # target. HTTPS remains the browser/older-build fallback in Synesthesia.
     native_scheme = "virya-signal"
-    native_host = "my-signal"
-    native_filter = next(
-        (node for node in activity.findall("intent-filter")
-         if any(
-             data.attrib.get(f"{{{ANDROID_NS}}}scheme") == native_scheme
-             and data.attrib.get(f"{{{ANDROID_NS}}}host") == native_host
-             for data in node.findall("data")
-         )),
-        None,
-    )
-    if native_filter is None:
-        native_filter = ET.SubElement(activity, "intent-filter")
-    ensure_intent_child(native_filter, "action", "android.intent.action.VIEW")
-    ensure_intent_child(native_filter, "category", "android.intent.category.DEFAULT")
-    ensure_intent_child(native_filter, "category", "android.intent.category.BROWSABLE")
-    native_expected = {
-        f"{{{ANDROID_NS}}}scheme": native_scheme,
-        f"{{{ANDROID_NS}}}host": native_host,
-    }
-    if not any(
-        all(data.attrib.get(key) == value for key, value in native_expected.items())
-        for data in native_filter.findall("data")
-    ):
-        ET.SubElement(native_filter, "data", native_expected)
+    for native_host in ("my-signal", "fan"):
+        native_filter = next(
+            (node for node in activity.findall("intent-filter")
+             if any(
+                 data.attrib.get(f"{{{ANDROID_NS}}}scheme") == native_scheme
+                 and data.attrib.get(f"{{{ANDROID_NS}}}host") == native_host
+                 for data in node.findall("data")
+             )),
+            None,
+        )
+        if native_filter is None:
+            native_filter = ET.SubElement(activity, "intent-filter")
+        ensure_intent_child(native_filter, "action", "android.intent.action.VIEW")
+        ensure_intent_child(native_filter, "category", "android.intent.category.DEFAULT")
+        ensure_intent_child(native_filter, "category", "android.intent.category.BROWSABLE")
+        native_expected = {
+            f"{{{ANDROID_NS}}}scheme": native_scheme,
+            f"{{{ANDROID_NS}}}host": native_host,
+        }
+        if not any(
+            all(data.attrib.get(key) == value for key, value in native_expected.items())
+            for data in native_filter.findall("data")
+        ):
+            ET.SubElement(native_filter, "data", native_expected)
 
     tree.write(manifest, encoding="utf-8", xml_declaration=True)
 

@@ -300,6 +300,8 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "you_can_also_paste_the_full_link" => {
             "You can also paste the full link or the 64-character code. The app will extract the correct token."
         }
+        "link_from_the_email_is_ready" => "The link from your email is ready.",
+        "set_a_pin_and_enter_signal" => "Set a PIN and enter Signal.",
         "email_link_or_code" => "Email link or code",
         "paste_a_link_or_code_or_use" => "Paste a link or code, or use QR",
         "scan_qr" => "SCAN QR",
