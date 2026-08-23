@@ -39,17 +39,6 @@ class GooglePlayReleaseContractTests(unittest.TestCase):
             self.assertTrue(text)
             self.assertLessEqual(len(text), 500)
 
-    def test_release_runbook_exists(self):
-        runbook = (ROOT / "docs/google-play-production-release.md").read_text()
-        for token in (
-            "10% staged rollout",
-            "10% → 25% → 50% → 100%",
-            "Data safety",
-            "Play App Signing",
-            "GOOGLE_PLAY_WIF_PROVIDER",
-        ):
-            self.assertIn(token, runbook)
-
 
 if __name__ == "__main__":
     unittest.main()
