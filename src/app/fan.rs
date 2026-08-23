@@ -561,8 +561,14 @@ fn FanAccess(
                         <button class:active=move || access_mode.get() == FanAccessMode::Confirm on:click=move |_| access_mode.set(FanAccessMode::Confirm)>{tr("i_have_a_code")}</button>
                     </div>
                     <div class="form-grid fan-form">
-                        <label>{tr("email")}<input aria-label=tr("email") type="email" autocomplete="email" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label>
-                        <label>{tr("name_optional")}<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/></label>
+                        // CrowdRelay resolves the identity from the token itself,
+                        // so a capability that already arrived needs no address and
+                        // no name. Asking for them anyway is what made the screen
+                        // look like the link had done nothing.
+                        <Show when=move || !link_pending.get()>
+                            <label>{tr("email")}<input aria-label=tr("email") type="email" autocomplete="email" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label>
+                            <label>{tr("name_optional")}<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/></label>
+                        </Show>
                         <Show when=move || access_mode.get() == FanAccessMode::Signup fallback=move || view! {
                             <>
                                 <Show when=move || link_pending.get() fallback=move || view! {
@@ -570,10 +576,15 @@ fn FanAccess(
                                 }>
                                     <p class="confirm-hint"><strong>{tr("link_from_the_email_is_ready")}</strong><br/>{tr("set_a_pin_and_enter_signal")}</p>
                                 </Show>
-                                <label>{tr("email_link_or_code")}<textarea aria-label=tr("email_link_or_code") rows="3" autocomplete="one-time-code" spellcheck="false" autocapitalize="none" placeholder=tr("paste_a_link_or_code_or_use") prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
-                                <div class="confirmation-actions single">
-                                    <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("or_hold_the_field_above_and_choose")}</small></button>
-                                </div>
+                                // A capability that already arrived leaves nothing
+                                // to paste or scan. Showing the empty field and the
+                                // scanner next to it reads as "nothing happened".
+                                <Show when=move || !link_pending.get()>
+                                    <label>{tr("email_link_or_code")}<textarea aria-label=tr("email_link_or_code") rows="3" autocomplete="one-time-code" spellcheck="false" autocapitalize="none" placeholder=tr("paste_a_link_or_code_or_use") prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
+                                    <div class="confirmation-actions single">
+                                        <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("or_hold_the_field_above_and_choose")}</small></button>
+                                    </div>
+                                </Show>
                                 <label class="pin-field">
                                     <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
                                     <small id="fan-confirm-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
