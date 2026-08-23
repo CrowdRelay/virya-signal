@@ -194,13 +194,36 @@ function viryaPermissionState(value) {
   return value?.camera ?? value?.status ?? value?.state ?? 'prompt';
 }
 
+// Resolves once the app is back in the foreground, or after a grace period if
+// no wake-up arrives. The shell raises `virya:resume`, and window focus covers
+// the cases where it does not.
+function viryaAwaitForegroundSettle(timeoutMs) {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener('virya:resume', finish);
+      window.removeEventListener('focus', finish);
+      resolve();
+    };
+    window.addEventListener('virya:resume', finish);
+    window.addEventListener('focus', finish);
+    window.setTimeout(finish, timeoutMs);
+  });
+}
+
+// Reports whether the grant had to be asked for, because a fresh grant means
+// the app is only now coming back from the permission dialog.
 async function viryaEnsureCameraPermission(scanner) {
   if (!scanner?.checkPermissions || !scanner?.requestPermissions) {
     throw new Error(viryaTexts.cameraModuleUnavailable);
   }
 
+  let prompted = false;
   let state = viryaPermissionState(await scanner.checkPermissions());
   if (state === 'prompt' || state === 'prompt-with-rationale') {
+    prompted = true;
     state = viryaPermissionState(await scanner.requestPermissions());
   }
   if (state !== 'granted') {
@@ -208,6 +231,7 @@ async function viryaEnsureCameraPermission(scanner) {
       viryaTexts.cameraDenied,
     );
   }
+  return { prompted };
 }
 
 const VIRYA_SCAN_CANCELLED = '__VIRYA_SCAN_CANCELLED__';
@@ -279,7 +303,16 @@ async function viryaScanQrRaw() {
     throw new Error(viryaTexts.scannerUnavailable);
   }
 
-  await viryaEnsureCameraPermission(scanner);
+  const { prompted } = await viryaEnsureCameraPermission(scanner);
+  if (prompted) {
+    // requestPermissions resolves while the permission dialog is still its own
+    // foreground activity. Opening a windowed preview into a WebView surface
+    // that is mid-reattach abandons the buffer queue a few hundred ms later,
+    // which the scanner reports as a cancelled scan and the caller then treats
+    // as "the fan changed their mind": a silent no-op that only succeeds on the
+    // second attempt, once the grant is settled.
+    await viryaAwaitForegroundSettle(700);
+  }
   const format = scanner.Format?.QRCode ?? 'QR_CODE';
   const overlay = viryaMountScannerOverlay(scanner);
   const scanPromise = Promise.resolve(scanner.scan({ windowed: true, formats: [format] }))
