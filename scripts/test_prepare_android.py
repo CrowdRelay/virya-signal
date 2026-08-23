@@ -199,10 +199,18 @@ dependencies {
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             manifest_text = manifest.read_text()
-            for path in ("/latarnik", "/pl/latarnik", "/my-signal", "/pl/my-signal"):
+            for path in (
+                "/latarnik",
+                "/pl/latarnik",
+                "/my-signal",
+                "/pl/my-signal",
+                "/signal/confirm",
+                "/pl/signal/confirm",
+            ):
                 self.assertEqual(manifest_text.count(f'android:pathPrefix="{path}"'), 1)
-            self.assertEqual(manifest_text.count('android:scheme="virya-signal"'), 1)
+            self.assertEqual(manifest_text.count('android:scheme="virya-signal"'), 2)
             self.assertEqual(manifest_text.count('android:host="my-signal"'), 1)
+            self.assertEqual(manifest_text.count('android:host="fan"'), 1)
 
             second = subprocess.run(
                 ["python3", str(scripts / SCRIPT.name)],
@@ -213,10 +221,18 @@ dependencies {
             )
             self.assertEqual(second.returncode, 0, second.stderr)
             manifest_text = manifest.read_text()
-            for path in ("/latarnik", "/pl/latarnik", "/my-signal", "/pl/my-signal"):
+            for path in (
+                "/latarnik",
+                "/pl/latarnik",
+                "/my-signal",
+                "/pl/my-signal",
+                "/signal/confirm",
+                "/pl/signal/confirm",
+            ):
                 self.assertEqual(manifest_text.count(f'android:pathPrefix="{path}"'), 1)
-            self.assertEqual(manifest_text.count('android:scheme="virya-signal"'), 1)
+            self.assertEqual(manifest_text.count('android:scheme="virya-signal"'), 2)
             self.assertEqual(manifest_text.count('android:host="my-signal"'), 1)
+            self.assertEqual(manifest_text.count('android:host="fan"'), 1)
 
     def test_configures_firebase_only_with_valid_secret(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

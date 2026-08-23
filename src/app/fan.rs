@@ -199,6 +199,56 @@ fn submit_fan_confirmation_values(
     });
 }
 
+/// Spends a confirmation link Android handed to the app. The token stayed
+/// native, so the only thing this sends is the PIN the fan just chose.
+fn submit_fan_confirm_link(
+    token: RwSignal<String>,
+    pin: RwSignal<String>,
+    busy: RwSignal<bool>,
+    session: FanConfirmationSession,
+    error: RwSignal<Option<String>>,
+) {
+    if busy.get_untracked() {
+        return;
+    }
+    let current_pin = pin.get_untracked();
+    if !new_operator_pin_is_valid(&current_pin) {
+        error.set(Some(tr("enter_4_6_digits_for_this_fan_profile").to_owned()));
+        return;
+    }
+    busy.set(true);
+    spawn_local(async move {
+        match bridge::invoke::<FanSessionStatus, _>(
+            "fan_confirm_link",
+            &FanConfirmLinkArgs {
+                api_base_url: API_BASE,
+                pin: &current_pin,
+            },
+        )
+        .await
+        {
+            Ok(value) => adopt_fan_session(value, token, pin, session),
+            Err(message) => {
+                // Same reasoning as run_fan_confirmation: the capability is
+                // one-time, so native state decides whether this failed.
+                if let Ok(status) = bridge::invoke_timeout::<FanSessionStatus, _>(
+                    "fan_status",
+                    &EmptyArgs {},
+                    5_000,
+                )
+                .await
+                    && status.unlocked
+                {
+                    adopt_fan_session(status, token, pin, session);
+                } else {
+                    let _ = error.try_set(Some(message));
+                }
+            }
+        }
+        let _ = busy.try_set(false);
+    });
+}
+
 fn submit_fan_confirmation(
     email: RwSignal<String>,
     name: RwSignal<String>,
@@ -231,6 +281,23 @@ fn FanAccess(
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let access_mode = RwSignal::new(FanAccessMode::Signup);
+    // A confirmation link Android routed to the app instead of the browser. The
+    // token itself stays native; this only records that one is waiting so the
+    // form can drop to a PIN prompt.
+    let link_pending = RwSignal::new(false);
+    Effect::new(move |_| {
+        if !bridge::native_available() || link_pending.get_untracked() {
+            return;
+        }
+        spawn_local(async move {
+            if let Ok(true) =
+                bridge::invoke::<bool, _>("fan_take_confirm_link", &EmptyArgs {}).await
+            {
+                let _ = link_pending.try_set(true);
+                let _ = access_mode.try_set(FanAccessMode::Confirm);
+            }
+        });
+    });
     let email = RwSignal::new(String::new());
     let name = RwSignal::new(String::new());
     // City onboarding is deliberately local-first. The remote canonical list is
@@ -384,6 +451,10 @@ fn FanAccess(
     };
 
     let confirm = move |_| {
+        if link_pending.get_untracked() {
+            submit_fan_confirm_link(token, pin, busy, confirmation_session, error);
+            return;
+        }
         submit_fan_confirmation(email, name, token, pin, busy, confirmation_session, error);
     };
 
@@ -489,7 +560,11 @@ fn FanAccess(
                         <label>{tr("name_optional")}<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/></label>
                         <Show when=move || access_mode.get() == FanAccessMode::Signup fallback=move || view! {
                             <>
-                                <p class="confirm-hint"><strong>{tr("fastest_scan_the_qr_from_the_email")}</strong><br/>{tr("you_can_also_paste_the_full_link")}</p>
+                                <Show when=move || link_pending.get() fallback=move || view! {
+                                    <p class="confirm-hint"><strong>{tr("fastest_scan_the_qr_from_the_email")}</strong><br/>{tr("you_can_also_paste_the_full_link")}</p>
+                                }>
+                                    <p class="confirm-hint"><strong>{tr("link_from_the_email_is_ready")}</strong><br/>{tr("set_a_pin_and_enter_signal")}</p>
+                                </Show>
                                 <label>{tr("email_link_or_code")}<textarea aria-label=tr("email_link_or_code") rows="3" autocomplete="one-time-code" spellcheck="false" autocapitalize="none" placeholder=tr("paste_a_link_or_code_or_use") prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
                                 <div class="confirmation-actions single">
                                     <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("or_hold_the_field_above_and_choose")}</small></button>
@@ -500,7 +575,7 @@ fn FanAccess(
                                     <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-confirm-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e)))/>
                                 </label>
                                 <p class="confirmation-note">{tr("pin_encrypts_your_profile_on_this_device")}</p>
-                                <button class="primary" disabled=move || busy.get() || token.get().trim().is_empty() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_enter")}</button>
+                                <button class="primary" disabled=move || busy.get() || (!link_pending.get() && token.get().trim().is_empty()) || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_enter")}</button>
                                 <button type="button" class="text-button" disabled=move || busy.get() || email.get().trim().is_empty() on:click=request_access>{tr("i_already_have_an_account_send_login")}</button>
                                 <p class="confirmation-resend">{tr("no_message_check_spam_after_15_minutes")}</p>
                             </>

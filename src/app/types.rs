@@ -143,6 +143,13 @@ pub(super) struct PinArgs<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(super) struct FanConfirmLinkArgs<'a> {
+    pub api_base_url: &'a str,
+    pub pin: &'a str,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct StaffGateArgs<'a> {
     pub password: &'a str,
 }

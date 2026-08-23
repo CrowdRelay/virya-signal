@@ -298,6 +298,8 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "you_can_also_paste_the_full_link" => {
             "Możesz też wkleić cały link albo 64-znakowy kod. Aplikacja sama wyciągnie właściwy token."
         }
+        "link_from_the_email_is_ready" => "Link z e-maila jest gotowy.",
+        "set_a_pin_and_enter_signal" => "Ustaw PIN i wejdź do Signal.",
         "email_link_or_code" => "Link lub kod z e-maila",
         "paste_a_link_or_code_or_use" => "Wklej link, kod albo użyj QR",
         "scan_qr" => "SKANUJ QR",
