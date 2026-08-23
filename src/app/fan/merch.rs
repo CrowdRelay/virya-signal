@@ -1,3 +1,7 @@
+/// The Echoes cover, shipped byte-identical to the one virya.music serves so
+/// the two never drift. That parity is asserted in `test_merch_brand_assets`,
+/// which is why this one stays at its canonical 1200px while the catalog art
+/// goes through the 600px CDN variant.
 const STAGE_PACK_PREVIEW_URL: &str = "bundle-stage-pack.webp";
 
 include!("affiliate.rs");
