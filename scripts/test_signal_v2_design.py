@@ -65,7 +65,10 @@ class SignalV2DesignContract(unittest.TestCase):
         self.assertIn("content-visibility: auto", CSS)
         self.assertIn("contain-intrinsic-size", CSS)
         self.assertRegex(CSS, r"@media \(max-width:\s*520px\)")
-        self.assertRegex(CSS, r"\.fan-merch-list\s*\{\s*grid-template-columns:\s*1fr")
+        self.assertRegex(
+            CSS,
+            r"\.fan-merch-list\s*\{[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)",
+        )
 
     def test_logo_uses_shared_core_colors_without_effect_bloat(self) -> None:
         self.assertIn('fill="#070908"', LOGO)
