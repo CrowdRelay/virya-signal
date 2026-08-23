@@ -159,7 +159,7 @@ button:disabled { opacity: .48; cursor: default; }
 .overflow-menu button span { width: 22px; text-align: center; font-size: 1.1rem; }
 .menu-trigger { width: 44px; min-width: 44px; display: grid !important; place-content: center; gap: 5px; border-radius: 2px; border-color: var(--line) !important; background: var(--surface) !important; }
 .menu-trigger i { display: block; width: 21px; height: 2px; border-radius: 2px; background: var(--signal-hot); box-shadow: 0 0 10px #93c6c033; }
-.menu-trigger[aria-expanded="true"] { background: #25200b !important; border-color: var(--signal-hot) !important; }
+.menu-trigger[aria-expanded="true"] { background: #0f1a17 !important; border-color: var(--signal-hot) !important; }
 .scanner-button { margin-top: 14px; width: 100%; min-height: 300px; border: 1px solid var(--signal-deep); background: linear-gradient(145deg, var(--surface), #090b0a); color: var(--text); display: grid; place-content: center; justify-items: center; gap: 14px; }
 .scanner-frame { width: 142px; height: 142px; border: 2px solid var(--signal-hot); }
 .scanner-button strong { color: var(--signal-hot); letter-spacing: .08em; }
@@ -185,13 +185,13 @@ button:disabled { opacity: .48; cursor: default; }
 .two-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .danger { border: 1px solid var(--danger); border-radius: var(--control-radius); background: var(--danger); color: #080808; padding: 12px; font-weight: 900; transition: opacity .15s; }
 .ghost { min-height: 48px; border: 1px solid var(--line); border-radius: 2px; background: transparent; color: var(--muted); padding: 12px 16px; font-weight: 850; transition: border-color .15s, background .15s, color .15s, transform .1s; }
-.ghost:active:not(:disabled) { transform: scale(.98); border-color: #68614a; background: #ffffff09; color: #e2e0d6; }
+.ghost:active:not(:disabled) { transform: scale(.98); border-color: var(--signal-deep); background: #ffffff09; color: #e2e0d6; }
 .danger.ghost { border-color: var(--danger); background: transparent; color: var(--danger); }
 .advanced-config > .ghost { width: 100%; min-height: 54px; padding: 15px 18px; text-align: center; letter-spacing: .06em; }
-.token-box { border: 1px solid #4f441b; background: #0d0c07; padding: 12px; }
+.token-box { border: 1px solid var(--line); background: var(--bg-raised); padding: 12px; }
 .token-box strong { color: var(--signal-hot); }
 .token-box p { font-family: ui-monospace, monospace; font-size: var(--type-micro); word-break: break-all; }
-.coupon-visual { min-height: 138px; display: flex; align-items: center; gap: 20px; border: 1px dashed #6a5818; padding: 20px; background: linear-gradient(120deg,#171407,#0d0d0d); }
+.coupon-visual { min-height: 138px; display: flex; align-items: center; gap: 20px; border: 1px dashed var(--signal-deep); padding: 20px; background: linear-gradient(120deg,#0f1a17,#0d0d0d); }
 .coupon-visual > span { font-size: 70px; color: var(--signal-hot); font-weight: 1000; }
 .coupon-visual p { color: var(--muted); font-size: var(--type-meta); }
 .campaign-card { border: 1px solid var(--line); background: var(--surface); padding: 15px; display: grid; gap: 12px; }
@@ -240,17 +240,17 @@ button:disabled { opacity: .48; cursor: default; }
 .fan-event-card p { margin: 0; color: var(--muted); }
 .fan-merch-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 10px; }
 .merch-grid-action, .merch-grid-heading, .merch-grid-message { grid-column: 1 / -1; }
-.merch-grid-action .ticket-buy-button { width: 100%; min-height: 52px; border: 1px solid #65561c; border-radius: 6px; background: #191607; color: var(--signal-hot); padding: 14px 16px; font-size: var(--type-micro); font-weight: 900; letter-spacing: .07em; }
-.merch-grid-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin: 17px 0 1px; padding-bottom: 9px; border-bottom: 1px solid #312b17; }
+.merch-grid-action .ticket-buy-button { width: 100%; min-height: 52px; border: 1px solid var(--signal-deep); border-radius: 6px; background: rgba(132,180,172,.08); color: var(--signal-hot); padding: 14px 16px; font-size: var(--type-micro); font-weight: 900; letter-spacing: .07em; }
+.merch-grid-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin: 17px 0 1px; padding-bottom: 9px; border-bottom: 1px solid var(--line); }
 .merch-grid-heading p, .merch-grid-heading h3 { margin: 0; }
 .merch-grid-heading h3 { margin-top: 4px; font-size: 16px; text-transform: uppercase; }
 .merch-grid-heading > span { color: var(--signal-hot); font-size: var(--type-micro); font-weight: 900; letter-spacing: .08em; white-space: nowrap; }
 .merch-products-heading { margin-top: 22px; }
 .merch-grid-message { display: grid; gap: 10px; border: 1px solid var(--line); background: var(--surface); padding: 14px; }
 .merch-grid-message p { margin: 0; color: var(--muted); font-size: var(--type-meta); line-height: 1.5; }
-.merch-grid-message .ticket-buy-button { width: 100%; min-height: 48px; border: 1px solid #5d4f1c; border-radius: 6px; background: #171407; color: var(--signal-hot); padding: 13px 12px; font-size: var(--type-micro); font-weight: 900; }
+.merch-grid-message .ticket-buy-button { width: 100%; min-height: 48px; border: 1px solid var(--signal-deep); border-radius: 6px; background: #0f1a17; color: var(--signal-hot); padding: 13px 12px; font-size: var(--type-micro); font-weight: 900; }
 .fan-merch-card { position: relative; min-width: 0; height: 100%; border: 1px solid var(--line); border-radius: var(--control-radius); background: var(--surface); overflow: hidden; display: flex; flex-direction: column; contain: layout paint; content-visibility: auto; contain-intrinsic-size: auto 420px; }
-.fan-merch-bundle { border-color: #514719; background: linear-gradient(155deg, #171407, #111 54%); }
+.fan-merch-bundle { border-color: var(--signal-deep); background: linear-gradient(155deg, #0f1a17, #111 54%); }
 .bundle-badge { position: absolute; z-index: 2; top: 8px; left: 8px; border: 1px solid var(--signal-deep); border-radius: 999px; background: #0b100fe8; color: var(--signal-hot); padding: 5px 7px; font-size: var(--type-micro); font-weight: 950; letter-spacing: .12em; box-shadow: 0 4px 16px #0008; }
 .fan-merch-card > img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; display: block; background: #171715 center/cover no-repeat; }
 .fan-merch-body { flex: 1; display: flex; flex-direction: column; gap: 9px; padding: 11px; }
@@ -259,22 +259,22 @@ button:disabled { opacity: .48; cursor: default; }
 .fan-merch-heading h3 { margin: 0 0 5px; text-transform: uppercase; font-size: 14px; line-height: 1.15; overflow-wrap: anywhere; }
 .fan-merch-heading strong { color: var(--signal-hot); font-size: 13px; }
 .fan-merch-heading > span { justify-self: start; border: 1px solid #4b2b2b; border-radius: 999px; color: #d99494; padding: 4px 6px; font-size: var(--type-micro); font-weight: 900; letter-spacing: .06em; }
-.fan-merch-heading > span.available { border-color: #66571d; color: var(--signal-hot); }
+.fan-merch-heading > span.available { border-color: var(--signal-deep); color: var(--signal-hot); }
 .fan-merch-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
 .fan-merch-price del { color: #98a5a0; font-size: var(--type-micro); }
 .fan-merch-includes { margin: 0; padding: 0 0 0 14px; color: #aaa; font-size: var(--type-micro); line-height: 1.45; }
 .fan-merch-includes li + li { margin-top: 2px; }
 .fan-merch-variants { display: flex; flex-wrap: wrap; gap: 4px; }
 .fan-merch-variants span { min-width: 27px; border: 1px solid #343431; border-radius: 5px; color: #98a5a0; padding: 5px 6px; text-align: center; font-size: var(--type-micro); font-weight: 800; }
-.fan-merch-variants span.available { border-color: #6a5a21; color: #bddbd5; background: #93c6c00d; }
+.fan-merch-variants span.available { border-color: var(--signal-deep); color: #bddbd5; background: #93c6c00d; }
 .fan-merch-card .ticket-buy-button { width: 100%; min-height: 52px; margin-top: auto; border: 1px solid var(--signal-hot); border-radius: 6px; background: var(--signal-hot); color: #090909; padding: 14px 8px; font-size: var(--type-micro); font-weight: 950; letter-spacing: .055em; line-height: 1.2; transition: transform .1s, filter .15s; }
 .fan-merch-card .ticket-buy-button:active:not(:disabled) { transform: scale(.965); filter: brightness(.9); }
 .event-description { margin-top: 12px !important; line-height: 1.5; font-size: 12px; }
 .event-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 16px; }
-.event-actions button, .event-actions a, .ticket-pool-status { min-height: 48px; border: 1px solid #4d431b; border-radius: var(--control-radius); background: transparent; color: var(--signal-hot); padding: 12px 10px; text-align: center; font-size: var(--type-micro); font-weight: 900; line-height: 1.3; }
+.event-actions button, .event-actions a, .ticket-pool-status { min-height: 48px; border: 1px solid var(--signal-deep); border-radius: var(--control-radius); background: transparent; color: var(--signal-hot); padding: 12px 10px; text-align: center; font-size: var(--type-micro); font-weight: 900; line-height: 1.3; }
 .event-actions button.active { background: var(--signal-hot); color: #080808; }
 .ticket-pool-status { display: grid; place-items: center; color: #aaa; border-color: #3b3932; background: #0d0d0b; cursor: default; }
-.ticket-pool-status.is-loading { color: #a7954d; border-color: #4d431b; }
+.ticket-pool-status.is-loading { color: #a7954d; border-color: var(--signal-deep); }
 .ticket-pool-status.is-warning { color: #c7aa68; border-color: #58451f; background: #171207; }
 .admission-card { border: 1px solid var(--signal-deep); background: linear-gradient(145deg,#0f1f1b,#0e0e0d); padding: 20px; display: grid; gap: 8px; }
 .admission-card h3 { margin: 5px 0 0; font-size: 28px; text-transform: uppercase; }
@@ -287,7 +287,7 @@ button:disabled { opacity: .48; cursor: default; }
 .wallet-card p { margin: 0; color: var(--muted); font-size: var(--type-meta); }
 .wallet-card header > strong { color: var(--signal-hot); font-family: ui-monospace, monospace; font-size: var(--type-micro); }
 .ticket-stack { margin-top: 12px; }
-.ticket-card { border: 1px solid #3a351e; background: #0d0d0b; padding: 13px; display: grid; grid-template-columns: 1fr 105px; align-items: center; gap: 10px; }
+.ticket-card { border: 1px solid var(--line); background: #0d0d0b; padding: 13px; display: grid; grid-template-columns: 1fr 105px; align-items: center; gap: 10px; }
 .ticket-card strong, .ticket-card span { display: block; }
 .ticket-card strong { margin: 5px 0; color: var(--signal-hot); font-family: ui-monospace, monospace; }
 .ticket-card span, .ticket-card small { color: var(--muted); font-size: var(--type-micro); }
@@ -435,8 +435,8 @@ button:disabled { opacity: .48; cursor: default; }
   background: rgba(18,18,22,.84);
 }
 .show-mode-card.show-mode-active {
-  border-color: rgba(245,183,56,.58);
-  box-shadow: inset 0 0 0 1px rgba(245,183,56,.12);
+  border-color: color-mix(in srgb, var(--signal) 58%, transparent);
+  box-shadow: inset 0 0 0 1px rgba(132,180,172,.12);
 }
 .show-mode-card .section-head { margin: 0; align-items: center; }
 .show-mode-card .section-head h3 { margin: .15rem 0 0; }
@@ -447,10 +447,10 @@ button:disabled { opacity: .48; cursor: default; }
 }
 .show-mode-card > p { margin: 0; color: var(--muted); }
 .show-mode-status-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
-.show-mode-status-grid article { min-width: 0; border: 1px solid #343128; border-radius: 6px; background: #0c0c0a; padding: 10px 8px; }
+.show-mode-status-grid article { min-width: 0; border: 1px solid var(--line); border-radius: 6px; background: #0c0c0a; padding: 10px 8px; }
 .show-mode-status-grid strong { display: block; color: #f5f5ef; font-size: 21px; line-height: 1; }
 .show-mode-status-grid span { display: block; margin-top: 6px; color: var(--muted); font-size: var(--type-micro); font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
-.show-mode-active .show-mode-status-grid article:first-child { border-color: #665619; background: #161306; }
+.show-mode-active .show-mode-status-grid article:first-child { border-color: var(--signal-deep); background: #161306; }
 .show-mode-active .show-mode-status-grid article:first-child strong { color: var(--signal-hot); }
 .show-mode-actions { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: .5rem; }
 .show-mode-actions button { min-height: 2.75rem; border-radius: var(--control-radius); padding: 10px 12px; font-size: var(--type-micro); }
@@ -784,7 +784,7 @@ html[data-virya-scanner-active] .app-shell {
 .signal-admin-toolbar p { margin: 0; color: var(--muted); font-size: var(--type-meta); line-height: 1.45; }
 .signal-admin-toolbar button { align-self: stretch; }
 .signal-admin-content { display: grid; gap: 10px; }
-.signal-health-card { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 18px; padding: 18px; border: 1px solid #403718; background: linear-gradient(145deg, #1b1708, #111 68%); }
+.signal-health-card { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 18px; padding: 18px; border: 1px solid var(--signal-deep); background: linear-gradient(145deg, #0f1a17, #111 68%); }
 .signal-health-card > div > strong { display: block; margin-top: 6px; color: var(--signal-hot); font-size: 42px; line-height: 1; }
 .signal-health-card > div > span { display: block; margin-top: 8px; color: var(--muted); font-size: var(--type-micro); line-height: 1.4; }
 .signal-health-card dl { margin: 0; display: grid; gap: 6px; }
@@ -854,16 +854,16 @@ html[data-virya-scanner-active] .app-shell {
 .ticket-type-card p { margin: 0 0 9px; color: var(--muted); font-size: var(--type-meta); line-height: 1.45; }
 .ticket-type-card strong { display: block; color: var(--signal-hot); font-size: 15px; }
 .ticket-type-card small { display: block; margin-top: 5px; color: #98a5a0; font-size: var(--type-micro); }
-.ticket-stepper { display: grid; grid-template-columns: 44px 40px 44px; align-items: center; overflow: hidden; border: 1px solid #4b421e; border-radius: var(--control-radius); background: #0b0b09; }
+.ticket-stepper { display: grid; grid-template-columns: 44px 40px 44px; align-items: center; overflow: hidden; border: 1px solid var(--signal-deep); border-radius: var(--control-radius); background: #0b0b09; }
 .ticket-stepper button { width: 44px; height: 44px; border: 0; border-radius: 0; background: transparent; color: var(--signal-hot); display: grid; place-items: center; padding: 0; font-size: 24px; font-weight: 700; line-height: 1; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 .ticket-stepper button:active:not(:disabled) { background: #93c6c018; }
-.ticket-stepper button:disabled { background: #080807; color: #625725; opacity: .72; }
+.ticket-stepper button:disabled { background: #080807; color: var(--muted); opacity: .72; }
 .ticket-stepper output { min-width: 40px; text-align: center; color: #fff; font-weight: 900; font-variant-numeric: tabular-nums; }
 .ticket-buyer-panel { display: grid; gap: 11px; border: 1px solid var(--line); background: #10100e; padding: 15px; }
 .ticket-buyer-panel label { display: grid; gap: 7px; color: #999; font-size: var(--type-micro); font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
 .ticket-buyer-panel p { margin: 0; color: var(--muted); font-size: var(--type-meta); line-height: 1.45; }
 .ticket-buyer-panel .ticket-buy-button { width: 100%; }
-.ticket-checkout-total { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: calc(20px + var(--safe-bottom)); border: 1px solid #5d4d16; background: linear-gradient(145deg, #1a1607, #0e0e0c); padding: 15px; box-shadow: 0 16px 44px #0007; scroll-margin-bottom: calc(112px + var(--safe-bottom)); }
+.ticket-checkout-total { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: calc(20px + var(--safe-bottom)); border: 1px solid var(--signal-deep); background: linear-gradient(145deg, #0f1a17, #0e0e0c); padding: 15px; box-shadow: 0 16px 44px #0007; scroll-margin-bottom: calc(112px + var(--safe-bottom)); }
 .ticket-checkout-total > div { min-width: 0; border-bottom: 1px solid #39331c; padding: 0 3px 11px; }
 .ticket-checkout-total > div:nth-child(2) { text-align: right; }
 .ticket-checkout-total span { display: block; color: var(--muted); font-size: var(--type-micro); text-transform: uppercase; }
@@ -872,7 +872,7 @@ html[data-virya-scanner-active] .app-shell {
 .ticket-checkout-total .checkout-retry,
 .ticket-checkout-total > small { grid-column: 1 / -1; }
 .ticket-checkout-total .primary { min-height: 56px; border-radius: var(--control-radius); padding: 16px 14px; font-size: var(--type-micro); line-height: 1.25; }
-.ticket-checkout-total .primary:disabled { background: #514515; color: #a99a5d; opacity: .78; }
+.ticket-checkout-total .primary:disabled { background: var(--surface-2); color: var(--muted); opacity: .78; }
 .ticket-checkout-total .checkout-retry { min-height: 44px; border: 1px solid var(--signal-hot); border-radius: 6px; background: transparent; color: var(--signal-hot); padding: 10px 14px; font-size: var(--type-micro); font-weight: 900; letter-spacing: .07em; }
 .ticket-checkout-total > small { color: #98a5a0; font-size: var(--type-micro); line-height: 1.45; text-align: center; }
 .merch-screen .screen-title > p:last-child { color: var(--muted); line-height: 1.5; }
@@ -976,7 +976,7 @@ html[data-virya-scanner-active] .app-shell {
 .participation-history-heading small { max-width: 18rem; color: var(--muted); font-size: var(--type-micro); line-height: 1.4; text-align: right; }
 .participation-history-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
 .participation-history-grid article { min-width: 0; border: 1px solid #24241f; border-radius: 6px; background: #10100e; padding: 11px; }
-.participation-history-grid article.active { border-color: #5a4c18; background: #93c6c008; }
+.participation-history-grid article.active { border-color: var(--signal-deep); background: #93c6c008; }
 .participation-history-grid strong { display: block; color: #f5f5ef; font-size: 18px; font-variant-numeric: tabular-nums; }
 .participation-history-grid span { display: block; margin-top: 5px; color: var(--muted); font-size: var(--type-micro); line-height: 1.35; }
 @media (max-width: 680px) {
@@ -1088,17 +1088,17 @@ html[data-virya-scanner-active] .app-shell {
   display: grid;
   gap: 14px;
   padding: 16px;
-  border: 1px solid color-mix(in srgb, var(--amber, #84b4ac) 28%, transparent);
+  border: 1px solid color-mix(in srgb, var(--signal) 28%, transparent);
   border-radius: 6px;
-  background: color-mix(in srgb, #151515 92%, var(--amber, #84b4ac) 8%);
+  background: color-mix(in srgb, #151515 92%, var(--signal) 8%);
 }
 .push-setting-heading { display: flex; gap: 12px; align-items: flex-start; }
 .push-setting-heading strong { display: block; margin-bottom: 5px; }
 .push-setting-heading p { margin: 0; color: var(--muted, #aaa); line-height: 1.45; }
 .push-setting-icon {
   display: grid; place-items: center; flex: 0 0 36px; height: 36px;
-  border-radius: 50%; background: color-mix(in srgb, var(--amber, #84b4ac) 18%, transparent);
-  color: var(--amber, #84b4ac); font-size: 18px;
+  border-radius: 50%; background: color-mix(in srgb, var(--signal) 18%, transparent);
+  color: var(--signal); font-size: 18px;
 }
 .push-setting-copy small { display: block; margin-top: 10px; line-height: 1.4; }
 .push-setting-copy small.success { color: #9bd5ab; }
