@@ -286,6 +286,11 @@ fn FanAccess(
     // form can drop to a PIN prompt.
     let link_pending = RwSignal::new(false);
     Effect::new(move |_| {
+        // A link tapped while Signal is already running arrives as a warm
+        // intent, and the resume signal is what the shell bumps for exactly
+        // that case. Without reading it here this runs once at mount and a
+        // warm confirmation link is never collected.
+        status_refresh.get();
         if !bridge::native_available() || link_pending.get_untracked() {
             return;
         }
