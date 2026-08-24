@@ -1,8 +1,6 @@
 //! Offline "show mode": a signed CrowdRelay snapshot is downloaded once per
 //! event, admissions are scanned and queued locally (even without
-//! connectivity), and queued scans are synced back opportunistically. See
-//! `docs/ARCHITECTURE.md` for the offline show-mode contract this module
-//! implements.
+//! connectivity), and queued scans are synced back opportunistically.
 
 use std::sync::Arc;
 

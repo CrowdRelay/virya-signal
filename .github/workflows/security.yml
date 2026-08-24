@@ -46,7 +46,7 @@ jobs:
         run: python3 scripts/generate_lock_sbom.py Cargo.lock artifacts/virya-signal-sbom.cdx.json
       - name: Upload dependency SBOM
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: virya-signal-sbom-${{ github.sha }}
           path: artifacts/virya-signal-sbom.cdx.json
@@ -54,7 +54,7 @@ jobs:
           retention-days: 90
       - name: Cache pinned cargo-audit binary
         id: cargo-audit-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v7.0.1
         with:
           path: ~/.cargo/bin/cargo-audit
           key: ${{ runner.os }}-cargo-audit-0.22.2

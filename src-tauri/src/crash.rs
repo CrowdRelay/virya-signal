@@ -1,6 +1,6 @@
 //! Native crash evidence: a single bounded file written from the panic hook
 //! (see `run()` in `lib.rs`) and read back once on next launch so the WebView
-//! can show and clear the report. See `docs/ARCHITECTURE.md`.
+//! can show and clear the report.
 
 use std::{path::PathBuf, sync::OnceLock};
 

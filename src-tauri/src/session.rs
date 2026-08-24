@@ -16,7 +16,7 @@ use crate::{
 
 /// Runs a CPU/IO-bound closure on the blocking thread pool and converts a
 /// panicked or cancelled task into a plain `AppError` instead of propagating
-/// a panic (see `docs/ARCHITECTURE.md` and the crate-level panic strategy in
+/// a panic (see the crate-level panic strategy in
 /// the workspace `Cargo.toml`, which relies on this boundary to keep a single
 /// failed command from taking down the whole process).
 pub(crate) async fn run_blocking<T, F>(task: F) -> Result<T, AppError>
