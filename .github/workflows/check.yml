@@ -150,13 +150,3 @@ jobs:
         if: always()
         run: sccache --show-stats
 
-  android-debug:
-    needs: contracts
-    uses: ./.github/workflows/_android-build.yml
-    with:
-      build_kind: debug-apk
-      version: debug
-      artifact_name: virya-signal-android-debug
-      retention_days: 14
-      signed: false
-    secrets: inherit

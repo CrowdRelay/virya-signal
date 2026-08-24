@@ -145,7 +145,7 @@ fn Scanner(
             {
                 Ok(value) => {
                     show_message.set(i18n::format(
-                        "snapshot_gotowy_value_trwaych_biletow",
+                        "snapshot_ready_durable_tickets",
                         &[value.eligible_passes.to_string()],
                     ));
                     offline.set(true);
@@ -173,7 +173,7 @@ fn Scanner(
             {
                 Ok(value) => {
                     show_message.set(i18n::format(
-                        "sync_value_zapisane_value_konfliktow_value_nadal_czeka",
+                        "sync_saved_conflicts_still_pending",
                         &[
                             value.synced.to_string(),
                             value.conflicts.to_string(),

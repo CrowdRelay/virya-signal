@@ -68,8 +68,15 @@ fn persist_operator_push_preference(
         use std::os::unix::fs::PermissionsExt as _;
         std::fs::set_permissions(&temporary, std::fs::Permissions::from_mode(0o600))?;
     }
-    if path.exists() {
-        std::fs::remove_file(&path)?;
+    // Plain rename replaces atomically on Unix. The explicit remove only
+    // exists for platforms where rename fails on an existing target; removing
+    // unconditionally would let a crash between remove and rename re-enable
+    // notifications the operator had turned off.
+    #[cfg(windows)]
+    {
+        if path.exists() {
+            std::fs::remove_file(&path)?;
+        }
     }
     std::fs::rename(temporary, path)?;
     Ok(())

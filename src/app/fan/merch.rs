@@ -82,7 +82,7 @@ fn FanMerch(
                                     let placeholder = placeholder_style(product.placeholder_image_url);
                                     let product_name = product.name;
                                     let image_alt = i18n::format(
-                                        "value_merch_virya",
+                                        "virya_merch",
                                         std::slice::from_ref(&product_name),
                                     );
                                     let variants = product.variants.into_iter()
@@ -172,7 +172,7 @@ fn FanMerchBundles(
                     let placeholder = placeholder_style(bundle.placeholder_image_url);
                     let bundle_name = bundle.name;
                     let image_alt = i18n::format(
-                        "value_zestaw_merchu_virya",
+                        "virya_merch_bundle",
                         std::slice::from_ref(&bundle_name),
                     );
                     let original_price = (bundle.original_price_gross_minor > bundle.price_gross_minor)

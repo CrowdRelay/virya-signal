@@ -10,7 +10,7 @@ dist = "dist"
 minify = "on_release"
 
 [watch]
-ignore = ["./src-tauri", "./docs", "./scripts", "./artifacts"]
+ignore = ["./src-tauri", "./scripts", "./artifacts"]
 
 [serve]
 port = 1420

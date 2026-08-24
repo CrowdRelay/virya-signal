@@ -3,3 +3,14 @@ rustflags = [
   "-C", "link-arg=-Wl,-z,max-page-size=16384",
   "-C", "link-arg=-Wl,-z,common-page-size=16384",
 ]
+
+# LLVM only emits bulk-memory / non-trapping-float-to-int instructions for
+# wasm32 when the features are named. The runtime floor is Android's
+# auto-updating WebView (Chromium 69+, well above both features), so the
+# module gets native memory-copy instructions and a smaller post-wasm-opt
+# body instead of emulated loops.
+[target.wasm32-unknown-unknown]
+rustflags = [
+  "-C", "target-feature=+bulk-memory,+nontrapping-float-to-int",
+]
+

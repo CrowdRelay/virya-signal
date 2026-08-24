@@ -165,9 +165,9 @@ fn write_and_verify_operator(
 /// Derives the Stronghold password once per unlocked operator session. The
 /// caller keeps it in a Zeroizing buffer and drops it on lock.
 pub fn operator_password(app_data_dir: &Path, pin: &str) -> Result<Zeroizing<Vec<u8>>, AppError> {
-    ensure_pin(pin)?;
+    crate::validation::validate_pin(pin)?;
     let salt = read_salt(&operator_salt_path(app_data_dir))?;
-    Ok(Zeroizing::new(password(pin, &salt)?))
+    password(pin, &salt)
 }
 
 /// Opens the operator profile with an already derived password. An unlock that
@@ -339,9 +339,9 @@ pub fn save_fan_with_password(
 
 /// Derives the fan Stronghold password once for the unlocked session.
 pub fn fan_password(app_data_dir: &Path, pin: &str) -> Result<Zeroizing<Vec<u8>>, AppError> {
-    ensure_pin(pin)?;
+    crate::validation::validate_pin(pin)?;
     let salt = read_salt(&fan_salt_path(app_data_dir))?;
-    Ok(Zeroizing::new(password(pin, &salt)?))
+    password(pin, &salt)
 }
 
 pub fn load_fan_with_password(
@@ -525,9 +525,9 @@ pub fn save_beacon_with_password(
 
 /// Derives the Beacon Stronghold password once for the unlocked session.
 pub fn beacon_password(app_data_dir: &Path, pin: &str) -> Result<Zeroizing<Vec<u8>>, AppError> {
-    ensure_pin(pin)?;
+    crate::validation::validate_pin(pin)?;
     let salt = read_salt(&beacon_salt_path(app_data_dir))?;
-    Ok(Zeroizing::new(password(pin, &salt)?))
+    password(pin, &salt)
 }
 
 /// Opens the Beacon profile with an already derived password, so an unlock that
@@ -649,12 +649,12 @@ fn save_bytes_at(
     pin: &str,
     bytes: &[u8],
 ) -> Result<Zeroizing<Vec<u8>>, AppError> {
-    ensure_pin(pin)?;
+    crate::validation::validate_pin(pin)?;
     if let Some(parent) = vault_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
     let salt = load_or_create_salt(salt_path)?;
-    let password = Zeroizing::new(password(pin, &salt)?);
+    let password = password(pin, &salt)?;
     save_bytes_with_password_at(
         vault_path,
         client_path,
@@ -719,13 +719,13 @@ fn load_at<T: DeserializeOwned>(
     profile_key: &[u8],
     pin: &str,
 ) -> Result<T, AppError> {
-    ensure_pin(pin)?;
+    crate::validation::validate_pin(pin)?;
     if !exists_at(vault_path, salt_path) {
         return Err(AppError::NotConfigured);
     }
     let salt = read_salt(salt_path)?;
-    let key_provider = KeyProvider::try_from(Zeroizing::new(password(pin, &salt)?))
-        .map_err(|_| AppError::InvalidPin)?;
+    let key_provider =
+        KeyProvider::try_from(password(pin, &salt)?).map_err(|_| AppError::InvalidPin)?;
     let snapshot_path = SnapshotPath::from_path(vault_path);
     let _snapshot = lock_snapshot();
     let stronghold = Stronghold::default();
@@ -830,16 +830,6 @@ fn backup_path(path: &Path) -> PathBuf {
     PathBuf::from(value)
 }
 
-fn ensure_pin(pin: &str) -> Result<(), AppError> {
-    if (4..=128).contains(&pin.chars().count()) {
-        Ok(())
-    } else {
-        Err(AppError::InvalidInput(
-            crate::i18n::tr("native_pin_4_128").into(),
-        ))
-    }
-}
-
 fn load_or_create_salt(path: &Path) -> Result<[u8; SALT_BYTES], AppError> {
     if path.exists() {
         return read_salt(path);
@@ -865,12 +855,14 @@ fn read_salt(path: &Path) -> Result<[u8; SALT_BYTES], AppError> {
     })
 }
 
-fn password(pin: &str, salt: &[u8; SALT_BYTES]) -> Result<Vec<u8>, AppError> {
+fn password(pin: &str, salt: &[u8; SALT_BYTES]) -> Result<Zeroizing<Vec<u8>>, AppError> {
     let mut output = Zeroizing::new(vec![0_u8; PASSWORD_BYTES]);
     Argon2::default()
         .hash_password_into(pin.as_bytes(), salt, &mut output)
         .map_err(|_| AppError::StrongholdClient)?;
-    Ok(output.to_vec())
+    // The buffer stays in Zeroizing: copying out to a plain Vec reintroduced
+    // exactly the heap residue the wrapper exists to clear.
+    Ok(output)
 }
 
 fn create_private_file(path: &Path, contents: &[u8]) -> Result<(), std::io::Error> {

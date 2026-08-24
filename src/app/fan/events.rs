@@ -447,13 +447,13 @@ fn FanTicketSale(
                             checkout_event.set(None);
                             tab.set(FanTab::Wallet);
                             error.set(Some(i18n::format(
-                                "zamowienie_value_zapisane_dokoncz_bezpieczna_patnosc_stripe",
+                                "order_saved_complete_the_secure_stripe_payment",
                                 std::slice::from_ref(&checkout.order_reference),
                             )));
                         }
                         Err(message) => {
                             error.set(Some(i18n::format(
-                                "message_zamowienie_value_jest_zapisane_uzyj_przycisku_ponownego",
+                                "message_order_is_saved_use_the_reopen",
                                 &[message.to_string(), checkout.order_reference.to_string()],
                             )));
                         }
@@ -479,7 +479,7 @@ fn FanTicketSale(
                     checkout_event.set(None);
                     tab.set(FanTab::Wallet);
                     error.set(Some(i18n::format(
-                        "otworzono_patnosc_dla_zamowienia_value",
+                        "payment_opened_for_order",
                         std::slice::from_ref(&checkout.order_reference),
                     )));
                 }

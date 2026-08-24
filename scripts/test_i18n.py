@@ -173,6 +173,20 @@ class I18nContracts(unittest.TestCase):
         self.assertIn("dashboard=operator_dashboard", app)
         self.assertIn("tab=operator_tab", app)
 
+    def test_every_referenced_key_exists_in_the_catalog(self):
+        # Seven UI keys were once slugified copies of their Polish *values*
+        # ("snapshot_gotowy_value_trwaych_biletow"), rendered verbatim to users
+        # because nothing checked references against the catalog.
+        usage = re.compile(r'\bi18n::format\(\s*"([a-z0-9_]+)"', re.MULTILINE)
+        referenced = set()
+        for relative in ("src", "src-tauri/src"):
+            for path in sorted((ROOT / relative).rglob("*.rs")):
+                runtime_only = path.read_text().split("#[cfg(test)]", 1)[0]
+                referenced.update(usage.findall(runtime_only))
+        self.assertTrue(referenced, "no i18n::format references found")
+        missing = sorted(referenced - set(self.pl))
+        self.assertEqual(missing, [], "keys used in code but absent from the catalog")
+
     def test_catalog_identifiers_are_english_ascii_snake_case(self):
         for key in self.en:
             self.assertRegex(key, r"^[a-z][a-z0-9_]*$")
