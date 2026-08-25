@@ -257,8 +257,21 @@ if 'operator_pin_survives_a_fresh_vault_round_trip' not in vault:
 if 'native_operator_pin_4_6' not in validation:
     raise SystemExit('native staff PIN validation contract is missing')
 
-operator_nav = ui_main[ui_main.find('<nav class="overflow-menu">'):ui_main.find('<div class="content">')]
-if 'OperatorTab::Signal' in operator_nav:
+# The app was split into per-area modules, so nav contracts are checked
+# per file rather than across one concatenated string: a slice spanning
+# modules would bleed one area's overflow menu into another's content.
+import re as _re
+
+_signal_in_overflow = False
+_bottom_nav_with_signal = False
+for _path in [root / "src/app.rs", *sorted((root / "src/app").rglob("*.rs"))]:
+    _src = _path.read_text(encoding="utf-8")
+    for _menu in _re.finditer(r'<nav class="overflow-menu[^"]*">(.*?)</nav>', _src, _re.S):
+        if 'OperatorTab::Signal' in _menu.group(1):
+            _signal_in_overflow = True
+    if '<nav class="bottom-nav four primary-four">' in _src and 'own=OperatorTab::Signal' in _src:
+        _bottom_nav_with_signal = True
+if _signal_in_overflow or not _bottom_nav_with_signal:
     raise SystemExit('staff Signal must live in the bottom navigation, not the overflow menu')
 for contract in (
     '<nav class="bottom-nav four primary-four">',
