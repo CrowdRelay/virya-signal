@@ -17,9 +17,12 @@ class PrincipalStaffHardeningTests(unittest.TestCase):
         self.assertIn("/src-tauri/launcher-assets/", ignored)
 
     def test_mobile_smoke_tracks_root_boot_dependencies(self):
+        # The full APK build is main-push/dispatch only; PRs no longer repeat the
+        # trigger list, so each boot dependency must still gate the push build.
         workflow = read(".github/workflows/mobile-smoke.yml")
+        self.assertNotIn("pull_request:", workflow)
         for path in ("boot-i18n.js", "runtime-i18n.js", "bundle-stage-pack.webp"):
-            self.assertGreaterEqual(workflow.count(path), 2, path)
+            self.assertIn(f'"{path}"', workflow, path)
 
     def test_firebase_runtime_can_self_initialize_from_compiled_resources(self):
         kotlin = read("src-tauri/android-push/SignalPushPlugin.kt")

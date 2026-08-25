@@ -781,18 +781,6 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "native_qr_token_missing" => "Brak tokenu QR w odpowiedzi backendu",
         "native_qr_token_invalid" => "Nieprawidłowy token QR",
         "native_qr_generation_failed" => "Nie udało się wygenerować kodu QR",
-        "boot_starting" => "URUCHAMIAM VIRYA SIGNAL",
-        "boot_loading_secure_profile" => "Wczytuję bezpieczny profil urządzenia…",
-        "boot_taking_longer" => "To trwa dłużej niż zwykle",
-        "boot_still_starting" => {
-            "Aplikacja nadal się uruchamia. Możesz poczekać albo spróbować ponownie."
-        }
-        "boot_retry" => "SPRÓBUJ PONOWNIE",
-        "boot_diagnostics" => "DIAGNOSTYKA",
-        "boot_launch_failed" => "Nie udało się uruchomić aplikacji",
-        "boot_reload_help" => {
-            "Uruchom aplikację ponownie. Jeśli problem wróci, otwórz diagnostykę i wyślij raport."
-        }
         "boot_previous_terminated" => "Poprzednie uruchomienie zniknęło podczas etapu {phase}.",
         "boot_phase_wasm_loading" => "ŁADUJĘ SILNIK APLIKACJI",
         "boot_phase_wasm_entered" => "URUCHAMIAM INTERFEJS",
@@ -814,7 +802,6 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "boot_almost_ready" => "JESZCZE CHWILA — KOŃCZĘ START",
         "boot_initial_status" => "URUCHAMIAMY SYGNAŁ",
         "boot_retry_button" => "PONÓW START",
-        "boot_noscript" => "Virya Signal wymaga JavaScript/WASM.",
         "network_offline_cached" => "OFFLINE — DANE Z PAMIĘCI NADAL DZIAŁAJĄ",
         "network_restored" => "POŁĄCZENIE WRÓCIŁO",
         "native_bundle_name_label" => "nazwa zestawu",

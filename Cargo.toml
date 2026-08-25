@@ -8,13 +8,17 @@ license = "Apache-2.0"
 
 [dependencies]
 virya-signal-contracts = { path = "crates/virya-signal-contracts" }
-console_error_panic_hook = "0.1.7"
 js-sys = "0.3"
 leptos = { version = "0.8.20", default-features = false, features = ["csr"] }
 serde = { version = "1", features = ["derive"] }
 serde-wasm-bindgen = "0.6"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
+
+# Only invoked under cfg(debug_assertions); keeping it out of the release
+# dependency graph keeps the size-critical WASM free of the panic formatter.
+[target.'cfg(debug_assertions)'.dependencies]
+console_error_panic_hook = "0.1.7"
 
 [workspace]
 members = ["crates/virya-signal-contracts", "src-tauri"]
