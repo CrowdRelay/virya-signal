@@ -63,7 +63,7 @@ jobs:
           cache-on-failure: true
           cache-targets: false
           shared-key: wasm
-      - uses: taiki-e/install-action@b6b84cf49ebfe0176417bdce007c624f0db37f20 # v2
+      - uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518 # v2
         with:
           tool: trunk@0.21.14
       - name: Format
