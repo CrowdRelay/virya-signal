@@ -152,6 +152,10 @@ fn OperatorApp(
         });
     };
 
+    // Every panel stays mounted behind its `hidden` wrapper once unlocked, so
+    // switching preserves scroll position instead of rebuilding the DOM.
+    // Scanner is the deliberate exception: a fresh mount resets scan session
+    // state, show-mode gating and any camera edge from the previous shift.
     view! {
         <section class="authenticated">
             <header class="topbar">
@@ -173,16 +177,30 @@ fn OperatorApp(
                 </nav>
             </Show>
             <div class="content">
-                {move || match tab.get() {
-                    OperatorTab::Home => view! { <OperatorHome dashboard=dashboard loading=loading /> }.into_any(),
-                    OperatorTab::Signal => view! { <OperatorSignal overview=signal_overview loading=signal_loading owner=owner error=error /> }.into_any(),
-                    OperatorTab::Scan => view! { <Scanner dashboard=dashboard loading=loading error=error /> }.into_any(),
-                    OperatorTab::Tickets => view! { <Tickets dashboard=dashboard loading=loading error=error owner=owner /> }.into_any(),
-                    OperatorTab::Discounts => view! { <Discounts error=error /> }.into_any(),
-                    OperatorTab::Campaigns => view! { <Campaigns dashboard=dashboard loading=loading error=error /> }.into_any(),
-                    OperatorTab::Checklist => view! { <OperatorChecklist dashboard=dashboard loading=loading push_target=push_target error=error /> }.into_any(),
-                    OperatorTab::Settings => view! { <OperatorSettings status=status dashboard=dashboard loading=loading error=error /> }.into_any(),
-                }}
+                <div class="tab-page" hidden=move || tab.get() != OperatorTab::Home>
+                    <OperatorHome dashboard=dashboard loading=loading />
+                </div>
+                <div class="tab-page" hidden=move || tab.get() != OperatorTab::Signal>
+                    <OperatorSignal overview=signal_overview loading=signal_loading owner=owner error=error />
+                </div>
+                <Show when=move || tab.get() == OperatorTab::Scan>
+                    <Scanner dashboard=dashboard loading=loading error=error />
+                </Show>
+                <div class="tab-page" hidden=move || tab.get() != OperatorTab::Tickets>
+                    <Tickets dashboard=dashboard loading=loading error=error owner=owner />
+                </div>
+                <div class="tab-page" hidden=move || tab.get() != OperatorTab::Discounts>
+                    <Discounts error=error />
+                </div>
+                <div class="tab-page" hidden=move || tab.get() != OperatorTab::Campaigns>
+                    <Campaigns dashboard=dashboard loading=loading error=error />
+                </div>
+                <div class="tab-page" hidden=move || tab.get() != OperatorTab::Checklist>
+                    <OperatorChecklist dashboard=dashboard loading=loading push_target=push_target error=error />
+                </div>
+                <div class="tab-page" hidden=move || tab.get() != OperatorTab::Settings>
+                    <OperatorSettings status=status dashboard=dashboard loading=loading error=error />
+                </div>
             </div>
             <nav class="bottom-nav four primary-four">
                 <NavButton tab=tab own=OperatorTab::Home icon="home" label=tr("home_tab") />

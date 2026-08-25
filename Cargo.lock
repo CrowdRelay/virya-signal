@@ -6099,6 +6099,7 @@ dependencies = [
  "virya-signal-contracts",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
