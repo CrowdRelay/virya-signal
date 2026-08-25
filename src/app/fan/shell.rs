@@ -60,6 +60,10 @@ fn FanApp(
 
     Effect::new(move |_| {
         persist_fan_tab(tab.get());
+        // The old per-tab remount landed every switch at the top of the page.
+        // Keep-alive preserves the DOM, so restore that expectation explicitly
+        // instead of letting a tall Merch scroll carry into Shows.
+        leptos::prelude::window().scroll_to_with_x_and_y(0.0, 0.0);
     });
 
     Effect::new(move |_| {
@@ -290,11 +294,63 @@ fn FanApp(
         mode.set(RootMode::Latarnik);
     };
 
-    let refresh_all = move |_| {
-        menu_open.set(false);
+    let request_full_refresh = move || {
         bridge::invalidate_latest("fan:");
         refresh_requested.update(|value| *value = value.wrapping_add(1).max(1));
     };
+    let refresh_all = move |_| {
+        menu_open.set(false);
+        request_full_refresh();
+    };
+
+    // Pull-to-refresh on the content column. Armed only while the page sits at
+    // the very top, so a pull inside a scrolled list never hijacks the gesture,
+    // and horizontal drags are ignored. The indicator is a decorative glyph
+    // with no new i18n strings; releasing past the threshold reuses the same
+    // refresh generation as the menu button.
+    const PULL_TRIGGER_PX: f64 = 70.0;
+    const PULL_FIRE_PX: f64 = 56.0;
+    let near_top = || leptos::prelude::window().scroll_y().unwrap_or(0.0) <= 1.0;
+    let pull_origin = RwSignal::new(None::<(i32, i32)>);
+    let pull_px = RwSignal::new(0_f64);
+    let ptr_start = move |event: leptos::ev::TouchEvent| {
+        if !near_top() {
+            return;
+        }
+        if let Some(touch) = event.touches().item(0) {
+            pull_origin.set(Some((touch.client_x(), touch.client_y())));
+        }
+    };
+    let ptr_move = move |event: leptos::ev::TouchEvent| {
+        let Some((origin_x, origin_y)) = pull_origin.get_untracked() else {
+            return;
+        };
+        let Some(touch) = event.touches().item(0) else {
+            return;
+        };
+        let dx = (touch.client_x() - origin_x) as f64;
+        let dy = (touch.client_y() - origin_y) as f64;
+        if dy <= 0.0 || dx.abs() > dy.abs() || !near_top() {
+            pull_origin.set(None);
+            pull_px.set(0.0);
+            return;
+        }
+        pull_px.set((dy * 0.4).min(96.0));
+    };
+    let ptr_end = move |_| {
+        pull_origin.set(None);
+        let pulled = pull_px.get_untracked();
+        pull_px.set(0.0);
+        if pulled >= PULL_FIRE_PX {
+            request_full_refresh();
+        }
+    };
+
+    // Keep-alive tab pages: every tab stays mounted once unlocked and inactive
+    // ones collapse, so a switch preserves scroll position and decoded imagery
+    // instead of rebuilding the DOM on every visit. All per-tab data lives in
+    // shell-owned signals gated by `loaded`, so mounting early changes when
+    // nothing but the first paint of rarely visited tabs happens.
 
     view! {
         <section class="authenticated fan-authenticated">
@@ -313,26 +369,54 @@ fn FanApp(
                     <button on:click=close><span>"×"</span>{tr("close_and_lock_signal")}</button>
                 </nav>
             </Show>
-            <div class="content">{move || match tab.get() {
-                FanTab::Signal => view! { <FanSignal home=home dashboard=dashboard tab=tab focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview loading=loading error=error /> }.into_any(),
-                FanTab::Events => checkout_event.get().map(|event| view! {
-                    <FanTicketCheckout
-                        event=event
-                        status=status
-                        tab=tab
-                        checkout_event=checkout_event
-                        wallets=wallets
-                        loading=loading
-                        error=error
-                    />
-                }.into_any()).value_or_else(|| view! {
-                    <FanEvents dashboard=dashboard public=public focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview checkout_event=checkout_event loading=loading error=error />
-                }.into_any()),
-                FanTab::Merch => view! { <FanMerch merch=merch bundles=merch_bundles loading=loading error=error /> }.into_any(),
-                FanTab::Game => view! { <AreaGameScreen area=area loading=loading error=error /> }.into_any(),
-                FanTab::Wallet => view! { <FanWallet dashboard=dashboard wallets=wallets admission_qr=admission_qr loading=loading error=error /> }.into_any(),
-                FanTab::Profile => view! { <FanProfileScreen status=status dashboard=dashboard wallets=wallets area=area loading=loading error=error /> }.into_any(),
-            }}</div>
+            <div class="content" on:touchstart=ptr_start on:touchmove=ptr_move on:touchend=ptr_end>
+                <div
+                    class="ptr-hint"
+                    style=move || {
+                        let pulled = pull_px.get();
+                        format!(
+                            "transform:translateY({:.1}px) rotate({:.0}deg);opacity:{:.2}{}",
+                            pulled,
+                            pulled * 4.0,
+                            (pulled / PULL_TRIGGER_PX).min(1.0),
+                            // Mid-drag the glyph must track the finger exactly;
+                            // the stylesheet transition applies to release only.
+                            if pulled > 2.0 { ";transition:none" } else { "" },
+                        )
+                    }
+                    aria-hidden="true"
+                ><span>"↻"</span></div>
+                <div class="tab-page" hidden=move || tab.get() != FanTab::Signal>
+                    <FanSignal home=home dashboard=dashboard tab=tab focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview loading=loading error=error />
+                </div>
+                <div class="tab-page" hidden=move || tab.get() != FanTab::Events>
+                    {move || checkout_event.get().map(|event| view! {
+                        <FanTicketCheckout
+                            event=event
+                            status=status
+                            tab=tab
+                            checkout_event=checkout_event
+                            wallets=wallets
+                            loading=loading
+                            error=error
+                        />
+                    }.into_any()).value_or_else(|| view! {
+                        <FanEvents dashboard=dashboard public=public focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview checkout_event=checkout_event loading=loading error=error />
+                    }.into_any())}
+                </div>
+                <div class="tab-page" hidden=move || tab.get() != FanTab::Merch>
+                    <FanMerch merch=merch bundles=merch_bundles loading=loading error=error />
+                </div>
+                <div class="tab-page" hidden=move || tab.get() != FanTab::Game>
+                    <AreaGameScreen area=area loading=loading error=error />
+                </div>
+                <div class="tab-page" hidden=move || tab.get() != FanTab::Wallet>
+                    <FanWallet dashboard=dashboard wallets=wallets admission_qr=admission_qr loading=loading error=error />
+                </div>
+                <div class="tab-page" hidden=move || tab.get() != FanTab::Profile>
+                    <FanProfileScreen status=status dashboard=dashboard wallets=wallets area=area loading=loading error=error />
+                </div>
+            </div>
             <nav class="bottom-nav four primary-four"><FanNavButton tab=tab own=FanTab::Signal icon="signal" label=tr("signal_tab")/><FanNavButton tab=tab own=FanTab::Events icon="events" label=tr("shows_tab")/><FanNavButton tab=tab own=FanTab::Merch icon="shop" label=tr("store_tab")/><FanNavButton tab=tab own=FanTab::Wallet icon="ticket" label=tr("tickets_tab")/></nav>
         </section>
     }

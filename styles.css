@@ -1193,3 +1193,27 @@ html[data-virya-scanner-active] .app-shell {
   .beacon-status-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .beacon-status-strip span { font-size: 12px; }
 }
+
+/* Keep-alive tab pages: every tab stays mounted and inactive ones collapse,
+   preserving scroll position and decoded imagery across switches. */
+.tab-page[hidden] { display: none; }
+
+/* Pull-to-refresh hint hanging above the fan content column. Decorative glyph
+   only; transitions are disabled mid-drag so it tracks the finger exactly. */
+.fan-authenticated .content { position: relative; }
+.ptr-hint {
+  position: absolute;
+  top: -34px;
+  left: 0;
+  right: 0;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: #93c6c0;
+  pointer-events: none;
+  z-index: 3;
+  opacity: 0;
+  transition: transform .22s ease, opacity .22s ease;
+}

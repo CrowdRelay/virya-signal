@@ -399,7 +399,7 @@ fn BeaconAccess(
                 }>
                     <div class="form-grid">
                         <p>{tr("latarnik_vault_locked")}</p>
-                        <label class="pin-field"><span>{tr("latarnik_pin")}</span><input type="password" autocomplete="current-password" placeholder=tr("your_pin") prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
+                        <label class="pin-field"><span>{tr("latarnik_pin")}</span><input type="password" autocomplete="current-password" inputmode="numeric" pattern="[0-9]*" placeholder=tr("your_pin") prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/></label>
                         <button class="primary" disabled=move || busy.get() || pin.get().chars().count()<4 on:click=unlock>{tr("latarnik_unlock")}</button>
                         <button type="button" class="text-button" disabled=move || busy.get() on:click=move |_| { pin.set(String::new()); reactivation.set(true); }>{tr("latarnik_use_new_invite")}</button>
                     </div>

@@ -14,6 +14,8 @@ serde = { version = "1", features = ["derive"] }
 serde-wasm-bindgen = "0.6"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
+# Pull-to-refresh reads the touch list off the content column's touch events.
+web-sys = { version = "0.3", features = ["Touch", "TouchList"] }
 
 # Only invoked under cfg(debug_assertions); keeping it out of the release
 # dependency graph keeps the size-critical WASM free of the panic formatter.

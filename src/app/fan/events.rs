@@ -30,7 +30,7 @@ fn FanEvents(
                                     focused_event_slug.set(None);
                                     focused_event_preview.set(None);
                                 }>{tr("back_back_to_shows")}</button>
-                                <FanEventCard event=event checkout_event=checkout_event dashboard=dashboard loading=loading error=error />
+                                <FanEventCard event=event checkout_event=checkout_event dashboard=dashboard error=error />
                             </div>
                         }.into_any();
                     }
@@ -41,7 +41,7 @@ fn FanEvents(
                 if events.is_empty() {
                     view! { <div class="empty-state"><strong>{tr("no_shows_in_the_calendar")}</strong><p>{tr("new_events_will_appear_here_2")}</p></div> }.into_any()
                 } else {
-                    view! { <div class="card-list fan-event-list">{events.into_iter().map(|event| view! { <FanEventCard event=event checkout_event=checkout_event dashboard=dashboard loading=loading error=error /> }).collect_view()}</div> }.into_any()
+                    view! { <div class="card-list fan-event-list">{events.into_iter().map(|event| view! { <FanEventCard event=event checkout_event=checkout_event dashboard=dashboard error=error /> }).collect_view()}</div> }.into_any()
                 }
             }}
         </section>
@@ -61,7 +61,6 @@ fn FanEventCard(
     event: PublicEvent,
     checkout_event: RwSignal<Option<PublicEvent>>,
     dashboard: RwSignal<Option<FanDashboardData>>,
-    loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let should_probe_pool = event.ticket_url.is_none();
@@ -113,8 +112,10 @@ fn FanEventCard(
     let interest_event = event.clone();
     let busy = RwSignal::new(false);
     // Saving used to take two round trips before the button changed: the write,
-    // then a full re-read of the interest list. The row shows as saved now and
-    // both happen behind it; a failed write takes the row back out.
+    // then a full re-read of the interest list. The row shows as saved while
+    // the write happens behind it; a failed write takes the row back out, and
+    // the next full refresh reconciles server ordering instead of paying a
+    // second round trip on every tap.
     let interest = move |_| {
         if interested.get_untracked() || busy.get_untracked() {
             return;
@@ -140,7 +141,6 @@ fn FanEventCard(
             {
                 Ok(_) => {
                     error.set(Some(tr("show_saved_to_your_signal").to_owned()));
-                    refresh_fan_interests(dashboard, loading, error);
                 }
                 Err(message) => {
                     dashboard.update(|state| {

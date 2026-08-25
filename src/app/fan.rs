@@ -634,7 +634,7 @@ fn FanAccess(
                                 <label class="pin-field">
                                     <span class="pin-field-label">{tr("fan_app_unlock_pin")}</span>
                                     <small id="fan-unlock-pin-help">{tr("enter_the_pin_created_for_this_fan")}</small>
-                                    <input type="password" autocomplete="current-password" placeholder=tr("your_pin") aria-describedby="fan-unlock-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/>
+                                    <input type="password" autocomplete="current-password" inputmode="numeric" pattern="[0-9]*" placeholder=tr("your_pin") aria-describedby="fan-unlock-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/>
                                 </label>
                                 <button class="primary" disabled=move || busy.get() || pin.get().chars().count() < 4 on:click=unlock>{tr("open_my_signal")}</button>
                                 <button type="button" class="text-button recovery-link" on:click=move |_| recovery_open.set(true)>{tr("i_forgot_my_pin_sign_in_again")}</button>
