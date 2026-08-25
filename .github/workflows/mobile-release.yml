@@ -43,6 +43,7 @@ jobs:
     outputs:
       version: ${{ steps.release.outputs.version }}
       android_artifact: ${{ steps.release.outputs.android_artifact }}
+      android_version_code: ${{ steps.release.outputs.android_version_code }}
     steps:
       - id: release
         env:
@@ -57,6 +58,9 @@ jobs:
           test -n "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "android_artifact=virya-signal-android-$version" >> "$GITHUB_OUTPUT"
+          # Same monotonic scheme android-play.yml publishes with, so a tag-push
+          # store release can never carry a lower code than an earlier main push.
+          echo "android_version_code=$((100000000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_OUTPUT"
 
   android-build:
     if: github.event_name == 'push' || inputs.target == 'android' || inputs.target == 'all'
@@ -65,6 +69,7 @@ jobs:
     with:
       build_kind: release-aab
       version: ${{ needs.meta.outputs.version }}
+      android_version_code: ${{ needs.meta.outputs.android_version_code }}
       artifact_name: ${{ needs.meta.outputs.android_artifact }}
       retention_days: 30
       signed: true

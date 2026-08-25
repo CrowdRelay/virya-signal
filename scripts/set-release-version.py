@@ -5,12 +5,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SEMVER = re.compile(r"\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?")
+# Google Play publishes versionCode 100000000 + GITHUB_RUN_NUMBER; every build
+# must derive "auto" from the same monotonic source so a tag-push release can
+# never publish a lower code than an earlier main-push Play upload.
+PLAY_VERSION_CODE_BASE = 100_000_000
 
 
 def normalize_version(raw: str) -> str:
@@ -20,12 +25,14 @@ def normalize_version(raw: str) -> str:
     return version
 
 
-def derive_android_version_code(version: str) -> int:
-    stable = version.split("-", 1)[0].split("+", 1)[0]
-    major, minor, patch = map(int, stable.split("."))
-    if minor >= 1000 or patch >= 1000:
-        raise ValueError("minor and patch versions must be below 1000")
-    code = major * 1_000_000 + minor * 1_000 + patch
+def derive_android_version_code() -> int:
+    raw = os.environ.get("GITHUB_RUN_NUMBER", "").strip()
+    if not raw.isdigit():
+        raise ValueError(
+            "android_version_code 'auto' requires a numeric GITHUB_RUN_NUMBER "
+            "so the code matches the Google Play 100000000+run-number scheme"
+        )
+    code = PLAY_VERSION_CODE_BASE + int(raw)
     if not 1 <= code <= 2_100_000_000:
         raise ValueError("derived Android version code is outside the supported range")
     return code
@@ -46,7 +53,7 @@ def update_config(
         bundle.setdefault("iOS", {})["bundleVersion"] = build_number
     if android_version_code:
         code = (
-            derive_android_version_code(version)
+            derive_android_version_code()
             if android_version_code == "auto"
             else int(android_version_code)
         )

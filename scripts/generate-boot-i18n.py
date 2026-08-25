@@ -33,7 +33,6 @@ BOOT_KEYS = [
     "boot_almost_ready",
     "boot_initial_status",
     "boot_retry_button",
-    "boot_noscript",
 ]
 
 

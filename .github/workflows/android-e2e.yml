@@ -44,6 +44,10 @@ jobs:
           distribution: temurin
           java-version: "21"
       - uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v7.0.1
+        with:
+          path: /usr/local/lib/android/sdk/system-images/android-${{ env.ANDROID_API }}/google_apis/x86_64
+          key: android-system-image-${{ runner.os }}-android${{ env.ANDROID_API }}-google_apis-x86_64
       - name: Install emulator image
         shell: bash
         run: |

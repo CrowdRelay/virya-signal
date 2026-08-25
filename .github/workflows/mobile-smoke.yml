@@ -19,23 +19,6 @@ on:
       - "scripts/**"
       - ".github/workflows/_android-build.yml"
       - ".github/workflows/mobile-smoke.yml"
-  pull_request:
-    paths:
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "rust-toolchain.toml"
-      - "Trunk.toml"
-      - "index.html"
-      - "boot.js"
-      - "boot-i18n.js"
-      - "runtime-i18n.js"
-      - "bundle-stage-pack.webp"
-      - "styles.css"
-      - "src/**"
-      - "src-tauri/**"
-      - "scripts/**"
-      - ".github/workflows/_android-build.yml"
-      - ".github/workflows/mobile-smoke.yml"
   workflow_dispatch:
 
 permissions:
