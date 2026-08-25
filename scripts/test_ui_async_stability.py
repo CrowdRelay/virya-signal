@@ -110,8 +110,18 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         self.assertIn("mode.set(RootMode::Latarnik)", latarnik)
         self.assertNotIn("spawn_local", latarnik)
         self.assertLess(latarnik.index("menu_open.set(false)"), latarnik.index("mode.set(RootMode::Latarnik)"))
+        # The keep-alive refactor moved the refresh bump into a shared
+        # `request_full_refresh` closure; the menu must still call it after
+        # closing, and the closure itself must stay latest-wins.
         fan_refresh = fan_shell.split("let refresh_all", 1)[1].split("view!", 1)[0]
-        self.assertIn("refresh_requested.update", fan_refresh)
+        self.assertIn("menu_open.set(false)", fan_refresh)
+        self.assertIn("request_full_refresh();", fan_refresh)
+        fan_bump = fan_shell.split("let request_full_refresh", 1)[1].split("};", 1)[0]
+        self.assertIn('bridge::invalidate_latest("fan:")', fan_bump)
+        self.assertIn(
+            "refresh_requested.update(|value| *value = value.wrapping_add(1).max(1))",
+            fan_bump,
+        )
         operator_refresh = operator_shell.split("let refresh_all", 1)[1].split("on_cleanup", 1)[0]
         self.assertIn("refresh_requested.update", operator_refresh)
 
