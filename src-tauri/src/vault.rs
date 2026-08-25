@@ -5,7 +5,7 @@ use std::{
     sync::{Mutex, MutexGuard, Once},
 };
 
-use argon2::Argon2;
+use argon2::{Algorithm, Argon2, Params, Version};
 use iota_stronghold::{KeyProvider, SnapshotPath, Stronghold};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use zeroize::Zeroizing;
@@ -855,9 +855,28 @@ fn read_salt(path: &Path) -> Result<[u8; SALT_BYTES], AppError> {
     })
 }
 
+/// Argon2id cost for stretching the PIN into the Stronghold password, pinned
+/// explicitly so a future `argon2` crate upgrade cannot move the work factor
+/// without this file saying so. These are the same values the crate defaults
+/// to today (m = 19 MiB, t = 2, p = 1) — the OWASP interactive-auth floor and
+/// the right point for a client that derives once per unlock on a background
+/// thread and reuses the result for the whole session. Raising them would add
+/// visible unlock latency on low-end Android for no real gain: the PIN is not
+/// the only thing between an attacker and the data, the device itself must be
+/// unlocked first, and the scrypt pass over the snapshot is layered on top.
+fn vault_params() -> Result<Params, AppError> {
+    Params::new(
+        Params::DEFAULT_M_COST,
+        Params::DEFAULT_T_COST,
+        Params::DEFAULT_P_COST,
+        Some(PASSWORD_BYTES),
+    )
+    .map_err(|_| AppError::StrongholdClient)
+}
+
 fn password(pin: &str, salt: &[u8; SALT_BYTES]) -> Result<Zeroizing<Vec<u8>>, AppError> {
     let mut output = Zeroizing::new(vec![0_u8; PASSWORD_BYTES]);
-    Argon2::default()
+    Argon2::new(Algorithm::Argon2id, Version::V0x13, vault_params()?)
         .hash_password_into(pin.as_bytes(), salt, &mut output)
         .map_err(|_| AppError::StrongholdClient)?;
     // The buffer stays in Zeroizing: copying out to a plain Vec reintroduced
