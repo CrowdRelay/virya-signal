@@ -126,7 +126,7 @@ jobs:
           path: ~/.cache/trunk
           key: trunk-${{ runner.os }}-0.21.14-${{ hashFiles('Cargo.lock') }}
       - name: Install pinned Tauri tools
-        uses: taiki-e/install-action@b6b84cf49ebfe0176417bdce007c624f0db37f20 # v2
+        uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518 # v2
         with:
           tool: trunk@0.21.14,tauri-cli@2.11.4
       - name: Set release version
