@@ -217,7 +217,7 @@ fn NavButton<T>(tab: RwSignal<T>, own: T, icon: &'static str, label: &'static st
 where
     T: Copy + PartialEq + Send + Sync + 'static,
 {
-    view! { <button class:active=move || tab.get() == own on:click=move |_| tab.set(own)><NavGlyph icon=icon/><small>{label}</small></button> }
+    view! { <button class:active=move || tab.get() == own aria-current=move || (tab.get() == own).then_some("page") on:click=move |_| tab.set(own)><NavGlyph icon=icon/><small>{label}</small></button> }
 }
 
 #[component]
