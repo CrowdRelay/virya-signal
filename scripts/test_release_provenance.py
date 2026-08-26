@@ -5,7 +5,13 @@ import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-EXPECTED_OPENAPI_SHA = "556e3f0988de51a1d4f58b7d91f406d5b449ca0d730a01ebd5cce785c137de48"
+# Single source of truth: the regenerated fan-contract lock. The provenance
+# receipt must always carry exactly this digest.
+EXPECTED_OPENAPI_SHA = (
+    (ROOT / "crates" / "virya-signal-contracts" / "crowdrelay-openapi.sha256")
+    .read_text(encoding="ascii")
+    .strip()
+)
 
 class ReleaseProvenanceTests(unittest.TestCase):
     def test_android_receipt_binds_version_code_firebase_and_crowdrelay_contract(self):
