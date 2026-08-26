@@ -185,7 +185,7 @@ jobs:
             artifacts/lighthouse-summary.json
             artifacts/lighthouse-summary.md
           if-no-files-found: warn
-          retention-days: 30
+          retention-days: 7
 
       - name: Store successful regression baseline
         if: success()
@@ -194,4 +194,4 @@ jobs:
           name: virya-signal-lighthouse-baseline
           path: artifacts/lighthouse-summary.json
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 7

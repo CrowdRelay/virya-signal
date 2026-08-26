@@ -35,6 +35,6 @@ jobs:
       build_kind: debug-apk
       version: debug
       artifact_name: virya-signal-android-debug
-      retention_days: 14
+      retention_days: 7
       signed: false
     secrets: inherit

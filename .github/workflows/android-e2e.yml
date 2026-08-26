@@ -192,4 +192,4 @@ jobs:
           name: virya-signal-android-e2e-report-${{ github.run_id }}
           path: artifacts/android-e2e
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 7
