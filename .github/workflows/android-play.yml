@@ -162,7 +162,7 @@ jobs:
       version: ${{ needs.prepare.outputs.version }}
       android_version_code: ${{ needs.prepare.outputs.android_version_code }}
       artifact_name: virya-signal-google-play-${{ needs.prepare.outputs.version }}
-      retention_days: 90
+      retention_days: 7
       signed: true
     secrets: inherit
 

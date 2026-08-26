@@ -47,7 +47,7 @@ jobs:
       build_kind: release-apk
       version: ${{ needs.meta.outputs.version }}
       artifact_name: ${{ needs.meta.outputs.artifact_name }}
-      retention_days: 90
+      retention_days: 7
       signed: true
     secrets: inherit
 

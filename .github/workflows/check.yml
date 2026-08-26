@@ -79,7 +79,7 @@ jobs:
           name: virya-signal-web-dist
           path: dist
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 7
       - name: Release lint
         run: cargo clippy --locked --release -p virya-signal-ui --target wasm32-unknown-unknown -- -D warnings
       - name: Record and compare Web performance metrics
@@ -109,7 +109,7 @@ jobs:
           name: virya-signal-web-metrics
           path: artifacts/web-metrics.json
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 7
       - name: Compiler cache statistics
         if: always()
         run: sccache --show-stats

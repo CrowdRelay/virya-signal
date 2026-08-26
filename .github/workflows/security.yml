@@ -51,7 +51,7 @@ jobs:
           name: virya-signal-sbom-${{ github.sha }}
           path: artifacts/virya-signal-sbom.cdx.json
           if-no-files-found: error
-          retention-days: 90
+          retention-days: 7
       - name: Cache pinned cargo-audit binary
         id: cargo-audit-cache
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v7.0.1

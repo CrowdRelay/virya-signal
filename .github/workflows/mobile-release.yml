@@ -71,7 +71,7 @@ jobs:
       version: ${{ needs.meta.outputs.version }}
       android_version_code: ${{ needs.meta.outputs.android_version_code }}
       artifact_name: ${{ needs.meta.outputs.android_artifact }}
-      retention_days: 30
+      retention_days: 7
       signed: true
     secrets: inherit
 
@@ -197,7 +197,7 @@ jobs:
             ios-artifact-manifest.json
             scripts/artifact_manifest.py
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
       - name: Upload to TestFlight
         if: ${{ !inputs.submit_ios_review }}
         env:
