@@ -44,7 +44,7 @@ pub(crate) async fn fan_unlock(
             // `Locked` here only means the fan logged out before reconciliation
             // finished, which is the expected outcome of a fast logout, not a
             // degraded sync.
-            Ok(()) | Err(AppError::Locked) => {}
+            Ok(_) | Err(AppError::Locked) => {}
             Err(error) => {
                 eprintln!("[virya:push-sync] unlock reconciliation degraded: {error}");
             }

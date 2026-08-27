@@ -429,6 +429,7 @@ pub(crate) async fn operator_push_open_settings(
         &state,
         &app,
         Some("notification_settings_opened".to_owned()),
+        None,
     )
     .await)
 }

@@ -174,6 +174,7 @@ pub(crate) async fn current_native_push_status(
     state: &State<'_, AppState>,
     app: &AppHandle,
     detail: Option<String>,
+    cached_config: Option<&FanPushConfigApi>,
 ) -> FanPushStatus {
     let profile = match fan_profile(state).await {
         Ok(value) => value,
@@ -196,10 +197,14 @@ pub(crate) async fn current_native_push_status(
         };
     }
     let permission = native_push_permission(app).unwrap_or_else(|_| "unknown".to_owned());
-    let config = state.api.fan_push_config(&profile).await;
-    let (backend_enabled, config_detail) = match config {
-        Ok(config) => (config.enabled && config.android_fcm, None),
-        Err(error) => (false, Some(format!("push_config_unavailable:{error}"))),
+    // Reuse the config a sync/enable already fetched instead of a second
+    // round-trip on cellular. Only fetch when the caller had no reason to.
+    let (backend_enabled, config_detail) = match cached_config {
+        Some(config) => (config.enabled && config.android_fcm, None),
+        None => match state.api.fan_push_config(&profile).await {
+            Ok(config) => (config.enabled && config.android_fcm, None),
+            Err(error) => (false, Some(format!("push_config_unavailable:{error}"))),
+        },
     };
     let firebase_configured = native_firebase_configured(app).unwrap_or(false);
     let provider_detail = (!firebase_configured).then(|| "firebase_not_configured".to_owned());
@@ -221,21 +226,21 @@ async fn sync_native_push_if_desired(
     state: &State<'_, AppState>,
     app: &AppHandle,
     expected: Option<Arc<FanProfile>>,
-) -> Result<(), AppError> {
+) -> Result<Option<FanPushConfigApi>, AppError> {
     let profile = fan_profile(state).await?;
     let expected_ref = expected.as_ref();
     if !session_is_current(state, expected_ref).await {
-        return Ok(());
+        return Ok(None);
     }
     if !state.native_push_available || !cfg!(target_os = "android") {
-        return Ok(());
+        return Ok(None);
     }
     if !profile.push_enabled {
         if profile.push_last_sync_ok {
-            return Ok(());
+            return Ok(None);
         }
         let Some(_mutation) = lock_for_push_mutation(state, expected_ref).await else {
-            return Ok(());
+            return Ok(None);
         };
         if let Some(installation_id) = read_native_push_installation_id(&state.app_data_dir) {
             let response = state
@@ -252,17 +257,17 @@ async fn sync_native_push_if_desired(
         // Disabling the fan audience must never delete the provider token, or
         // staff reminders on the same installation would silently break.
         persist_push_state(state, expected_ref, &profile, false, true).await?;
-        return Ok(());
+        return Ok(None);
     }
     if !session_is_current(state, expected_ref).await {
-        return Ok(());
+        return Ok(None);
     }
     let config = state.api.fan_push_config(&profile).await?;
     // The config read above is the only remaining lock-free network leg. Past
     // this point every branch writes push state, so the rest runs under one
     // `fan_mutation` hold; the local Android calls in between do not block.
     let Some(_mutation) = lock_for_push_mutation(state, expected_ref).await else {
-        return Ok(());
+        return Ok(Some(config));
     };
     if !config.enabled || !config.android_fcm {
         let _ = persist_push_state(state, expected_ref, &profile, true, false).await;
@@ -286,7 +291,7 @@ async fn sync_native_push_if_desired(
         ));
     }
     persist_push_state(state, expected_ref, &profile, true, true).await?;
-    Ok(())
+    Ok(Some(config))
 }
 
 #[tauri::command]
@@ -296,15 +301,18 @@ pub(crate) async fn fan_push_sync(
 ) -> Result<FanPushStatus, AppError> {
     let _mutation = state.fan_mutation.lock().await;
     match sync_native_push_if_desired(&state, &app, None).await {
-        Ok(()) => Ok(current_native_push_status(&state, &app, None).await),
+        Ok(config) => {
+            Ok(current_native_push_status(&state, &app, None, config.as_ref()).await)
+        }
         Err(AppError::Forbidden) => Ok(current_native_push_status(
             &state,
             &app,
             Some("notification_permission_denied".to_owned()),
+            None,
         )
         .await),
         Err(AppError::Conflict(detail)) => {
-            Ok(current_native_push_status(&state, &app, Some(detail)).await)
+            Ok(current_native_push_status(&state, &app, Some(detail), None).await)
         }
         Err(error) => Err(error),
     }
@@ -330,6 +338,7 @@ pub(crate) async fn fan_push_enable(
             &state,
             &app,
             Some("android_push_unavailable".to_owned()),
+            None,
         )
         .await);
     }
@@ -339,6 +348,7 @@ pub(crate) async fn fan_push_enable(
             &state,
             &app,
             Some("push_delivery_not_live".to_owned()),
+            Some(&config),
         )
         .await);
     }
@@ -348,6 +358,7 @@ pub(crate) async fn fan_push_enable(
             &state,
             &app,
             Some("notification_permission_denied".to_owned()),
+            Some(&config),
         )
         .await);
     }
@@ -366,7 +377,7 @@ pub(crate) async fn fan_push_enable(
         ));
     }
     persist_push_state_now(&state, &profile, true, true).await?;
-    Ok(current_native_push_status(&state, &app, None).await)
+    Ok(current_native_push_status(&state, &app, None, Some(&config)).await)
 }
 
 #[tauri::command]
@@ -395,7 +406,7 @@ pub(crate) async fn fan_push_disable(
             None
         }
     };
-    Ok(current_native_push_status(&state, &app, detail).await)
+    Ok(current_native_push_status(&state, &app, detail, None).await)
 }
 
 #[tauri::command]
@@ -419,6 +430,7 @@ pub(crate) async fn fan_push_open_settings(
             &state,
             &app,
             Some("android_push_unavailable".to_owned()),
+            None,
         )
         .await);
     }
@@ -432,6 +444,7 @@ pub(crate) async fn fan_push_open_settings(
         &state,
         &app,
         Some("notification_settings_opened".to_owned()),
+        None,
     )
     .await)
 }
