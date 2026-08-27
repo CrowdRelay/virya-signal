@@ -13,7 +13,10 @@ use zeroize::Zeroizing;
 
 use crate::{
     AppError, AppState, MAX_SECRET_BYTES, PendingFanConfirmation,
-    api::{SignalMerchBundleCatalog, TicketCheckoutInput, TicketCheckoutStart, TicketSaleOffer},
+    api::{
+        FanPushConfigApi, SignalMerchBundleCatalog, TicketCheckoutInput, TicketCheckoutStart,
+        TicketSaleOffer,
+    },
     models::{
         AdmissionPass, AreaChallenge, AreaClaimResult, AreaPositionSample, FanAuthResult,
         FanConfirmationInput, FanEventInterest, FanHomeData, FanProfile, FanPushPreferences,

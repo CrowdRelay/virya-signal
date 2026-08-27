@@ -13,5 +13,6 @@ mod ticketing;
 pub use client::CrowdRelayClient;
 
 pub(crate) use beacon::BeaconPreferencesInput;
+pub(crate) use fan::FanPushConfigApi;
 pub(crate) use site::SignalMerchBundleCatalog;
 pub(crate) use ticketing::{TicketCheckoutInput, TicketCheckoutStart, TicketSaleOffer};

@@ -11,7 +11,7 @@ use zeroize::Zeroizing;
 
 use crate::{
     AppError, AppState, PendingBeaconConfirmation,
-    api::BeaconPreferencesInput,
+    api::{BeaconPreferencesInput, FanPushConfigApi},
     commands::fan::{
         ensure_native_push_installation_id, native_push_permission, native_push_token,
         open_native_push_settings, read_native_push_installation_id,
@@ -728,6 +728,7 @@ async fn current_push_status(
     state: &State<'_, AppState>,
     app: &AppHandle,
     detail: Option<String>,
+    cached_config: Option<&FanPushConfigApi>,
 ) -> FanPushStatus {
     let profile = match beacon_profile(state).await {
         Ok(value) => value,
@@ -750,10 +751,14 @@ async fn current_push_status(
         };
     }
     let permission = native_push_permission(app).unwrap_or_else(|_| "unknown".to_owned());
-    let config = state.api.beacon_push_config(&profile).await;
-    let (backend_enabled, config_detail) = match config {
-        Ok(config) => (config.enabled && config.android_fcm, None),
-        Err(error) => (false, Some(format!("push_config_unavailable:{error}"))),
+    // Reuse the config a sync/enable already fetched instead of a second
+    // round-trip on cellular. Only fetch when the caller had no reason to.
+    let (backend_enabled, config_detail) = match cached_config {
+        Some(config) => (config.enabled && config.android_fcm, None),
+        None => match state.api.beacon_push_config(&profile).await {
+            Ok(config) => (config.enabled && config.android_fcm, None),
+            Err(error) => (false, Some(format!("push_config_unavailable:{error}"))),
+        },
     };
     FanPushStatus {
         supported,
@@ -771,14 +776,14 @@ async fn current_push_status(
 async fn sync_native_push_if_desired(
     state: &State<'_, AppState>,
     app: &AppHandle,
-) -> Result<(), AppError> {
+) -> Result<Option<FanPushConfigApi>, AppError> {
     let profile = beacon_profile(state).await?;
     if !state.native_push_available || !cfg!(target_os = "android") {
-        return Ok(());
+        return Ok(None);
     }
     if !profile.push_enabled {
         if profile.push_last_sync_ok {
-            return Ok(());
+            return Ok(None);
         }
         if let Some(installation_id) = read_native_push_installation_id(&state.app_data_dir) {
             let response = state
@@ -792,7 +797,7 @@ async fn sync_native_push_if_desired(
             }
         }
         persist_push_state(state, &profile, false, true).await?;
-        return Ok(());
+        return Ok(None);
     }
     let config = state.api.beacon_push_config(&profile).await?;
     if !config.enabled || !config.android_fcm {
@@ -817,7 +822,7 @@ async fn sync_native_push_if_desired(
         ));
     }
     persist_push_state(state, &profile, true, true).await?;
-    Ok(())
+    Ok(Some(config))
 }
 
 #[tauri::command]
@@ -827,15 +832,16 @@ pub(crate) async fn beacon_push_sync(
 ) -> Result<FanPushStatus, AppError> {
     let _mutation = state.beacon_mutation.lock().await;
     match sync_native_push_if_desired(&state, &app).await {
-        Ok(()) => Ok(current_push_status(&state, &app, None).await),
+        Ok(config) => Ok(current_push_status(&state, &app, None, config.as_ref()).await),
         Err(AppError::Forbidden) => Ok(current_push_status(
             &state,
             &app,
             Some("notification_permission_denied".to_owned()),
+            None,
         )
         .await),
         Err(AppError::Conflict(detail)) => {
-            Ok(current_push_status(&state, &app, Some(detail)).await)
+            Ok(current_push_status(&state, &app, Some(detail), None).await)
         }
         Err(error) => Err(error),
     }
@@ -849,15 +855,23 @@ pub(crate) async fn beacon_push_enable(
     let _mutation = state.beacon_mutation.lock().await;
     let profile = beacon_profile(&state).await?;
     if !state.native_push_available || !cfg!(target_os = "android") {
-        return Ok(
-            current_push_status(&state, &app, Some("android_push_unavailable".to_owned())).await,
-        );
+        return Ok(current_push_status(
+            &state,
+            &app,
+            Some("android_push_unavailable".to_owned()),
+            None,
+        )
+        .await);
     }
     let config = state.api.beacon_push_config(&profile).await?;
     if !config.enabled || !config.android_fcm {
-        return Ok(
-            current_push_status(&state, &app, Some("push_delivery_not_live".to_owned())).await,
-        );
+        return Ok(current_push_status(
+            &state,
+            &app,
+            Some("push_delivery_not_live".to_owned()),
+            Some(&config),
+        )
+        .await);
     }
     let permission = request_native_push_permission(&app).map_err(AppError::InvalidInput)?;
     if permission != "granted" {
@@ -865,6 +879,7 @@ pub(crate) async fn beacon_push_enable(
             &state,
             &app,
             Some("notification_permission_denied".to_owned()),
+            Some(&config),
         )
         .await);
     }
@@ -881,7 +896,7 @@ pub(crate) async fn beacon_push_enable(
         ));
     }
     persist_push_state(&state, &profile, true, true).await?;
-    Ok(current_push_status(&state, &app, None).await)
+    Ok(current_push_status(&state, &app, None, Some(&config)).await)
 }
 
 #[tauri::command]
@@ -910,7 +925,7 @@ pub(crate) async fn beacon_push_disable(
             None
         }
     };
-    Ok(current_push_status(&state, &app, detail).await)
+    Ok(current_push_status(&state, &app, detail, None).await)
 }
 
 #[tauri::command]
@@ -919,9 +934,13 @@ pub(crate) async fn beacon_push_open_settings(
     app: AppHandle,
 ) -> Result<FanPushStatus, AppError> {
     if !state.native_push_available || !cfg!(target_os = "android") {
-        return Ok(
-            current_push_status(&state, &app, Some("android_push_unavailable".to_owned())).await,
-        );
+        return Ok(current_push_status(
+            &state,
+            &app,
+            Some("android_push_unavailable".to_owned()),
+            None,
+        )
+        .await);
     }
     let _mutation = state.beacon_mutation.lock().await;
     let profile = beacon_profile(&state).await?;
@@ -931,6 +950,7 @@ pub(crate) async fn beacon_push_open_settings(
         &state,
         &app,
         Some("notification_settings_opened".to_owned()),
+        None,
     )
     .await)
 }
