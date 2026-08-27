@@ -114,6 +114,19 @@ jobs:
         with:
           toolchain: 1.97.1
           targets: "wasm32-unknown-unknown,${{ inputs.target_arch == 'aarch64' && 'aarch64-linux-android' || 'x86_64-linux-android' }}"
+      - name: Purge stale sccache entries
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t ids < <(gh api "repos/${GITHUB_REPOSITORY}/actions/caches?per_page=100" \
+            --jq '.actions_caches[] | select(.key | startswith("sccache/")) | .id' 2>/dev/null || true)
+          for id in "${ids[@]}"; do
+            gh api -X DELETE "repos/${GITHUB_REPOSITORY}/actions/caches/${id}" 2>/dev/null || true
+          done
+          echo "Purged ${#ids[@]} stale sccache entries"
       - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
         with:
           version: "v0.16.0"
