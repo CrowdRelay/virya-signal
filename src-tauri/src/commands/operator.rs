@@ -46,13 +46,20 @@ struct OperatorPushPreference {
 
 fn read_operator_push_preference(app_data_dir: &Path) -> OperatorPushPreference {
     let path = app_data_dir.join(OPERATOR_PUSH_PREFERENCE_FILE);
-    let Ok(bytes) = std::fs::read(path) else {
+    let Ok(bytes) = std::fs::read(&path) else {
         return OperatorPushPreference::default();
     };
     if bytes.len() > 256 {
         return OperatorPushPreference::default();
     }
-    serde_json::from_slice(&bytes).unwrap_or_default()
+    match serde_json::from_slice(&bytes) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("[virya:operator-push] corrupted preference reset to default: {error}");
+            let _ = std::fs::remove_file(&path);
+            OperatorPushPreference::default()
+        }
+    }
 }
 
 fn persist_operator_push_preference(

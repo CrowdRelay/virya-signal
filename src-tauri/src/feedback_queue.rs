@@ -39,8 +39,15 @@ pub(crate) fn load(dir: &Path) -> Result<Vec<QueuedFeedback>, AppError> {
         let _ = fs::remove_file(&path);
         return Ok(Vec::new());
     }
-    let bytes = fs::read(path)?;
-    let mut values: Vec<QueuedFeedback> = serde_json::from_slice(&bytes).unwrap_or_default();
+    let bytes = fs::read(&path)?;
+    let mut values: Vec<QueuedFeedback> = match serde_json::from_slice(&bytes) {
+        Ok(values) => values,
+        Err(error) => {
+            eprintln!("[virya:feedback-queue] corrupted outbox discarded: {error}");
+            let _ = fs::remove_file(&path);
+            Vec::new()
+        }
+    };
     prune(&mut values);
     Ok(values)
 }

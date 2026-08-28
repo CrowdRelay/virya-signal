@@ -504,7 +504,7 @@ fn BeaconApp(
         else if target.contains("/radar") { tab.set(BeaconTab::Radar); }
         else { tab.set(BeaconTab::Briefing); }
         if let Some((_, id)) = target.split_once("event=") {
-            let id = id.split('&').next().unwrap_or(id).trim();
+            let id = id.split('&').next().unwrap_or("").trim();
             if !id.is_empty() { selected_event.set(Some(id.to_owned())); }
         }
     });

@@ -248,17 +248,9 @@ pub async fn scan_and_confirm_beacon() -> Result<Option<crate::models::BeaconSes
 }
 
 pub async fn current_position() -> Result<crate::models::AreaPositionSample, String> {
-    #[derive(Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct RawPosition {
-        lat: f64,
-        lng: f64,
-        accuracy: f64,
-        captured_at: u64,
-    }
-
     let value = current_position_js().await.map_err(js_error)?;
     let value: RawPosition = serde_wasm_bindgen::from_value(value).map_err(decode_error)?;
+    validate_position(&value)?;
     Ok(crate::models::AreaPositionSample {
         lat: value.lat,
         lng: value.lng,
@@ -272,21 +264,13 @@ pub async fn collect_location_samples(
     max_samples: u32,
     min_duration_ms: u32,
 ) -> Result<Vec<crate::models::AreaPositionSample>, String> {
-    #[derive(Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct RawPosition {
-        lat: f64,
-        lng: f64,
-        accuracy: f64,
-        captured_at: u64,
-    }
-
     let value = collect_location_samples_js(min_samples, max_samples, min_duration_ms)
         .await
         .map_err(js_error)?;
     let values: Vec<RawPosition> = serde_wasm_bindgen::from_value(value).map_err(decode_error)?;
     Ok(values
         .into_iter()
+        .filter(|value| validate_position(value).is_ok())
         .map(|value| crate::models::AreaPositionSample {
             lat: value.lat,
             lng: value.lng,
@@ -294,6 +278,28 @@ pub async fn collect_location_samples(
             captured_at: value.captured_at,
         })
         .collect())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RawPosition {
+    lat: f64,
+    lng: f64,
+    accuracy: f64,
+    captured_at: u64,
+}
+
+fn validate_position(value: &RawPosition) -> Result<(), String> {
+    if !value.lat.is_finite() || !(-90.0..=90.0).contains(&value.lat) {
+        return Err(i18n::tr("invalid_location_sample").to_owned());
+    }
+    if !value.lng.is_finite() || !(-180.0..=180.0).contains(&value.lng) {
+        return Err(i18n::tr("invalid_location_sample").to_owned());
+    }
+    if !value.accuracy.is_finite() || value.accuracy < 0.0 {
+        return Err(i18n::tr("invalid_location_sample").to_owned());
+    }
+    Ok(())
 }
 
 pub fn install_runtime_guards() {

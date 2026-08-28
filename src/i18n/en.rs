@@ -758,6 +758,9 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "native_snapshot_expired" => "The event snapshot is invalid or has expired",
         "native_snapshot_too_large" => "The snapshot exceeds the safe limit of 10,000 entries",
         "native_snapshot_integrity_failed" => "The event snapshot failed its integrity check",
+        "native_show_checklist_unavailable" => {
+            "The show checklist could not be loaded. Check your connection and try again."
+        }
         "native_qr_too_long" => "The QR code is too long",
         "native_snapshot_refresh_required" => {
             "The event snapshot has expired. Connect to the network and download a new one"
@@ -820,6 +823,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "could_not_read_a_fresh_location_move" => {
             "Unfortunately, this is not the correct location. Keep looking!"
         }
+        "invalid_location_sample" => "The location sample is invalid.",
         "native_area_claim_invalid" => "The AREA point verification data is invalid.",
         "native_area_drop_inactive" => "This AREA point is not active now.",
         "native_area_challenge_invalid" => {

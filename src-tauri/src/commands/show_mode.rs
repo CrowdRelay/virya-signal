@@ -303,6 +303,13 @@ pub(crate) async fn show_mode_prepare(
             .ok(),
         None => None,
     };
+    // Surface a clear error if the checklist could not be loaded. Without it
+    // the operator would scan against a stale or incomplete snapshot.
+    if checklist.is_none() {
+        return Err(AppError::Conflict(
+            crate::i18n::tr("native_show_checklist_unavailable").into(),
+        ));
+    }
     ensure_show_store_loaded(&state).await?;
     let status = {
         let mut cached = state.show_mode_store.write().await;

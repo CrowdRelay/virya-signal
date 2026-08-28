@@ -39,9 +39,17 @@ pub(super) fn process_start() -> Instant {
 
 /// Computes `fetched_at` for a disk-restored cache entry, clamping the age
 /// to process uptime so the entry is never treated as fresher than it is.
+/// When the age exceeds process uptime (clock skew or stale disk data), the
+/// entry is marked as expired by setting `fetched_at` before process start
+/// minus the TTL, ensuring it will be revalidated on the next access.
 pub(super) fn restored_fetched_at(age: Duration) -> Instant {
     let now = Instant::now();
-    now.checked_sub(age).unwrap_or(process_start())
+    now.checked_sub(age).unwrap_or_else(|| {
+        // Age exceeds elapsed process time — treat as maximally stale.
+        process_start()
+            .checked_sub(Duration::from_secs(60 * 60 * 24))
+            .unwrap_or(process_start())
+    })
 }
 
 pub(super) struct CacheEntry<T> {

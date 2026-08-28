@@ -434,9 +434,9 @@ fn FanAccess(
                             Some(false) => {
                                 let minutes = result
                                     .retry_after_seconds
-                                    .map(|seconds| seconds.saturating_add(59) / 60)
+                                    .map(|seconds| (seconds / 60).saturating_add(if seconds % 60 > 0 { 1 } else { 0 }))
                                     .unwrap_or(15)
-                                    .max(1);
+                                    .clamp(1, 15);
                                 i18n::format(
                                     "new_message_not_sent_previous_code_still_valid_minutes",
                                     &[minutes.to_string()],

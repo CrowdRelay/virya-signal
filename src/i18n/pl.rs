@@ -758,6 +758,9 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "native_snapshot_integrity_failed" => {
             "Snapshot koncertu nie przeszedł kontroli integralności"
         }
+        "native_show_checklist_unavailable" => {
+            "Nie udało się pobrać checklisty koncertu. Sprawdź połączenie i spróbuj ponownie."
+        }
         "native_qr_too_long" => "Kod QR jest zbyt długi",
         "native_snapshot_refresh_required" => {
             "Snapshot koncertu wygasł. Połącz się z siecią i pobierz nowy"
@@ -820,6 +823,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "could_not_read_a_fresh_location_move" => {
             "Niestety to nie jest poprawna lokalizacja. Próbuj dalej!"
         }
+        "invalid_location_sample" => "Próbka lokalizacji jest nieprawidłowa.",
         "native_area_claim_invalid" => "Dane potwierdzenia punktu AREA są nieprawidłowe.",
         "native_area_drop_inactive" => "Ten punkt AREA nie jest teraz aktywny.",
         "native_area_challenge_invalid" => {
