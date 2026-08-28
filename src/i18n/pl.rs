@@ -1303,6 +1303,42 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "affiliate_section_aria" => "Sprzęt VIRYA i linki afiliacyjne Thomann",
         "affiliate_title" => "Sprzęt, którego naprawdę używamy",
         "affiliate_used_live" => "UŻYWAMY NA ŻYWO",
+        // ── Three-tier priority dashboard + FanHomeBanner ──
+        "tier_priority" => "PRIORYTET",
+        "tier_active" => "AKTYWNE",
+        "tier_background" => "TŁO",
+        "next_best_action" => "NASTĘPNA AKCJA",
+        "action_continue_synesthesia" => "Kontynuuj podróż Synesthesia",
+        "action_open_wallet" => "Otwórz portfel biletów",
+        "action_open_live_event" => "Koncert trwa — otwórz wydarzenie",
+        "action_share_post_show_feedback" => "Podziel się wrażeniami po koncercie",
+        "action_get_ticket" => "Kup bilet na następny koncert",
+        "action_follow_next_event" => "Obserwuj następny koncert",
+        "action_explore_signal" => "Zobacz, co daje Sygnał",
+        "action_unknown" => "Odkryj swój Sygnał",
+        "counts_interests" => "Obserwujesz",
+        "counts_passes" => "Passe",
+        "counts_orders" => "Bilety",
+        "counts_claims" => "Zbiory AREA",
+        // ── Email-first signup ──
+        "enter_email_to_start" => "Wpisz e-mail, aby zacząć",
+        "email_first_hint" => "Wyślemy Ci link potwierdzający. Reszta zajmie 30 sekund.",
+        "continue_to_details" => "Dalej",
+        "signup_details_hint" => "Jeszcze jeden krok — wybierz miasto i PIN.",
+        // ── Always-visible referral ──
+        "referral_preview" => {
+            "Poleć znajomemu → 10% zniżki w merchu dla was obu. Kolejne polecenia odblokowują losowania i nagrody fizyczne."
+        }
+        "referral_code_loading" => "Ładuję kod…",
+        "referral_share_label" => "Udostępnij przez",
+        // ── Progressive checkout ──
+        "checkout_step_tickets" => "1. Bilety",
+        "checkout_step_details" => "2. Dane",
+        "checkout_step_payment" => "3. Płatność",
+        "checkout_review" => "Sprawdź zamówienie",
+        "checkout_continue_to_details" => "Dalej do danych",
+        "checkout_continue_to_payment" => "Dalej do płatności",
+        "checkout_back" => "Wstecz",
         _ => key,
     }
 }

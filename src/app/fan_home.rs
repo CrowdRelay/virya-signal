@@ -1,4 +1,6 @@
 use crate::app::formatters::synesthesia_best_summary;
+use std::ops::Not;
+use virya_signal_contracts::fan::FanRecommendedAction;
 
 fn event_phase_label(phase: &str) -> &'static str {
     match phase {
@@ -8,6 +10,124 @@ fn event_phase_label(phase: &str) -> &'static str {
     }
 }
 
+fn recommended_action_label(action: &FanRecommendedAction) -> &'static str {
+    match action {
+        FanRecommendedAction::ContinueSynesthesia => tr("action_continue_synesthesia"),
+        FanRecommendedAction::OpenWallet => tr("action_open_wallet"),
+        FanRecommendedAction::OpenLiveEvent => tr("action_open_live_event"),
+        FanRecommendedAction::SharePostShowFeedback => tr("action_share_post_show_feedback"),
+        FanRecommendedAction::GetTicket => tr("action_get_ticket"),
+        FanRecommendedAction::FollowNextEvent => tr("action_follow_next_event"),
+        FanRecommendedAction::ExploreSignal => tr("action_explore_signal"),
+        FanRecommendedAction::Unknown => tr("action_unknown"),
+    }
+}
+
+#[component]
+fn FanHomeBanner(
+    home: RwSignal<Option<FanHomeData>>,
+    tab: RwSignal<FanTab>,
+    focused_event_slug: RwSignal<Option<String>>,
+    focused_event_preview: RwSignal<Option<PublicEvent>>,
+) -> impl IntoView {
+    view! {
+        {move || home.get().and_then(|snapshot| {
+            let recommended = snapshot.recommended.clone()?;
+            let label = recommended_action_label(&recommended.kind);
+            let counts = snapshot.counts.clone();
+            let next_event = snapshot.next_event.clone();
+            let action_view = match recommended.kind {
+                FanRecommendedAction::OpenWallet => Some(view! {
+                    <button class="banner-cta" on:click=move |_| tab.set(FanTab::Wallet)>
+                        {tr("action_open_wallet")} " →"
+                    </button>
+                }.into_any()),
+                FanRecommendedAction::GetTicket | FanRecommendedAction::FollowNextEvent => {
+                    next_event.map(|event| {
+                        let event_slug = event.slug.clone();
+                        let event_preview = PublicEvent {
+                            slug: event.slug.clone(),
+                            title: event.title.clone(),
+                            description: None,
+                            city: event.city.clone().map(|name| EventCity { name }),
+                            venue: event.venue.clone(),
+                            starts_at: event.starts_at.clone(),
+                            ticket_url: event.ticket_url.clone(),
+                            image_url: None,
+                            image_thumbnail_url: None,
+                        };
+                        view! {
+                            <button class="banner-cta" on:click=move |_| {
+                                focused_event_preview.set(Some(event_preview.clone()));
+                                focused_event_slug.set(Some(event_slug.clone()));
+                                tab.set(FanTab::Events);
+                            }>{label} " →"</button>
+                        }.into_any()
+                    })
+                }
+                FanRecommendedAction::OpenLiveEvent => {
+                    next_event.map(|event| {
+                        let event_slug = event.slug.clone();
+                        let event_preview = PublicEvent {
+                            slug: event.slug.clone(),
+                            title: event.title.clone(),
+                            description: None,
+                            city: event.city.clone().map(|name| EventCity { name }),
+                            venue: event.venue.clone(),
+                            starts_at: event.starts_at.clone(),
+                            ticket_url: event.ticket_url.clone(),
+                            image_url: None,
+                            image_thumbnail_url: None,
+                        };
+                        view! {
+                            <button class="banner-cta" on:click=move |_| {
+                                focused_event_preview.set(Some(event_preview.clone()));
+                                focused_event_slug.set(Some(event_slug.clone()));
+                                tab.set(FanTab::Events);
+                            }>{label} " →"</button>
+                        }.into_any()
+                    })
+                }
+                FanRecommendedAction::ContinueSynesthesia => Some(view! {
+                    <ExternalLink
+                        url="https://synesthesia.virya.music/?source=signal-app&resume=1".to_owned()
+                        label="Continue →"
+                        error=RwSignal::new(None)
+                    />
+                }.into_any()),
+                _ => Some(view! {
+                    <span class="banner-cta-text">{label}</span>
+                }.into_any()),
+            };
+            Some(view! {
+                <article class="home-banner priority-banner">
+                    <div class="banner-content">
+                        <p class="eyebrow">{tr("next_best_action")}</p>
+                        <strong>{label}</strong>
+                        {recommended.reason.is_empty().not().then(|| view! {
+                            <p class="banner-reason">{recommended.reason}</p>
+                        })}
+                        {action_view}
+                    </div>
+                    <div class="banner-counts">
+                        {(counts.event_interests > 0).then(|| view! {
+                            <span><b>{counts.event_interests}</b><small>{tr("counts_interests")}</small></span>
+                        })}
+                        {(counts.active_passes > 0).then(|| view! {
+                            <span><b>{counts.active_passes}</b><small>{tr("counts_passes")}</small></span>
+                        })}
+                        {(counts.paid_orders > 0).then(|| view! {
+                            <span><b>{counts.paid_orders}</b><small>{tr("counts_orders")}</small></span>
+                        })}
+                        {(counts.area_claims > 0).then(|| view! {
+                            <span><b>{counts.area_claims}</b><small>{tr("counts_claims")}</small></span>
+                        })}
+                    </div>
+                </article>
+            }.into_any())
+        })}
+    }
+}
 
 #[component]
 fn FanHomeOverview(
@@ -30,6 +150,7 @@ fn FanHomeOverview(
                     let next_event = snapshot.next_event.clone();
                     let city = snapshot.profile.primary_city.clone();
                     view! {
+                        <FanHomeBanner home=home tab=tab focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview />
                         <header class="fan-home-header">
                             <div>
                                 <p class="eyebrow">{tr("your_signal_now")}</p>

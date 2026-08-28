@@ -302,6 +302,21 @@ fn FanApp(
         menu_open.set(false);
         request_full_refresh();
     };
+    // A thin progress bar at the top of the content column tracks the full
+    // refresh. It shows while any section is still loading after the
+    // refresh_requested generation bumps, and hides once they all settle.
+    let refresh_active = Signal::derive(move || {
+        let state = loading.get();
+        refresh_requested.get() > 0
+            && (state.home
+                || state.events
+                || state.referral
+                || state.interests
+                || state.merch
+                || state.admission_pass
+                || state.wallets
+                || state.area)
+    });
 
     // Pull-to-refresh on the content column. Armed only while the page sits at
     // the very top, so a pull inside a scrolled list never hijacks the gesture,
@@ -370,6 +385,7 @@ fn FanApp(
                 </nav>
             </Show>
             <div class="content" on:touchstart=ptr_start on:touchmove=ptr_move on:touchend=ptr_end>
+                <div class="content-refresh-bar" class:active=move || refresh_active.get() aria-hidden="true"></div>
                 <div
                     class="ptr-hint"
                     style=move || {
@@ -386,10 +402,10 @@ fn FanApp(
                     }
                     aria-hidden="true"
                 ><span>"↻"</span></div>
-                <div class="tab-page" hidden=move || tab.get() != FanTab::Signal>
+                <div class="tab-page" class:hidden=move || tab.get() != FanTab::Signal class:tab-active=move || tab.get() == FanTab::Signal>
                     <FanSignal home=home dashboard=dashboard tab=tab focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview loading=loading error=error />
                 </div>
-                <div class="tab-page" hidden=move || tab.get() != FanTab::Events>
+                <div class="tab-page" class:hidden=move || tab.get() != FanTab::Events class:tab-active=move || tab.get() == FanTab::Events>
                     {move || checkout_event.get().map(|event| view! {
                         <FanTicketCheckout
                             event=event
@@ -404,16 +420,16 @@ fn FanApp(
                         <FanEvents dashboard=dashboard public=public focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview checkout_event=checkout_event loading=loading error=error />
                     }.into_any())}
                 </div>
-                <div class="tab-page" hidden=move || tab.get() != FanTab::Merch>
+                <div class="tab-page" class:hidden=move || tab.get() != FanTab::Merch class:tab-active=move || tab.get() == FanTab::Merch>
                     <FanMerch merch=merch bundles=merch_bundles loading=loading error=error />
                 </div>
-                <div class="tab-page" hidden=move || tab.get() != FanTab::Game>
+                <div class="tab-page" class:hidden=move || tab.get() != FanTab::Game class:tab-active=move || tab.get() == FanTab::Game>
                     <AreaGameScreen area=area loading=loading error=error />
                 </div>
-                <div class="tab-page" hidden=move || tab.get() != FanTab::Wallet>
+                <div class="tab-page" class:hidden=move || tab.get() != FanTab::Wallet class:tab-active=move || tab.get() == FanTab::Wallet>
                     <FanWallet dashboard=dashboard wallets=wallets admission_qr=admission_qr loading=loading error=error />
                 </div>
-                <div class="tab-page" hidden=move || tab.get() != FanTab::Profile>
+                <div class="tab-page" class:hidden=move || tab.get() != FanTab::Profile class:tab-active=move || tab.get() == FanTab::Profile>
                     <FanProfileScreen status=status dashboard=dashboard wallets=wallets area=area loading=loading error=error />
                 </div>
             </div>
@@ -488,21 +504,24 @@ fn FanSignal(
                     }).collect_view()}</div>
                 });
                 view! {
-                    {share_url.map(|url| {
-                        let share_url = url.clone();
-                        view! {
-                            <article class="home-action-card signal-relay-card">
-                                <p class="eyebrow">{tr("carry_the_signal")}</p>
-                                <strong>{tr("invite_real_metalheads")}</strong>
-                                <p>{tr("invite_one_to_three_people_you_really_think_would_care")}</p>
-                                <button
-                                    class="referral-code-copy"
-                                    type="button"
-                                    on:click=copy_referral
-                                    disabled=move || dashboard.with(|state| state.as_ref().is_none_or(|data| data.referral.referral_code.trim().is_empty()))
-                                >
-                                    {move || dashboard.with(|state| state.as_ref().map(|d| i18n::format("code", std::slice::from_ref(&d.referral.referral_code))).value_or_else(|| tr("loading_signal").to_owned()))}
-                                </button>
+                    // Referral card — always visible, even with 0 referrals or
+                    // while the code is still loading. The share button is
+                    // disabled until a code arrives.
+                    <article class="home-action-card signal-relay-card">
+                        <p class="eyebrow">{tr("carry_the_signal")}</p>
+                        <strong>{tr("invite_real_metalheads")}</strong>
+                        <p>{tr("referral_preview")}</p>
+                        <button
+                            class="referral-code-copy"
+                            type="button"
+                            on:click=copy_referral
+                            disabled=move || dashboard.with(|state| state.as_ref().is_none_or(|data| data.referral.referral_code.trim().is_empty()))
+                        >
+                            {move || dashboard.with(|state| state.as_ref().map(|d| i18n::format("code", std::slice::from_ref(&d.referral.referral_code))).value_or_else(|| tr("referral_code_loading").to_owned()))}
+                        </button>
+                        {share_url.as_ref().map(|url| {
+                            let share_url = url.clone();
+                            view! {
                                 <button class="ghost" type="button" on:click=move |_| {
                                     let url = share_url.clone();
                                     share_status.set(None);
@@ -519,10 +538,10 @@ fn FanSignal(
                                         }
                                     });
                                 }>{tr("share_signal")}</button>
-                                {move || share_status.get().map(|message| view! { <small class="success">{message}</small> })}
-                            </article>
-                        }
-                    })}
+                            }
+                        })}
+                        {move || share_status.get().map(|message| view! { <small class="success">{message}</small> })}
+                    </article>
                     <div class="section-head"><h3>{tr("active_draws")}</h3><span>{draw_count}</span></div>
                     <div class="card-list">{draws.into_iter().map(|draw| {
                         let proof_url = (!draw.slug.is_empty()).then(|| format!(

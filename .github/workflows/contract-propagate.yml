@@ -1,0 +1,154 @@
+name: Contract propagate
+
+# Triggered by CrowdRelay when its OpenAPI spec changes on main.
+# Regenerates the fan wire contract from the new spec and opens a PR.
+# Also runs as a fallback on schedule in case the dispatch was missed.
+
+on:
+  repository_dispatch:
+    types: [crowdrelay-contract-propagated]
+  workflow_dispatch:
+    inputs:
+      openapi_sha:
+        description: "CrowdRelay OpenAPI SHA256 (optional — defaults to current main)"
+        required: false
+        type: string
+  schedule:
+    - cron: "13 */6 * * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: contract-propagate
+  cancel-in-progress: true
+
+jobs:
+  regenerate:
+    name: Regenerate fan wire contract from CrowdRelay OpenAPI
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      # Canonical ecosystem layout: both repos as siblings under $GITHUB_WORKSPACE.
+      # The generator script resolves CrowdRelay via ROOT.parent / "crowdrelay".
+      - name: Check out Signal
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: virya-signal
+
+      - name: Check out CrowdRelay (dispatch SHA or current main)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: CrowdRelay/crowdrelay
+          ref: ${{ github.event.client_payload.crowdrelay_sha || 'main' }}
+          path: crowdrelay
+          persist-credentials: false
+
+      - name: Compute expected OpenAPI SHA
+        id: sha
+        working-directory: virya-signal
+        run: |
+          set -euo pipefail
+          if [[ -n "${{ github.event.client_payload.openapi_sha }}" ]]; then
+            EXPECTED="${{ github.event.client_payload.openapi_sha }}"
+          elif [[ -n "${{ inputs.openapi_sha }}" ]]; then
+            EXPECTED="${{ inputs.openapi_sha }}"
+          else
+            EXPECTED="$(sha256sum ../crowdrelay/openapi/openapi.yaml | awk '{print $1}')"
+          fi
+          echo "sha=$EXPECTED" >> "$GITHUB_OUTPUT"
+          echo "Expected OpenAPI SHA: $EXPECTED"
+
+      - name: Check if contract is already up to date
+        id: check
+        working-directory: virya-signal
+        run: |
+          set -euo pipefail
+          CURRENT=""
+          if [[ -f crates/virya-signal-contracts/crowdrelay-openapi.sha256 ]]; then
+            CURRENT="$(cat crates/virya-signal-contracts/crowdrelay-openapi.sha256 | tr -d '[:space:]')"
+          fi
+          echo "Current contract SHA: ${CURRENT:-none}"
+          if [[ "$CURRENT" == "${{ steps.sha.outputs.sha }}" ]]; then
+            echo "up_to_date=true" >> "$GITHUB_OUTPUT"
+            echo "Contract is already up to date — no PR needed"
+          else
+            echo "up_to_date=false" >> "$GITHUB_OUTPUT"
+            echo "Contract is stale — will regenerate"
+          fi
+
+      - name: Regenerate contract from CrowdRelay OpenAPI
+        if: steps.check.outputs.up_to_date == 'false'
+        working-directory: virya-signal
+        run: |
+          set -euo pipefail
+          # The generator expects crowdrelay and virya-signal as siblings.
+          # Both are checked out under $GITHUB_WORKSPACE, so run from the
+          # parent of virya-signal (i.e. $GITHUB_WORKSPACE).
+          cd ..
+          python3 virya-signal/scripts/generate-crowdrelay-fan-contract.py
+          echo "Contract regenerated successfully"
+
+      - name: Verify contract test passes with regenerated files
+        if: steps.check.outputs.up_to_date == 'false'
+        run: |
+          set -euo pipefail
+          python3 crowdrelay/scripts/test-ecosystem-contract-v2.py || {
+            echo "Contract test still fails after regeneration — schema drift requires manual review"
+            exit 1
+          }
+          echo "Contract test passes with regenerated files"
+
+      - name: Create or update PR
+        if: steps.check.outputs.up_to_date == 'false'
+        working-directory: virya-signal
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          BRANCH="auto/contract-propagate"
+          # Check if branch already exists
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "Branch $BRANCH already exists — updating"
+            git checkout "$BRANCH"
+          else
+            git checkout -b "$BRANCH"
+          fi
+          git add crates/virya-signal-contracts/src/fan_wire.generated.rs \
+                  crates/virya-signal-contracts/crowdrelay-openapi.sha256
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "auto: regenerate fan wire contract from CrowdRelay OpenAPI
+
+          OpenAPI SHA256: ${{ steps.sha.outputs.sha }}
+          Triggered by: ${{ github.event_name }}
+
+          Generated by scripts/generate-crowdrelay-fan-contract.py" || {
+            echo "No changes to commit — contract was already current"
+            exit 0
+          }
+          git push origin "$BRANCH"
+
+          PR_BODY="## Summary
+
+          - Regenerated \`fan_wire.generated.rs\` from CrowdRelay OpenAPI
+          - Updated \`crowdrelay-openapi.sha256\` lock file
+          - Contract test passes with the regenerated files
+
+          **OpenAPI SHA256:** \`${{ steps.sha.outputs.sha }}\`
+          **Trigger:** ${{ github.event_name }}
+
+          Generated with [Devin](https://devin.ai)"
+
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
+          if [[ -n "$EXISTING_PR" ]]; then
+            gh pr edit "$EXISTING_PR" --body "$PR_BODY"
+            echo "Updated existing PR #$EXISTING_PR"
+          else
+            gh pr create \
+              --head "$BRANCH" \
+              --base main \
+              --title "auto: regenerate fan wire contract from CrowdRelay OpenAPI" \
+              --body "$PR_BODY" 2>/dev/null || true
+          fi

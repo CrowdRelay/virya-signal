@@ -318,6 +318,9 @@ fn FanAccess(
     let radius_km = RwSignal::new(150_u16);
     let busy = RwSignal::new(false);
     let recovery_open = RwSignal::new(false);
+    // Email-first signup: stage 1 collects only the email, stage 2 reveals
+    // city, PIN and consent. Lower friction, same backend payload.
+    let signup_stage = RwSignal::new(1_u8);
 
     let open_latarnik = move |_| mode.set(RootMode::Latarnik);
 
@@ -566,8 +569,10 @@ fn FanAccess(
                         // no name. Asking for them anyway is what made the screen
                         // look like the link had done nothing.
                         <Show when=move || !link_pending.get()>
-                            <label>{tr("email")}<input aria-label=tr("email") type="email" autocomplete="email" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label>
-                            <label>{tr("name_optional")}<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/></label>
+                            <label>{tr("enter_email_to_start")}<input aria-label=tr("email") type="email" autocomplete="email" placeholder=tr("email_first_hint") prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label>
+                            <Show when=move || { signup_stage.get() >= 2 }>
+                                <label>{tr("name_optional")}<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/></label>
+                            </Show>
                         </Show>
                         <Show when=move || access_mode.get() == FanAccessMode::Signup fallback=move || view! {
                             <>
@@ -597,30 +602,37 @@ fn FanAccess(
                             </>
                         }>
                             <>
-                                <div class="custom-city-fields city-stable-entry">
-                                    <label>{tr("city")}<input placeholder=tr("e_g_bielawa") prop:value=move || custom_city_name.get() on:input=move |e| custom_city_name.set(event_target_value(&e))/></label>
-                                    <label>{tr("province_region_optional")}<input placeholder=tr("lower_silesia") prop:value=move || custom_region.get() on:input=move |e| custom_region.set(event_target_value(&e))/></label>
-                                    <p class="inline-note">{tr("enter_your_city_manually_we_will_match")}</p>
-                                </div>
-                                <div class="nearby-pref">
-                                    <label class="pref-row pref-row-inline"><span class="pref-row-label">{tr("notify_me_about_nearby_shows")}</span><input type="checkbox" class="pref-switch" prop:checked=move || nearby_enabled.get() on:change=move |e| nearby_enabled.set(event_target_checked(&e))/></label>
-                                    <Show when=move || nearby_enabled.get()>
-                                        <div class="radius-picker">
-                                            <button type="button" class:active=move || radius_km.get()==50 on:click=move |_| radius_km.set(50)>"50 km"</button>
-                                            <button type="button" class:active=move || radius_km.get()==100 on:click=move |_| radius_km.set(100)>"100 km"</button>
-                                            <button type="button" class:active=move || radius_km.get()==150 on:click=move |_| radius_km.set(150)>"150 km"</button>
-                                            <button type="button" class:active=move || radius_km.get()==250 on:click=move |_| radius_km.set(250)>"250 km"</button>
+                                <Show when=move || { signup_stage.get() < 2 } fallback=move || view! {
+                                    <>
+                                        <p class="signup-details-hint">{tr("signup_details_hint")}</p>
+                                        <div class="custom-city-fields city-stable-entry">
+                                            <label>{tr("city")}<input placeholder=tr("e_g_bielawa") prop:value=move || custom_city_name.get() on:input=move |e| custom_city_name.set(event_target_value(&e))/></label>
+                                            <label>{tr("province_region_optional")}<input placeholder=tr("lower_silesia") prop:value=move || custom_region.get() on:input=move |e| custom_region.set(event_target_value(&e))/></label>
+                                            <p class="inline-note">{tr("enter_your_city_manually_we_will_match")}</p>
                                         </div>
-                                    </Show>
-                                </div>
-                                <label>{tr("referral_code_optional")}<input prop:value=move || referral.get() on:input=move |e| referral.set(event_target_value(&e))/></label>
-                                <label class="pin-field">
-                                    <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
-                                    <small id="fan-signup-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
-                                    <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-signup-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e)))/>
-                                </label>
-                                <div class="pref-list"><label class="pref-row"><span class="pref-row-label">{tr("i_want_to_receive_information_about_virya")}</span><input type="checkbox" class="pref-switch" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/></label></div>
-                                <button class="primary" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=signup>{tr("join_signal")}</button>
+                                        <div class="nearby-pref">
+                                            <label class="pref-row pref-row-inline"><span class="pref-row-label">{tr("notify_me_about_nearby_shows")}</span><input type="checkbox" class="pref-switch" prop:checked=move || nearby_enabled.get() on:change=move |e| nearby_enabled.set(event_target_checked(&e))/></label>
+                                            <Show when=move || nearby_enabled.get()>
+                                                <div class="radius-picker">
+                                                    <button type="button" class:active=move || radius_km.get()==50 on:click=move |_| radius_km.set(50)>"50 km"</button>
+                                                    <button type="button" class:active=move || radius_km.get()==100 on:click=move |_| radius_km.set(100)>"100 km"</button>
+                                                    <button type="button" class:active=move || radius_km.get()==150 on:click=move |_| radius_km.set(150)>"150 km"</button>
+                                                    <button type="button" class:active=move || radius_km.get()==250 on:click=move |_| radius_km.set(250)>"250 km"</button>
+                                                </div>
+                                            </Show>
+                                        </div>
+                                        <label>{tr("referral_code_optional")}<input prop:value=move || referral.get() on:input=move |e| referral.set(event_target_value(&e))/></label>
+                                        <label class="pin-field">
+                                            <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
+                                            <small id="fan-signup-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
+                                            <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-signup-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e)))/>
+                                        </label>
+                                        <div class="pref-list"><label class="pref-row"><span class="pref-row-label">{tr("i_want_to_receive_information_about_virya")}</span><input type="checkbox" class="pref-switch" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/></label></div>
+                                        <button class="primary" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=signup>{tr("join_signal")}</button>
+                                    </>
+                                }>
+                                    <button class="primary" disabled=move || busy.get() || email.get().trim().is_empty() on:click=move |_| signup_stage.set(2)>{tr("continue_to_details")}</button>
+                                </Show>
                             </>
                         </Show>
                     </div>

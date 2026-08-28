@@ -6,8 +6,13 @@
     <meta name="theme-color" content="#080808" />
     <meta name="color-scheme" content="dark" />
     <title>Virya Signal</title>
+    <link rel="preconnect" href="https://signal-api.virya.music" />
+    <link rel="dns-prefetch" href="https://signal-api.virya.music" />
+    <link rel="preconnect" href="https://cdn.virya.music" crossorigin />
+    <link rel="dns-prefetch" href="https://cdn.virya.music" />
     <style>
-      #boot-splash{position:fixed;inset:0;z-index:2147483647;display:grid;place-content:center;justify-items:center;gap:9px;padding:24px;background:radial-gradient(circle at 50% 35%,#122724 0,#080808 38%);color:#f5f5ef;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;text-align:center;transition:opacity .18s ease}
+      #boot-splash{position:fixed;inset:0;z-index:2147483647;display:grid;place-content:center;justify-items:center;gap:9px;padding:24px;background:radial-gradient(circle at 50% 35%,#122724 0,#080808 38%);color:#f5f5ef;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;text-align:center;transition:opacity .18s ease;animation:boot-bg-shift 4s ease-in-out infinite alternate}
+      @keyframes boot-bg-shift{to{background:radial-gradient(circle at 50% 35%,#16302b 0,#080808 38%)}}
       #boot-splash[aria-hidden="true"]{opacity:0;pointer-events:none}
       .boot-signal{height:36px;display:flex;align-items:center;gap:5px}
       .boot-signal i{display:block;width:4px;border-radius:2px;background:#93c6c0;box-shadow:0 0 10px #93c6c0aa,0 0 28px #93c6c055;animation:boot-pulse .8s ease-in-out infinite alternate;transform-origin:center}
@@ -20,6 +25,57 @@
       #boot-retry[hidden]{display:none}
       @keyframes boot-pulse{to{opacity:.3;transform:scaleY(.55)}}
       @media(prefers-reduced-motion:reduce){.boot-signal i{animation:none}}
+    </style>
+    <!-- Critical above-the-fold CSS: renders the app shell, topbar, bottom-nav,
+         skeleton and base typography before the deferred stylesheet activates.
+         Kept in sync with styles.css by scripts/extract-critical-css.py. -->
+    <style id="critical-css">
+      :root{color-scheme:dark;--bg:#070908;--surface:#101715;--surface-2:#16201d;--line:#27322f;--muted:#98a5a0;--bg-raised:#0b100f;--text:#eef4f1;--signal:#84b4ac;--signal-hot:#93c6c0;--signal-deep:#26655d;--control-radius:6px;--type-micro:12px;--type-meta:13px;--type-body:15px;--touch-min:44px;--safe-bottom:env(safe-area-inset-bottom,0px);--blur-surface:blur(12px) saturate(1.2);--dur-fast:.15s;--dur-med:.25s;--ease-out:cubic-bezier(.16,1,.3,1);--spring:cubic-bezier(.34,1.56,.64,1);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+      *{box-sizing:border-box}
+      html,body,#root{min-height:100%;margin:0;background:var(--bg)}
+      body{overflow-x:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent}
+      button,input,textarea,select,a{font:inherit}
+      button,input,textarea,select{min-height:var(--touch-min)}
+      button,a{touch-action:manipulation}
+      button{cursor:pointer}
+      button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--signal-hot);outline-offset:2px;border-radius:2px}
+      a{color:inherit;text-decoration:none}
+      .app-shell{min-height:100dvh;background:linear-gradient(180deg,rgba(16,23,21,.34),transparent 260px),var(--bg)}
+      .authenticated{min-height:100dvh;padding-bottom:calc(98px + var(--safe-bottom))}
+      .topbar{position:sticky;z-index:20;top:0;display:flex;align-items:center;justify-content:space-between;padding:max(16px,env(safe-area-inset-top)) 18px 14px;border-bottom:1px solid rgba(39,50,47,.5);background:rgba(7,9,8,.72);backdrop-filter:var(--blur-surface);-webkit-backdrop-filter:var(--blur-surface)}
+      @supports not (backdrop-filter:blur(12px)){.topbar{background:rgba(7,9,8,.985);border-bottom-color:rgba(39,50,47,.82)}}
+      .topbar strong{display:block;margin-top:4px;font-size:15px}
+      .topbar-actions{display:flex;align-items:center;gap:10px}
+      .topbar-actions button{width:44px;height:44px;border:1px solid var(--line);border-radius:var(--control-radius);background:#111;color:#999;font-size:18px}
+      .content{max-width:760px;margin:auto}
+      .screen{padding:22px 20px 48px}
+      .screen-title{margin-bottom:20px}
+      .screen-title h2{margin:6px 0 0;font-size:clamp(32px,9vw,44px);line-height:.92;letter-spacing:-.052em;text-transform:uppercase;text-wrap:balance}
+      .eyebrow{margin:0;color:var(--signal-hot);font-weight:850;letter-spacing:.28em;font-size:12px;line-height:1.2;text-transform:uppercase}
+      .bottom-nav{position:fixed;z-index:40;left:0;right:0;bottom:0;height:calc(80px + var(--safe-bottom));padding:4px 6px var(--safe-bottom);display:grid;gap:2px;background:rgba(7,9,8,.72);backdrop-filter:var(--blur-surface);-webkit-backdrop-filter:var(--blur-surface);border-top:1px solid rgba(39,50,47,.5)}
+      @supports not (backdrop-filter:blur(12px)){.bottom-nav{background:rgba(7,9,8,.97);border-top-color:var(--line)}}
+      .bottom-nav.four{grid-template-columns:repeat(4,1fr)}
+      .bottom-nav button{min-width:0;min-height:68px;border:0;border-radius:2px;background:transparent;color:var(--muted);display:grid;place-content:center;justify-items:center;gap:5px;padding:7px 4px;transition:color .15s,background .15s,transform .1s}
+      .bottom-nav button:active{transform:scale(.96)}
+      .bottom-nav button.active{color:var(--signal-hot);background:rgba(132,180,172,.045);box-shadow:inset 0 2px 0 var(--signal-hot),0 -4px 16px rgba(147,198,192,.08);animation:nav-activate var(--dur-fast) var(--spring)}
+      @keyframes nav-activate{0%{transform:scale(.92)}60%{transform:scale(1.04)}100%{transform:scale(1)}}
+      .nav-icon{width:31px;height:31px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;overflow:visible}
+      .bottom-nav.primary-four .nav-icon{width:35px;height:35px}
+      .bottom-nav.primary-four small{font-size:var(--type-meta)}
+      .bottom-nav small{font-size:var(--type-micro);font-weight:850;letter-spacing:.045em;line-height:1}
+      .skeleton-stack{display:grid;gap:9px}
+      .skeleton-stack i{display:block;height:82px;contain:strict;background:linear-gradient(90deg,#1b1b19 25%,#252523 50%,#1b1b19 75%);background-size:200% 100%;animation:skeleton-shimmer 1.5s ease-in-out infinite}
+      @keyframes skeleton-shimmer{to{background-position:-200% 0}}
+      .tab-page[hidden]{display:none}
+      .tab-page.hidden{display:none}
+      .tab-page.tab-active{animation:tab-enter var(--dur-med) var(--ease-out)}
+      @keyframes tab-enter{from{opacity:0;transform:translateX(8px)}}
+      .fade-in{animation:fade-in var(--dur-med) var(--ease-out)}
+      @keyframes fade-in{from{opacity:0;transform:translateY(4px)}}
+      .primary{border:0;border-radius:2px;background:var(--signal-hot);color:#07100e;min-height:50px;padding:14px 18px;font-weight:950;letter-spacing:.08em;transition:opacity .15s,transform .1s;position:relative;overflow:hidden}
+      .primary:active:not(:disabled){transform:scale(.97)}
+      button:disabled{opacity:.48;cursor:default}
+      @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;scroll-behavior:auto !important;transition-duration:.01ms !important}}
     </style>
     <!-- The inline splash owns first paint. App styles load in parallel and are
          activated by boot.js well before the larger WASM module can mount. -->

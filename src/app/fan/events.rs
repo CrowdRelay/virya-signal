@@ -41,7 +41,7 @@ fn FanEvents(
                 if events.is_empty() {
                     view! { <div class="empty-state"><strong>{tr("no_shows_in_the_calendar")}</strong><p>{tr("new_events_will_appear_here_2")}</p></div> }.into_any()
                 } else {
-                    view! { <div class="card-list fan-event-list">{events.into_iter().map(|event| view! { <FanEventCard event=event checkout_event=checkout_event dashboard=dashboard error=error /> }).collect_view()}</div> }.into_any()
+                    view! { <div class="card-list fan-event-list">{events.into_iter().enumerate().map(|(i, event)| view! { <div style=format!("--stagger:{}", i.min(7))><FanEventCard event=event checkout_event=checkout_event dashboard=dashboard error=error /></div> }).collect_view()}</div> }.into_any()
                 }
             }}
         </section>
@@ -163,6 +163,7 @@ fn FanEventCard(
     let description = event.description;
     let title = event.title;
     let image_alt = i18n::format("virya_show", std::slice::from_ref(&title));
+    let image_loaded = RwSignal::new(false);
     view! {
         <article class="fan-event-card">
             {image.map(|url| view! {
@@ -175,6 +176,8 @@ fn FanEventCard(
                     decoding="async"
                     fetchpriority="low"
                     referrerpolicy="no-referrer"
+                    class:loaded=move || image_loaded.get()
+                    on:load=move |_| image_loaded.set(true)
                 />
             })}
             <div class="fan-event-body">
@@ -406,7 +409,7 @@ fn FanTicketSale(
     let selected_count = Signal::derive(move || checkout_count(quantities));
     let gross_offer = offer.clone();
     let selected_gross = Signal::derive(move || checkout_gross(&gross_offer, quantities));
-    let purchase_slug = event_slug.clone();
+    let purchase_slug = RwSignal::new(event_slug.clone());
 
     let purchase = move |_| {
         if busy.get_untracked() || pending_checkout.get_untracked().is_some() {
@@ -423,7 +426,7 @@ fn FanTicketSale(
         }
         let name = buyer_name.get_untracked().trim().to_owned();
         let input = TicketCheckoutInput {
-            event_slug: purchase_slug.clone(),
+            event_slug: purchase_slug.get_untracked(),
             buyer_name: (!name.is_empty()).then_some(name),
             items,
         };
@@ -488,10 +491,16 @@ fn FanTicketSale(
         });
     };
 
-    let currency_for_total = offer.currency.clone();
     let purchase_disabled = Signal::derive(move || {
         busy.get() || selected_count.get() == 0 || pending_checkout.get().is_some()
     });
+    // Progressive checkout: step 1 = tickets, step 2 = details, step 3 = payment.
+    // A sticky summary bar shows the running total at every step.
+    let checkout_step = RwSignal::new(1_u8);
+    let can_continue_to_details = Signal::derive(move || selected_count.get() > 0 && !busy.get());
+    // Currency travels in a RwSignal so multiple Show blocks can read it
+    // without moving a String into their FnOnce children closures.
+    let currency_signal = RwSignal::new(offer.currency.clone());
     view! {
         <div class="ticket-sale-summary">
             <div><strong>{sale_available}</strong><span>{tr("available_label")}</span></div>
@@ -499,64 +508,102 @@ fn FanTicketSale(
             <div><strong>{sale_sold}</strong><span>{tr("sold")}</span></div>
         </div>
         <p class="checkout-state-copy">{state_copy}</p>
-        <div class="ticket-type-list">
-            {ticket_types.into_iter().map(|ticket_type| {
-                let quantity_slug = ticket_type.slug.clone();
-                let decrement_slug = ticket_type.slug.clone();
-                let increment_slug = ticket_type.slug.clone();
-                let available = ticket_type.available.max(0) as u32;
-                let currency = offer.currency.clone();
-                let quantity = Signal::derive(move || checkout_quantity(quantities, &quantity_slug));
-                let decrement_disabled = Signal::derive(move || quantity.get() == 0);
-                let increment_disabled = Signal::derive(move || {
-                    quantity.get() >= available || selected_count.get() >= max_per_order
-                });
-                let decrement = move |_| {
-                    let current = checkout_quantity(quantities, &decrement_slug);
-                    set_checkout_quantity(
-                        quantities,
-                        &decrement_slug,
-                        current.saturating_sub(1),
-                        available,
-                        max_per_order,
-                    );
-                };
-                let increment = move |_| {
-                    let current = checkout_quantity(quantities, &increment_slug);
-                    set_checkout_quantity(
-                        quantities,
-                        &increment_slug,
-                        current.saturating_add(1),
-                        available,
-                        max_per_order,
-                    );
-                };
-                view! {
-                    <article class="ticket-type-card">
-                        <div>
-                            <h3>{ticket_type.name}</h3>
-                            {ticket_type.description.map(|description| view! { <p>{description}</p> })}
-                            <strong>{money(ticket_type.price_gross_minor, &currency)}</strong>
-                            <small>{i18n::format("available", &[ticket_type.available.max(0).to_string()])}</small>
-                        </div>
-                        <div class="ticket-stepper" role="group" aria-label=tr("ticket_quantity")>
-                            <button type="button" aria-label=tr("decrease_ticket_quantity") on:click=decrement disabled=move || decrement_disabled.get()>"−"</button>
-                            <output aria-live="polite">{move || quantity.get()}</output>
-                            <button type="button" aria-label=tr("increase_ticket_quantity") on:click=increment disabled=move || increment_disabled.get()>"+"</button>
-                        </div>
-                    </article>
-                }
-            }).collect_view()}
+        // Step indicator
+        <div class="checkout-steps">
+            <span class:active=move || { checkout_step.get() == 1 }>{tr("checkout_step_tickets")}</span>
+            <span class:active=move || { checkout_step.get() == 2 }>{tr("checkout_step_details")}</span>
+            <span class:active=move || { checkout_step.get() == 3 }>{tr("checkout_step_payment")}</span>
         </div>
-        <div class="ticket-buyer-panel">
-            <label>{tr("name_on_the_order_optional")}<input autocomplete="name" maxlength="160" prop:value=move || buyer_name.get() on:input=move |event| buyer_name.set(event_target_value(&event))/></label>
-            <p>{move || status.get().session.map(|profile| i18n::format("tickets_and_confirmation_will_be_sent_to", std::slice::from_ref(&profile.email))).value_or_else(|| tr("tickets_will_be_sent_to_the_fan").to_owned())}</p>
-            <ExternalLink url=full_form_url label=tr("invoice_full_form") error=error />
-        </div>
-        <footer class="ticket-checkout-total">
+        // Step 1: Ticket selection
+        <Show when=move || { checkout_step.get() == 1 }>
+            <div class="ticket-type-list">
+                {ticket_types.iter().map(|ticket_type| {
+                    let quantity_slug = ticket_type.slug.clone();
+                    let decrement_slug = ticket_type.slug.clone();
+                    let increment_slug = ticket_type.slug.clone();
+                    let available = ticket_type.available.max(0) as u32;
+                    let currency = offer.currency.clone();
+                    let quantity = Signal::derive(move || checkout_quantity(quantities, &quantity_slug));
+                    let decrement_disabled = Signal::derive(move || quantity.get() == 0);
+                    let increment_disabled = Signal::derive(move || {
+                        quantity.get() >= available || selected_count.get() >= max_per_order
+                    });
+                    let decrement = move |_| {
+                        let current = checkout_quantity(quantities, &decrement_slug);
+                        set_checkout_quantity(
+                            quantities,
+                            &decrement_slug,
+                            current.saturating_sub(1),
+                            available,
+                            max_per_order,
+                        );
+                    };
+                    let increment = move |_| {
+                        let current = checkout_quantity(quantities, &increment_slug);
+                        set_checkout_quantity(
+                            quantities,
+                            &increment_slug,
+                            current.saturating_add(1),
+                            available,
+                            max_per_order,
+                        );
+                    };
+                    let name = ticket_type.name.clone();
+                    let description = ticket_type.description.clone();
+                    let price_gross_minor = ticket_type.price_gross_minor;
+                    let available_count = ticket_type.available.max(0);
+                    view! {
+                        <article class="ticket-type-card">
+                            <div>
+                                <h3>{name}</h3>
+                                {description.map(|description| view! { <p>{description}</p> })}
+                                <strong>{money(price_gross_minor, &currency)}</strong>
+                                <small>{i18n::format("available", &[available_count.to_string()])}</small>
+                            </div>
+                            <div class="ticket-stepper" role="group" aria-label=tr("ticket_quantity")>
+                                <button type="button" aria-label=tr("decrease_ticket_quantity") on:click=decrement disabled=move || decrement_disabled.get()>"−"</button>
+                                <output aria-live="polite">{move || quantity.get()}</output>
+                                <button type="button" aria-label=tr("increase_ticket_quantity") on:click=increment disabled=move || increment_disabled.get()>"+"</button>
+                            </div>
+                        </article>
+                    }
+                }).collect_view()}
+            </div>
+        </Show>
+        // Step 2: Buyer details
+        <Show when=move || { checkout_step.get() == 2 }>
+            <div class="ticket-buyer-panel">
+                <label>{tr("name_on_the_order_optional")}<input autocomplete="name" maxlength="160" prop:value=move || buyer_name.get() on:input=move |event| buyer_name.set(event_target_value(&event))/></label>
+                <p>{move || status.get().session.map(|profile| i18n::format("tickets_and_confirmation_will_be_sent_to", std::slice::from_ref(&profile.email))).value_or_else(|| tr("tickets_will_be_sent_to_the_fan").to_owned())}</p>
+                <ExternalLink url=full_form_url.clone() label=tr("invoice_full_form") error=error />
+            </div>
+        </Show>
+        // Step 3: Payment review
+        <Show when=move || { checkout_step.get() == 3 }>
+            <div class="checkout-review">
+                <h3>{tr("checkout_review")}</h3>
+                <div><span>{tr("selected_tickets")}</span><strong>{move || selected_count.get()}</strong></div>
+                <div><span>{tr("gross_total")}</span><strong>{move || money(selected_gross.get(), &currency_signal.get())}</strong></div>
+            </div>
+        </Show>
+        // Sticky summary bar — visible at all steps
+        <footer class="ticket-checkout-total ticket-checkout-sticky">
             <div><span>{tr("selected_tickets")}</span><strong>{move || selected_count.get()}</strong></div>
-            <div><span>{tr("gross_total")}</span><strong>{move || money(selected_gross.get(), &currency_for_total)}</strong></div>
-            <button type="button" class="primary" on:click=purchase disabled=move || purchase_disabled.get()>{move || if busy.get() { tr("reserving") } else if pending_checkout.get().is_some() { tr("order_saved") } else { tr("continue_to_stripe_payment") }}</button>
+            <div><span>{tr("gross_total")}</span><strong>{move || money(selected_gross.get(), &currency_signal.get())}</strong></div>
+            // Step 1: Continue to details
+            <Show when=move || { checkout_step.get() == 1 }>
+                <button type="button" class="primary" on:click=move |_| checkout_step.set(2) disabled=move || !can_continue_to_details.get()>{tr("checkout_continue_to_details")}</button>
+            </Show>
+            // Step 2: Back + Continue to payment
+            <Show when=move || { checkout_step.get() == 2 }>
+                <button type="button" class="ghost" on:click=move |_| checkout_step.set(1)>{tr("checkout_back")}</button>
+                <button type="button" class="primary" on:click=move |_| checkout_step.set(3)>{tr("checkout_continue_to_payment")}</button>
+            </Show>
+            // Step 3: Back + Pay
+            <Show when=move || { checkout_step.get() == 3 }>
+                <button type="button" class="ghost" on:click=move |_| checkout_step.set(2)>{tr("checkout_back")}</button>
+                <button type="button" class="primary" on:click=purchase disabled=move || purchase_disabled.get()>{move || if busy.get() { tr("reserving") } else if pending_checkout.get().is_some() { tr("order_saved") } else { tr("continue_to_stripe_payment") }}</button>
+            </Show>
             <Show when=move || pending_checkout.get().is_some()>
                 <button type="button" class="ghost checkout-retry" on:click=retry_payment>{tr("reopen_payment")}</button>
             </Show>

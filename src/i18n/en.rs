@@ -1295,6 +1295,42 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "affiliate_section_aria" => "VIRYA gear and Thomann affiliate links",
         "affiliate_title" => "Gear we actually use",
         "affiliate_used_live" => "USED LIVE",
+        // ── Three-tier priority dashboard + FanHomeBanner ──
+        "tier_priority" => "PRIORITY",
+        "tier_active" => "ACTIVE",
+        "tier_background" => "BACKGROUND",
+        "next_best_action" => "NEXT ACTION",
+        "action_continue_synesthesia" => "Continue your Synesthesia journey",
+        "action_open_wallet" => "Open your ticket wallet",
+        "action_open_live_event" => "Show is live — open event",
+        "action_share_post_show_feedback" => "Share your post-show feedback",
+        "action_get_ticket" => "Get a ticket for the next show",
+        "action_follow_next_event" => "Follow the next show",
+        "action_explore_signal" => "Explore what Signal can do",
+        "action_unknown" => "Explore your Signal",
+        "counts_interests" => "Following",
+        "counts_passes" => "Passes",
+        "counts_orders" => "Tickets",
+        "counts_claims" => "AREA claims",
+        // ── Email-first signup ──
+        "enter_email_to_start" => "Enter your email to start",
+        "email_first_hint" => "We'll send you a confirmation link. The rest takes 30 seconds.",
+        "continue_to_details" => "Continue",
+        "signup_details_hint" => "One more step — pick your city and a PIN.",
+        // ── Always-visible referral ──
+        "referral_preview" => {
+            "Refer a friend → 10% merch discount for you both. More referrals unlock draws and physical rewards."
+        }
+        "referral_code_loading" => "Loading your code…",
+        "referral_share_label" => "Share via",
+        // ── Progressive checkout ──
+        "checkout_step_tickets" => "1. Tickets",
+        "checkout_step_details" => "2. Details",
+        "checkout_step_payment" => "3. Payment",
+        "checkout_review" => "Review your order",
+        "checkout_continue_to_details" => "Continue to details",
+        "checkout_continue_to_payment" => "Continue to payment",
+        "checkout_back" => "Back",
         _ => key,
     }
 }

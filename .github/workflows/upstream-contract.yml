@@ -47,4 +47,21 @@ jobs:
           persist-credentials: false
 
       - name: Verify Signal against current upstream capabilities and schema
+        id: contract
         run: python3 crowdrelay/scripts/test-ecosystem-contract-v2.py
+
+      # If the scheduled/polling check detects drift, trigger the
+      # contract-propagate workflow to auto-regenerate and open a PR.
+      # This only runs on the default branch (not on PRs — a PR failing
+      # the contract test is the developer's signal to fix it manually).
+      - name: Trigger auto-regeneration on drift
+        if: failure() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          OPENAPI_SHA="$(sha256sum crowdrelay/openapi/openapi.yaml | awk '{print $1}')"
+          echo "Contract drift detected on polling check — triggering contract-propagate"
+          gh workflow run contract-propagate.yml \
+            -f openapi_sha="$OPENAPI_SHA" \
+            || echo "WARN: could not trigger contract-propagate workflow"

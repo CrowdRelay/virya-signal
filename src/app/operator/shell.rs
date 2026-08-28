@@ -177,28 +177,28 @@ fn OperatorApp(
                 </nav>
             </Show>
             <div class="content">
-                <div class="tab-page" hidden=move || tab.get() != OperatorTab::Home>
+                <div class="tab-page" class:hidden=move || tab.get() != OperatorTab::Home class:tab-active=move || tab.get() == OperatorTab::Home>
                     <OperatorHome dashboard=dashboard loading=loading />
                 </div>
-                <div class="tab-page" hidden=move || tab.get() != OperatorTab::Signal>
+                <div class="tab-page" class:hidden=move || tab.get() != OperatorTab::Signal class:tab-active=move || tab.get() == OperatorTab::Signal>
                     <OperatorSignal overview=signal_overview loading=signal_loading owner=owner error=error />
                 </div>
                 <Show when=move || tab.get() == OperatorTab::Scan>
                     <Scanner dashboard=dashboard loading=loading error=error />
                 </Show>
-                <div class="tab-page" hidden=move || tab.get() != OperatorTab::Tickets>
+                <div class="tab-page" class:hidden=move || tab.get() != OperatorTab::Tickets class:tab-active=move || tab.get() == OperatorTab::Tickets>
                     <Tickets dashboard=dashboard loading=loading error=error owner=owner />
                 </div>
-                <div class="tab-page" hidden=move || tab.get() != OperatorTab::Discounts>
+                <div class="tab-page" class:hidden=move || tab.get() != OperatorTab::Discounts class:tab-active=move || tab.get() == OperatorTab::Discounts>
                     <Discounts error=error />
                 </div>
-                <div class="tab-page" hidden=move || tab.get() != OperatorTab::Campaigns>
+                <div class="tab-page" class:hidden=move || tab.get() != OperatorTab::Campaigns class:tab-active=move || tab.get() == OperatorTab::Campaigns>
                     <Campaigns dashboard=dashboard loading=loading error=error />
                 </div>
-                <div class="tab-page" hidden=move || tab.get() != OperatorTab::Checklist>
+                <div class="tab-page" class:hidden=move || tab.get() != OperatorTab::Checklist class:tab-active=move || tab.get() == OperatorTab::Checklist>
                     <OperatorChecklist dashboard=dashboard loading=loading push_target=push_target error=error />
                 </div>
-                <div class="tab-page" hidden=move || tab.get() != OperatorTab::Settings>
+                <div class="tab-page" class:hidden=move || tab.get() != OperatorTab::Settings class:tab-active=move || tab.get() == OperatorTab::Settings>
                     <OperatorSettings status=status dashboard=dashboard loading=loading error=error />
                 </div>
             </div>
@@ -294,7 +294,7 @@ fn OperatorHome(
                         {if events.is_empty() {
                             view! { <div class="empty-state"><strong>{tr("no_upcoming_shows")}</strong><p>{tr("new_events_will_appear_here")}</p></div> }.into_any()
                         } else {
-                            view! { <div class="card-list">{events.into_iter().map(|event| view! { <EventCard event=event /> }).collect_view()}</div> }.into_any()
+                            view! { <div class="card-list">{events.into_iter().enumerate().map(|(i, event)| view! { <div style=format!("--stagger:{}", i.min(7))><EventCard event=event /></div> }).collect_view()}</div> }.into_any()
                         }}
                     }
                 }.into_any())).value_or_else(|| view! { <Skeleton /> }.into_any())}
