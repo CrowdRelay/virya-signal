@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use crate::{
     AppError,
     models::{CitySignal, MerchCatalog, PublicEvent},
-    util::OptionValueOrExt,
 };
 
 pub(super) const MAX_PUBLIC_EVENTS: usize = 100;
@@ -24,6 +23,26 @@ pub(super) const MAX_CACHE_ORIGINS: usize = 8;
 const PUBLIC_CACHE_VERSION: u8 = 1;
 const MAX_FUTURE_CLOCK_SKEW: Duration = Duration::from_secs(5 * 60);
 pub(super) const MAX_DISK_CACHE_BYTES: u64 = 2 * 1024 * 1024;
+
+/// Process start time, used to clamp disk-restored cache ages.
+///
+/// On a cold start, `Instant::now()` is near zero. If a disk snapshot's
+/// wall-clock age exceeds the process uptime, `Instant::now() - age`
+/// underflows. We clamp to process start so restored entries are treated
+/// as stale (max possible age) instead of fresh.
+static PROCESS_START: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+
+/// Returns the `Instant` at process start (lazily captured on first call).
+pub(super) fn process_start() -> Instant {
+    *PROCESS_START.get_or_init(Instant::now)
+}
+
+/// Computes `fetched_at` for a disk-restored cache entry, clamping the age
+/// to process uptime so the entry is never treated as fresher than it is.
+pub(super) fn restored_fetched_at(age: Duration) -> Instant {
+    let now = Instant::now();
+    now.checked_sub(age).unwrap_or(process_start())
+}
 
 pub(super) struct CacheEntry<T> {
     pub value: T,
@@ -201,7 +220,6 @@ fn restore_entries<T>(
     max_age: Duration,
 ) -> HashMap<String, CacheEntry<T>> {
     let now_unix = unix_now();
-    let now = Instant::now();
     let mut entries = entries
         .into_iter()
         .filter_map(|(key, entry)| {
@@ -222,7 +240,7 @@ fn restore_entries<T>(
                 key,
                 CacheEntry {
                     value: entry.value,
-                    fetched_at: now.checked_sub(age).value_or(now),
+                    fetched_at: restored_fetched_at(age),
                     stored_at_unix_secs: entry.stored_at_unix_secs,
                     etag: entry.etag,
                     last_modified: entry.last_modified,

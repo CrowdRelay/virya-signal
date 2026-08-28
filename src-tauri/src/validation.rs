@@ -148,6 +148,8 @@ pub(crate) fn validate_campaign(input: &mut CreateQrCampaignInput) -> Result<(),
         || input.label.chars().count() > 100
         || input.valid_from.len() > 64
         || input.valid_until.len() > 64
+        || !valid_iso_timestamp(&input.valid_from)
+        || !valid_iso_timestamp(&input.valid_until)
         || input.valid_until.as_str() <= input.valid_from.as_str()
         || input.max_checkins == Some(0)
     {
@@ -156,6 +158,23 @@ pub(crate) fn validate_campaign(input: &mut CreateQrCampaignInput) -> Result<(),
         ));
     }
     Ok(())
+}
+
+/// Validates that a string is a well-formed ISO 8601 / RFC 3339 timestamp.
+/// This ensures lexicographic string comparison of two timestamps matches
+/// chronological order, which `validate_campaign` relies on. Without this,
+/// inconsistent formats like "2024-3-5" compare incorrectly against
+/// "2024-12-01" (the former sorts after the latter because '3' > '1').
+fn valid_iso_timestamp(value: &str) -> bool {
+    if value.is_empty() {
+        return false;
+    }
+    // Accept RFC 3339: YYYY-MM-DDTHH:MM:SS with optional fractional seconds
+    // and timezone offset (Z or ±HH:MM). We require the full date+time form
+    // because a bare date ("2024-03-15") would also sort correctly, but the
+    // server expects a timestamp and rejecting early is safer than sending
+    // an ambiguous value.
+    time::OffsetDateTime::parse(value, &time::format_description::well_known::Rfc3339).is_ok()
 }
 
 /// New operator PINs are intentionally short, numeric and usable at the gate.
@@ -389,5 +408,18 @@ mod tests {
         );
         assert_eq!(clean_optional(Some("   ".into())), None);
         assert_eq!(clean_optional(None), None);
+    }
+
+    #[test]
+    fn iso_timestamp_validation_accepts_rfc3339_and_rejects_ambiguous_formats() {
+        assert!(valid_iso_timestamp("2024-03-15T00:00:00Z"));
+        assert!(valid_iso_timestamp("2024-03-15T19:30:00+02:00"));
+        assert!(valid_iso_timestamp("2024-12-31T23:59:59.999Z"));
+        // Bare dates and inconsistent formats must be rejected so string
+        // comparison stays chronologically correct.
+        assert!(!valid_iso_timestamp("2024-03-15"));
+        assert!(!valid_iso_timestamp("2024-3-5"));
+        assert!(!valid_iso_timestamp(""));
+        assert!(!valid_iso_timestamp("not-a-date"));
     }
 }

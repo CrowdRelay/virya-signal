@@ -17,7 +17,7 @@ use crate::{
 };
 
 use super::{
-    cache::{self, CacheEntry},
+    cache::{self, CacheEntry, restored_fetched_at},
     client::{FAN_COOKIE, FAN_HOME_CACHE_TTL, FAN_HOME_STALE_TTL},
     http::{
         MAX_TOKEN_BYTES, bounded_required, decode, endpoint, normalized_optional, response_cookie,
@@ -116,8 +116,7 @@ impl super::CrowdRelayClient {
         }
         home.stale = true;
         let effective_age = age.max(FAN_HOME_CACHE_TTL);
-        let now = Instant::now();
-        let fetched_at = now.checked_sub(effective_age).unwrap_or(now);
+        let fetched_at = restored_fetched_at(effective_age);
         let key = fan_home_key(profile);
         let mut cache_map = self.fan_home_cache.write().await;
         cache::prune_cache(&mut cache_map, FAN_HOME_STALE_TTL);
