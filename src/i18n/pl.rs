@@ -290,6 +290,22 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "shows_near_you" => " koncerty blisko Ciebie",
         "tickets_and_qr_codes_on_your_phone" => " bilety i QR w telefonie",
         "rewards_for_simple_actions" => " nagrody za proste akcje",
+        "benefit_shows_title" => "Koncerty blisko Ciebie",
+        "benefit_shows_desc" => {
+            " Odkryj koncerty metalowe w Twojej okolicy, dobierane przez ludzi, którzy naprawdę słuchają."
+        }
+        "benefit_tickets_title" => "Bilety i QR w telefonie",
+        "benefit_tickets_desc" => {
+            " Bez papieru, bez zrzutów ekranu. Twój bilet żyje w aplikacji, gotowy przy wejściu."
+        }
+        "benefit_rewards_title" => "Nagrody za realne akcje",
+        "benefit_rewards_desc" => {
+            " Zdobywaj zniżki na merch, wejścia do losowań i ekskluzywne treści przez uczestnictwo."
+        }
+        "benefit_referrals_title" => "Nieś Sygnał",
+        "benefit_referrals_desc" => {
+            " Zaproś ludzi, którym naprawdę może zależeć, i zdobywaj nagrody, gdy się pojawiają."
+        }
         "get_started" => "ZACZYNAM",
         "i_have_a_code" => "MAM KOD",
         "email" => "E-mail",

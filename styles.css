@@ -28,9 +28,21 @@
   --shadow-lg: 0 8px 28px rgba(0,0,0,.45);
   --shadow-glow: 0 0 20px rgba(147,198,192,.15);
   --blur-surface: blur(12px) saturate(1.2);
+  --blur-strong: blur(20px) saturate(1.3);
+  --blur-subtle: blur(8px) saturate(1.1);
+  --glass-bg: rgba(16,23,21,.72);
+  --glass-bg-strong: rgba(11,16,15,.85);
+  --glass-bg-inner: rgba(22,32,29,.55);
+  --glass-bg-input: rgba(8,12,11,.65);
+  --glass-border: rgba(39,50,47,.5);
+  --glass-border-subtle: rgba(39,50,47,.3);
+  --glass-glow: 0 0 24px rgba(132,180,172,.08);
+  --shadow-glass: 0 8px 32px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.03);
+  --shadow-glass-sm: 0 4px 16px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.02);
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
+  --radius-xl: 18px;
   --spring: cubic-bezier(.34,1.56,.64,1);
   --ease-out: cubic-bezier(.16,1,.3,1);
   --dur-fast: .15s;
@@ -112,7 +124,7 @@ button:disabled { opacity: .48; cursor: default; }
 .lock-copy { margin: 0 0 5px; color: #aaa; line-height: 1.5; }
 .staff-gate-screen { background: linear-gradient(180deg, rgba(132,180,172,.08), transparent 260px), var(--bg); }
 .staff-gate-hero { margin-bottom: 18px; }
-.staff-gate-card { display: grid; gap: 16px; border-color: var(--line); }
+.staff-gate-card { display: grid; gap: 16px; border-color: var(--glass-border); background: var(--glass-bg-strong); backdrop-filter: var(--blur-strong); -webkit-backdrop-filter: var(--blur-strong); box-shadow: var(--shadow-glass); }
 .staff-gate-card h2 { margin: 5px 0 8px; font-size: 24px; text-transform: uppercase; letter-spacing: -.035em; }
 .staff-gate-card p { margin: 0; color: #999; line-height: 1.55; }
 .staff-gate-lock { width: 58px; height: 58px; border: 1px solid var(--signal-deep); border-radius: 6px; background: var(--bg-raised); color: var(--signal-hot); display: grid; place-content: center; font-size: 30px; }
@@ -133,7 +145,7 @@ button:disabled { opacity: .48; cursor: default; }
 .screen { padding: 22px 20px 48px; }
 .screen-title { margin-bottom: 20px; }
 .screen-title h2 { margin: 6px 0 0; font-size: clamp(32px, 9vw, 44px); line-height: .92; letter-spacing: -.052em; text-transform: uppercase; text-wrap: balance; }
-.hero-card { min-height: 176px; display: flex; flex-direction: column; justify-content: end; padding: 22px; border: 1px solid var(--line); background: linear-gradient(145deg, rgba(132,180,172,.08), var(--surface) 64%); position: relative; overflow: hidden; box-shadow: var(--shadow-lg); }
+.hero-card { min-height: 176px; display: flex; flex-direction: column; justify-content: end; padding: 22px; border: 1px solid var(--glass-border); background: linear-gradient(145deg, rgba(132,180,172,.1), var(--glass-bg) 64%); backdrop-filter: var(--blur-surface); -webkit-backdrop-filter: var(--blur-surface); position: relative; overflow: hidden; box-shadow: var(--shadow-glass); border-radius: var(--radius-lg); }
 .hero-card h3 { max-width: 78%; margin: 10px 0 6px; font-size: 27px; line-height: 1.05; text-transform: uppercase; }
 .hero-card p, .hero-card time { margin: 0; color: #aaa; }
 .hero-card time { margin-top: 16px; color: var(--signal-hot); font-weight: 800; }
@@ -152,7 +164,7 @@ button:disabled { opacity: .48; cursor: default; }
   animation-delay: calc(var(--stagger, 0) * 40ms);
 }
 @keyframes list-item-enter { from { opacity: 0; transform: translateY(8px); } }
-.event-card, .order-card { display: grid; grid-template-columns: auto 1fr auto; gap: 13px; align-items: center; border: 1px solid var(--line); background: var(--surface); padding: 11px; box-shadow: var(--shadow-sm); }
+.event-card, .order-card { display: grid; grid-template-columns: auto 1fr auto; gap: 13px; align-items: center; border: 1px solid var(--glass-border); background: var(--glass-bg); backdrop-filter: var(--blur-subtle); -webkit-backdrop-filter: var(--blur-subtle); padding: 11px; box-shadow: var(--shadow-glass-sm); border-radius: var(--radius-md); }
 .event-card, .order-card, .campaign-card, .fan-event-card, .wallet-card, .ticket-card { contain: layout paint; }
 .event-card, .order-card, .campaign-card, .ticket-card { content-visibility: auto; contain-intrinsic-size: auto 96px; }
 .fan-event-card, .wallet-card { content-visibility: auto; contain-intrinsic-size: auto 280px; }
@@ -180,8 +192,8 @@ button:disabled { opacity: .48; cursor: default; }
 .bottom-nav.primary-three small,
 .bottom-nav.primary-four small { font-size: var(--type-meta); }
 .bottom-nav small { font-size: var(--type-micro); font-weight: 850; letter-spacing: .045em; line-height: 1; }
-.overflow-backdrop { position: fixed; inset: 0; z-index: 50; background: #00000088; }
-.overflow-menu { position: fixed; z-index: 51; top: max(60px, calc(env(safe-area-inset-top) + 48px)); right: 14px; min-width: 190px; background: rgba(11,16,15,.98); border: 1px solid var(--line); border-radius: 6px; padding: 5px; display: grid; gap: 2px; }
+.overflow-backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(0,0,0,.6); backdrop-filter: var(--blur-subtle); -webkit-backdrop-filter: var(--blur-subtle); }
+.overflow-menu { position: fixed; z-index: 51; top: max(60px, calc(env(safe-area-inset-top) + 48px)); right: 14px; min-width: 190px; background: var(--glass-bg-strong); backdrop-filter: var(--blur-strong); -webkit-backdrop-filter: var(--blur-strong); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 5px; display: grid; gap: 2px; box-shadow: var(--shadow-glass); }
 .overflow-menu button { min-height: 48px; border: 0; border-radius: 2px; background: transparent; color: var(--muted); display: flex; align-items: center; gap: 10px; padding: 13px 16px; font-size: .88rem; font-weight: 700; }
 .overflow-menu button:active, .overflow-menu button.active { background: var(--surface-2); color: var(--signal-hot); }
 .overflow-menu button span { width: 22px; text-align: center; font-size: 1.1rem; }
@@ -207,7 +219,7 @@ button:disabled { opacity: .48; cursor: default; }
 .revenue-card { margin-top: 10px; border: 1px solid var(--line); background: var(--surface); padding: 20px; display: grid; gap: 4px; }
 .revenue-card p, .revenue-card span { margin: 0; color: #98a5a0; font-size: var(--type-micro); }
 .revenue-card strong { font-size: 30px; color: var(--signal-hot); }
-.admin-box, .panel, .claim-box { margin-top: 22px; border: 1px solid var(--line); background: var(--surface); padding: 16px; display: grid; gap: 10px; }
+.admin-box, .panel, .claim-box { margin-top: 22px; border: 1px solid var(--glass-border); background: var(--glass-bg); backdrop-filter: var(--blur-surface); -webkit-backdrop-filter: var(--blur-surface); padding: 16px; display: grid; gap: 10px; border-radius: var(--radius-md); box-shadow: var(--shadow-glass-sm); }
 .admin-box h3, .claim-box h3 { margin: 5px 0 2px; }
 .admin-box hr { width: 100%; border: 0; border-top: 1px solid var(--line); }
 .two-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -223,7 +235,7 @@ button:disabled { opacity: .48; cursor: default; }
 .coupon-visual { min-height: 138px; display: flex; align-items: center; gap: 20px; border: 1px dashed var(--signal-deep); padding: 20px; background: linear-gradient(120deg,#0f1a17,#0d0d0d); }
 .coupon-visual > span { font-size: 70px; color: var(--signal-hot); font-weight: 1000; }
 .coupon-visual p { color: var(--muted); font-size: var(--type-meta); }
-.campaign-card { border: 1px solid var(--line); background: var(--surface); padding: 15px; display: grid; gap: 12px; }
+.campaign-card { border: 1px solid var(--glass-border); background: var(--glass-bg); backdrop-filter: var(--blur-subtle); -webkit-backdrop-filter: var(--blur-subtle); padding: 15px; display: grid; gap: 12px; border-radius: var(--radius-md); }
 .campaign-head, .campaign-stats { display: flex; justify-content: space-between; gap: 12px; }
 .campaign-head p { margin: 4px 0 0; color: var(--muted); font-size: var(--type-meta); }
 .campaign-stats { color: #aaa; font-size: var(--type-micro); }
@@ -339,10 +351,11 @@ button:disabled { opacity: .48; cursor: default; }
 .profile-card { display: flex; align-items: center; gap: 14px; border: 1px solid var(--line); background: var(--surface); padding: 16px; }
 .avatar { width: 54px; height: 54px; display: grid; place-content: center; background: var(--signal-hot); color: #080808; font-size: 30px; font-weight: 1000; }
 .profile-card p { margin: 4px 0 0; color: var(--muted); }
-.toast { position: fixed; z-index: 100; left: 16px; right: 16px; bottom: calc(82px + var(--safe-bottom)); max-width: 600px; margin: auto; border: 1px solid #8b7521; background: #211b08; color: #ffedaa; padding: 14px; text-align: left; box-shadow: 0 12px 44px #000; animation: toast-in .25s ease-out, toast-out .4s ease-in 4.6s forwards; }
+.toast { position: fixed; z-index: 100; left: 16px; right: 16px; bottom: calc(82px + var(--safe-bottom)); max-width: 600px; margin: auto; border: 1px solid #8b7521; background: #211b08; color: #ffedaa; padding: 14px; text-align: left; box-shadow: 0 12px 44px #000; animation: toast-in .25s ease-out; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(12px); } }
 @keyframes toast-out { to { opacity: 0; transform: translateY(8px); } }
 .toast-success { border-color: #2d7a4a; background: #0e1f14; color: #a8f0c0; }
+.toast-transient { border-color: #3a3f4b; background: #11141a; color: #aeb4c0; font-size: .82rem; opacity: .9; }
 .scan-result { animation: scan-flash .35s ease-out; }
 @keyframes scan-flash { 0% { opacity: 0; transform: scale(.96); } 50% { transform: scale(1.01); } 100% { opacity: 1; transform: scale(1); } }
 .empty-state { padding: 36px 20px; text-align: left; border-top: 1px solid var(--line); }
@@ -426,9 +439,13 @@ button:disabled { opacity: .48; cursor: default; }
 .warning { border-color: rgba(251,191,36,.32); background: rgba(251,191,36,.07); }
 .ops-panel { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 20px; }
 .ops-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-.ops-item { border: 1px solid var(--line); background: var(--surface); padding: 13px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; }
+.ops-item { border: 1px solid var(--glass-border); background: var(--glass-bg); backdrop-filter: var(--blur-subtle); -webkit-backdrop-filter: var(--blur-subtle); padding: 13px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; border-radius: var(--radius-md); }
 .ops-item p, .ops-item small { display: block; margin: 4px 0 0; color: var(--muted); word-break: break-word; }
 .ops-item button { min-height: 44px; padding: 10px 13px; }
+.ops-item-info { border: 0; background: transparent; text-align: left; padding: 0; cursor: pointer; display: block; min-width: 0; }
+.ops-item-info strong { font-size: .92rem; }
+.ops-item-info p { font-size: var(--type-meta); }
+.ops-item-info:active { opacity: .7; }
 .ops-healthy { border: 1px solid rgba(52,211,153,.25); background: rgba(52,211,153,.06); color: #a7f3d0; padding: 14px; }
 
 @media (min-width: 720px) {
@@ -1000,6 +1017,25 @@ html[data-virya-scanner-active] .app-shell {
 .home-action-card { min-height: 154px; border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface); padding: 17px; display: flex; flex-direction: column; gap: 9px; box-shadow: var(--shadow-md); }
 .home-action-card strong { font-size: 18px; line-height: 1.05; }
 .home-action-card > p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: var(--type-meta); }
+
+/* Premium benefits section — replaces the flat signal-relay-card with a
+   richer layout: hero header, 2×2 benefit grid, and a CTA cluster. */
+.benefits-hero { border: 1px solid var(--line); border-radius: var(--radius-lg); background: linear-gradient(160deg, color-mix(in srgb, var(--signal) 6%, var(--surface)), var(--surface) 70%); padding: 22px 18px; display: flex; flex-direction: column; gap: 18px; box-shadow: var(--shadow-md); }
+.benefits-hero-head { display: flex; flex-direction: column; gap: 7px; }
+.benefits-hero-head strong { font-size: 20px; line-height: 1.15; }
+.benefits-hero-head p:not(.eyebrow) { margin: 0; color: var(--muted); font-size: var(--type-meta); line-height: 1.5; }
+.benefits-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.benefit-tile { display: flex; flex-direction: column; gap: 5px; padding: 14px 12px; border: 1px solid var(--line); border-radius: var(--radius-md); background: color-mix(in srgb, var(--surface) 85%, transparent); }
+.benefit-tile strong { font-size: .92rem; line-height: 1.2; }
+.benefit-tile p { margin: 0; color: var(--muted); font-size: .76rem; line-height: 1.45; }
+.benefit-icon { font-size: 1.4rem; color: var(--signal-hot); line-height: 1; margin-bottom: 2px; }
+.benefits-cta { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding-top: 4px; border-top: 1px solid var(--line); }
+.benefits-cta .referral-code-copy { flex: 1 1 auto; min-width: 160px; }
+.benefits-cta .ghost { flex: 0 0 auto; }
+.benefits-cta .success { width: 100%; color: var(--good); font-size: .78rem; }
+@media (max-width: 380px) {
+  .benefits-grid { grid-template-columns: 1fr; }
+}
 /* Side album experiment, so it sits after the cards people open Home for.
    Ordered rather than moved in the markup to keep the Show block intact. */
 .synesthesia-home-card { order: 99; background: linear-gradient(145deg, rgba(109,162,152,.08), var(--surface) 60%); border-color: color-mix(in srgb, var(--signal) 32%, var(--line)); }
@@ -1183,6 +1219,28 @@ html[data-virya-scanner-active] .app-shell {
 .checklist-copy small { color: var(--muted); font-size: var(--type-micro); letter-spacing: .08em; }
 .checklist-done .checklist-copy strong { text-decoration: line-through; }
 .success-note { margin: 0; }
+
+/* Staff task detail modal — glassmorphism overlay with email preview */
+.modal-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6); backdrop-filter: var(--blur-subtle); -webkit-backdrop-filter: var(--blur-subtle); animation: fade-in var(--dur-fast) var(--ease-out); }
+@keyframes fade-in { from { opacity: 0; } }
+.modal-sheet { position: fixed; z-index: 61; left: 8px; right: 8px; bottom: 8px; max-height: calc(100dvh - 16px); overflow-y: auto; border: 1px solid var(--glass-border); border-radius: var(--radius-xl); background: var(--glass-bg-strong); backdrop-filter: var(--blur-strong); -webkit-backdrop-filter: var(--blur-strong); box-shadow: var(--shadow-glass); animation: sheet-up var(--dur-med) var(--spring); }
+@keyframes sheet-up { from { transform: translateY(40px); opacity: .5; } }
+.modal-sheet-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid var(--glass-border-subtle); background: var(--glass-bg-strong); backdrop-filter: var(--blur-strong); -webkit-backdrop-filter: var(--blur-strong); }
+.modal-sheet-head h3 { margin: 4px 0 0; font-size: 20px; line-height: 1.1; text-transform: uppercase; letter-spacing: -.03em; }
+.modal-sheet-head .eyebrow { margin: 0; }
+.modal-sheet-body { padding: 18px 20px 24px; display: grid; gap: 16px; }
+.modal-close { flex: 0 0 auto; width: 36px; height: 36px; border: 1px solid var(--glass-border); border-radius: var(--control-radius); background: var(--glass-bg-inner); color: var(--muted); font-size: 18px; line-height: 1; display: grid; place-content: center; }
+
+/* Email preview inside the modal */
+.email-preview { border: 1px solid var(--glass-border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+.email-preview-head { display: grid; gap: 6px; padding: 14px 16px; border-bottom: 1px solid var(--glass-border-subtle); background: var(--glass-bg-inner); }
+.email-preview-row { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; align-items: baseline; }
+.email-preview-label { color: var(--muted); font-size: var(--type-micro); text-transform: uppercase; letter-spacing: .06em; }
+.email-preview-row strong { font-size: 1rem; }
+.email-preview-body { padding: 16px; font-size: var(--type-body); line-height: 1.6; color: var(--text); white-space: pre-wrap; }
+.email-preview-body em { color: var(--signal-hot); font-style: normal; }
+.email-preview-meta { display: flex; gap: 12px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--glass-border-subtle); background: var(--glass-bg-inner); }
+.email-preview-meta span { font-size: var(--type-micro); color: var(--muted); }
 
 /* Fan UX reliability: the referral code is an explicit full-link copy target. */
 .referral-code-copy {

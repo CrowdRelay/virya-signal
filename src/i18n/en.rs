@@ -292,6 +292,22 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "shows_near_you" => " shows near you",
         "tickets_and_qr_codes_on_your_phone" => " tickets and QR codes on your phone",
         "rewards_for_simple_actions" => " rewards for simple actions",
+        "benefit_shows_title" => "Shows near you",
+        "benefit_shows_desc" => {
+            " Discover metal concerts in your area, curated by people who actually listen."
+        }
+        "benefit_tickets_title" => "Tickets & QR on your phone",
+        "benefit_tickets_desc" => {
+            " No paper, no screenshots. Your ticket lives in the app, ready at the gate."
+        }
+        "benefit_rewards_title" => "Rewards for real actions",
+        "benefit_rewards_desc" => {
+            " Earn merch discounts, entries to draws, and exclusive content by engaging."
+        }
+        "benefit_referrals_title" => "Carry the Signal",
+        "benefit_referrals_desc" => {
+            " Invite people who might genuinely care and earn rewards when they show up."
+        }
         "get_started" => "GET STARTED",
         "i_have_a_code" => "I HAVE A CODE",
         "email" => "Email",

@@ -7,6 +7,7 @@ fn AutopilotPanel(
     refresh_requested: RwSignal<u32>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
+    let detail_action = RwSignal::new(None::<crate::models::PendingAutopilotAction>);
     let refresh = move |_| {
         refresh_requested.update(|value| *value = value.wrapping_add(1).max(1));
     };
@@ -115,7 +116,7 @@ fn AutopilotPanel(
                                 <For each=move || needs_you.clone() key=|action| action.id.clone() children={
                                     let available_assignees = available_assignees.clone();
                                     move |action| view! {
-                                        <AutopilotPendingCard action=action available_assignees=available_assignees.clone() loading=loading refresh_requested=refresh_requested error=error />
+                                        <AutopilotPendingCard action=action available_assignees=available_assignees.clone() loading=loading refresh_requested=refresh_requested error=error detail_action=detail_action />
                                     }
                                 } />
                             </div>
@@ -179,6 +180,12 @@ fn AutopilotPanel(
                         {recent_view}
                     }
                 })}
+            </Show>
+            <Show when=move || detail_action.get().is_some()>
+                <TaskDetailModal
+                    action=detail_action.get_untracked()
+                    on_close=move || detail_action.set(None)
+                />
             </Show>
         </section>
     }

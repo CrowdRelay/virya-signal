@@ -504,44 +504,69 @@ fn FanSignal(
                     }).collect_view()}</div>
                 });
                 view! {
-                    // Referral card — always visible, even with 0 referrals or
-                    // while the code is still loading. The share button is
-                    // disabled until a code arrives. The ID is used by the
-                    // ExploreSignal banner CTA to scroll to this section.
-                    <article class="home-action-card signal-relay-card" id="signal-benefits-section">
-                        <p class="eyebrow">{tr("carry_the_signal")}</p>
-                        <strong>{tr("invite_real_metalheads")}</strong>
-                        <p>{tr("referral_preview")}</p>
-                        <button
-                            class="referral-code-copy"
-                            type="button"
-                            on:click=copy_referral
-                            disabled=move || dashboard.with(|state| state.as_ref().is_none_or(|data| data.referral.referral_code.trim().is_empty()))
-                        >
-                            {move || dashboard.with(|state| state.as_ref().map(|d| i18n::format("code", std::slice::from_ref(&d.referral.referral_code))).value_or_else(|| tr("referral_code_loading").to_owned()))}
-                        </button>
-                        {share_url.as_ref().map(|url| {
-                            let share_url = url.clone();
-                            view! {
-                                <button class="ghost" type="button" on:click=move |_| {
-                                    let url = share_url.clone();
-                                    share_status.set(None);
-                                    spawn_local(async move {
-                                        match bridge::share_text(
-                                            tr("virya_signal"),
-                                            tr("virya_signal_share_copy"),
-                                            &url,
-                                        ).await {
-                                            Ok(result) if result == "shared" => share_status.set(Some(tr("signal_shared").to_owned())),
-                                            Ok(result) if result == "copied" => share_status.set(Some(tr("signal_link_copied").to_owned())),
-                                            Ok(_) => {},
-                                            Err(message) => error.set(Some(message)),
-                                        }
-                                    });
-                                }>{tr("share_signal")}</button>
-                            }
-                        })}
-                        {move || share_status.get().map(|message| view! { <small class="success">{message}</small> })}
+                    // Premium benefits section — always visible, even with 0
+                    // referrals or while the code is still loading. The ID is
+                    // used by the ExploreSignal banner CTA to scroll here.
+                    <article class="benefits-hero" id="signal-benefits-section">
+                        <div class="benefits-hero-head">
+                            <p class="eyebrow">{tr("carry_the_signal")}</p>
+                            <strong>{tr("invite_real_metalheads")}</strong>
+                            <p>{tr("referral_preview")}</p>
+                        </div>
+                        <div class="benefits-grid" role="group" aria-label=tr("what_virya_signal_gives_you")>
+                            <div class="benefit-tile">
+                                <span class="benefit-icon" aria-hidden="true">"⌁"</span>
+                                <strong>{tr("benefit_shows_title")}</strong>
+                                <p>{tr("benefit_shows_desc")}</p>
+                            </div>
+                            <div class="benefit-tile">
+                                <span class="benefit-icon" aria-hidden="true">"▣"</span>
+                                <strong>{tr("benefit_tickets_title")}</strong>
+                                <p>{tr("benefit_tickets_desc")}</p>
+                            </div>
+                            <div class="benefit-tile">
+                                <span class="benefit-icon" aria-hidden="true">"✦"</span>
+                                <strong>{tr("benefit_rewards_title")}</strong>
+                                <p>{tr("benefit_rewards_desc")}</p>
+                            </div>
+                            <div class="benefit-tile">
+                                <span class="benefit-icon" aria-hidden="true">"⤴"</span>
+                                <strong>{tr("benefit_referrals_title")}</strong>
+                                <p>{tr("benefit_referrals_desc")}</p>
+                            </div>
+                        </div>
+                        <div class="benefits-cta">
+                            <button
+                                class="referral-code-copy"
+                                type="button"
+                                on:click=copy_referral
+                                disabled=move || dashboard.with(|state| state.as_ref().is_none_or(|data| data.referral.referral_code.trim().is_empty()))
+                            >
+                                {move || dashboard.with(|state| state.as_ref().map(|d| i18n::format("code", std::slice::from_ref(&d.referral.referral_code))).value_or_else(|| tr("referral_code_loading").to_owned()))}
+                            </button>
+                            {share_url.as_ref().map(|url| {
+                                let share_url = url.clone();
+                                view! {
+                                    <button class="ghost" type="button" on:click=move |_| {
+                                        let url = share_url.clone();
+                                        share_status.set(None);
+                                        spawn_local(async move {
+                                            match bridge::share_text(
+                                                tr("virya_signal"),
+                                                tr("virya_signal_share_copy"),
+                                                &url,
+                                            ).await {
+                                                Ok(result) if result == "shared" => share_status.set(Some(tr("signal_shared").to_owned())),
+                                                Ok(result) if result == "copied" => share_status.set(Some(tr("signal_link_copied").to_owned())),
+                                                Ok(_) => {},
+                                                Err(message) => error.set(Some(message)),
+                                            }
+                                        });
+                                    }>{tr("share_signal")}</button>
+                                }
+                            })}
+                            {move || share_status.get().map(|message| view! { <small class="success">{message}</small> })}
+                        </div>
                     </article>
                     <div class="section-head"><h3>{tr("active_draws")}</h3><span>{draw_count}</span></div>
                     <div class="card-list">{draws.into_iter().map(|draw| {

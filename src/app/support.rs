@@ -12,13 +12,20 @@ fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
         if error.get().is_some() {
             let generation = dismiss_generation.get_untracked().wrapping_add(1);
             dismiss_generation.set(generation);
+            // Transient/noisy errors get a shorter display window; real
+            // errors and success messages get the full 5 seconds.
+            let timeout = error.with(|msg| {
+                msg.as_ref()
+                    .map(|m| classify_error_timeout(m.as_str()))
+                    .unwrap_or(std::time::Duration::from_secs(5))
+            });
             set_timeout(
                 move || {
                     if dismiss_generation.try_get_untracked() == Some(generation) {
                         let _ = error.try_set(None);
                     }
                 },
-                std::time::Duration::from_secs(5),
+                timeout,
             );
         }
     });
@@ -41,7 +48,64 @@ fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
             })
         })
     };
-    view! { <Show when=move || error.get().is_some()><button class="toast" class:toast-success=is_success on:click=move |_| error.set(None)>{move || error.get().value_or_else(Default::default)}</button></Show> }
+    let is_transient = move || {
+        error.with(|msg| {
+            msg.as_ref().is_some_and(|m| {
+                let lower = m.to_lowercase();
+                lower.contains("timeout")
+                    || lower.contains("timed out")
+                    || lower.contains("network")
+                    || lower.contains("connection")
+                    || lower.contains("cancelled")
+                    || lower.contains("offline")
+            })
+        })
+    };
+    view! {
+        <Show when=move || error.get().is_some()>
+            <button
+                class="toast"
+                class:toast-success=is_success
+                class:toast-transient=is_transient
+                on:click=move |_| error.set(None)
+            >
+                {move || error.get().value_or_else(Default::default)}
+            </button>
+        </Show>
+    }
+}
+
+/// Classifies an error message and returns the appropriate display timeout.
+/// Transient/network errors get a shorter window (2.5s) because they're
+/// noisy and self-resolving. Real errors and success messages get 5s.
+fn classify_error_timeout(message: &str) -> std::time::Duration {
+    let lower = message.to_lowercase();
+    let is_transient = lower.contains("timeout")
+        || lower.contains("timed out")
+        || lower.contains("network")
+        || lower.contains("connection")
+        || lower.contains("cancelled")
+        || lower.contains("offline");
+    if is_transient {
+        std::time::Duration::from_millis(2500)
+    } else {
+        std::time::Duration::from_secs(5)
+    }
+}
+
+/// Sets an error on the shared RwSignal, but suppresses rapid-fire
+/// duplicates. If the same message is already showing, it's silently
+/// dropped instead of re-triggering the toast. This prevents error storms
+/// when multiple parallel requests fail simultaneously (e.g. all API
+/// calls timing out at once).
+pub fn set_error_debounced(error: RwSignal<Option<String>>, message: String) {
+    let is_duplicate = error.with(|current| {
+        current.as_ref().is_some_and(|m| m == &message)
+    });
+    if is_duplicate {
+        return;
+    }
+    error.set(Some(message));
 }
 
 fn latest_request_completed<T>(result: &Result<Option<T>, String>) -> bool {
@@ -102,7 +166,7 @@ fn refresh_operator_events(
                 state.get_or_insert_with(DashboardData::default).events = value;
             }),
             Ok(None) => {}
-            Err(message) => error.set(Some(message)),
+            Err(message) => set_error_debounced(error, message),
         }
         if completed {
             loading.update(|state| state.events = false);
@@ -130,7 +194,7 @@ fn refresh_operator_qr(
                 state.get_or_insert_with(DashboardData::default).qr = Some(value);
             }),
             Ok(None) => {}
-            Err(message) => error.set(Some(message)),
+            Err(message) => set_error_debounced(error, message),
         }
         if completed {
             loading.update(|state| state.qr = false);
@@ -187,7 +251,7 @@ fn refresh_operator_autopilot(
         match result {
             Ok(Some(value)) => overview.set(Some(value)),
             Ok(None) => {}
-            Err(message) => error.set(Some(message)),
+            Err(message) => set_error_debounced(error, message),
         }
         if completed {
             loading.set(false);
@@ -216,7 +280,7 @@ fn refresh_operator_chief(
         match result {
             Ok(Some(value)) => brief.set(Some(value)),
             Ok(None) => {}
-            Err(message) => error.set(Some(message)),
+            Err(message) => set_error_debounced(error, message),
         }
         if completed {
             loading.set(false);
@@ -245,7 +309,7 @@ fn refresh_operator_ops(
         match result {
             Ok(Some(value)) => overview.set(Some(value)),
             Ok(None) => {}
-            Err(message) => error.set(Some(message)),
+            Err(message) => set_error_debounced(error, message),
         }
         if completed {
             loading.set(false);
@@ -443,7 +507,7 @@ fn refresh_fan_events(
                     stable_fan_events(value);
             }),
             Ok(None) => {}
-            Err(message) => error.set(Some(message)),
+            Err(message) => set_error_debounced(error, message),
         }
         if completed {
             loading.update(|state| state.events = false);
@@ -546,7 +610,7 @@ fn refresh_fan_referral(
                 state.get_or_insert_with(FanDashboardData::default).referral = value;
             }),
             Ok(None) => {}
-            Err(message) => error.set(Some(message)),
+            Err(message) => set_error_debounced(error, message),
         }
         if completed {
             loading.update(|state| state.referral = false);
@@ -576,7 +640,7 @@ fn refresh_fan_interests(
                     .interests = stable_fan_interests(value);
             }),
             Ok(None) => {}
-            Err(message) => error.set(Some(message)),
+            Err(message) => set_error_debounced(error, message),
         }
         if completed {
             loading.update(|state| state.interests = false);
@@ -606,7 +670,7 @@ fn refresh_fan_admission_pass(
                     .admission_pass = value;
             }),
             Ok(None) => {}
-            Err(message) => error.set(Some(message)),
+            Err(message) => set_error_debounced(error, message),
         }
         if completed {
             loading.update(|state| state.admission_pass = false);
@@ -632,7 +696,7 @@ fn refresh_fan_area(
         match result {
             Ok(Some(value)) => area.set(Some(value)),
             Ok(None) => {}
-            Err(message) => error.set(Some(message)),
+            Err(message) => set_error_debounced(error, message),
         }
         if completed {
             loading.update(|state| state.area = false);
@@ -698,7 +762,7 @@ fn refresh_wallets(
                 }
             }
             Ok(None) => {}
-            Err(message) => error.set(Some(message)),
+            Err(message) => set_error_debounced(error, message),
         }
         if completed
             && let Some(loading) = loading

@@ -350,7 +350,7 @@ pub fn App() -> impl IntoView {
                     }
                 }
                 Ok(None) => {}
-                Err(message) => error.set(Some(message)),
+                Err(message) => set_error_debounced(error, message),
             }
         });
     });
@@ -378,7 +378,7 @@ pub fn App() -> impl IntoView {
                     {
                         Ok(value) => beacon_status.set(value),
                         Err(message) => {
-                            error.set(Some(message));
+                            set_error_debounced(error, message);
                             return;
                         }
                     }
@@ -386,7 +386,7 @@ pub fn App() -> impl IntoView {
                     mode.set(RootMode::Latarnik);
                 }
                 Ok(_) => {}
-                Err(message) => error.set(Some(message)),
+                Err(message) => set_error_debounced(error, message),
             }
         });
     });
@@ -406,7 +406,7 @@ pub fn App() -> impl IntoView {
                     mode.set(RootMode::Fan);
                 }
                 Ok(false) => {}
-                Err(message) => error.set(Some(message)),
+                Err(message) => set_error_debounced(error, message),
             }
         });
     });
@@ -485,7 +485,7 @@ pub fn App() -> impl IntoView {
                         fan_status_failed.set(true);
                         beacon_status_failed.set(true);
                     }
-                    error.set(Some(message));
+                    set_error_debounced(error, message);
                 }
             }
             if completed && initial_load {
