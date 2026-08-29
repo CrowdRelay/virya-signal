@@ -939,7 +939,31 @@ export function viryaInstallRuntimeGuards() {
     viryaShowRuntimeFailure(failure, false);
     window.dispatchEvent(new CustomEvent('virya-runtime-error', { detail: failure }));
   };
-  window.addEventListener('error', (event) => report('window-error', event.error ?? event.message));
+  window.addEventListener('error', (event) => {
+    // Resource loading failures (images, scripts, fonts) fire window-error
+    // events with no Error object and a generic message. After app restart,
+    // tauri.localhost may briefly fail to serve resources, producing false
+    // crash reports that get attributed to whatever IPC call happens to be
+    // in flight (e.g. fan_ticket_sale). Skip these — they're transient
+    // network hiccups, not code errors. A real code error has event.error
+    // (an Error object) or a non-empty message that isn't a resource URL.
+    const msg = typeof event.message === 'string' ? event.message : '';
+    const hasError = event.error != null;
+    const isResourceLoad = !hasError && (
+      msg === '' ||
+      msg.startsWith('NS_ERROR') ||
+      msg.includes('net::ERR') ||
+      msg.includes('Failed to fetch') ||
+      msg.includes('unreachable') ||
+      msg.includes('Load failed') ||
+      (event.target instanceof Element && event.target.tagName !== undefined)
+    );
+    if (isResourceLoad) {
+      window.console?.warn?.('[virya:window-error] suppressed resource/network error:', msg || event.filename || '(unknown)');
+      return;
+    }
+    report('window-error', event.error ?? event.message);
+  });
   window.addEventListener('unhandledrejection', (event) => {
     event.preventDefault();
     report('unhandled-rejection', event.reason);

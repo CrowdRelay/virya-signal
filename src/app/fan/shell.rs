@@ -417,7 +417,7 @@ fn FanApp(
                             error=error
                         />
                     }.into_any()).value_or_else(|| view! {
-                        <FanEvents dashboard=dashboard public=public focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview checkout_event=checkout_event loading=loading error=error />
+                        <FanEvents dashboard=dashboard public=public focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview checkout_event=checkout_event loading=loading error=error status=status />
                     }.into_any())}
                 </div>
                 <div class="tab-page" class:hidden=move || tab.get() != FanTab::Merch class:tab-active=move || tab.get() == FanTab::Merch>
@@ -506,8 +506,9 @@ fn FanSignal(
                 view! {
                     // Referral card — always visible, even with 0 referrals or
                     // while the code is still loading. The share button is
-                    // disabled until a code arrives.
-                    <article class="home-action-card signal-relay-card">
+                    // disabled until a code arrives. The ID is used by the
+                    // ExploreSignal banner CTA to scroll to this section.
+                    <article class="home-action-card signal-relay-card" id="signal-benefits-section">
                         <p class="eyebrow">{tr("carry_the_signal")}</p>
                         <strong>{tr("invite_real_metalheads")}</strong>
                         <p>{tr("referral_preview")}</p>

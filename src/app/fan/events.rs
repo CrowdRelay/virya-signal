@@ -7,6 +7,8 @@ fn FanEvents(
     checkout_event: RwSignal<Option<PublicEvent>>,
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
+    #[prop(optional)]
+    status: RwSignal<crate::models::FanSessionStatus>,
 ) -> impl IntoView {
     view! {
         <section class="screen">
@@ -30,7 +32,7 @@ fn FanEvents(
                                     focused_event_slug.set(None);
                                     focused_event_preview.set(None);
                                 }>{tr("back_back_to_shows")}</button>
-                                <FanEventCard event=event checkout_event=checkout_event dashboard=dashboard error=error />
+                                <FanEventCard event=event checkout_event=checkout_event dashboard=dashboard error=error status=status />
                             </div>
                         }.into_any();
                     }
@@ -41,7 +43,7 @@ fn FanEvents(
                 if events.is_empty() {
                     view! { <div class="empty-state"><strong>{tr("no_shows_in_the_calendar")}</strong><p>{tr("new_events_will_appear_here_2")}</p></div> }.into_any()
                 } else {
-                    view! { <div class="card-list fan-event-list">{events.into_iter().enumerate().map(|(i, event)| view! { <div style=format!("--stagger:{}", i.min(7))><FanEventCard event=event checkout_event=checkout_event dashboard=dashboard error=error /></div> }).collect_view()}</div> }.into_any()
+                    view! { <div class="card-list fan-event-list">{events.into_iter().enumerate().map(|(i, event)| view! { <div style=format!("--stagger:{}", i.min(7))><FanEventCard event=event checkout_event=checkout_event dashboard=dashboard error=error status=status /></div> }).collect_view()}</div> }.into_any()
                 }
             }}
         </section>
@@ -62,6 +64,8 @@ fn FanEventCard(
     checkout_event: RwSignal<Option<PublicEvent>>,
     dashboard: RwSignal<Option<FanDashboardData>>,
     error: RwSignal<Option<String>>,
+    #[prop(optional)]
+    status: RwSignal<crate::models::FanSessionStatus>,
 ) -> impl IntoView {
     let should_probe_pool = event.ticket_url.is_none();
     let pool = RwSignal::new(if should_probe_pool {
@@ -74,6 +78,17 @@ fn FanEventCard(
     let request_scope = pool_scope.clone();
     Effect::new(move |_| {
         if !should_probe_pool {
+            return;
+        }
+        // Guard: don't probe the ticket pool until the fan session is
+        // unlocked. After app restart, the session is locked and
+        // fan_ticket_sale returns AppError::Locked. This would set
+        // window.__VIRYA_LAST_OPERATION__ to "fan_ticket_sale", and any
+        // concurrent window-error (e.g. a resource load failure during
+        // startup) gets falsely attributed to fan_ticket_sale in the
+        // crash report. Waiting for unlock avoids the false attribution
+        // and the unnecessary IPC round-trip.
+        if !status.get_untracked().unlocked {
             return;
         }
         let event_slug = pool_slug.clone();

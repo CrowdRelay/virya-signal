@@ -921,6 +921,10 @@ html[data-virya-scanner-active] .app-shell {
 .home-banner .banner-counts span { text-align: center; min-width: 48px; }
 .home-banner .banner-counts b { display: block; color: var(--signal-hot); font-size: 1.1rem; }
 .home-banner .banner-counts small { color: var(--muted); font-size: var(--type-micro); text-transform: uppercase; }
+.home-banner .banner-benefits-summary { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.home-banner .benefit-pill { display: flex; flex-direction: column; align-items: center; padding: 6px 12px; border-radius: var(--control-radius); background: var(--surface-raised); border: 1px solid var(--border); min-width: 56px; }
+.home-banner .benefit-pill b { color: var(--signal-hot); font-size: 1.05rem; line-height: 1.2; }
+.home-banner .benefit-pill small { color: var(--muted); font-size: var(--type-micro); text-transform: uppercase; letter-spacing: .04em; }
 
 /* ── Progressive checkout: step indicator + sticky bar ── */
 .checkout-steps { display: flex; gap: 8px; margin: 10px 0 14px; }

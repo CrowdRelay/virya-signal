@@ -95,6 +95,56 @@ fn FanHomeBanner(
                         error=RwSignal::new(None)
                     />
                 }.into_any()),
+                FanRecommendedAction::ExploreSignal => {
+                    let counts_clone = counts.clone();
+                    let referral = snapshot.referral.clone();
+                    Some(view! {
+                        <button
+                            class="banner-cta"
+                            type="button"
+                            on:click=move |_| {
+                                // Scroll to the referral/benefits section
+                                // which is rendered below the overview.
+                                if let Some(el) = leptos::prelude::document()
+                                    .get_element_by_id("signal-benefits-section")
+                                {
+                                    el.scroll_into_view_with_bool(true);
+                                }
+                            }
+                        >
+                            {tr("action_explore_signal")} " →"
+                        </button>
+                        // Inline benefits summary so the fan sees value
+                        // immediately without scrolling. Shows referral
+                        // progress + active passes + interests.
+                        <div class="banner-benefits-summary">
+                            {(referral.qualified > 0 || referral.pending > 0).then(|| view! {
+                                <span class="benefit-pill">
+                                    <b>{referral.qualified + referral.pending}</b>
+                                    <small>{tr("counts_referrals")}</small>
+                                </span>
+                            })}
+                            {(counts_clone.active_passes > 0).then(|| view! {
+                                <span class="benefit-pill">
+                                    <b>{counts_clone.active_passes}</b>
+                                    <small>{tr("counts_passes")}</small>
+                                </span>
+                            })}
+                            {(counts_clone.event_interests > 0).then(|| view! {
+                                <span class="benefit-pill">
+                                    <b>{counts_clone.event_interests}</b>
+                                    <small>{tr("counts_interests")}</small>
+                                </span>
+                            })}
+                            {(counts_clone.paid_orders > 0).then(|| view! {
+                                <span class="benefit-pill">
+                                    <b>{counts_clone.paid_orders}</b>
+                                    <small>{tr("counts_orders")}</small>
+                                </span>
+                            })}
+                        </div>
+                    }.into_any())
+                }
                 _ => Some(view! {
                     <span class="banner-cta-text">{label}</span>
                 }.into_any()),

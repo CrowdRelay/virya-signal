@@ -1324,6 +1324,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "counts_passes" => "Passe",
         "counts_orders" => "Bilety",
         "counts_claims" => "Zbiory AREA",
+        "counts_referrals" => "Poleceń",
         // ── Email-first signup ──
         "enter_email_to_start" => "Wpisz e-mail, aby zacząć",
         "email_first_hint" => "Wyślemy Ci link potwierdzający. Reszta zajmie 30 sekund.",
