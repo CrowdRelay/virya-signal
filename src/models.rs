@@ -944,9 +944,14 @@ pub struct TicketWallet {
 pub struct WalletBatch {
     #[serde(default)]
     pub wallets: Vec<TicketWallet>,
+    // These counts are received from the native side but no longer surfaced
+    // to the fan — partial refresh failures are handled silently. The fields
+    // stay for deserialization compatibility with the native bridge.
     #[serde(default)]
+    #[allow(dead_code)]
     pub failed_count: usize,
     #[serde(default)]
+    #[allow(dead_code)]
     pub cached_count: usize,
 }
 

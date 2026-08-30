@@ -48,6 +48,25 @@
   --dur-fast: .15s;
   --dur-med: .25s;
   --dur-slow: .4s;
+  /* Deep-glass-calm v2 — additive tiered blur and glass tokens.
+     Existing tokens above are contract-locked; these are additive only. */
+  --blur-t1: blur(28px) saturate(1.3);
+  --blur-t2: blur(20px) saturate(1.2);
+  --blur-t3: blur(14px) saturate(1.15);
+  --blur-t4: blur(8px) saturate(1.1);
+  --glass-bg-t1: rgba(7,9,8,.88);
+  --glass-bg-t2: rgba(16,23,21,.72);
+  --glass-bg-t3: rgba(22,32,29,.50);
+  --glass-bg-t4: rgba(22,32,29,.30);
+  --glass-border-bright: rgba(132,180,172,.18);
+  --glass-refraction: linear-gradient(180deg, rgba(255,255,255,.04) 0%, transparent 30%);
+  --shadow-glass-lg: 0 12px 40px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.04);
+  --glow-signal: 0 0 24px rgba(132,180,172,.10);
+  --mesh-1: radial-gradient(ellipse 80% 50% at 20% 0%, rgba(132,180,172,.06), transparent);
+  --mesh-2: radial-gradient(ellipse 60% 40% at 80% 10%, rgba(38,101,93,.04), transparent);
+  --mesh-3: radial-gradient(ellipse 50% 30% at 50% 100%, rgba(147,198,192,.03), transparent);
+  --t-spring: cubic-bezier(.34,1.56,.64,1);
+  --t-smooth: cubic-bezier(.16,1,.3,1);
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: var(--bg);
   color: var(--text);
@@ -55,6 +74,20 @@
 * { box-sizing: border-box; }
 html, body, #root { min-height: 100%; margin: 0; background: var(--bg); }
 body { overflow-x: hidden; overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+/* Deep-glass-calm: mesh gradient + noise overlay. Fixed pseudo-elements
+   so they never cause reflow. Reduced motion disables the drift. */
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -2; pointer-events: none;
+  background: var(--mesh-1), var(--mesh-2), var(--mesh-3);
+  animation: mesh-drift 30s var(--t-smooth) infinite alternate;
+}
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  opacity: .012; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@keyframes mesh-drift { to { transform: translate(2%, -1%) scale(1.02); } }
+@media (prefers-reduced-motion: reduce) { body::before { animation: none; } }
 button, input, textarea, select, a { font: inherit; }
 button, input, textarea, select { min-height: var(--touch-min); }
 button, a { touch-action: manipulation; }
@@ -348,6 +381,7 @@ button:disabled { opacity: .48; cursor: default; }
 .import-box { margin-top: 18px; border: 1px solid var(--line); padding: 14px; background: var(--surface); }
 .import-box summary { color: var(--signal-hot); font-weight: 800; cursor: pointer; }
 .import-box .form-grid { margin-top: 14px; }
+.inline-form-error { color: #e85a5a; font-size: var(--type-meta); margin: 8px 0 0; line-height: 1.4; }
 .profile-card { display: flex; align-items: center; gap: 14px; border: 1px solid var(--line); background: var(--surface); padding: 16px; }
 .avatar { width: 54px; height: 54px; display: grid; place-content: center; background: var(--signal-hot); color: #080808; font-size: 30px; font-weight: 1000; }
 .profile-card p { margin: 4px 0 0; color: var(--muted); }
@@ -1371,4 +1405,157 @@ html[data-virya-scanner-active] .app-shell {
   z-index: 3;
   opacity: 0;
   transition: transform .22s ease, opacity .22s ease;
+}
+
+/* ─── Deep-glass-calm v2: refraction edges, card press, nav glass ─── */
+
+/* Glass refraction top-edge highlight on key card types.
+   Pseudo-element so it never affects layout or content. */
+.hero-card::before, .event-card::before, .fan-event-card::before,
+.fan-merch-card::before, .wallet-card::before, .ticket-card::before,
+.admin-box::before, .panel::before, .claim-box::before,
+.benefits-hero::before, .home-action-card::before, .ops-item::before,
+.area-target-card::before, .area-win-card::before, .beacon-hero::before,
+.push-setting-card::before, .feedback-card::before, .admission-card::before,
+.mode-card::before, .access-card::before, .campaign-card::before,
+.revenue-card::before, .coupon-visual::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  background: var(--glass-refraction); pointer-events: none; z-index: 0;
+}
+/* Ensure content stays above the refraction layer */
+.hero-card > *, .event-card > *, .fan-event-card > *, .fan-merch-card > *,
+.wallet-card > *, .ticket-card > *, .admin-box > *, .panel > *, .claim-box > *,
+.benefits-hero > *, .home-action-card > *, .ops-item > *, .area-target-card > *,
+.area-win-card > *, .beacon-hero > *, .push-setting-card > *, .feedback-card > *,
+.admission-card > *, .mode-card > *, .access-card > *, .campaign-card > *,
+.revenue-card > *, .coupon-visual > * { position: relative; z-index: 1; }
+
+/* Card press lift + border brighten — subtle, professional */
+.event-card, .fan-event-card, .fan-merch-card, .home-action-card,
+.campaign-card, .mode-card, .area-target-card, .area-win-card {
+  transition: transform var(--dur-fast) var(--t-smooth),
+              border-color var(--dur-fast) var(--t-smooth),
+              box-shadow var(--dur-fast) var(--t-smooth);
+}
+.event-card:active, .fan-event-card:active, .fan-merch-card:active,
+.home-action-card:active, .campaign-card:active, .area-target-card:active,
+.area-win-card:active {
+  transform: translateY(-1px);
+  border-color: var(--glass-border-bright);
+  box-shadow: var(--shadow-glass-lg), var(--glow-signal);
+}
+
+/* Topbar: deeper glass + refraction bottom edge */
+.topbar { background: var(--glass-bg-t1); backdrop-filter: var(--blur-t1); -webkit-backdrop-filter: var(--blur-t1); }
+.topbar::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--glass-border-bright), transparent);
+  pointer-events: none;
+}
+
+/* Bottom nav: deeper glass + refraction top edge */
+.bottom-nav { background: var(--glass-bg-t1); backdrop-filter: var(--blur-t1); -webkit-backdrop-filter: var(--blur-t1); }
+.bottom-nav::before {
+  content: ""; position: absolute; left: 0; right: 0; top: -1px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--glass-border-bright), transparent);
+  pointer-events: none;
+}
+
+/* Staff entry button: deeper glass */
+.staff-entry-button { background: var(--glass-bg-t1); backdrop-filter: var(--blur-t3); -webkit-backdrop-filter: var(--blur-t3); }
+
+/* Access card: deeper glass + refraction */
+.access-card { background: var(--glass-bg-t1); backdrop-filter: var(--blur-t2); -webkit-backdrop-filter: var(--blur-t2); box-shadow: var(--shadow-glass-lg); }
+
+/* Settings list articles: subtle glass upgrade */
+.settings-list article { background: var(--glass-bg-t3); backdrop-filter: var(--blur-t4); -webkit-backdrop-filter: var(--blur-t4); border-color: var(--glass-border-subtle); }
+
+/* Scanner button: deeper gradient + refined shadow */
+.scanner-button { box-shadow: var(--shadow-glass-lg); }
+
+/* Feedback card: deeper glass + refraction */
+.feedback-card { background: linear-gradient(145deg, rgba(132,180,172,.10), var(--glass-bg-t2) 66%); backdrop-filter: var(--blur-t2); -webkit-backdrop-filter: var(--blur-t2); box-shadow: var(--shadow-glass-lg); }
+
+/* Push setting card: glass upgrade */
+.push-setting-card { background: var(--glass-bg-t2); backdrop-filter: var(--blur-t2); -webkit-backdrop-filter: var(--blur-t2); border: 1px solid var(--glass-border-subtle); border-radius: var(--radius-md); }
+
+/* Admission card: signal-tinted glass */
+.admission-card { background: linear-gradient(145deg, rgba(132,180,172,.08), var(--glass-bg-t2) 60%); backdrop-filter: var(--blur-t2); -webkit-backdrop-filter: var(--blur-t2); border: 1px solid var(--glass-border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-glass-sm); }
+
+/* Wallet card: glass upgrade */
+.wallet-card { background: var(--glass-bg-t2); backdrop-filter: var(--blur-t2); -webkit-backdrop-filter: var(--blur-t2); border: 1px solid var(--glass-border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-glass-sm); }
+
+/* Ticket card: inner glass */
+.ticket-card { background: var(--glass-bg-t3); backdrop-filter: var(--blur-t3); -webkit-backdrop-filter: var(--blur-t3); border: 1px solid var(--glass-border-subtle); border-radius: var(--radius-sm); }
+
+/* Fan event card: glass upgrade */
+.fan-event-card { background: var(--glass-bg-t2); backdrop-filter: var(--blur-t2); -webkit-backdrop-filter: var(--blur-t2); border: 1px solid var(--glass-border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-glass-sm); overflow: hidden; }
+
+/* Fan merch card: glass upgrade */
+.fan-merch-card { background: var(--glass-bg-t2); backdrop-filter: var(--blur-t2); -webkit-backdrop-filter: var(--blur-t2); border: 1px solid var(--glass-border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-glass-sm); overflow: hidden; }
+
+/* Home action card: glass upgrade */
+.home-action-card { background: var(--glass-bg-t2); backdrop-filter: var(--blur-t2); -webkit-backdrop-filter: var(--blur-t2); border: 1px solid var(--glass-border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-glass-sm); overflow: hidden; }
+
+/* Benefits hero: richer gradient + glass */
+.benefits-hero { background: linear-gradient(145deg, rgba(132,180,172,.12), var(--glass-bg-t2) 60%); backdrop-filter: var(--blur-t2); -webkit-backdrop-filter: var(--blur-t2); border: 1px solid var(--glass-border-subtle); border-radius: var(--radius-lg); box-shadow: var(--shadow-glass-lg); overflow: hidden; }
+
+/* Beacon hero: gold-tinted glass */
+.beacon-hero { background: linear-gradient(145deg, rgba(243,197,26,.08), var(--glass-bg-t2) 60%); backdrop-filter: var(--blur-t2); -webkit-backdrop-filter: var(--blur-t2); border: 1px solid var(--glass-border-subtle); border-radius: var(--radius-lg); box-shadow: var(--shadow-glass-lg); overflow: hidden; }
+
+/* Area target/win cards: glass upgrade */
+.area-target-card, .area-win-card { background: var(--glass-bg-t2); backdrop-filter: var(--blur-t2); -webkit-backdrop-filter: var(--blur-t2); border: 1px solid var(--glass-border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-glass-sm); overflow: hidden; }
+
+/* Campaign card: deeper glass */
+.campaign-card { background: var(--glass-bg-t2); backdrop-filter: var(--blur-t2); -webkit-backdrop-filter: var(--blur-t2); }
+
+/* Revenue card: glass upgrade */
+.revenue-card { background: var(--glass-bg-t2); backdrop-filter: var(--blur-t3); -webkit-backdrop-filter: var(--blur-t3); border: 1px solid var(--glass-border-subtle); border-radius: var(--radius-md); }
+
+/* Mode card: deeper glass + refraction */
+.mode-card { background: var(--glass-bg-t2); backdrop-filter: var(--blur-t2); -webkit-backdrop-filter: var(--blur-t2); border: 1px solid var(--glass-border-subtle); box-shadow: var(--shadow-glass-lg); overflow: hidden; }
+.mode-card.fan-mode { background: linear-gradient(145deg, rgba(132,180,172,.10), var(--glass-bg-t2) 62%); }
+
+/* Claim box: glass upgrade */
+.claim-box { background: var(--glass-bg-t2); backdrop-filter: var(--blur-t2); -webkit-backdrop-filter: var(--blur-t2); }
+
+/* Import box: glass upgrade */
+.import-box { background: var(--glass-bg-t3); backdrop-filter: var(--blur-t3); -webkit-backdrop-filter: var(--blur-t3); border-color: var(--glass-border-subtle); border-radius: var(--radius-md); }
+
+/* Admin box / panel: deeper glass */
+.admin-box, .panel { background: var(--glass-bg-t2); backdrop-filter: var(--blur-t2); -webkit-backdrop-filter: var(--blur-t2); box-shadow: var(--shadow-glass-lg); }
+
+/* Coupon visual: glass upgrade */
+.coupon-visual { background: linear-gradient(120deg, rgba(132,180,172,.06), var(--glass-bg-t3)); border-color: var(--glass-border-subtle); border-radius: var(--radius-md); }
+
+/* Security note: refined left border */
+.security-note { background: var(--glass-bg-t4); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+
+/* Confirm hint: glass upgrade */
+.confirm-hint { background: var(--glass-bg-t4); backdrop-filter: var(--blur-t4); -webkit-backdrop-filter: var(--blur-t4); border-color: var(--glass-border-bright); border-radius: var(--radius-sm); }
+
+/* Modal sheet: deeper glass */
+.modal-sheet { background: var(--glass-bg-t1); backdrop-filter: var(--blur-t1); -webkit-backdrop-filter: var(--blur-t1); box-shadow: var(--shadow-glass-lg); }
+
+/* ─── Motion refinement ─── */
+/* Smoother card entrance: use t-smooth easing */
+@media (prefers-reduced-motion: no-preference) {
+  .fan-event-card, .fan-merch-card, .home-action-card, .wallet-card {
+    animation: card-enter var(--dur-med) var(--t-smooth) both;
+  }
+  @keyframes card-enter {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+/* ─── Mobile blur reduction for performance ─── */
+@media (max-width: 768px) {
+  .topbar, .bottom-nav { backdrop-filter: var(--blur-t3); -webkit-backdrop-filter: var(--blur-t3); }
+  .fan-event-card, .fan-merch-card, .wallet-card, .admission-card,
+  .push-setting-card, .feedback-card, .benefits-hero, .beacon-hero,
+  .area-target-card, .area-win-card, .home-action-card, .mode-card,
+  .admin-box, .panel, .claim-box, .campaign-card, .access-card {
+    backdrop-filter: var(--blur-t4); -webkit-backdrop-filter: var(--blur-t4);
+  }
 }

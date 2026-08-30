@@ -10,14 +10,20 @@ fn FanWallet(
     let checkout_token = RwSignal::new(String::new());
     let claim_token = RwSignal::new(String::new());
     let busy = RwSignal::new(false);
+    // Inline status for form actions — the fan sees the result on the form,
+    // not a global toast. Success still uses the shared error signal for the
+    // positive toast.
+    let import_status = RwSignal::new(None::<String>);
+    let claim_status = RwSignal::new(None::<String>);
 
     let import = move |_| {
         let order = order_id.get().trim().to_owned();
         let token = checkout_token.get().trim().to_owned();
         if order.is_empty() || token.is_empty() {
-            error.set(Some(tr("enter_the_order_id_and_private_token").to_owned()));
+            import_status.set(Some(tr("enter_the_order_id_and_private_token").to_owned()));
             return;
         }
+        import_status.set(None);
         // The recovery token must not remain rendered in the WebView while IPC runs.
         checkout_token.set(String::new());
         busy.set(true);
@@ -35,7 +41,7 @@ fn FanWallet(
                     error.set(Some(tr("tickets_saved_to_the_wallet").to_owned()));
                     refresh_wallets(wallets, Some(loading), error);
                 }
-                Err(message) => error.set(Some(message)),
+                Err(message) => import_status.set(Some(message)),
             }
             busy.set(false);
         });
@@ -44,9 +50,10 @@ fn FanWallet(
     let claim = move |_| {
         let token = claim_token.get().trim().to_owned();
         if token.is_empty() {
-            error.set(Some(tr("paste_the_admission_pass_token").to_owned()));
+            claim_status.set(Some(tr("paste_the_admission_pass_token").to_owned()));
             return;
         }
+        claim_status.set(None);
         busy.set(true);
         spawn_local(async move {
             match bridge::invoke::<AdmissionPass, _>(
@@ -63,7 +70,7 @@ fn FanWallet(
                     ));
                     refresh_fan_admission_pass(dashboard, loading, error);
                 }
-                Err(message) => error.set(Some(message)),
+                Err(message) => claim_status.set(Some(message)),
             }
             busy.set(false);
         });
@@ -72,9 +79,9 @@ fn FanWallet(
     let qr = move |_| {
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<AdmissionQr, _>("fan_admission_qr", &EmptyArgs {}).await {
-                Ok(value) => admission_qr.set(Some(value)),
-                Err(message) => error.set(Some(message)),
+            // Silent: the button re-enables and the fan can tap again.
+            if let Ok(value) = bridge::invoke::<AdmissionQr, _>("fan_admission_qr", &EmptyArgs {}).await {
+                admission_qr.set(Some(value));
             }
             busy.set(false);
         });
@@ -82,10 +89,10 @@ fn FanWallet(
 
     view! {
         <section class="screen"><header class="screen-title"><p class="eyebrow">{tr("mobile_wallet")}</p><h2>{tr("tickets_and_entry")}</h2></header><Show when=move || !loading.get().admission_pass fallback=move || view! { <Skeleton rows=1 /> }>{move || dashboard.with(|state| state.as_ref().and_then(|d| d.admission_pass.clone())).map(|pass| view! { <article class="admission-card"><p class="eyebrow">{tr("virya_admission_pass")}</p><h3>{pass.event_title}</h3><p>{event_time_location(&pass.starts_at, pass.venue.as_deref())}</p><strong>{pass.public_reference}</strong><span>{pass.status}</span><button class="primary" on:click=qr disabled=move || busy.get()>{tr("show_entry_qr")}</button>{move || admission_qr.get().map(|value| view! { <QrPanel svg=value.qr_svg token=value.token expires=value.expires_at /> })}</article> })}
-        <Show when=move || dashboard.with(|state| state.as_ref().is_none_or(|d| d.admission_pass.is_none()))><div class="claim-box"><p class="eyebrow">{tr("did_you_win_an_admission_pass")}</p><h3>{tr("assign_it_to_your_phone")}</h3><textarea rows="3" placeholder=tr("token_from_the_message") prop:value=move || claim_token.get() on:input=move |e| claim_token.set(event_target_value(&e))></textarea><button class="primary" on:click=claim disabled=move || busy.get()>{tr("claim_admission_pass")}</button></div></Show></Show>
+        <Show when=move || dashboard.with(|state| state.as_ref().is_none_or(|d| d.admission_pass.is_none()))><div class="claim-box"><p class="eyebrow">{tr("did_you_win_an_admission_pass")}</p><h3>{tr("assign_it_to_your_phone")}</h3><textarea rows="3" placeholder=tr("token_from_the_message") prop:value=move || claim_token.get() on:input=move |e| claim_token.set(event_target_value(&e))></textarea><button class="primary" on:click=claim disabled=move || busy.get()>{tr("claim_admission_pass")}</button>{move || claim_status.get().map(|msg| view! { <p class="inline-form-error">{msg}</p> })}</div></Show></Show>
         <div class="section-head"><h3>{tr("ticket_wallet")}</h3><span>{move || wallets.get().len()}</span></div><Show when=move || !loading.get().wallets fallback=move || view! { <Skeleton rows=2 /> }><div class="wallet-stack">{move || wallets.get().into_iter().map(|wallet| view! {
             <WalletCard wallet=wallet error=error />
-        }).collect_view()}</div></Show><details class="import-box"><summary>{tr("add_an_existing_order")}</summary><div class="form-grid"><label>"Order ID"<input placeholder=tr("order_uuid") prop:value=move || order_id.get() on:input=move |e| order_id.set(event_target_value(&e))/></label><label>{tr("private_checkout_token")}<textarea rows="3" autocomplete="off" autocapitalize="none" spellcheck="false" prop:value=move || checkout_token.get() on:input=move |e| checkout_token.set(event_target_value(&e))></textarea></label><button class="primary" on:click=import disabled=move || busy.get()>{tr("add_to_wallet")}</button></div></details></section>
+        }).collect_view()}</div></Show><details class="import-box"><summary>{tr("add_an_existing_order")}</summary><div class="form-grid"><label>"Order ID"<input placeholder=tr("order_uuid") prop:value=move || order_id.get() on:input=move |e| order_id.set(event_target_value(&e))/></label><label>{tr("private_checkout_token")}<textarea rows="3" autocomplete="off" autocapitalize="none" spellcheck="false" prop:value=move || checkout_token.get() on:input=move |e| checkout_token.set(event_target_value(&e))></textarea></label><button class="primary" on:click=import disabled=move || busy.get()>{tr("add_to_wallet")}</button>{move || import_status.get().map(|msg| view! { <p class="inline-form-error">{msg}</p> })}</div></details></section>
     }
 }
 
@@ -102,10 +109,10 @@ fn WalletCard(wallet: TicketWallet, error: RwSignal<Option<String>>) -> impl Int
         let order = delivery_order_id.clone();
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke_unit("fan_request_delivery", &OrderArgs { order_id: &order }).await
+            // Silent: the button re-enables and the fan can tap again.
+            if let Ok(()) = bridge::invoke_unit("fan_request_delivery", &OrderArgs { order_id: &order }).await
             {
-                Ok(_) => error.set(Some(tr("we_resent_the_wallet_by_email").to_owned())),
-                Err(message) => error.set(Some(message)),
+                error.set(Some(tr("we_resent_the_wallet_by_email").to_owned()));
             }
             busy.set(false);
         });
@@ -141,6 +148,7 @@ fn WalletTicketCard(
     ticket: WalletTicket,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
+    let _ = error;
     let public_reference = ticket.public_reference.clone();
     let qr_available = ticket.qr_available;
     let ticket_state = wallet_ticket_state(&ticket);
@@ -159,7 +167,8 @@ fn WalletTicketCard(
         let public_reference = public_reference.clone();
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke::<String, _>(
+            // Silent: the button re-enables and the fan can tap again.
+            if let Ok(svg) = bridge::invoke::<String, _>(
                 "render_wallet_qr",
                 &WalletQrArgs {
                     order_id: &order_id,
@@ -168,11 +177,8 @@ fn WalletTicketCard(
             )
             .await
             {
-                Ok(svg) => {
-                    qr_svg.set(Some(svg));
-                    qr_visible.set(true);
-                }
-                Err(message) => error.set(Some(message)),
+                qr_svg.set(Some(svg));
+                qr_visible.set(true);
             }
             busy.set(false);
         });
@@ -210,27 +216,22 @@ fn FanProfileScreen(
             session: None,
         });
         spawn_local(async move {
-            match bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
-                Ok(value) => {
-                    let _ = status.try_set(value);
-                }
-                Err(message) => {
-                    let _ = error.try_set(Some(message));
-                }
+            // Silent: the optimistic UI already locked the session.
+            // If the native side disagrees, it reconciles on next status.
+            if let Ok(value) = bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
+                let _ = status.try_set(value);
             }
         })
     };
     let forget = move |_| {
         spawn_local(async move {
-            match bridge::invoke::<FanSessionStatus, _>("fan_forget", &EmptyArgs {}).await {
-                Ok(value) => {
-                    dashboard.set(None);
-                    wallets.set(Vec::new());
-                    area.set(None);
-                    loading.set(FanLoadingState::all());
-                    status.set(value);
-                }
-                Err(message) => error.set(Some(message)),
+            // Silent: the fan can tap again. The button stays enabled.
+            if let Ok(value) = bridge::invoke::<FanSessionStatus, _>("fan_forget", &EmptyArgs {}).await {
+                dashboard.set(None);
+                wallets.set(Vec::new());
+                area.set(None);
+                loading.set(FanLoadingState::all());
+                status.set(value);
             }
         })
     };
@@ -241,16 +242,15 @@ fn FanProfileScreen(
             return;
         }
         spawn_local(async move {
-            match bridge::invoke::<FanSessionStatus, _>("fan_delete_account", &EmptyArgs {}).await {
-                Ok(value) => {
-                    dashboard.set(None);
-                    wallets.set(Vec::new());
-                    area.set(None);
-                    loading.set(FanLoadingState::all());
-                    delete_confirming.set(false);
-                    status.set(value);
-                }
-                Err(message) => error.set(Some(message)),
+            // Silent: the confirmation dialog stays open and the fan
+            // can try again. A toast here would be alarming.
+            if let Ok(value) = bridge::invoke::<FanSessionStatus, _>("fan_delete_account", &EmptyArgs {}).await {
+                dashboard.set(None);
+                wallets.set(Vec::new());
+                area.set(None);
+                loading.set(FanLoadingState::all());
+                delete_confirming.set(false);
+                status.set(value);
             }
         })
     };
@@ -291,6 +291,7 @@ fn AnonymousFeedback(error: RwSignal<Option<String>>) -> impl IntoView {
     let category = RwSignal::new("idea".to_owned());
     let message = RwSignal::new(String::new());
     let busy = RwSignal::new(false);
+    let inline_status = RwSignal::new(None::<String>);
 
     let submit = move |_| {
         if busy.get_untracked() {
@@ -300,11 +301,12 @@ fn AnonymousFeedback(error: RwSignal<Option<String>>) -> impl IntoView {
         let current_message = message.get_untracked().trim().to_owned();
         let length = current_message.chars().count();
         if !(8..=2_000).contains(&length) {
-            error.set(Some(
+            inline_status.set(Some(
                 tr("feedback_must_contain_between_8_and_2000").to_owned(),
             ));
             return;
         }
+        inline_status.set(None);
         busy.set(true);
         spawn_local(async move {
             match bridge::invoke_unit(
@@ -322,7 +324,7 @@ fn AnonymousFeedback(error: RwSignal<Option<String>>) -> impl IntoView {
                         tr("feedback_was_sent_anonymously_thank_you").to_owned(),
                     ));
                 }
-                Err(message) => error.set(Some(message)),
+                Err(message) => inline_status.set(Some(message)),
             }
             busy.set(false);
         });
@@ -361,6 +363,7 @@ fn AnonymousFeedback(error: RwSignal<Option<String>>) -> impl IntoView {
                     {move || if busy.get() { tr("sending_2") } else { tr("send_anonymously") }}
                 </button>
             </div>
+            {move || inline_status.get().map(|msg| view! { <p class="inline-form-error">{msg}</p> })}
         </section>
     }
 }

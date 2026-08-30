@@ -108,6 +108,26 @@ pub fn set_error_debounced(error: RwSignal<Option<String>>, message: String) {
     error.set(Some(message));
 }
 
+/// Returns true for transient/background errors that should never surface
+/// to the fan. The app recovers silently via cached data + the next refresh
+/// cycle (tab switch, pull-to-refresh, or status_refresh). The fan never
+/// sees these — the data signal stays at its last value and the skeleton
+/// only shows when there is genuinely nothing to display.
+#[allow(dead_code)]
+pub fn is_transient_error(message: &str) -> bool {
+    let lower = message.to_lowercase();
+    lower.contains("timeout")
+        || lower.contains("timed out")
+        || lower.contains("network")
+        || lower.contains("connection")
+        || lower.contains("cancelled")
+        || lower.contains("offline")
+        || lower.contains("unavailable")
+        || lower.contains("temporarily")
+        || lower.contains("reset by peer")
+        || lower.contains("broken pipe")
+}
+
 fn latest_request_completed<T>(result: &Result<Option<T>, String>) -> bool {
     // `invoke_latest` maps an invalidated/stale invocation to `Ok(None)`. The
     // newer invocation owns the loading flag, so the stale completion must not
@@ -372,7 +392,9 @@ fn refresh_fan_home(
                 &[value.schema_version.to_string()],
             ))),
             Ok(None) => {}
-            Err(message) if home.get_untracked().is_none() => error.set(Some(message)),
+            // Fan background refresh errors are silent: the cache or empty
+            // state handles the UI, and the next refresh cycle retries
+            // naturally. The fan never sees a transient error toast.
             Err(_) => {}
         }
         if completed {
@@ -467,7 +489,7 @@ fn refresh_fan_parts(
 fn refresh_fan_events(
     dashboard: RwSignal<Option<FanDashboardData>>,
     loading: RwSignal<FanLoadingState>,
-    error: RwSignal<Option<String>>,
+    _error: RwSignal<Option<String>>,
 ) {
     let has_events = dashboard.with_untracked(|value| value.as_ref().is_some_and(|data| !data.events.is_empty()));
     blank_only_when_empty(loading, has_events, |state, value| state.events = value);
@@ -507,7 +529,8 @@ fn refresh_fan_events(
                     stable_fan_events(value);
             }),
             Ok(None) => {}
-            Err(message) => set_error_debounced(error, message),
+            // Silent: cached events or empty state handles the UI.
+            Err(_) => {}
         }
         if completed {
             loading.update(|state| state.events = false);
@@ -518,7 +541,7 @@ fn refresh_fan_events(
 fn refresh_fan_merch(
     merch: RwSignal<Option<MerchCatalog>>,
     loading: RwSignal<FanLoadingState>,
-    error: RwSignal<Option<String>>,
+    _error: RwSignal<Option<String>>,
 ) {
     let has_merch = merch.with_untracked(|value| value.is_some());
     blank_only_when_empty(loading, has_merch, |state, value| state.merch = value);
@@ -558,10 +581,9 @@ fn refresh_fan_merch(
                 }
             }
             Ok(None) => {}
-            Err(message) => {
-                merch.set(None);
-                error.set(Some(message));
-            }
+            // Silent: keep the last catalog (or cached snapshot) instead of
+            // clearing it. The fan keeps browsing; the next refresh retries.
+            Err(_) => {}
         }
         if completed {
             loading.update(|state| state.merch = false);
@@ -585,7 +607,8 @@ fn refresh_fan_merch_bundles(bundles: RwSignal<Option<FanMerchBundleCatalog>>) {
                 }
             }
             Ok(None) => {}
-            Err(_) => bundles.set(None),
+            // Silent: keep last bundles instead of clearing.
+            Err(_) => {}
         }
     });
 }
@@ -593,7 +616,7 @@ fn refresh_fan_merch_bundles(bundles: RwSignal<Option<FanMerchBundleCatalog>>) {
 fn refresh_fan_referral(
     dashboard: RwSignal<Option<FanDashboardData>>,
     loading: RwSignal<FanLoadingState>,
-    error: RwSignal<Option<String>>,
+    _error: RwSignal<Option<String>>,
 ) {
     blank_only_when_empty(loading, dashboard.with_untracked(|value| value.is_some()), |state, value| state.referral = value);
     spawn_local(async move {
@@ -610,7 +633,8 @@ fn refresh_fan_referral(
                 state.get_or_insert_with(FanDashboardData::default).referral = value;
             }),
             Ok(None) => {}
-            Err(message) => set_error_debounced(error, message),
+            // Silent: cached referral data or empty state handles the UI.
+            Err(_) => {}
         }
         if completed {
             loading.update(|state| state.referral = false);
@@ -621,7 +645,7 @@ fn refresh_fan_referral(
 fn refresh_fan_interests(
     dashboard: RwSignal<Option<FanDashboardData>>,
     loading: RwSignal<FanLoadingState>,
-    error: RwSignal<Option<String>>,
+    _error: RwSignal<Option<String>>,
 ) {
     blank_only_when_empty(loading, dashboard.with_untracked(|value| value.as_ref().is_some_and(|data| !data.interests.is_empty())), |state, value| state.interests = value);
     spawn_local(async move {
@@ -640,7 +664,8 @@ fn refresh_fan_interests(
                     .interests = stable_fan_interests(value);
             }),
             Ok(None) => {}
-            Err(message) => set_error_debounced(error, message),
+            // Silent: cached interests or empty state handles the UI.
+            Err(_) => {}
         }
         if completed {
             loading.update(|state| state.interests = false);
@@ -651,7 +676,7 @@ fn refresh_fan_interests(
 fn refresh_fan_admission_pass(
     dashboard: RwSignal<Option<FanDashboardData>>,
     loading: RwSignal<FanLoadingState>,
-    error: RwSignal<Option<String>>,
+    _error: RwSignal<Option<String>>,
 ) {
     blank_only_when_empty(loading, dashboard.with_untracked(|value| value.is_some()), |state, value| state.admission_pass = value);
     spawn_local(async move {
@@ -670,7 +695,8 @@ fn refresh_fan_admission_pass(
                     .admission_pass = value;
             }),
             Ok(None) => {}
-            Err(message) => set_error_debounced(error, message),
+            // Silent: cached admission pass or empty state handles the UI.
+            Err(_) => {}
         }
         if completed {
             loading.update(|state| state.admission_pass = false);
@@ -681,7 +707,7 @@ fn refresh_fan_admission_pass(
 fn refresh_fan_area(
     area: RwSignal<Option<AreaWallet>>,
     loading: RwSignal<FanLoadingState>,
-    error: RwSignal<Option<String>>,
+    _error: RwSignal<Option<String>>,
 ) {
     blank_only_when_empty(loading, area.with_untracked(|value| value.is_some()), |state, value| state.area = value);
     spawn_local(async move {
@@ -696,7 +722,8 @@ fn refresh_fan_area(
         match result {
             Ok(Some(value)) => area.set(Some(value)),
             Ok(None) => {}
-            Err(message) => set_error_debounced(error, message),
+            // Silent: cached AREA wallet or empty state handles the UI.
+            Err(_) => {}
         }
         if completed {
             loading.update(|state| state.area = false);
@@ -707,7 +734,7 @@ fn refresh_fan_area(
 fn refresh_wallets(
     wallets: RwSignal<Vec<TicketWallet>>,
     loading: Option<RwSignal<FanLoadingState>>,
-    error: RwSignal<Option<String>>,
+    _error: RwSignal<Option<String>>,
 ) {
     if let Some(loading) = loading {
         blank_only_when_empty(
@@ -746,23 +773,13 @@ fn refresh_wallets(
         match result {
             Ok(Some(value)) => {
                 wallets.set(stable_wallets(value.wallets));
-                if value.failed_count > 0 {
-                    let key = if value.cached_count > 0 {
-                        "could_not_refresh_orders_cached_orders_available"
-                    } else {
-                        "could_not_refresh_orders_count_other_tickets_remain_available"
-                    };
-                    error.set(Some(i18n::format(
-                        key,
-                        &[
-                            value.failed_count.to_string(),
-                            value.cached_count.to_string(),
-                        ],
-                    )));
-                }
+                // Partial wallet refresh failures are silent: the cached
+                // wallets are already on screen and the next refresh
+                // retries. The fan never sees a "could not refresh" toast.
             }
             Ok(None) => {}
-            Err(message) => set_error_debounced(error, message),
+            // Silent: cached wallets or empty state handles the UI.
+            Err(_) => {}
         }
         if completed
             && let Some(loading) = loading

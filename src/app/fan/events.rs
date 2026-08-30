@@ -157,14 +157,15 @@ fn FanEventCard(
                 Ok(_) => {
                     error.set(Some(tr("show_saved_to_your_signal").to_owned()));
                 }
-                Err(message) => {
+                Err(_) => {
+                    // Silent: the row reverts to unsaved state. The fan
+                    // can tap again. No toast for a transient interest toggle.
                     dashboard.update(|state| {
                         if let Some(data) = state.as_mut() {
                             data.interests
                                 .retain(|item| item.event.slug != event_slug);
                         }
                     });
-                    error.set(Some(message));
                 }
             }
             busy.set(false);
@@ -265,10 +266,11 @@ fn FanTicketCheckout(
                     sale_failed.set(false);
                 }
                 Ok(None) => {}
-                Err(message) => {
+                Err(_) => {
                     sale.set(None);
                     sale_failed.set(true);
-                    error.set(Some(message));
+                    // Silent: sale_failed shows the "temporarily unavailable"
+                    // inline status. No toast needed.
                 }
             }
             if completed {
@@ -425,6 +427,8 @@ fn FanTicketSale(
     let gross_offer = offer.clone();
     let selected_gross = Signal::derive(move || checkout_gross(&gross_offer, quantities));
     let purchase_slug = RwSignal::new(event_slug.clone());
+    // Inline checkout error — shown on the checkout total bar, not a toast.
+    let checkout_error = RwSignal::new(None::<String>);
 
     let purchase = move |_| {
         if busy.get_untracked() || pending_checkout.get_untracked().is_some() {
@@ -436,9 +440,10 @@ fn FanTicketSale(
             .filter(|item| item.quantity > 0)
             .collect::<Vec<_>>();
         if items.is_empty() {
-            error.set(Some(tr("select_at_least_one_ticket").to_owned()));
+            checkout_error.set(Some(tr("select_at_least_one_ticket").to_owned()));
             return;
         }
+        checkout_error.set(None);
         let name = buyer_name.get_untracked().trim().to_owned();
         let input = TicketCheckoutInput {
             event_slug: purchase_slug.get_untracked(),
@@ -478,7 +483,8 @@ fn FanTicketSale(
                     }
                 }
                 Err(message) => {
-                    error.set(Some(message));
+                    // Inline: show on the checkout total bar, not a toast.
+                    checkout_error.set(Some(message));
                     sale_refresh.update(|value| *value = value.wrapping_add(1));
                 }
             }
@@ -501,7 +507,8 @@ fn FanTicketSale(
                         std::slice::from_ref(&checkout.order_reference),
                     )));
                 }
-                Err(message) => error.set(Some(message)),
+                // Inline: show on the checkout bar, not a toast.
+                Err(message) => checkout_error.set(Some(message)),
             }
         });
     };
@@ -622,6 +629,7 @@ fn FanTicketSale(
             <Show when=move || pending_checkout.get().is_some()>
                 <button type="button" class="ghost checkout-retry" on:click=retry_payment>{tr("reopen_payment")}</button>
             </Show>
+            {move || checkout_error.get().map(|msg| view! { <small class="inline-form-error">{msg}</small> })}
             <small>{tr("card_details_never_reach_virya_signal_payment")}</small>
         </footer>
     }
@@ -695,29 +703,26 @@ fn ExternalLink(
     label: &'static str,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
+    let _ = error;
     let open_url = url.clone();
     let open = move |_| {
         let current = open_url.clone();
         spawn_local(async move {
-            if let Err(message) =
-                bridge::invoke_unit("open_external_url", &UrlArgs { url: &current }).await
-            {
-                error.set(Some(message));
-            }
+            // Silent: the fan can tap the link again if the URL open fails.
+            let _ = bridge::invoke_unit("open_external_url", &UrlArgs { url: &current }).await;
         });
     };
     view! { <button type="button" class="ticket-buy-button" on:click=open>{label}</button> }
 }
 
 fn open_area_game(error: RwSignal<Option<String>>) {
+    let _ = error;
     spawn_local(async move {
         let url = format!(
             "https://virya.music/{}/area/#area-map",
             i18n::current().code()
         );
-        if let Err(message) = bridge::invoke_unit("open_external_url", &UrlArgs { url: &url }).await
-        {
-            error.set(Some(message));
-        }
+        // Silent: the fan can tap again.
+        let _ = bridge::invoke_unit("open_external_url", &UrlArgs { url: &url }).await;
     });
 }

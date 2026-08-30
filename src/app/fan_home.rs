@@ -397,21 +397,18 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
                     if retry_after_settings && value.permission != "denied" && !value.enabled =>
                 {
                     let _ = status.try_set(Some(value));
-                    match bridge::invoke_timeout::<FanPushStatus, _>(
+                    // Silent: push sync failures are already shown
+                    // inline via the degraded status message.
+                    if let Ok(value) = bridge::invoke_timeout::<FanPushStatus, _>(
                         "fan_push_enable",
                         &EmptyArgs {},
                         45_000,
                     )
                     .await
                     {
-                        Ok(value) => {
-                            let _ = enable_after_settings
-                                .try_set(!value.enabled && value.permission != "denied");
-                            let _ = status.try_set(Some(value));
-                        }
-                        Err(message) => {
-                            let _ = error.try_set(Some(message));
-                        }
+                        let _ = enable_after_settings
+                            .try_set(!value.enabled && value.permission != "denied");
+                        let _ = status.try_set(Some(value));
                     }
                 }
                 Ok(Some(value)) => {
@@ -421,9 +418,8 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
                     let _ = status.try_set(Some(value));
                 }
                 Ok(None) => {}
-                Err(message) => {
-                    let _ = error.try_set(Some(message));
-                }
+                // Silent: push sync failures show inline via status message.
+                Err(_) => {}
             }
             finish_resumable_ui_task(busy, resume_pending, resume_refresh);
         });
@@ -455,13 +451,10 @@ fn NativePushControl(error: RwSignal<Option<String>>) -> impl IntoView {
             desired.set(Some(want_enabled));
         }
         spawn_lifecycle_task(async move {
-            match bridge::invoke_timeout::<FanPushStatus, _>(command, &EmptyArgs {}, 45_000).await {
-                Ok(value) => {
-                    let _ = status.try_set(Some(value));
-                }
-                Err(message) => {
-                    let _ = error.try_set(Some(message));
-                }
+            // Silent: the switch reverts and the status message shows
+            // the current state. The fan can tap again.
+            if let Ok(value) = bridge::invoke_timeout::<FanPushStatus, _>(command, &EmptyArgs {}, 45_000).await {
+                let _ = status.try_set(Some(value));
             }
             let _ = desired.try_set(None);
             finish_resumable_ui_task(busy, resume_pending, resume_refresh);
@@ -555,7 +548,7 @@ fn update_push_preference(
     preferences: RwSignal<FanPushPreferences>,
     confirmed: RwSignal<Option<FanPushPreferences>>,
     writing: RwSignal<bool>,
-    error: RwSignal<Option<String>>,
+    _error: RwSignal<Option<String>>,
     key: u8,
     checked: bool,
 ) {
@@ -591,13 +584,13 @@ fn update_push_preference(
                         break;
                     }
                 }
-                Err(message) => {
+                Err(_) => {
                     // Put the switches back where the backend last confirmed them
                     // instead of leaving the fan with a setting that never landed.
+                    // Silent: the switch reversion is the visible feedback.
                     if let Some(previous) = confirmed.try_get_untracked().flatten() {
                         let _ = preferences.try_set(previous);
                     }
-                    let _ = error.try_set(Some(message));
                     break;
                 }
             }

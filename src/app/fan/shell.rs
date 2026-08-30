@@ -277,14 +277,10 @@ fn FanApp(
         });
         persist_fan_tab(FanTab::Signal);
         spawn_local(async move {
-            match bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
-                // Native state stays authoritative: adopt whatever it reports.
-                Ok(value) => {
-                    let _ = status.try_set(value);
-                }
-                Err(message) => {
-                    let _ = error.try_set(Some(message));
-                }
+            // Native state stays authoritative: adopt whatever it reports.
+            // Silent: the optimistic UI already locked the session.
+            if let Ok(value) = bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
+                let _ = status.try_set(value);
             }
         });
     };
@@ -472,9 +468,9 @@ fn FanSignal(
         let url = format!("https://www.virya.music/r/{referral_code}");
         share_status.set(None);
         spawn_local(async move {
-            match bridge::copy_text(&url).await {
-                Ok(()) => share_status.set(Some(tr("signal_link_copied").to_owned())),
-                Err(message) => error.set(Some(message)),
+            // Silent: the fan can tap the copy button again.
+            if let Ok(()) = bridge::copy_text(&url).await {
+                share_status.set(Some(tr("signal_link_copied").to_owned()));
             }
         });
     };
@@ -559,7 +555,8 @@ fn FanSignal(
                                                 Ok(result) if result == "shared" => share_status.set(Some(tr("signal_shared").to_owned())),
                                                 Ok(result) if result == "copied" => share_status.set(Some(tr("signal_link_copied").to_owned())),
                                                 Ok(_) => {},
-                                                Err(message) => error.set(Some(message)),
+                                                // Silent: the fan can tap share again.
+                                                Err(_) => {}
                                             }
                                         });
                                     }>{tr("share_signal")}</button>
