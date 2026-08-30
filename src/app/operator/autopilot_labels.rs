@@ -137,7 +137,15 @@ fn autopilot_payload_detail(payload: &AutopilotActionPayload) -> String {
             task_title,
             reminder_number,
             ..
-        } => format!("{recipient_name} · {task_title} · reminder {reminder_number}"),
+        } => {
+            if *reminder_number > 0 {
+                i18n::format("autopilot_task_reminder_of", &[reminder_number.to_string(), "3".to_owned()])
+                    + " — "
+                    + task_title
+            } else {
+                format!("{recipient_name} — {task_title}")
+            }
+        }
     }
 }
 

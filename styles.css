@@ -1228,8 +1228,15 @@ html[data-virya-scanner-active] .app-shell {
 .modal-sheet-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 20px 14px; border-bottom: 1px solid var(--glass-border-subtle); background: var(--glass-bg-strong); backdrop-filter: var(--blur-strong); -webkit-backdrop-filter: var(--blur-strong); }
 .modal-sheet-head h3 { margin: 4px 0 0; font-size: 20px; line-height: 1.1; text-transform: uppercase; letter-spacing: -.03em; }
 .modal-sheet-head .eyebrow { margin: 0; }
+.modal-eyebrow { margin: 0; color: var(--muted); font-size: var(--type-micro); text-transform: none; letter-spacing: .02em; }
 .modal-sheet-body { padding: 18px 20px 24px; display: grid; gap: 16px; }
 .modal-close { flex: 0 0 auto; width: 36px; height: 36px; border: 1px solid var(--glass-border); border-radius: var(--control-radius); background: var(--glass-bg-inner); color: var(--muted); font-size: 18px; line-height: 1; display: grid; place-content: center; }
+.modal-detail { margin: 0; font-size: var(--type-body); line-height: 1.5; color: var(--text); }
+
+/* Meta rows — icon + label, conversational not technical */
+.modal-meta { display: grid; gap: 8px; }
+.modal-meta-row { display: flex; align-items: center; gap: 8px; font-size: var(--type-small); color: var(--muted); }
+.modal-meta-icon { font-size: 14px; line-height: 1; flex-shrink: 0; }
 
 /* Email preview inside the modal */
 .email-preview { border: 1px solid var(--glass-border-subtle); border-radius: var(--radius-md); overflow: hidden; }
@@ -1239,8 +1246,9 @@ html[data-virya-scanner-active] .app-shell {
 .email-preview-row strong { font-size: 1rem; }
 .email-preview-body { padding: 16px; font-size: var(--type-body); line-height: 1.6; color: var(--text); white-space: pre-wrap; }
 .email-preview-body em { color: var(--signal-hot); font-style: normal; }
-.email-preview-meta { display: flex; gap: 12px; flex-wrap: wrap; padding: 10px 16px; border-top: 1px solid var(--glass-border-subtle); background: var(--glass-bg-inner); }
-.email-preview-meta span { font-size: var(--type-micro); color: var(--muted); }
+.email-preview-meta { display: flex; gap: 12px; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 10px 16px; border-top: 1px solid var(--glass-border-subtle); background: var(--glass-bg-inner); }
+.email-preview-reminder { font-size: var(--type-small); color: var(--muted); }
+.email-preview-link { font-size: var(--type-small); color: var(--signal-hot); text-decoration: none; font-weight: 600; }
 
 /* Fan UX reliability: the referral code is an explicit full-link copy target. */
 .referral-code-copy {
