@@ -111,6 +111,7 @@ jobs:
           # Check if branch already exists
           if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
             echo "Branch $BRANCH already exists — updating"
+            git fetch origin "$BRANCH"
             git checkout "$BRANCH"
           else
             git checkout -b "$BRANCH"
