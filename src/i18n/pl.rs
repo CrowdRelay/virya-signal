@@ -1360,6 +1360,10 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "checkout_continue_to_details" => "Dalej do danych",
         "checkout_continue_to_payment" => "Dalej do płatności",
         "checkout_back" => "Wstecz",
+        "due" => "Termin",
+        "reminder" => "Przypomnienie",
+        "subject" => "Temat",
+        "to" => "Do",
         _ => key,
     }
 }
