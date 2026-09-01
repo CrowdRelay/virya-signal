@@ -19,7 +19,7 @@ jobs:
     uses: ./.github/workflows/_android-build.yml
     with:
       build_kind: debug-apk
-      version: 0.5.0-staging
+      version: 0.5.1-staging
       artifact_name: virya-signal-android-staging-smoke
       retention_days: 7
       signed: false

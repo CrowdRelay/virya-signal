@@ -33,11 +33,12 @@ if compile_count != 1 or target_count != 1:
         f"(found {compile_count}/{target_count})"
     )
 
-# Keep Android release startup conservative until the release artifact itself
-# is runtime-smoked. Tauri/plugin generated entry points have previously been
-# exercised only by unminified debug E2E; enabling R8 without a release-runtime
-# gate can therefore turn a structurally valid Play AAB into an instant crash.
-# Size optimisation can be re-enabled later behind that gate.
+# R8 minification is enabled for release builds with comprehensive ProGuard
+# keep rules (src-tauri/android-push/proguard-rules.pro). The rules preserve
+# Tauri plugin runtime (reflection-based discovery), Firebase Messaging
+# service classes, WebView JS interfaces, and native methods while allowing
+# R8 to obfuscate and shrink everything else. This satisfies Google Play's
+# code obfuscation threshold (was 1% with minification disabled).
 def _find_kotlin_named_block(source: str, name: str) -> tuple[int, int, str]:
     patterns = (
         rf'getByName\(\"{re.escape(name)}\"\)\s*\{{',
@@ -240,7 +241,7 @@ def _patch_build_type(
 has_debug_build_type = _has_kotlin_named_block(text, "debug")
 if has_debug_build_type:
     text = _patch_build_type(text, "debug", minify=False, shrink=None, proguard=False)
-text = _patch_build_type(text, "release", minify=False, shrink=False, proguard=False)
+text = _patch_build_type(text, "release", minify=True, shrink=True, proguard=True)
 
 # Verify the effective configuration after all mutations.
 if has_debug_build_type:
@@ -253,13 +254,13 @@ if has_debug_build_type:
 release_open, release_close, _ = _find_kotlin_named_block(text, "release")
 release_body = text[release_open + 1 : release_close]
 for fragment in (
-    "isMinifyEnabled = false",
-    "isShrinkResources = false",
+    "isMinifyEnabled = true",
+    "isShrinkResources = true",
 ):
     if fragment not in release_body:
         raise SystemExit(f"release build invariant missing: {fragment}")
-if "proguardFiles(" in release_body:
-    raise SystemExit("release build must not enable ProGuard while the safe release mode is active")
+if "proguardFiles(" not in release_body:
+    raise SystemExit("release build must enable ProGuard files for R8 minification")
 
 # Each Kotlin shrinker property must remain on its own physical line. The
 # property matcher above intentionally uses horizontal whitespace only because
@@ -322,6 +323,16 @@ if args.signing:
             raise SystemExit("could not locate release build type in generated Gradle file")
 
 gradle.write_text(text, encoding="utf-8")
+
+# Install R8/ProGuard keep rules into the generated Android project. The
+# generated proguard-rules.pro is an empty template; our rules preserve the
+# Tauri plugin runtime, Firebase Messaging, WebView JS interfaces, and native
+# methods while R8 obfuscates and shrinks everything else.
+proguard_source = root / "src-tauri" / "android-push" / "proguard-rules.pro"
+proguard_target = android / "app" / "proguard-rules.pro"
+if not proguard_source.is_file():
+    raise SystemExit(f"missing ProGuard rules: {proguard_source}")
+shutil.copy2(proguard_source, proguard_target)
 
 # Tauri's generic icon generator uses the full app tile as the adaptive
 # foreground, which makes the Android foreground fully opaque. Keep one audited
@@ -770,7 +781,7 @@ def _stage_android_push() -> bool:
 push_configured = _stage_android_push()
 
 print(
-    f"Android project prepared: API 36, R8/resource shrinking=off-safe-release, "
+    f"Android project prepared: API 36, R8/resource shrinking=on-release, "
     f"signing={'on' if args.signing else 'off'}, canonical-icons=on, debug-r8=off, "
     f"push-firebase={'on' if push_configured else 'degraded-no-config'}"
 )

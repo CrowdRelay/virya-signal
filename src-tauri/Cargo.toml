@@ -1,6 +1,6 @@
 [package]
 name = "virya-signal"
-version = "0.5.0"
+version = "0.5.1"
 description = "Virya Signal mobile fan wallet and live operations client"
 authors = ["Wojciech Bator"]
 edition = "2024"
