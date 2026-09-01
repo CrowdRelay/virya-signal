@@ -1363,8 +1363,6 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "reminder" => "Reminder",
         "subject" => "Subject",
         "to" => "To",
-        "demo_login" => "DEMO LOGIN",
-        "demo_login_hint" => "For app review only",
         _ => key,
     }
 }
