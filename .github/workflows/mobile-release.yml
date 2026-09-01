@@ -152,7 +152,7 @@ jobs:
           cache-targets: false
           shared-key: ios-release
       - name: Install pinned Tauri tools
-        uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518 # v2
+        uses: taiki-e/install-action@742a3317eac7bd62f91cd888b4eead5e784ba833 # v2
         with:
           tool: trunk@0.21.14,tauri-cli@2.11.4
       - name: Set release version
