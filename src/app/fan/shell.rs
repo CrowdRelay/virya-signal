@@ -353,6 +353,7 @@ fn FanApp(
         let pulled = pull_px.get_untracked();
         pull_px.set(0.0);
         if pulled >= PULL_FIRE_PX {
+            bridge::haptic("tap");
             request_full_refresh();
         }
     };
@@ -441,7 +442,7 @@ fn FanNavButton(
     icon: &'static str,
     label: &'static str,
 ) -> impl IntoView {
-    view! { <button class:active=move || tab.get() == own aria-current=move || (tab.get() == own).then_some("page") on:click=move |_| tab.set(own)><NavGlyph icon=icon/><small>{label}</small></button> }
+    view! { <button class:active=move || tab.get() == own aria-current=move || (tab.get() == own).then_some("page") on:click=move |_| { bridge::haptic("tap"); tab.set(own); }><NavGlyph icon=icon/><small>{label}</small></button> }
 }
 
 #[component]
@@ -477,7 +478,7 @@ fn FanSignal(
     view! {
         <section class="screen fan-screen">
             <FanHomeOverview home=home loading=loading tab=tab focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview error=error />
-            <Show when=move || !loading.get().referral fallback=move || view! { <Skeleton /> }>
+            <Show when=move || !loading.get().referral fallback=move || view! { <Skeleton rows=1 height=180 /> }>
             {move || dashboard.with(|state| state.as_ref().map(|data| data.referral.clone())).map(|referral| {
                 let draw_count = referral.draw_entries.len();
                 let referral_code = referral.referral_code.clone();
@@ -584,7 +585,7 @@ fn FanSignal(
                     {coupons_view}
                     {rewards_view}
                 }.into_any()
-            }).value_or_else(|| view! { <Skeleton /> }.into_any())}
+            }).value_or_else(|| view! { <Skeleton rows=1 height=96 /> }.into_any())}
             </Show>
         </section>
     }

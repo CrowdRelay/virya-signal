@@ -137,6 +137,7 @@ fn BeaconSettings(
 
     let run_danger_action = move |action: u8| {
         if busy.get_untracked() { return; }
+        bridge::haptic("warning");
         busy.set(true);
         danger_action.set(None);
         spawn_local(async move {
@@ -147,7 +148,19 @@ fn BeaconSettings(
                 _ => { busy.set(false); return; }
             };
             match result {
-                Ok(_) => { let _ = web_reload(); }
+                Ok(_) => {
+                    let success_key = match action {
+                        1 => "latarnik_logout_done",
+                        2 => "latarnik_leave_done",
+                        _ => "latarnik_dnc_done",
+                    };
+                    error.set(Some(tr(success_key).to_owned()));
+                    // Delay the reload so the user sees the confirmation toast.
+                    set_timeout(
+                        move || { let _ = web_reload(); },
+                        std::time::Duration::from_millis(1000),
+                    );
+                }
                 Err(message) => error.set(Some(message)),
             }
             busy.set(false);

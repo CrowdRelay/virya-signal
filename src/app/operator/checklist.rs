@@ -338,7 +338,7 @@ fn OperatorChecklist(
                 }}
             </article>
 
-            <Show when=move || !checklist_loading.get() fallback=move || view! { <Skeleton /> }>
+            <Show when=move || !checklist_loading.get() fallback=move || view! { <Skeleton rows=3 height=64 /> }>
                 {move || checklist.get().map(|snapshot| {
                     let done = snapshot.items.iter().filter(|item| item.status == "done").count();
                     let total = snapshot.items.len();

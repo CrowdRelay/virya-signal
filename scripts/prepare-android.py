@@ -578,6 +578,15 @@ def _stage_android_push() -> bool:
             "uses-permission",
             {permission_name: "android.permission.POST_NOTIFICATIONS"},
         )
+    if not any(
+        node.tag == "uses-permission" and node.attrib.get(permission_name) == "android.permission.VIBRATE"
+        for node in manifest_root
+    ):
+        ET.SubElement(
+            manifest_root,
+            "uses-permission",
+            {permission_name: "android.permission.VIBRATE"},
+        )
     application = manifest_root.find("application")
     if application is None:
         raise SystemExit("generated Android manifest is missing <application>")

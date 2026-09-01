@@ -151,6 +151,13 @@ pub async fn share_text(title: &str, text: &str, url: &str) -> Result<String, St
     promise_string(promise).await
 }
 
+/// Tactile confirmation for key interactions. On Android WebView this drives
+/// the native Vibrator service via `navigator.vibrate()`; on desktop it
+/// silently no-ops. Fire-and-forget — never awaited on a UI path.
+pub fn haptic(kind: &str) {
+    haptic_js(kind);
+}
+
 pub async fn invoke_unit<A>(command: &str, args: &A) -> Result<(), String>
 where
     A: Serialize + ?Sized,
@@ -351,6 +358,22 @@ fn decode_error(error: serde_wasm_bindgen::Error) -> String {
 }
 
 fn js_error(value: JsValue) -> String {
+    // Tauri commands serialize `AppError` as `{"kind": "...", "message": "..."}`.
+    // Embed both in the error string as `kind\x1fmessage` so the UI can
+    // classify by kind without substring-matching the translated message.
+    // Errors without a `kind` field (JS bridge errors, timeouts) get no prefix.
+    if !value.is_null()
+        && !value.is_undefined()
+        && let (Ok(kind_val), Ok(msg_val)) = (
+            js_sys::Reflect::get(&value, &JsValue::from_str("kind")),
+            js_sys::Reflect::get(&value, &JsValue::from_str("message")),
+        )
+        && let (Some(kind), Some(message)) = (kind_val.as_string(), msg_val.as_string())
+        && !kind.is_empty()
+        && !message.is_empty()
+    {
+        return format!("{kind}\x1f{message}");
+    }
     value
         .as_string()
         .or_else(|| {

@@ -91,7 +91,7 @@ fn FanHomeBanner(
                 FanRecommendedAction::ContinueSynesthesia => Some(view! {
                     <ExternalLink
                         url="https://synesthesia.virya.music/?source=signal-app&resume=1".to_owned()
-                        label="Continue →"
+                        label=tr("continue_synesthesia")
                         error=RwSignal::new(None)
                     />
                 }.into_any()),
@@ -191,7 +191,7 @@ fn FanHomeOverview(
     let leaderboard_busy = RwSignal::new(false);
     view! {
         <section class="fan-home-overview">
-            <Show when=move || !loading.get().home fallback=move || view! { <Skeleton rows=3 /> }>
+            <Show when=move || !loading.get().home fallback=move || view! { <Skeleton rows=3 height=154 /> }>
                 {move || home.get().map(|snapshot| {
                     let stale = snapshot.stale;
                     let synesthesia = snapshot.synesthesia.clone();
@@ -216,7 +216,7 @@ fn FanHomeOverview(
                             // Only people who already engaged with it see the progress card.
                             <Show when=move || show_synesthesia>
                                 <article class="home-action-card synesthesia-home-card">
-                                    <p class="eyebrow">"SYNESTHESIA"</p>
+                                    <p class="eyebrow">{tr("synesthesia_eyebrow")}</p>
                                     <strong>{if synesthesia.completed { tr("journey_completed") } else if synesthesia.started { tr("continue_the_journey") } else { tr("start_the_journey") }}</strong>
                                     <p>{if synesthesia.completed {
                                         if synesthesia.linked_at.is_some() { tr("completion_linked_to_signal") } else { tr("completion_saved_link_it_to_signal") }

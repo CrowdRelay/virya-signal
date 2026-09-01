@@ -87,11 +87,48 @@ impl From<std::io::Error> for AppError {
     }
 }
 
+impl AppError {
+    /// Stable error category for client-side classification. The WebView
+    /// parses this to decide whether a toast is transient, what timeout to
+    /// use, and whether it should surface to the fan at all — without
+    /// substring-matching the translated message text.
+    #[must_use]
+    pub const fn kind(&self) -> &'static str {
+        match self {
+            Self::NotConfigured => "not_configured",
+            Self::InvalidPin => "invalid_pin",
+            Self::Locked => "locked",
+            Self::Unauthorized => "unauthorized",
+            Self::Forbidden => "forbidden",
+            Self::InvalidInput(_) => "invalid_input",
+            Self::Conflict(_) => "conflict",
+            Self::NotFound => "not_found",
+            Self::Remote { .. } => "remote",
+            Self::Network(_) => "network",
+            Self::Url(_) => "url",
+            Self::Json(_) => "json",
+            Self::Io(_) => "io",
+            Self::StrongholdClient => "vault",
+            Self::BackgroundTask => "background_task",
+        }
+    }
+}
+
 impl serde::Serialize for AppError {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&self.to_string())
+        use serde::ser::SerializeStruct;
+
+        // Structured form: `{"kind": "...", "message": "..."}`. The WebView
+        // bridge extracts both fields and embeds them in the error string as
+        // `kind\x1fmessage` (unit separator), so `error_kind()` and
+        // `error_message()` can split them without substring matching on the
+        // translated message text.
+        let mut state = serializer.serialize_struct("AppError", 2)?;
+        state.serialize_field("kind", self.kind())?;
+        state.serialize_field("message", &self.to_string())?;
+        state.end()
     }
 }

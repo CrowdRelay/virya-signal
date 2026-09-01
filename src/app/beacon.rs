@@ -581,7 +581,7 @@ fn BeaconBriefing(
     view! {
         <section class="screen beacon-screen">
             <header class="screen-title beacon-hero"><p class="eyebrow">{tr("latarnik_briefing_label")}</p><h2>{tr("latarnik_briefing_title")}</h2><p>{tr("latarnik_briefing_subtitle")}</p></header>
-            <Show when=move || !loading.get() || home.with(|value| value.is_some()) fallback=move || view! { <Skeleton rows=3/> }>
+            <Show when=move || !loading.get() || home.with(|value| value.is_some()) fallback=move || view! { <Skeleton rows=3 height=120/> }>
                 {move || home.get().and_then(|data| data.nearby_events.first().cloned()).map(|event| {
                     let id=event.id.clone(); let title=event.title.clone();
                     view! { <article class="beacon-feature-card"><p class="eyebrow">{tr("latarnik_near_you")}</p><h3>{title}</h3><p>{format!("{} · {} km", event.city, event.distance_km)}</p><button class="primary" on:click=move |_| { selected_event.set(Some(id.clone())); tab.set(BeaconTab::Radar); }>{tr("latarnik_open_radar")}</button></article> }
@@ -594,10 +594,12 @@ fn BeaconBriefing(
             </div>
             <div class="section-head"><div><p class="eyebrow">{tr("latarnik_news_label")}</p><h3>{tr("latarnik_news_title")}</h3></div></div>
             <div class="card-list beacon-news-list">
-                {move || news.get().map(|feed| feed.items.into_iter().take(6).map(|item| {
-                    let title=beacon_news_text(&item.title); let summary=beacon_news_text(&item.summary); let url=beacon_news_text(&item.url); let tag=beacon_news_text(&item.tag);
-                    view! { <article class="beacon-news-card"><p class="eyebrow">{tag}</p><h3>{title}</h3><p>{summary}</p><button class="ghost" on:click=move |_| beacon_open_url(url.clone(), error)>{tr("latarnik_read")}</button></article> }
-                }).collect_view())}
+                <Show when=move || news.get().is_some() fallback=move || view! { <Skeleton rows=2 height=80/> }>
+                    {move || news.get().map(|feed| feed.items.into_iter().take(6).map(|item| {
+                        let title=beacon_news_text(&item.title); let summary=beacon_news_text(&item.summary); let url=beacon_news_text(&item.url); let tag=beacon_news_text(&item.tag);
+                        view! { <article class="beacon-news-card"><p class="eyebrow">{tag}</p><h3>{title}</h3><p>{summary}</p><button class="ghost" on:click=move |_| beacon_open_url(url.clone(), error)>{tr("latarnik_read")}</button></article> }
+                    }).collect_view())}
+                </Show>
             </div>
         </section>
     }
@@ -653,7 +655,7 @@ fn BeaconRadar(
                 <h2>{tr("latarnik_radar_title")}</h2>
                 <p>{tr("latarnik_radar_subtitle")}</p>
             </header>
-            <Show when=move || !loading.get() || home.with(|value| value.is_some()) fallback=move || view! { <Skeleton rows=4/> }>
+            <Show when=move || !loading.get() || home.with(|value| value.is_some()) fallback=move || view! { <Skeleton rows=4 height=160/> }>
                 <div class="card-list beacon-event-list">
                     {move || home.get().map(|data| data.nearby_events.into_iter().map(|event| {
                         let event_id = event.id.clone();
@@ -800,17 +802,19 @@ fn BeaconPressRoom(
                 })}
             </header>
             <div class="beacon-assets">
-                {move || press_room.get().map(|room| room.assets.into_iter().map(|asset| {
-                    let label = if i18n::current() == Language::En { asset.label_en } else { asset.label_pl };
-                    let url = asset.url;
-                    view! {
-                        <article class="beacon-asset-card">
-                            <span class="cache-badge">{asset.asset_kind.to_uppercase()}</span>
-                            <strong>{label}</strong>
-                            <button class="ghost" on:click=move |_| beacon_open_url(url.clone(), error)>{tr("latarnik_open_asset")}</button>
-                        </article>
-                    }
-                }).collect_view())}
+                <Show when=move || press_room.get().is_some() fallback=move || view! { <Skeleton rows=2 height=80/> }>
+                    {move || press_room.get().map(|room| room.assets.into_iter().map(|asset| {
+                        let label = if i18n::current() == Language::En { asset.label_en } else { asset.label_pl };
+                        let url = asset.url;
+                        view! {
+                            <article class="beacon-asset-card">
+                                <span class="cache-badge">{asset.asset_kind.to_uppercase()}</span>
+                                <strong>{label}</strong>
+                                <button class="ghost" on:click=move |_| beacon_open_url(url.clone(), error)>{tr("latarnik_open_asset")}</button>
+                            </article>
+                        }
+                    }).collect_view())}
+                </Show>
             </div>
             <article class="beacon-request-card">
                 <p class="eyebrow">{tr("latarnik_need_something")}</p>

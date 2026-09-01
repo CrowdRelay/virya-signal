@@ -217,7 +217,7 @@ fn NavButton<T>(tab: RwSignal<T>, own: T, icon: &'static str, label: &'static st
 where
     T: Copy + PartialEq + Send + Sync + 'static,
 {
-    view! { <button class:active=move || tab.get() == own aria-current=move || (tab.get() == own).then_some("page") on:click=move |_| tab.set(own)><NavGlyph icon=icon/><small>{label}</small></button> }
+    view! { <button class:active=move || tab.get() == own aria-current=move || (tab.get() == own).then_some("page") on:click=move |_| { bridge::haptic("tap"); tab.set(own); }><NavGlyph icon=icon/><small>{label}</small></button> }
 }
 
 #[component]
@@ -272,8 +272,8 @@ fn OperatorHome(
 ) -> impl IntoView {
     view! {
         <section class="screen">
-            <header class="screen-title"><p class="eyebrow">LIVE OPERATIONS</p><h2>{tr("today_under_control")}</h2></header>
-            <Show when=move || !loading.get().events || !operator_events(dashboard).is_empty() fallback=move || view! { <Skeleton /> }>
+            <header class="screen-title"><p class="eyebrow">{tr("live_operations")}</p><h2>{tr("today_under_control")}</h2></header>
+            <Show when=move || !loading.get().events || !operator_events(dashboard).is_empty() fallback=move || view! { <Skeleton rows=3 height=96 /> }>
                 {move || dashboard.with(|state| state.as_ref().map(|data| {
                     let next = data.events.first().cloned();
                     let event_count = data.events.len();
@@ -297,7 +297,7 @@ fn OperatorHome(
                             view! { <div class="card-list">{events.into_iter().enumerate().map(|(i, event)| view! { <div style=format!("--stagger:{}", i.min(7))><EventCard event=event /></div> }).collect_view()}</div> }.into_any()
                         }}
                     }
-                }.into_any())).value_or_else(|| view! { <Skeleton /> }.into_any())}
+                }.into_any())).value_or_else(|| view! { <Skeleton rows=1 height=96 /> }.into_any())}
             </Show>
             <div class="stats-grid">
                 <Show when=move || !loading.get().qr fallback=move || view! { <Metric value="…".to_owned() label=tr("active_qr") /> }>

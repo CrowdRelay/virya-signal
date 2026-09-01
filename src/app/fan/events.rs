@@ -38,7 +38,7 @@ fn FanEvents(
                     }
                 }
                 if loading.get().events {
-                    return view! { <Skeleton /> }.into_any();
+                    return view! { <Skeleton rows=3 height=280 /> }.into_any();
                 }
                 if events.is_empty() {
                     view! { <div class="empty-state"><strong>{tr("no_shows_in_the_calendar")}</strong><p>{tr("new_events_will_appear_here_2")}</p></div> }.into_any()
@@ -337,7 +337,7 @@ fn FanTicketCheckout(
                     }
                 };
                 view! {
-                    <Show when=move || !sale_loading.get() fallback=move || view! { <Skeleton rows=4 /> }>
+                    <Show when=move || !sale_loading.get() fallback=move || view! { <Skeleton rows=4 height=120 /> }>
                         {render_sale.clone()}
                     </Show>
                 }
@@ -460,6 +460,7 @@ fn FanTicketSale(
             .await
             {
                 Ok(checkout) => {
+                    bridge::haptic("confirm");
                     pending_checkout.set(Some(checkout.clone()));
                     refresh_wallets(wallets, Some(loading), error);
                     let checkout_url = checkout.url.clone();
@@ -629,7 +630,7 @@ fn FanTicketSale(
             <Show when=move || pending_checkout.get().is_some()>
                 <button type="button" class="ghost checkout-retry" on:click=retry_payment>{tr("reopen_payment")}</button>
             </Show>
-            {move || checkout_error.get().map(|msg| view! { <small class="inline-form-error">{msg}</small> })}
+            {move || checkout_error.get().map(|msg| view! { <small class="inline-form-error">{error_message(&msg).to_owned()}</small> })}
             <small>{tr("card_details_never_reach_virya_signal_payment")}</small>
         </footer>
     }
@@ -703,26 +704,26 @@ fn ExternalLink(
     label: &'static str,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
-    let _ = error;
     let open_url = url.clone();
     let open = move |_| {
         let current = open_url.clone();
         spawn_local(async move {
-            // Silent: the fan can tap the link again if the URL open fails.
-            let _ = bridge::invoke_unit("open_external_url", &UrlArgs { url: &current }).await;
+            if let Err(message) = bridge::invoke_unit("open_external_url", &UrlArgs { url: &current }).await {
+                error.set(Some(message));
+            }
         });
     };
     view! { <button type="button" class="ticket-buy-button" on:click=open>{label}</button> }
 }
 
 fn open_area_game(error: RwSignal<Option<String>>) {
-    let _ = error;
     spawn_local(async move {
         let url = format!(
             "https://virya.music/{}/area/#area-map",
             i18n::current().code()
         );
-        // Silent: the fan can tap again.
-        let _ = bridge::invoke_unit("open_external_url", &UrlArgs { url: &url }).await;
+        if let Err(message) = bridge::invoke_unit("open_external_url", &UrlArgs { url: &url }).await {
+            error.set(Some(message));
+        }
     });
 }

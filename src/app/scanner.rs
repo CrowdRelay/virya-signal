@@ -89,6 +89,7 @@ fn Scanner(
                         } else {
                             "offline_queued"
                         };
+                        bridge::haptic("success");
                         result.set(Some(AdmissionRedemption {
                             public_reference: value.public_reference,
                             holder_name: value.holder_name,
@@ -109,8 +110,18 @@ fn Scanner(
                 )
                 .await
                 {
-                    Ok(value) => result.set(Some(value)),
-                    Err(message) => error.set(Some(message)),
+                    Ok(value) => {
+                        let is_denied = matches!(
+                            value.status.as_str(),
+                            "revoked" | "expired" | "not_claimed"
+                        );
+                        bridge::haptic(if is_denied { "deny" } else { "success" });
+                        result.set(Some(value));
+                    }
+                    Err(message) => {
+                        bridge::haptic("deny");
+                        error.set(Some(message));
+                    }
                 }
             }
             busy.set(false);

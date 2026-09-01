@@ -1,4 +1,57 @@
-/// A placeholder for a panel that has nothing to show yet.
+/// Unit separator used to delimit the error kind from the message in the
+/// error string. The bridge embeds Tauri errors as `kind\x1fmessage`; errors
+/// without a structured kind (JS bridge errors, timeouts) have no prefix.
+const ERROR_KIND_SEP: char = '\x1f';
+
+/// Extracts the stable error kind from an error string. Returns `"unknown"`
+/// for errors that don't carry a structured kind (e.g. JS bridge timeouts).
+fn error_kind(msg: &str) -> &str {
+    msg.split(ERROR_KIND_SEP).next().unwrap_or("unknown")
+}
+
+/// Extracts the human-readable message from an error string. For errors
+/// without a structured kind prefix, returns the whole string.
+pub fn error_message(msg: &str) -> &str {
+    msg.split_once(ERROR_KIND_SEP)
+        .map(|(_, message)| message)
+        .unwrap_or(msg)
+}
+
+/// Classifies a toast message as success, error, or transient. Success
+/// messages are identified by exact match against the translated values of
+/// known success keys, plus prefix matching for format-string templates
+/// (where `{}` is replaced with a dynamic value). This replaces the old
+/// fragile substring matching that relied on hardcoded Polish fragments
+/// and missed messages whose translation didn't contain those fragments.
+fn is_success_message(msg: &str) -> bool {
+    let display = error_message(msg);
+    // Direct exact matches against translated success keys.
+    let exact = [
+        tr("admission_pass_has_been_revoked"),
+        tr("qr_campaign_created"),
+        tr("campaign_has_been_disabled"),
+        tr("show_saved_to_your_signal"),
+        tr("tickets_saved_to_the_wallet"),
+        tr("we_resent_the_wallet_by_email"),
+        tr("synesthesia_result_saved_in_signal"),
+        tr("feedback_was_sent_anonymously_thank_you"),
+    ];
+    if exact.contains(&display) {
+        return true;
+    }
+    // Format-string templates: match on the prefix before the first `{}`.
+    // The formatted message will start with the same prefix.
+    let format_prefixes = [
+        tr("order_saved_complete_the_secure_stripe_payment"),
+        tr("payment_opened_for_order"),
+    ];
+    format_prefixes.iter().any(|template| {
+        let prefix = template.split('{').next().unwrap_or("");
+        !prefix.is_empty() && display.starts_with(prefix)
+    })
+}
+
+
 ///
 /// `height` is the height of one row, and it matters: the point of a skeleton
 /// is that the content replacing it lands in the same place. A fixed 82px row
@@ -46,34 +99,12 @@ fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
     });
     let is_success = move || {
         error.with(|msg| {
-            msg.as_ref().is_some_and(|m| {
-                let lower = m.to_lowercase();
-                lower.contains("utworzon")
-                    || lower.contains("zapisan")
-                    || lower.contains(tr("sent"))
-                    || lower.contains("sent")
-                    || lower.contains("saved")
-                    || lower.contains(tr("revoked"))
-                    || lower.contains("revoked")
-                    || lower.contains("zrealizowan")
-                    || lower.contains("gotowy")
-                    || lower.contains("zeskanowany")
-                    || lower.contains("ponownie")
-                    || lower.contains(tr("feedback_was_sent"))
-            })
+            msg.as_ref().is_some_and(|m| is_success_message(m))
         })
     };
     let is_transient = move || {
         error.with(|msg| {
-            msg.as_ref().is_some_and(|m| {
-                let lower = m.to_lowercase();
-                lower.contains("timeout")
-                    || lower.contains("timed out")
-                    || lower.contains("network")
-                    || lower.contains("connection")
-                    || lower.contains("cancelled")
-                    || lower.contains("offline")
-            })
+            msg.as_ref().is_some_and(|m| is_transient_kind(error_kind(m)))
         })
     };
     view! {
@@ -82,30 +113,36 @@ fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
                 class="toast"
                 class:toast-success=is_success
                 class:toast-transient=is_transient
+                role="status"
+                aria-live="polite"
                 on:click=move |_| error.set(None)
             >
-                {move || error.get().value_or_else(Default::default)}
+                {move || error.get().map(|m| error_message(&m).to_owned()).unwrap_or_default()}
             </button>
         </Show>
     }
 }
 
-/// Classifies an error message and returns the appropriate display timeout.
+/// Classifies an error by kind and returns the appropriate display timeout.
 /// Transient/network errors get a shorter window (2.5s) because they're
 /// noisy and self-resolving. Real errors and success messages get 5s.
 fn classify_error_timeout(message: &str) -> std::time::Duration {
-    let lower = message.to_lowercase();
-    let is_transient = lower.contains("timeout")
-        || lower.contains("timed out")
-        || lower.contains("network")
-        || lower.contains("connection")
-        || lower.contains("cancelled")
-        || lower.contains("offline");
-    if is_transient {
+    if is_transient_kind(error_kind(message)) {
         std::time::Duration::from_millis(2500)
     } else {
         std::time::Duration::from_secs(5)
     }
+}
+
+/// Returns true for transient error kinds that auto-resolve (network blips,
+/// timeouts, cancellations). Classified by the structured `kind` field, not
+/// by substring matching on the translated message — so a translation change
+/// can never break classification.
+fn is_transient_kind(kind: &str) -> bool {
+    matches!(
+        kind,
+        "network" | "background_task" | "timeout" | "cancelled" | "offline"
+    )
 }
 
 /// Sets an error on the shared RwSignal, but suppresses rapid-fire
@@ -130,7 +167,14 @@ pub fn set_error_debounced(error: RwSignal<Option<String>>, message: String) {
 /// only shows when there is genuinely nothing to display.
 #[allow(dead_code)]
 pub fn is_transient_error(message: &str) -> bool {
-    let lower = message.to_lowercase();
+    // Structured kind takes priority — it's stable across translations.
+    let kind = error_kind(message);
+    if kind != "unknown" {
+        return is_transient_kind(kind);
+    }
+    // Fallback for errors without a structured kind (JS bridge errors that
+    // don't come through Tauri's AppError serialization).
+    let lower = error_message(message).to_lowercase();
     lower.contains("timeout")
         || lower.contains("timed out")
         || lower.contains("network")

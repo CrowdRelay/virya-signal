@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct AutopilotPolicySummary {
@@ -175,6 +176,108 @@ pub enum AutopilotActionPayload {
         action_url_path: String,
         reminder_number: u8,
     },
+    VerifyPlaylistPlacement {
+        opportunity_id: String,
+        playlist_external_id: String,
+        track_external_id: String,
+        checkpoint: u8,
+    },
+    RequestBeaconInviteBatch {
+        beacon_id: String,
+        beacon_version: i64,
+        event_id: String,
+        requested_count: u16,
+    },
+    RequestOutreachDiscovery {
+        requested_candidates: u16,
+    },
+    RequestBookingTargetDiscovery {
+        requested_count: u16,
+    },
+    EscalateEditorialPitch {
+        release_id: String,
+        title: String,
+        due_at: String,
+    },
+    CounterLiveOpportunityTerms {
+        opportunity_id: String,
+        ask_minor: i64,
+        currency: String,
+        round: u8,
+    },
+    AcceptLiveOpportunityTerms {
+        opportunity_id: String,
+        fee_minor: i64,
+        currency: String,
+    },
+    RaiseGrowthOpportunity {
+        series_id: String,
+        platform: String,
+        metric_key: String,
+        signal: String,
+        recommended_action: String,
+        deviation_basis_points: u32,
+        priority: u16,
+        template_key: String,
+    },
+    RaiseGrowthDebt {
+        subject_kind: String,
+        subject_id: String,
+        debt_kind: String,
+        recommended_action: String,
+        overdue_basis_points: u32,
+        outstanding_items: u32,
+        tracked_items: u32,
+        priority: u16,
+        template_key: String,
+    },
+    IssueReferralCode {
+        fan_id: String,
+    },
+    RunPlayStep {
+        play_id: String,
+        play_kind: String,
+        step_index: u16,
+        step_kind: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        event_id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        fan_id: Option<String>,
+        template_key: String,
+    },
+    RequestAgentContent {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        template_id: Option<String>,
+        task_id: String,
+        draft: JsonValue,
+    },
+    RequestAgentRun {
+        template_id: String,
+        prompt: String,
+        priority: u8,
+        tier: String,
+    },
+    RequestCommunityEngagement {
+        target_id: String,
+        platform: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        subreddit: Option<String>,
+        title: String,
+        body: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        smart_link: Option<String>,
+    },
+    RequestSignalPush {
+        task_id: String,
+        title: String,
+        body: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        target_path: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        event_id: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        segment: Option<String>,
+    },
 }
 
 /// Flat wire projection of [`AutopilotActionPayload`].
@@ -294,6 +397,81 @@ struct WireAutopilotActionPayload {
     variant_id: Option<String>,
     #[serde(default)]
     winner_variant_id: Option<String>,
+    // ── Fields for the 15 action kinds synced with CrowdRelay ──
+    #[serde(default)]
+    ask_minor: Option<i64>,
+    #[serde(default)]
+    fee_minor: Option<i64>,
+    #[serde(default)]
+    body: Option<String>,
+    #[serde(default)]
+    checkpoint: Option<u8>,
+    #[serde(default)]
+    currency: Option<String>,
+    #[serde(default)]
+    debt_kind: Option<String>,
+    #[serde(default)]
+    deviation_basis_points: Option<u32>,
+    #[serde(default)]
+    draft: Option<JsonValue>,
+    #[serde(default)]
+    metric_key: Option<String>,
+    #[serde(default)]
+    outstanding_items: Option<u32>,
+    #[serde(default)]
+    platform: Option<String>,
+    #[serde(default)]
+    play_id: Option<String>,
+    #[serde(default)]
+    play_kind: Option<String>,
+    #[serde(default)]
+    playlist_external_id: Option<String>,
+    #[serde(default)]
+    priority: Option<u16>,
+    #[serde(default)]
+    agent_priority: Option<u8>,
+    #[serde(default)]
+    prompt: Option<String>,
+    #[serde(default)]
+    recommended_action: Option<String>,
+    #[serde(default)]
+    requested_candidates: Option<u16>,
+    #[serde(default)]
+    requested_count: Option<u16>,
+    #[serde(default)]
+    round: Option<u8>,
+    #[serde(default)]
+    series_id: Option<String>,
+    #[serde(default)]
+    signal: Option<String>,
+    #[serde(default)]
+    smart_link: Option<String>,
+    #[serde(default)]
+    step_index: Option<u16>,
+    #[serde(default)]
+    step_kind: Option<String>,
+    #[serde(default)]
+    subreddit: Option<String>,
+    #[serde(default)]
+    subject_id: Option<String>,
+    #[serde(default)]
+    subject_kind: Option<String>,
+    #[serde(default)]
+    target_path: Option<String>,
+    #[serde(default)]
+    task_id: Option<String>,
+    #[serde(default)]
+    template_id: Option<String>,
+    #[serde(default)]
+    tier: Option<String>,
+    #[serde(default)]
+    track_external_id: Option<String>,
+    #[serde(default)]
+    tracked_items: Option<u32>,
+    #[serde(default)]
+    overdue_basis_points: Option<u32>,
+    #[serde(default)]
+    segment: Option<String>,
 }
 
 /// Why a wire payload could not be modelled by this build.
@@ -439,6 +617,107 @@ impl WireAutopilotActionPayload {
                 action_url_path: required(self.action_url_path, "action_url_path")?,
                 reminder_number: required(self.reminder_number, "reminder_number")?,
             },
+            "verify_playlist_placement" => AutopilotActionPayload::VerifyPlaylistPlacement {
+                opportunity_id: required(self.opportunity_id, "opportunity_id")?,
+                playlist_external_id: required(self.playlist_external_id, "playlist_external_id")?,
+                track_external_id: required(self.track_external_id, "track_external_id")?,
+                checkpoint: required(self.checkpoint, "checkpoint")?,
+            },
+            "request_beacon_invite_batch" => AutopilotActionPayload::RequestBeaconInviteBatch {
+                beacon_id: required(self.beacon_id, "beacon_id")?,
+                beacon_version: required(self.beacon_version, "beacon_version")?,
+                event_id: required(self.event_id, "event_id")?,
+                requested_count: required(self.requested_count, "requested_count")?,
+            },
+            "request_outreach_discovery" => AutopilotActionPayload::RequestOutreachDiscovery {
+                requested_candidates: required(self.requested_candidates, "requested_candidates")?,
+            },
+            "request_booking_target_discovery" => {
+                AutopilotActionPayload::RequestBookingTargetDiscovery {
+                    requested_count: required(self.requested_count, "requested_count")?,
+                }
+            }
+            "escalate_editorial_pitch" => AutopilotActionPayload::EscalateEditorialPitch {
+                release_id: required(self.release_id, "release_id")?,
+                title: required(self.title, "title")?,
+                due_at: required(self.due_at, "due_at")?,
+            },
+            "counter_live_opportunity_terms" => {
+                AutopilotActionPayload::CounterLiveOpportunityTerms {
+                    opportunity_id: required(self.opportunity_id, "opportunity_id")?,
+                    ask_minor: required(self.ask_minor, "ask_minor")?,
+                    currency: required(self.currency, "currency")?,
+                    round: required(self.round, "round")?,
+                }
+            }
+            "accept_live_opportunity_terms" => AutopilotActionPayload::AcceptLiveOpportunityTerms {
+                opportunity_id: required(self.opportunity_id, "opportunity_id")?,
+                fee_minor: required(self.fee_minor, "fee_minor")?,
+                currency: required(self.currency, "currency")?,
+            },
+            "raise_growth_opportunity" => AutopilotActionPayload::RaiseGrowthOpportunity {
+                series_id: required(self.series_id, "series_id")?,
+                platform: required(self.platform, "platform")?,
+                metric_key: required(self.metric_key, "metric_key")?,
+                signal: required(self.signal, "signal")?,
+                recommended_action: required(self.recommended_action, "recommended_action")?,
+                deviation_basis_points: required(
+                    self.deviation_basis_points,
+                    "deviation_basis_points",
+                )?,
+                priority: required(self.priority, "priority")?,
+                template_key: required(self.template_key, "template_key")?,
+            },
+            "raise_growth_debt" => AutopilotActionPayload::RaiseGrowthDebt {
+                subject_kind: required(self.subject_kind, "subject_kind")?,
+                subject_id: required(self.subject_id, "subject_id")?,
+                debt_kind: required(self.debt_kind, "debt_kind")?,
+                recommended_action: required(self.recommended_action, "recommended_action")?,
+                overdue_basis_points: required(self.overdue_basis_points, "overdue_basis_points")?,
+                outstanding_items: required(self.outstanding_items, "outstanding_items")?,
+                tracked_items: required(self.tracked_items, "tracked_items")?,
+                priority: required(self.priority, "priority")?,
+                template_key: required(self.template_key, "template_key")?,
+            },
+            "issue_referral_code" => AutopilotActionPayload::IssueReferralCode {
+                fan_id: required(self.fan_id, "fan_id")?,
+            },
+            "run_play_step" => AutopilotActionPayload::RunPlayStep {
+                play_id: required(self.play_id, "play_id")?,
+                play_kind: required(self.play_kind, "play_kind")?,
+                step_index: required(self.step_index, "step_index")?,
+                step_kind: required(self.step_kind, "step_kind")?,
+                event_id: self.event_id,
+                fan_id: self.fan_id,
+                template_key: required(self.template_key, "template_key")?,
+            },
+            "request_agent_content" => AutopilotActionPayload::RequestAgentContent {
+                template_id: self.template_id,
+                task_id: required(self.task_id, "task_id")?,
+                draft: required(self.draft, "draft")?,
+            },
+            "request_agent_run" => AutopilotActionPayload::RequestAgentRun {
+                template_id: required(self.template_id, "template_id")?,
+                prompt: required(self.prompt, "prompt")?,
+                priority: required(self.agent_priority, "priority")?,
+                tier: required(self.tier, "tier")?,
+            },
+            "request_community_engagement" => AutopilotActionPayload::RequestCommunityEngagement {
+                target_id: required(self.target_id, "target_id")?,
+                platform: required(self.platform, "platform")?,
+                subreddit: self.subreddit,
+                title: required(self.title, "title")?,
+                body: required(self.body, "body")?,
+                smart_link: self.smart_link,
+            },
+            "request_signal_push" => AutopilotActionPayload::RequestSignalPush {
+                task_id: required(self.task_id, "task_id")?,
+                title: required(self.title, "title")?,
+                body: required(self.body, "body")?,
+                target_path: self.target_path,
+                event_id: self.event_id,
+                segment: self.segment,
+            },
             other => AutopilotActionPayload::Unrecognized {
                 wire_kind: other.to_owned(),
             },
@@ -504,6 +783,21 @@ impl AutopilotActionPayload {
             Self::PrepareFundingPackage { .. } => "funding.package.prepare",
             Self::SubmitFundingApplication { .. } => "funding.application.submit",
             Self::SendTeamAssignmentEmail { .. } => "team.assignment.email",
+            Self::VerifyPlaylistPlacement { .. } => "playlist.placement.verify",
+            Self::RequestBeaconInviteBatch { .. } => "beacon.invite_batch.request",
+            Self::RequestOutreachDiscovery { .. } => "outreach.discovery.request",
+            Self::RequestBookingTargetDiscovery { .. } => "booking.target_discovery.request",
+            Self::EscalateEditorialPitch { .. } => "release.editorial_pitch.escalate",
+            Self::CounterLiveOpportunityTerms { .. } => "opportunity.terms.counter",
+            Self::AcceptLiveOpportunityTerms { .. } => "opportunity.terms.accept",
+            Self::RaiseGrowthOpportunity { .. } => "growth.opportunity.raise",
+            Self::RaiseGrowthDebt { .. } => "growth.debt.raise",
+            Self::IssueReferralCode { .. } => "referral.code.issue",
+            Self::RunPlayStep { .. } => "play.step.run",
+            Self::RequestAgentContent { .. } => "agent.content.request",
+            Self::RequestAgentRun { .. } => "agent.run.request",
+            Self::RequestCommunityEngagement { .. } => "community.engage.request",
+            Self::RequestSignalPush { .. } => "signal.push.request",
             // Not a CrowdRelay kind: this build did not recognise the one it
             // was sent. `scripts/test_autopilot_wire_contract.py` excludes it
             // when comparing against the backend.

@@ -62,7 +62,7 @@ fn AccessLoader(mode: RwSignal<RootMode>, label: &'static str, show_back: bool) 
             </Show>
             <div class="access-card">
                 <p class="eyebrow">{label}</p>
-                <Skeleton rows=2 />
+                <Skeleton rows=2 height=120 />
             </div>
         </section>
     }

@@ -13,7 +13,7 @@ fn FanAffiliateGear(error: RwSignal<Option<String>>) -> impl IntoView {
                     <h3>{tr("affiliate_title")}</h3>
                     <p>{tr("affiliate_intro")}</p>
                 </div>
-                <span class="affiliate-partner-pill">"THOMANN · AFFILIATE"</span>
+                <span class="affiliate-partner-pill">{tr("affiliate_partner_pill")}</span>
             </header>
 
             <article class="affiliate-gear-card">

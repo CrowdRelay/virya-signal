@@ -14,10 +14,10 @@ fn AutopilotPanel(
     view! {
         <section class="ops-panel autopilot-panel">
             <div class="section-head">
-                <div><p class="eyebrow">VIRYAOS AUTOPILOT</p><h3>{tr("autopilot_control")}</h3></div>
+                <div><p class="eyebrow">{tr("viryaos_autopilot")}</p><h3>{tr("autopilot_control")}</h3></div>
                 <button class="text-button" on:click=refresh disabled=move || loading.get()>{tr("refresh_2")}</button>
             </div>
-            <Show when=move || !chief_loading.get() || chief.with(|value| value.is_some()) fallback=move || view! { <Skeleton rows=2 /> }>
+            <Show when=move || !chief_loading.get() || chief.with(|value| value.is_some()) fallback=move || view! { <Skeleton rows=2 height=120 /> }>
                 {move || chief.get().map(|brief| {
                     let attention = brief.attention_items.into_iter().take(6).collect::<Vec<_>>();
                     let opportunities = brief.top_opportunities.into_iter().take(5).collect::<Vec<_>>();
@@ -59,7 +59,7 @@ fn AutopilotPanel(
                     }
                 })}
             </Show>
-            <Show when=move || !loading.get() || overview.with(|value| value.is_some()) fallback=move || view! { <Skeleton rows=3 /> }>
+            <Show when=move || !loading.get() || overview.with(|value| value.is_some()) fallback=move || view! { <Skeleton rows=3 height=140 /> }>
                 {move || overview.get().map(|data| {
                     let runtime_enabled = data.runtime_enabled;
                     let policies = data.policies;

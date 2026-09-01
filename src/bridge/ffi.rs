@@ -93,6 +93,19 @@ export function viryaCopyText(text) {
   });
 }
 
+// Haptic feedback: on Android WebView, navigator.vibrate() drives the native
+// Vibrator service (requires android.permission.VIBRATE, injected by
+// prepare-android.py). On desktop browsers it silently no-ops. Patterns are
+// kept short — this is tactile confirmation, not a notification.
+export function viryaHaptic(kind) {
+  const patterns = {
+    tap: 10, confirm: 15, warning: 40,
+    success: [15, 40, 15], deny: [30, 50, 30],
+  };
+  const pattern = patterns[kind] ?? patterns.tap;
+  try { navigator.vibrate?.(pattern); } catch {}
+}
+
 export function viryaShareText(title, text, url) {
   const safeTitle = String(title ?? '').slice(0, 160);
   const safeText = String(text ?? '').slice(0, 500);
@@ -1001,6 +1014,9 @@ extern "C" {
 
     #[wasm_bindgen(catch, js_name = viryaCopyText)]
     fn copy_text_js(text: &str) -> Result<js_sys::Promise, JsValue>;
+
+    #[wasm_bindgen(js_name = viryaHaptic)]
+    fn haptic_js(kind: &str);
     #[wasm_bindgen(catch, js_name = viryaInvoke)]
     async fn invoke_js(command: &str, args: JsValue, timeout_ms: u32) -> Result<JsValue, JsValue>;
 

@@ -353,6 +353,7 @@ pub(super) fn AreaGameScreen(
             .await;
             match outcome {
                 Ok(value) => {
+                    bridge::haptic("success");
                     result.set(Some(value));
                     refresh_fan_area(area, loading, error);
                 }
@@ -369,7 +370,7 @@ pub(super) fn AreaGameScreen(
                 <h2>{tr("find_a_point_in_your_city")}</h2>
                 <p>{tr("choose_an_active_point_and_follow_the")}</p>
             </header>
-            <Show when=move || !loading.get().area fallback=move || view! { <Skeleton rows=3 /> }>
+            <Show when=move || !loading.get().area fallback=move || view! { <Skeleton rows=3 height=120 /> }>
                 {move || area.get().map(|wallet| {
                     let claimed_count = wallet.claims.len() as u32;
                     let total = wallet.collection_size.max(1);

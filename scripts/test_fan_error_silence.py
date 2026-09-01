@@ -148,13 +148,13 @@ class FanErrorSilenceTests(unittest.TestCase):
             "FanEventCard interest toggle still surfaces errors",
         )
 
-    def test_external_link_is_silent(self) -> None:
-        """ExternalLink must not set error on URL open failure."""
+    def test_external_link_surfaces_errors(self) -> None:
+        """ExternalLink must surface URL open failures via the error signal."""
         ext = extract_fn(EVENTS, "ExternalLink")
-        self.assertNotIn(
+        self.assertIn(
             "error.set(Some(message))",
             ext,
-            "ExternalLink still surfaces URL open errors",
+            "ExternalLink must not silently swallow URL open errors",
         )
 
     def test_fan_shell_lock_and_share_are_silent(self) -> None:

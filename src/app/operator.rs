@@ -59,7 +59,7 @@ fn StaffGate(mode: RwSignal<RootMode>, error: RwSignal<Option<String>>) -> impl 
                 {tr("back_signal")}
             </button>
             <header class="hero compact staff-gate-hero">
-                <p class="eyebrow">"VIRYA / STAFF"</p>
+                <p class="eyebrow">{tr("virya_staff_eyebrow")}</p>
                 <h1>{tr("zone_prefix")}<em>{tr("team_zone_suffix")}</em></h1>
                 <p>{tr("gate_sales_and_show_operations_access_is")}</p>
             </header>
