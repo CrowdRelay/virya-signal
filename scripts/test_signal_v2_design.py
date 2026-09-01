@@ -46,6 +46,53 @@ class SignalV2DesignContract(unittest.TestCase):
         self.assertIn("prefers-reduced-motion: reduce", CSS)
         self.assertIn("focus-visible", CSS)
 
+    def test_control_borders_stay_visible(self) -> None:
+        """A flat surface has no depth cue, so the border is the whole affordance.
+
+        This is checked because it already regressed once: the move off
+        glassmorphism kept the border colours that blur and translucency used to
+        supplement, leaving every boundary near 1.3:1 against its own surface
+        while body text sat at 17.9:1. Text contrast was never the problem, so a
+        text-only check did not notice.
+
+        WCAG 1.4.11 asks 3:1 where a border is the only thing marking a control.
+        """
+        surface = token("--surface")
+        self.assertGreaterEqual(
+            contrast(token("--border-strong"), surface),
+            3.0,
+            "--border-strong marks controls; below 3:1 a field stops reading as a field",
+        )
+        # Dividers are decorative and sit lower on purpose, but must still be
+        # separable from the surface they divide.
+        self.assertGreaterEqual(
+            contrast(token("--border-subtle"), surface),
+            1.4,
+            "--border-subtle is invisible against its own surface",
+        )
+
+    def test_hover_is_gated_behind_a_pointer_that_can_hover(self) -> None:
+        """A tapped element keeps :hover until something else is tapped.
+
+        Unwrapped, that leaves a field looking focused when it is not — which on
+        a touch-first client is every field the user has ever touched.
+        """
+        if ":hover" in CSS:
+            self.assertIn(
+                "@media (hover: hover)",
+                CSS,
+                "hover styles must be gated on a pointer that can actually hover",
+            )
+
+    def test_text_inputs_do_not_trigger_focus_zoom(self) -> None:
+        """Under 16px, a mobile browser zooms the page when a field takes focus,
+        and leaves the layout scrolled sideways afterwards."""
+        match = re.search(r"input, textarea, select \{[^}]*?font-size: *([0-9.]+)(px|rem)", CSS)
+        self.assertIsNotNone(match, "could not read the control font size")
+        assert match is not None
+        size = float(match.group(1)) * (16 if match.group(2) == "rem" else 1)
+        self.assertGreaterEqual(size, 16.0, "a control below 16px makes the page zoom on focus")
+
     def test_home_is_action_first_not_fandom_analytics(self) -> None:
         self.assertNotIn('class="stats-grid fan-home-stats"', HOME)
         self.assertNotIn('class="participation-history"', HOME)

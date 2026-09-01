@@ -66,7 +66,6 @@ CRITICAL_SELECTORS = [
     ".primary",
     ".primary:active:not(:disabled)",
     "button:disabled",
-    "@supports not (backdrop-filter: blur(12px))",
     "@keyframes skeleton-shimmer",
     "@keyframes fade-in",
     "@keyframes ripple",

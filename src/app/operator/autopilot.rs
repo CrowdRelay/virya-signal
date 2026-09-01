@@ -17,7 +17,7 @@ fn AutopilotPanel(
                 <div><p class="eyebrow">VIRYAOS AUTOPILOT</p><h3>{tr("autopilot_control")}</h3></div>
                 <button class="text-button" on:click=refresh disabled=move || loading.get()>{tr("refresh_2")}</button>
             </div>
-            <Show when=move || !chief_loading.get() fallback=move || view! { <Skeleton rows=2 /> }>
+            <Show when=move || !chief_loading.get() || chief.with(|value| value.is_some()) fallback=move || view! { <Skeleton rows=2 /> }>
                 {move || chief.get().map(|brief| {
                     let attention = brief.attention_items.into_iter().take(6).collect::<Vec<_>>();
                     let opportunities = brief.top_opportunities.into_iter().take(5).collect::<Vec<_>>();

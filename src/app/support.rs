@@ -1,6 +1,21 @@
+/// A placeholder for a panel that has nothing to show yet.
+///
+/// `height` is the height of one row, and it matters: the point of a skeleton
+/// is that the content replacing it lands in the same place. A fixed 82px row
+/// standing in for a 184px card moves everything below it down by a hundred
+/// pixels per row the moment data arrives, which is the shift the skeleton
+/// exists to avoid. Pass the height of whatever this panel actually renders.
 #[component]
-pub fn Skeleton(#[prop(default = 3)] rows: usize) -> impl IntoView {
-    view! { <div class="skeleton-stack" role="status" aria-label=tr("loading")>{(0..rows).map(|_| view! { <i></i> }).collect_view()}</div> }
+pub fn Skeleton(
+    #[prop(default = 3)] rows: usize,
+    #[prop(default = 82)] height: u32,
+) -> impl IntoView {
+    let row_style = format!("height:{height}px");
+    view! {
+        <div class="skeleton-stack" role="status" aria-label=tr("loading")>
+            {(0..rows).map(|_| view! { <i style=row_style.clone()></i> }).collect_view()}
+        </div>
+    }
 }
 
 #[component]
@@ -166,12 +181,29 @@ fn refresh_operator_parts(
     refresh_operator_qr(dashboard, loading, error);
 }
 
+/// `blank_only_when_empty` for the operator dashboard's loading struct.
+fn blank_operator_only_when_empty(
+    loading: RwSignal<OperatorLoadingState>,
+    has_data: bool,
+    mark: impl Fn(&mut OperatorLoadingState, bool) + 'static,
+) {
+    if !has_data {
+        loading.update(|state| mark(state, true));
+    }
+}
+
 fn refresh_operator_events(
     dashboard: RwSignal<Option<DashboardData>>,
     loading: RwSignal<OperatorLoadingState>,
     error: RwSignal<Option<String>>,
 ) {
-    loading.update(|state| state.events = true);
+    // Same rule as the fan sections: a refresh over a populated list stays
+    // silent instead of dropping the list back to a skeleton.
+    blank_operator_only_when_empty(
+        loading,
+        dashboard.with_untracked(|value| value.as_ref().is_some_and(|data| !data.events.is_empty())),
+        |state, value| state.events = value,
+    );
     spawn_local(async move {
         let result = bridge::invoke_latest::<Vec<PublicEvent>, _>(
             "operator_events",
@@ -222,6 +254,19 @@ fn refresh_operator_qr(
     });
 }
 
+/// The `RwSignal<bool>` counterpart of `blank_only_when_empty`, for the
+/// operator screens whose loading state is a single flag rather than a struct.
+///
+/// Without it those panels set the flag on every refresh, so a periodic or
+/// manual refresh replaced a populated panel with a skeleton and then put the
+/// same content back — a blank flash on data the app was already holding. The
+/// fan screens never did this; the operator screens did, on every cycle.
+fn blank_flag_only_when_empty(loading: RwSignal<bool>, has_data: bool) {
+    if !has_data {
+        loading.set(true);
+    }
+}
+
 fn refresh_operator_signal(
     overview: RwSignal<Option<OperatorSignalOverview>>,
     loading: RwSignal<bool>,
@@ -230,7 +275,7 @@ fn refresh_operator_signal(
     if loading.get_untracked() {
         return;
     }
-    loading.set(true);
+    blank_flag_only_when_empty(loading, overview.with_untracked(|value| value.is_some()));
     spawn_lifecycle_task(async move {
         match bridge::invoke_timeout::<OperatorSignalOverview, _>(
             "operator_signal_overview",
@@ -258,7 +303,7 @@ fn refresh_operator_autopilot(
     if loading.get_untracked() {
         return;
     }
-    loading.set(true);
+    blank_flag_only_when_empty(loading, overview.with_untracked(|value| value.is_some()));
     spawn_local(async move {
         let result = bridge::invoke_latest::<OperatorAutopilotOverview, _>(
             "operator_autopilot_overview",
@@ -287,7 +332,7 @@ fn refresh_operator_chief(
     if loading.get_untracked() {
         return;
     }
-    loading.set(true);
+    blank_flag_only_when_empty(loading, brief.with_untracked(|value| value.is_some()));
     spawn_local(async move {
         let result = bridge::invoke_latest::<AutopilotChiefOfStaff, _>(
             "operator_autopilot_chief_of_staff",
@@ -316,7 +361,7 @@ fn refresh_operator_ops(
     if loading.get_untracked() {
         return;
     }
-    loading.set(true);
+    blank_flag_only_when_empty(loading, overview.with_untracked(|value| value.is_some()));
     spawn_local(async move {
         let result = bridge::invoke_latest::<OperatorOpsOverview, _>(
             "operator_ops_overview",

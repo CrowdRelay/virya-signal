@@ -186,40 +186,63 @@ fn every_variant_tag_is_accepted() {
         "submit_funding_application",
         "send_team_assignment_email",
     ];
+    // A recognised tag with no fields decodes to `Unrecognized` carrying that
+    // same tag — it is modellable in principle, just not with this body. A tag
+    // this build has never heard of is indistinguishable at this level, which
+    // is the point: neither may fail the decode. What separates them is the
+    // ecosystem contract test, which compares the two repositories directly.
     for kind in kinds {
-        let error = serde_json::from_value::<AutopilotActionPayload>(json!({ "kind": kind }))
-            .expect_err("a tag with no fields must fail on a missing field, not an unknown tag");
-        let message = error.to_string();
-        assert!(
-            !message.contains("unknown variant"),
-            "`{kind}` must be a recognised payload tag, got: {message}"
-        );
+        let payload = serde_json::from_value::<AutopilotActionPayload>(json!({ "kind": kind }))
+            .expect("a payload must never fail to decode; see the Deserialize impl");
+        match payload {
+            AutopilotActionPayload::Unrecognized { wire_kind } => {
+                assert_eq!(wire_kind, kind, "the failing tag must be preserved");
+            }
+            other => panic!("`{kind}` decoded with no fields: {other:?}"),
+        }
     }
 }
 
+/// An unknown tag used to be a decode error. It cannot be.
+///
+/// `payload` is a required field of `PendingAutopilotAction` and those arrive
+/// as a list, so a rejected payload rejected its element and a rejected element
+/// rejected the whole list: the operator lost the entire Autopilot screen
+/// because of one row nobody could render. CrowdRelay adds action kinds on its
+/// own cadence and a store-distributed client is always some versions behind —
+/// at the time this changed, 16 backend payload kinds were already unmodellable
+/// here. Drift is still caught, by `scripts/test_autopilot_wire_contract.py`
+/// comparing the repositories, and still visible, as a labelled row.
 #[test]
-fn unknown_tag_is_rejected_as_an_unknown_variant() {
-    let error =
+fn an_unknown_tag_decodes_to_the_unrecognized_variant() {
+    let payload =
         serde_json::from_value::<AutopilotActionPayload>(json!({ "kind": "not_a_real_kind" }))
-            .expect_err("unknown payload tags must not decode");
-    assert!(
-        error.to_string().contains("unknown variant"),
-        "unknown tags must report an unknown variant: {error}"
-    );
+            .expect("an unknown tag must not fail the decode");
+    match payload {
+        AutopilotActionPayload::Unrecognized { wire_kind } => {
+            assert_eq!(wire_kind, "not_a_real_kind");
+        }
+        other => panic!("expected Unrecognized, got {other:?}"),
+    }
 }
 
+/// The other half of the same failure: a kind both sides know, whose shape has
+/// moved. It degrades identically, and for the same reason — an error here
+/// would cost the list, not the row.
 #[test]
-fn missing_required_field_is_reported_by_name() {
-    let error = serde_json::from_value::<AutopilotActionPayload>(json!({
+fn a_known_tag_missing_a_field_decodes_to_the_unrecognized_variant() {
+    let payload = serde_json::from_value::<AutopilotActionPayload>(json!({
         "kind": "change_ticket_price",
         "ticket_type_id": "tt-1",
         "from_minor": 1000
     }))
-    .expect_err("a missing required field must not decode");
-    assert!(
-        error.to_string().contains("to_minor"),
-        "the missing field must be named: {error}"
-    );
+    .expect("a missing field must not fail the decode");
+    match payload {
+        AutopilotActionPayload::Unrecognized { wire_kind } => {
+            assert_eq!(wire_kind, "change_ticket_price");
+        }
+        other => panic!("expected Unrecognized, got {other:?}"),
+    }
 }
 
 #[test]

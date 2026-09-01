@@ -273,6 +273,35 @@ fn submit_fan_confirmation(
     );
 }
 
+/// One-tap entry for Google Play reviewers. Spends the pre-provisioned demo
+/// fan confirmation token through the same `fan_confirm` path as a pasted code.
+fn demo_login(
+    token: RwSignal<String>,
+    pin: RwSignal<String>,
+    busy: RwSignal<bool>,
+    session: FanConfirmationSession,
+    error: RwSignal<Option<String>>,
+) {
+    if busy.get_untracked() {
+        return;
+    }
+    token.set(DEMO_FAN_TOKEN.to_owned());
+    pin.set(DEMO_FAN_PIN.to_owned());
+    submit_fan_confirmation_values(
+        FanConfirmationValues {
+            email: String::new(),
+            name: None,
+            token: DEMO_FAN_TOKEN.to_owned(),
+            pin: DEMO_FAN_PIN.to_owned(),
+        },
+        token,
+        pin,
+        busy,
+        session,
+        error,
+    );
+}
+
 #[component]
 fn FanAccess(
     mode: RwSignal<RootMode>,
@@ -466,6 +495,10 @@ fn FanAccess(
         submit_fan_confirmation(email, name, token, pin, busy, confirmation_session, error);
     };
 
+    let demo = move |_| {
+        demo_login(token, pin, busy, confirmation_session, error);
+    };
+
     let request_access = move |_| {
         if busy.get_untracked() {
             return;
@@ -636,6 +669,12 @@ fn FanAccess(
                             </>
                         </Show>
                     </div>
+                </div>
+                <div class="demo-login-section">
+                    <button type="button" class="demo-login-button" disabled=move || busy.get() on:click=demo>
+                        {tr("demo_login")}
+                    </button>
+                    <p class="demo-login-hint">{tr("demo_login_hint")}</p>
                 </div>
             }>
                 <div class="access-card fan-card">

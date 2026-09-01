@@ -77,6 +77,12 @@ fn autopilot_effect_label(assessment: &str) -> String {
 
 fn autopilot_payload_detail(payload: &AutopilotActionPayload) -> String {
     match payload {
+        // An action kind newer than this build. Showing the raw kind is more
+        // use to an operator than hiding the row, and hiding it was never an
+        // option anyway: the alternative this replaced failed the whole list.
+        AutopilotActionPayload::Unrecognized { wire_kind } => {
+            format!("{wire_kind} · needs a newer app version")
+        }
         AutopilotActionPayload::ChangeTicketPrice { from_minor, to_minor, .. } => {
             format!("{:.2} → {:.2} PLN", *from_minor as f64 / 100.0, *to_minor as f64 / 100.0)
         }

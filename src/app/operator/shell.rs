@@ -273,7 +273,7 @@ fn OperatorHome(
     view! {
         <section class="screen">
             <header class="screen-title"><p class="eyebrow">LIVE OPERATIONS</p><h2>{tr("today_under_control")}</h2></header>
-            <Show when=move || !loading.get().events fallback=move || view! { <Skeleton /> }>
+            <Show when=move || !loading.get().events || !operator_events(dashboard).is_empty() fallback=move || view! { <Skeleton /> }>
                 {move || dashboard.with(|state| state.as_ref().map(|data| {
                     let next = data.events.first().cloned();
                     let event_count = data.events.len();

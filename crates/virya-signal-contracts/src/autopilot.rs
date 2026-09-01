@@ -36,6 +36,21 @@ pub struct ExperimentAllocation {
 #[derive(Clone, Debug, Serialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum AutopilotActionPayload {
+    /// An action kind this build does not know.
+    ///
+    /// CrowdRelay ships action kinds on its own cadence; a store-distributed
+    /// client runs whatever version the user last installed, so the two are
+    /// never in lockstep. This variant used to be an error, and because
+    /// `payload` is a required field inside `PendingAutopilotAction`, that
+    /// error failed the whole element — and with it the entire pending-actions
+    /// list. One unknown kind blanked the operator's Autopilot screen rather
+    /// than one row of it. Keeping the raw kind lets the UI show the action,
+    /// label it generically, and leave it for a build that understands it.
+    Unrecognized {
+        /// The wire kind as received. Named apart from the `kind` tag serde
+        /// already uses to discriminate this enum.
+        wire_kind: String,
+    },
     ChangeTicketPrice {
         ticket_type_id: String,
         from_minor: i64,
@@ -281,35 +296,14 @@ struct WireAutopilotActionPayload {
     winner_variant_id: Option<String>,
 }
 
+/// Why a wire payload could not be modelled by this build.
+///
+/// Both outcomes are handled, never returned to serde: see the `Deserialize`
+/// impl for why an error here would cost the whole pending-actions list.
 enum WirePayloadError {
+    /// A kind this build knows, missing a field this build requires.
     MissingField(&'static str),
-    UnknownKind,
 }
-
-const AUTOPILOT_PAYLOAD_KINDS: &[&str] = &[
-    "change_ticket_price",
-    "change_ticket_capacity",
-    "request_fan_lifecycle_message",
-    "request_merch_reorder",
-    "change_merch_price",
-    "request_booking_outreach",
-    "request_audience_campaign",
-    "request_merch_bundle",
-    "request_outreach",
-    "request_beacon_discovery",
-    "request_beacon_outreach",
-    "request_show_growth",
-    "request_content_artifact",
-    "adjust_experiment",
-    "complete_show_task",
-    "escalate_show_task",
-    "request_promotion_budget_change",
-    "execute_release_milestone",
-    "apply_live_opportunity",
-    "prepare_funding_package",
-    "submit_funding_application",
-    "send_team_assignment_email",
-];
 
 #[inline]
 fn required<T>(value: Option<T>, field: &'static str) -> Result<T, WirePayloadError> {
@@ -445,7 +439,9 @@ impl WireAutopilotActionPayload {
                 action_url_path: required(self.action_url_path, "action_url_path")?,
                 reminder_number: required(self.reminder_number, "reminder_number")?,
             },
-            _ => return Err(WirePayloadError::UnknownKind),
+            other => AutopilotActionPayload::Unrecognized {
+                wire_kind: other.to_owned(),
+            },
         })
     }
 }
@@ -457,12 +453,23 @@ impl<'de> Deserialize<'de> for AutopilotActionPayload {
     {
         let wire = WireAutopilotActionPayload::deserialize(deserializer)?;
         let kind = wire.kind.clone();
-        wire.into_payload().map_err(|error| match error {
-            WirePayloadError::MissingField(field) => serde::de::Error::missing_field(field),
-            WirePayloadError::UnknownKind => {
-                serde::de::Error::unknown_variant(&kind, AUTOPILOT_PAYLOAD_KINDS)
+        // Neither failure mode may propagate. `payload` is a required field of
+        // `PendingAutopilotAction`, so an error here fails that element, and
+        // failing one element of the pending-actions list fails the list — the
+        // operator loses the whole Autopilot screen, not the one row nobody
+        // could render. A store-distributed client cannot be updated in step
+        // with the backend, so both an unknown kind and a known kind whose
+        // shape has moved degrade to one generic row carrying the wire kind.
+        Ok(wire.into_payload().unwrap_or_else(|error| {
+            // A missing field means the two sides genuinely disagree about a
+            // kind both claim to know. The contract crate has no logger — it is
+            // shared by the wasm UI and the native shell — so the signal is the
+            // generic row itself, carrying the wire kind that failed.
+            let WirePayloadError::MissingField(_field) = error;
+            AutopilotActionPayload::Unrecognized {
+                wire_kind: kind.clone(),
             }
-        })
+        }))
     }
 }
 
@@ -497,6 +504,10 @@ impl AutopilotActionPayload {
             Self::PrepareFundingPackage { .. } => "funding.package.prepare",
             Self::SubmitFundingApplication { .. } => "funding.application.submit",
             Self::SendTeamAssignmentEmail { .. } => "team.assignment.email",
+            // Not a CrowdRelay kind: this build did not recognise the one it
+            // was sent. `scripts/test_autopilot_wire_contract.py` excludes it
+            // when comparing against the backend.
+            Self::Unrecognized { .. } => "unrecognized",
         }
     }
 }
@@ -769,4 +780,69 @@ pub struct AutopilotAuthorityRequest {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AutopilotAssignRequest {
     pub member_key: String,
+}
+
+#[cfg(test)]
+mod forward_compatibility_tests {
+    use super::*;
+
+    /// The shape the operator screen actually receives: a list. One element it
+    /// cannot model must not cost the other elements.
+    ///
+    /// Note the payload `kind` tag is the snake_case variant name
+    /// (`change_ticket_price`), not the dotted wire action kind
+    /// (`ticket.price.change`). The two are separate vocabularies.
+    fn pending(kind: &str, extra: &str) -> String {
+        format!(
+            r#"{{"id":"a","context":"growth_intelligence","action_kind":"{kind}",
+                 "subject_kind":"workspace","subject_id":"w",
+                 "payload":{{"kind":"{kind}"{extra}}},"created_at":"2026-01-01T00:00:00Z"}}"#
+        )
+    }
+
+    #[test]
+    fn an_action_kind_this_build_never_heard_of_is_not_fatal() {
+        // CrowdRelay ships action kinds on its own cadence; at the time of
+        // writing it had 15 this crate cannot model. Each one used to fail the
+        // element, and one failed element fails the whole list.
+        let payload: AutopilotActionPayload =
+            serde_json::from_str(r#"{"kind":"issue_referral_code"}"#).expect("must not error");
+        match payload {
+            AutopilotActionPayload::Unrecognized { wire_kind } => {
+                assert_eq!(wire_kind, "issue_referral_code");
+            }
+            other => panic!("expected Unrecognized, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_known_kind_missing_a_required_field_is_not_fatal_either() {
+        // The other half of the same failure: the backend renames or adds a
+        // required field on a kind both sides claim to know.
+        let payload: AutopilotActionPayload =
+            serde_json::from_str(r#"{"kind":"change_ticket_price"}"#).expect("must not error");
+        assert!(matches!(
+            payload,
+            AutopilotActionPayload::Unrecognized { .. }
+        ));
+    }
+
+    #[test]
+    fn one_unmodellable_action_does_not_cost_the_rest_of_the_list() {
+        let list = format!(
+            "[{},{}]",
+            pending("some_future_kind", ""),
+            pending(
+                "change_ticket_price",
+                r#","ticket_type_id":"t","from_minor":1000,"to_minor":1200"#
+            ),
+        );
+        let actions: Vec<PendingAutopilotAction> =
+            serde_json::from_str(&list).expect("the list must survive an unknown element");
+        assert_eq!(actions.len(), 2, "the known action must still arrive");
+        assert!(matches!(
+            actions[1].payload,
+            AutopilotActionPayload::ChangeTicketPrice { .. }
+        ));
+    }
 }

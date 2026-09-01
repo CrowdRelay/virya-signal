@@ -118,6 +118,48 @@ class RuntimePerformanceContract(unittest.TestCase):
             )
         )
 
+    def test_a_refresh_never_blanks_a_populated_panel(self):
+        """Refreshing over data already on screen must not drop to a skeleton.
+
+        The fan screens routed every refresh through `blank_only_when_empty`,
+        so a tab switch or resume swapped new data in silently. The operator
+        screens set their loading flag unconditionally, so the same refresh
+        replaced a populated panel with a placeholder and then put the same
+        content back — a blank flash, once per cycle, on data the app already
+        held.
+
+        Both shapes of loading state now go through a guard. A bare
+        `loading.set(true)` in a refresher is the regression.
+        """
+        support = (ROOT / "src/app/support.rs").read_text()
+        refreshers = [
+            block.split("\nfn ", 1)[0]
+            for block in support.split("\nfn refresh_")[1:]
+        ]
+        self.assertGreaterEqual(len(refreshers), 8, "refresher scan found too little")
+        for body in refreshers:
+            name = body.split("(", 1)[0]
+            # `if loading.get_untracked() { return; }` is a re-entry guard, not
+            # a blanking call, and is fine.
+            for line in body.splitlines():
+                stripped = line.strip()
+                if stripped in ("loading.set(true);", "loading.update(|state| state.events = true);"):
+                    self.fail(
+                        f"refresh_{name} blanks its panel unconditionally; "
+                        f"use blank_only_when_empty/blank_flag_only_when_empty"
+                    )
+
+    def test_skeleton_rows_can_match_the_content_they_stand_in_for(self):
+        """A fixed row height moves everything below it when data lands.
+
+        CLS is gated at 0.10 by check-lighthouse.py, so this is about keeping
+        the affordance available rather than fixing a breach: a panel whose
+        content is much taller than 82px should be able to say so.
+        """
+        support = (ROOT / "src/app/support.rs").read_text()
+        skeleton = support.split("pub fn Skeleton(", 1)[1].split("\n}", 1)[0]
+        self.assertIn("height", skeleton, "Skeleton cannot size its rows to its panel")
+
     def test_wallet_loading_concurrency_is_bounded(self):
         source = read_rust_module(ROOT, "src-tauri/src/commands/fan.rs")
         self.assertIn("const WALLET_FETCH_CONCURRENCY: usize = 8;", source)

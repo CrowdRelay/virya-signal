@@ -15,6 +15,11 @@ pub(super) const API_BASE: &str = match option_env!("VIRYA_SIGNAL_E2E_API_BASE")
 #[cfg(not(debug_assertions))]
 pub(super) const API_BASE: &str = PRODUCTION_API_BASE;
 pub(super) const POLICY_VERSION: &str = "2026-07";
+/// Pre-provisioned demo fan confirmation token for Google Play reviewers.
+/// Single-use, 30-day TTL. Bound to a pending demo fan in the Virya workspace.
+pub(super) const DEMO_FAN_TOKEN: &str =
+    "d2cc8fda6a69eb6aeedb42e6b0aedcdbed88c376b7f00de5df2e3f0affd45e40";
+pub(super) const DEMO_FAN_PIN: &str = "2580";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum RootMode {

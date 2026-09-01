@@ -48,8 +48,20 @@ class AutopilotWireContract(unittest.TestCase):
 
         action_kind_body = contract.split("pub const fn action_kind", 1)[1].split("pub struct TeamAssigneeSummary", 1)[0]
         contract_action_kinds = set(re.findall(r'=> \"([a-z0-9_.]+)\"', action_kind_body))
+        # "unrecognized" is a client-side sentinel for an action kind newer than
+        # this build, not something CrowdRelay ever sends. It exists so a kind
+        # this app has never heard of degrades to one generic row instead of
+        # failing the whole pending-actions list.
+        self.assertIn(
+            "unrecognized",
+            contract_action_kinds,
+            "the forward-compatible payload variant is gone; an unknown action "
+            "kind would fail the entire operator overview again",
+        )
+        contract_action_kinds.discard("unrecognized")
         label_body = labels.split("fn autopilot_action_kind_label", 1)[1].split("fn autopilot_measurement_kind_label", 1)[0]
         labelled_action_kinds = set(re.findall(r'"([a-z0-9_.]+)" =>', label_body))
+        labelled_action_kinds.discard("unrecognized")
         self.assertEqual(labelled_action_kinds, contract_action_kinds)
 
         # Ecosystem worktrees may include CrowdRelay next to Signal; standalone
@@ -60,7 +72,25 @@ class AutopilotWireContract(unittest.TestCase):
             backend_model = backend_path.read_text()
             backend_body = backend_model.split("pub const fn action_kind", 1)[1].split("/// Action-ready", 1)[0]
             backend_action_kinds = set(re.findall(r'=> "([a-z0-9_.]+)"', backend_body))
-            self.assertEqual(contract_action_kinds, backend_action_kinds)
+            missing = sorted(backend_action_kinds - contract_action_kinds)
+            extra = sorted(contract_action_kinds - backend_action_kinds)
+            # Drift here is no longer a crash: an action kind this build cannot
+            # model decodes to AutopilotActionPayload::Unrecognized and renders
+            # as one labelled row. It is still worth failing on, because each
+            # missing kind is an action a staff member can see but not act on.
+            self.assertEqual(
+                [],
+                missing,
+                "CrowdRelay ships action kinds this build cannot model; they "
+                "degrade to a generic row until a variant is added here: "
+                + ", ".join(missing),
+            )
+            self.assertEqual(
+                [],
+                extra,
+                "this build models action kinds CrowdRelay no longer sends: "
+                + ", ".join(extra),
+            )
 
 
 if __name__ == "__main__":
