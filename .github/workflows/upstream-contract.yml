@@ -45,6 +45,7 @@ jobs:
           ref: main
           path: crowdrelay
           persist-credentials: false
+          token: ${{ secrets.CROWDRELAY_PAT }}
 
       - name: Verify Signal against current upstream capabilities and schema
         id: contract
