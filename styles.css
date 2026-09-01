@@ -90,7 +90,7 @@ a { color: inherit; text-decoration: none; }
 .staff-entry-button { position: fixed; z-index: 35; top: max(17px, env(safe-area-inset-top)); right: 16px; min-height: 44px; border: 1px solid var(--line); border-radius: 2px; background: var(--surface); color: var(--muted); padding: 11px 13px; display: inline-flex; align-items: center; gap: 7px; font-size: var(--type-micro); font-weight: 900; letter-spacing: .1em; }
 .staff-entry-button:active { color: var(--signal-hot); border-color: var(--signal-deep); background: var(--surface-2); }
 .staff-entry-button span { color: var(--signal-hot); font-size: 14px; line-height: 1; }
-.access-screen, .fan-access { min-height: 100dvh; padding: max(76px, calc(env(safe-area-inset-top) + 58px)) 20px 38px; display: flex; flex-direction: column; justify-content: center; position: relative; }
+.access-screen, .fan-access { min-height: 100dvh; padding: max(76px, calc(env(safe-area-inset-top) + 58px)) 20px 38px; display: flex; flex-direction: column; justify-content: safe center; position: relative; }
 .hero, .fan-access-hero { width: 100%; max-width: 600px; margin: 0 auto 24px; }
 .hero h1, .fan-access-hero h1 { font-size: clamp(42px, 12vw, 70px); line-height: .9; text-transform: uppercase; margin: 9px 0 17px; letter-spacing: -.07em; text-wrap: balance; }
 .hero h1 em, .fan-access-hero h1 em { font-style: normal; background: linear-gradient(135deg, var(--signal-hot), var(--signal)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: var(--signal-hot); }
