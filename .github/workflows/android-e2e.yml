@@ -16,7 +16,7 @@ jobs:
     uses: ./.github/workflows/_android-build.yml
     with:
       build_kind: debug-apk
-      version: 0.4.2-e2e
+      version: 0.5.0-e2e
       artifact_name: virya-signal-android-e2e
       retention_days: 7
       signed: false
