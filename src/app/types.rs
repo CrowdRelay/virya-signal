@@ -15,8 +15,18 @@ pub(super) const API_BASE: &str = match option_env!("VIRYA_SIGNAL_E2E_API_BASE")
 #[cfg(not(debug_assertions))]
 pub(super) const API_BASE: &str = PRODUCTION_API_BASE;
 pub(super) const POLICY_VERSION: &str = "2026-07";
-/// Pre-provisioned demo fan confirmation token for Google Play reviewers.
-/// Single-use, 30-day TTL. Bound to a pending demo fan in the Virya workspace.
+/// Pre-provisioned demo access token for Google Play reviewers.
+///
+/// Must be a **reusable** `purpose = 'session'` token bound to an **active**
+/// demo fan in the Virya workspace. Not a `confirm` token: those are spent on
+/// first use and only act on a pending fan, so the first reviewer to tap Demo
+/// Login consumed it and every reviewer after — and every later review of an
+/// update — got a conflict. CrowdRelay migration 0211 adds the reusable flag,
+/// restricted to session tokens so a stale confirmation still cannot
+/// reactivate an unsubscribed fan.
+///
+/// Expiry still applies and may not exceed 180 days. Re-provision before it
+/// lapses or demo access dies silently.
 pub(super) const DEMO_FAN_TOKEN: &str =
     "d2cc8fda6a69eb6aeedb42e6b0aedcdbed88c376b7f00de5df2e3f0affd45e40";
 pub(super) const DEMO_FAN_PIN: &str = "2580";
