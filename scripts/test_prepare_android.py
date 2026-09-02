@@ -145,9 +145,10 @@ dependencies {
             # tao-0.35.3 calls getId() via JNI on the activity instance.
             # R8 can strip the inherited getter from WryActivity despite
             # -keep rules. prepare-android.py must patch MainActivity.kt
-            # to define getId() directly so the JNI lookup succeeds.
+            # to override the id property so getId() is generated directly
+            # on MainActivity and the JNI lookup succeeds.
             patched = main_activity.read_text()
-            self.assertIn("fun getId()", patched)
+            self.assertIn("override val id", patched)
 
             properties = (android / "gradle.properties").read_text()
             self.assertIn("org.gradle.caching=true", properties)
