@@ -157,13 +157,13 @@ button:disabled { opacity: .48; cursor: default; }
 .status-failure h2 { margin: 0; font-size: 24px; text-transform: uppercase; }
 .status-failure p:not(.eyebrow) { margin: 0; color: #aaa; line-height: 1.55; }
 .public-strip { width: 100%; max-width: 600px; margin: 24px auto 0; }
-.authenticated { min-height: 100dvh; padding-bottom: calc(98px + var(--safe-bottom)); }
-.topbar { position: sticky; z-index: 20; top: 0; display: flex; align-items: center; justify-content: space-between; padding: max(16px, env(safe-area-inset-top)) 18px 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.authenticated { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
+.topbar { position: sticky; z-index: 20; top: 0; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: max(16px, env(safe-area-inset-top)) 18px 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
 .topbar strong { display: block; margin-top: 4px; font-size: 15px; }
 .topbar-actions { display: flex; align-items: center; gap: 10px; }
 .topbar-actions button { width: 44px; height: 44px; border: 1px solid var(--border-strong); border-radius: var(--control-radius); background: #111; color: #999; font-size: 18px; }
 .role-pill { padding: 7px 10px; border: 1px solid var(--signal-deep); color: var(--signal-hot); font-size: var(--type-micro); font-weight: 900; letter-spacing: .14em; }
-.content { max-width: 760px; margin: auto; }
+.content { max-width: 760px; margin: auto; flex: 1; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .screen { padding: 22px 20px 48px; }
 .screen-title { margin-bottom: 20px; }
 .screen-title h2 { margin: 6px 0 0; font-size: clamp(32px, 9vw, 44px); line-height: .92; letter-spacing: -.052em; text-transform: uppercase; text-wrap: balance; }
@@ -199,7 +199,7 @@ button:disabled { opacity: .48; cursor: default; }
 .event-card h4 { font-size: 14px; }
 .event-card p, .order-card p { color: var(--muted); font-size: var(--type-meta); margin-top: 4px; }
 .chevron { color: var(--signal-hot); font-size: 28px; }
-.bottom-nav { position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; height: calc(80px + var(--safe-bottom)); padding: 4px 6px var(--safe-bottom); display: grid; gap: 2px; background: var(--surface); border-top: 1px solid var(--line); transform: translateZ(0); }
+.bottom-nav { position: relative; z-index: 40; flex-shrink: 0; height: calc(80px + var(--safe-bottom)); padding: 4px 6px var(--safe-bottom); display: grid; gap: 2px; background: var(--surface); border-top: 1px solid var(--line); }
 .bottom-nav.three { grid-template-columns: repeat(3, 1fr); }
 .bottom-nav.four { grid-template-columns: repeat(4, 1fr); }
 .bottom-nav.five { grid-template-columns: repeat(5, 1fr); }
@@ -476,7 +476,7 @@ button:disabled { opacity: .48; cursor: default; }
 @media (min-width: 720px) {
   .mode-grid { grid-template-columns: 1fr 1fr; }
   .screen { padding: 28px 24px 50px; }
-  .bottom-nav { left: 50%; width: 760px; transform: translateX(-50%) translateZ(0); border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+  .bottom-nav { max-width: 760px; margin: 0 auto; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
   .scanner-button { min-height: 380px; }
 }
 @media (max-width: 390px) {
@@ -925,7 +925,7 @@ html[data-virya-scanner-active] .app-shell {
 .checkout-review > div:last-child { border-bottom: none; }
 .checkout-review span { color: var(--muted); font-size: var(--type-micro); text-transform: uppercase; }
 .checkout-review strong { color: var(--signal-hot); font-size: 1.05rem; }
-.ticket-checkout-sticky { position: sticky; bottom: calc(80px + var(--safe-bottom)); z-index: 10; }
+.ticket-checkout-sticky { position: sticky; bottom: 0; z-index: 10; }
 .signup-details-hint { color: var(--muted); font-size: .85rem; margin: 4px 0 10px; line-height: 1.4; }
 .merch-screen .screen-title > p:last-child { color: var(--muted); line-height: 1.5; }
 .merch-screen .empty-state .ghost { min-height: 50px; padding-top: 13px; padding-bottom: 13px; }
@@ -1251,7 +1251,7 @@ html[data-virya-scanner-active] .app-shell {
 
 /* Latarnik is a separate professional principal and surface, not a fan tier. */
 .beacon-authenticated { --beacon-gold: #d8b44a; }
-.beacon-content { padding-bottom: 88px; }
+.beacon-content { padding-bottom: 0; }
 .beacon-screen { display: grid; gap: 16px; }
 .beacon-hero { padding: 18px; border: 1px solid #3b3420; border-radius: 6px; background: linear-gradient(145deg, #17150e, #0b0b0a 62%); }
 .beacon-hero h2 { max-width: 18ch; }
