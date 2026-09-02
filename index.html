@@ -310,7 +310,7 @@ button:disabled { opacity: .48; cursor: default; }
 
 .event-card p, .order-card p { color: var(--muted); font-size: var(--type-meta); margin-top: 4px; }
 
-.bottom-nav { position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; height: calc(80px + var(--safe-bottom)); padding: 4px 6px var(--safe-bottom); display: grid; gap: 2px; background: var(--surface); border-top: 1px solid var(--line); }
+.bottom-nav { position: fixed; z-index: 40; left: 0; right: 0; bottom: 0; height: calc(80px + var(--safe-bottom)); padding: 4px 6px var(--safe-bottom); display: grid; gap: 2px; background: var(--surface); border-top: 1px solid var(--line); transform: translateZ(0); }
 
 .bottom-nav.three { grid-template-columns: repeat(3, 1fr); }
 
@@ -1855,8 +1855,8 @@ html[data-virya-scanner-active] .app-shell {
     animation: tab-enter var(--dur-med) var(--ease-out);
   }
   @keyframes tab-enter {
-    from { opacity: 0; transform: translateX(8px) scale(.98); }
-    to { opacity: 1; transform: translateX(0) scale(1); }
+    from { opacity: 0; transform: translateX(8px); }
+    to { opacity: 1; transform: translateX(0); }
   }
 }
 @media (prefers-reduced-motion: no-preference) {
