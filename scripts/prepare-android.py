@@ -414,7 +414,13 @@ main_activity_text = re.sub(
     main_activity_text,
     flags=re.MULTILINE,
 )
-if "override val id" not in main_activity_text:
+main_activity_text = re.sub(
+    r"^[ \t]*//[^\n]*\n[ \t]*//[^\n]*\n[ \t]*//[^\n]*\n[ \t]*//[^\n]*\n[ \t]*override var id: Int\n[ \t]*get\(\) = super\.id\n[ \t]*set\(value\) \{ super\.id = value \}\n",
+    "",
+    main_activity_text,
+    flags=re.MULTILINE,
+)
+if "override val id" not in main_activity_text and "override var id" not in main_activity_text:
     main_activity_text = main_activity_text.rstrip()
     if not main_activity_text.endswith("}"):
         raise SystemExit("MainActivity.kt does not end with closing brace — cannot patch")
@@ -425,8 +431,9 @@ if "override val id" not in main_activity_text:
         "  // R8 can strip the inherited getter from WryActivity despite -keep\n"
         "  // rules. Override the property so getId() is generated directly on\n"
         "  // MainActivity and the JNI lookup succeeds regardless of R8.\n"
-        "  override val id: Int\n"
+        "  override var id: Int\n"
         "    get() = super.id\n"
+        "    set(value) { super.id = value }\n"
         "}\n"
     )
     main_activity.write_text(main_activity_text, encoding="utf-8")

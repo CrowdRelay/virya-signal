@@ -161,7 +161,7 @@ dependencies {
             # WryActivity and override it in MainActivity so getId() is
             # generated directly on MainActivity.
             patched = main_activity.read_text()
-            self.assertIn("override val id", patched)
+            self.assertIn("override var id", patched)
             wry = app / "src" / "main" / "java" / "music" / "virya" / "signal" / "generated" / "WryActivity.kt"
             patched_wry = wry.read_text()
             self.assertIn("open var id", patched_wry)
