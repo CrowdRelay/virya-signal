@@ -476,7 +476,7 @@ button:disabled { opacity: .48; cursor: default; }
 @media (min-width: 720px) {
   .mode-grid { grid-template-columns: 1fr 1fr; }
   .screen { padding: 28px 24px 50px; }
-  .bottom-nav { left: 50%; width: 760px; transform: translateX(-50%); border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+  .bottom-nav { left: 50%; width: 760px; transform: translateX(-50%) translateZ(0); border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
   .scanner-button { min-height: 380px; }
 }
 @media (max-width: 390px) {
@@ -1299,8 +1299,8 @@ html[data-virya-scanner-active] .app-shell {
    preserving scroll position and decoded imagery across switches. */
 .tab-page[hidden] { display: none; }
 .tab-page.hidden { display: none; }
-.tab-page.tab-active { animation: tab-enter var(--dur-med) var(--ease-out); }
-@keyframes tab-enter { from { opacity: 0; transform: translateX(8px); } }
+.tab-page.tab-active { }
+@keyframes tab-enter { from { opacity: 1; } }
 
 /* Pull-to-refresh hint hanging above the fan content column. Decorative glyph
    only; transitions are disabled mid-drag so it tracks the finger exactly. */
@@ -1376,16 +1376,11 @@ html[data-virya-scanner-active] .app-shell {
 
 /* ─── Next-level motion polish ─── */
 
-/* Tab transition: subtle slide for depth. The bottom nav buttons
-   themselves don't animate — only the page content does. */
+/* Tab transition: disabled — any transform on the tab page creates a
+   compositing layer that drags the fixed bottom nav on Android WebView. */
 @media (prefers-reduced-motion: no-preference) {
-  .tab-page.tab-active {
-    animation: tab-enter var(--dur-med) var(--ease-out);
-  }
-  @keyframes tab-enter {
-    from { opacity: 0; transform: translateX(8px); }
-    to { opacity: 1; transform: translateX(0); }
-  }
+  .tab-page.tab-active { }
+  @keyframes tab-enter { from { opacity: 1; } }
 }
 
 /* Toast entrance: spring pop for tactile confirmation */
