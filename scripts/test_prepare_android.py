@@ -43,12 +43,25 @@ MAIN_ACTIVITY_KT = (
     "}\n"
 )
 
+WRY_ACTIVITY_KT = (
+    "package music.virya.signal\n"
+    "\n"
+    "import android.os.Bundle\n"
+    "\n"
+    "abstract class WryActivity : AppCompatActivity() {\n"
+    "  var id: Int = 0\n"
+    "}\n"
+)
+
 
 def seed_main_activity(app: Path) -> Path:
-    """Create the generated MainActivity.kt in the app source tree."""
+    """Create the generated MainActivity.kt and WryActivity.kt in the app source tree."""
     main_activity = app / "src" / "main" / "java" / "music" / "virya" / "signal" / "MainActivity.kt"
     main_activity.parent.mkdir(parents=True, exist_ok=True)
     main_activity.write_text(MAIN_ACTIVITY_KT, encoding="utf-8")
+    wry_activity = app / "src" / "main" / "java" / "music" / "virya" / "signal" / "generated" / "WryActivity.kt"
+    wry_activity.parent.mkdir(parents=True, exist_ok=True)
+    wry_activity.write_text(WRY_ACTIVITY_KT, encoding="utf-8")
     return main_activity
 
 
@@ -144,11 +157,14 @@ dependencies {
 
             # tao-0.35.3 calls getId() via JNI on the activity instance.
             # R8 can strip the inherited getter from WryActivity despite
-            # -keep rules. prepare-android.py must patch MainActivity.kt
-            # to override the id property so getId() is generated directly
-            # on MainActivity and the JNI lookup succeeds.
+            # -keep rules. prepare-android.py must make id open in
+            # WryActivity and override it in MainActivity so getId() is
+            # generated directly on MainActivity.
             patched = main_activity.read_text()
             self.assertIn("override val id", patched)
+            wry = app / "src" / "main" / "java" / "music" / "virya" / "signal" / "generated" / "WryActivity.kt"
+            patched_wry = wry.read_text()
+            self.assertIn("open var id", patched_wry)
 
             properties = (android / "gradle.properties").read_text()
             self.assertIn("org.gradle.caching=true", properties)

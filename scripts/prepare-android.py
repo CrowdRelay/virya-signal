@@ -342,23 +342,33 @@ if not proguard_source.is_file():
     raise SystemExit(f"missing ProGuard rules: {proguard_source}")
 shutil.copy2(proguard_source, proguard_target)
 
-# Patch MainActivity.kt to override the id property with a getter that
-# calls the superclass implementation. tao-0.35.3 calls getId() via JNI on
-# the activity instance (ndk_glue.rs:391). getId() is inherited from
-# WryActivity (var id: Int = 0), but R8 can strip the inherited method
-# despite -keep rules. Overriding the property generates a getId() method
-# directly on MainActivity, ensuring the JNI lookup succeeds regardless of
-# R8 behavior. We cannot add a bare fun getId() because Kotlin's property
-# getter <get-id> has the same JVM signature and causes an accidental
-# override error.
+# Patch WryActivity.kt to make the id property open, then override it in
+# MainActivity.kt. tao-0.35.3 calls getId() via JNI on the activity instance
+# (ndk_glue.rs:391). getId() is inherited from WryActivity (var id: Int = 0),
+# but R8 can strip the inherited method despite -keep rules. Making id open
+# and overriding it in MainActivity generates getId() directly on
+# MainActivity, ensuring the JNI lookup succeeds regardless of R8 behavior.
+wry_activity = android / "app" / "src" / "main" / "java" / "music" / "virya" / "signal" / "generated" / "WryActivity.kt"
+if not wry_activity.is_file():
+    raise SystemExit(f"missing WryActivity.kt: {wry_activity}")
+wry_text = wry_activity.read_text(encoding="utf-8")
+if "open var id" not in wry_text:
+    wry_text = wry_text.replace("var id: Int = 0", "open var id: Int = 0", 1)
+    wry_activity.write_text(wry_text, encoding="utf-8")
+
 main_activity = android / "app" / "src" / "main" / "java" / "music" / "virya" / "signal" / "MainActivity.kt"
 if not main_activity.is_file():
     raise SystemExit(f"missing MainActivity.kt: {main_activity}")
 main_activity_text = main_activity.read_text(encoding="utf-8")
-# Remove any stale fun getId() patch from a previous run — it causes
-# an accidental override error with Kotlin's property getter.
+# Remove any stale patches from previous runs.
 main_activity_text = re.sub(
     r"^[ \t]*//[^\n]*\n[ \t]*//[^\n]*\n[ \t]*//[^\n]*\n[ \t]*fun getId\(\): Int = this\.id\n",
+    "",
+    main_activity_text,
+    flags=re.MULTILINE,
+)
+main_activity_text = re.sub(
+    r"^[ \t]*//[^\n]*\n[ \t]*//[^\n]*\n[ \t]*//[^\n]*\n[ \t]*//[^\n]*\n[ \t]*override val id: Int\n[ \t]*get\(\) = super\.id\n",
     "",
     main_activity_text,
     flags=re.MULTILINE,
