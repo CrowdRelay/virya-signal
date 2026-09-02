@@ -23,6 +23,17 @@
     @app.tauri.annotation.Permission <methods>;
 }
 
+# ── Virya Signal app classes ──
+# The native Rust code calls methods (getId, getVersion, setWebView, etc.)
+# via JNI on the MainActivity instance. MainActivity extends TauriActivity
+# extends WryActivity. proguard-wry.pro keeps WryActivity and proguard-tauri.pro
+# keeps TauriActivity.getPluginManager, but R8 can still rename inherited
+# methods on subclasses, breaking JNI lookups. Keep the entire app package
+# — it is ~11 Kotlin files; R8 still obfuscates the dependencies (Tauri,
+# Firebase, AndroidX) which are the bulk of the code and satisfy the Play
+# obfuscation threshold.
+-keep class music.virya.signal.** { *; }
+
 # ── Virya Signal push plugin ──
 -keep class music.virya.signal.push.** { *; }
 
