@@ -850,56 +850,14 @@ function viryaFailureText(report) {
   return lines.filter(Boolean).join('\n');
 }
 
-function viryaShowRuntimeFailure(report, previous = false) {
-  const document = window.document;
-  if (!document?.body) {
-    window.setTimeout(() => viryaShowRuntimeFailure(report, previous), 50);
-    return;
-  }
-  document.getElementById('virya-runtime-failure')?.remove();
-  const node = document.createElement('section');
-  node.id = 'virya-runtime-failure';
-  node.setAttribute('role', 'alertdialog');
-  node.setAttribute('aria-modal', 'true');
-  // A dialog role without an accessible name is announced as an unlabelled
-  // group, which is exactly the wrong outcome for the panel that only appears
-  // when something already went wrong. Name it from its own visible heading so
-  // the two can never drift apart.
-  node.setAttribute('aria-labelledby', 'virya-runtime-failure-title');
-  node.innerHTML = `
-    <div class="virya-runtime-failure-card">
-      <p class="eyebrow">${viryaTexts.diagnostics}</p>
-      <h2 id="virya-runtime-failure-title">${previous ? viryaTexts.previousFailure : viryaTexts.currentFailure}</h2>
-      <p>${viryaTexts.reportHelp}</p>
-      <pre></pre>
-      <div class="virya-runtime-failure-actions">
-        <button type="button" data-action="copy">${viryaTexts.copyReport}</button>
-        <button type="button" data-action="reload">${viryaTexts.restart}</button>
-        <button type="button" data-action="close" class="ghost">${viryaTexts.close}</button>
-      </div>
-      <small class="copy-status"></small>
-    </div>`;
-  const text = viryaFailureText(report);
-  const pre = node.querySelector('pre');
-  if (pre) pre.textContent = text;
-  node.querySelector('[data-action="copy"]')?.addEventListener('click', async () => {
-    const status = node.querySelector('.copy-status');
-    try {
-      await window.navigator?.clipboard?.writeText(text);
-      if (status) status.textContent = viryaTexts.reportCopied;
-    } catch {
-      if (status) status.textContent = viryaTexts.copyManually;
-    }
-  });
-  node.querySelector('[data-action="reload"]')?.addEventListener('click', () => {
-    viryaClearRuntimeFailure();
-    window.location.reload();
-  });
-  node.querySelector('[data-action="close"]')?.addEventListener('click', () => {
-    viryaClearRuntimeFailure();
-    node.remove();
-  });
-  document.body.appendChild(node);
+// The diagnostics crash dialog was removed. Fans and beacons never see a
+// red "VIRYA SIGNAL / DIAGNOSTICS" popup — not on a fresh crash, not on
+// relaunch after a crash, not when not logged in. Errors still go to the
+// browser console and window.__VIRYA_LAST_FAILURE__ so staff can pull them
+// via `adb logcat` or remote devtools, but no visible UI is ever shown.
+function viryaShowRuntimeFailure(report, _previous = false) {
+  window.__VIRYA_LAST_FAILURE__ = report;
+  window.console?.error?.('[virya:runtime-failure]', viryaFailureText(report));
 }
 
 async function viryaWaitForNativeCore() {
@@ -984,21 +942,9 @@ export function viryaInstallRuntimeGuards() {
   viryaRecoverInterruptedOperation(report);
   viryaRecoverBootDiagnostic(report);
   void viryaRecoverNativeCrash(report);
-  try {
-    const raw = window.localStorage?.getItem(VIRYA_FAILURE_STORAGE_KEY);
-    if (raw) {
-      const previous = JSON.parse(raw);
-      const age = Date.now() - Date.parse(previous?.occurredAt ?? '');
-      if (Number.isFinite(age) && age >= 0 && age < 24 * 60 * 60 * 1_000) {
-        viryaShowRuntimeFailure(previous, true);
-      } else {
-        viryaClearRuntimeFailure();
-      }
-    }
-  } catch (error) {
-    window.console?.warn?.('[virya:previous-crash]', error);
-    viryaClearRuntimeFailure();
-  }
+  // Previous-launch crash dialog removed. Fans never see a diagnostics
+  // popup on relaunch. Clear any stored failure so it doesn't accumulate.
+  viryaClearRuntimeFailure();
 }
 
 "#)]
