@@ -858,6 +858,7 @@ function viryaFailureText(report) {
 function viryaShowRuntimeFailure(report, _previous = false) {
   window.__VIRYA_LAST_FAILURE__ = report;
   window.console?.error?.('[virya:runtime-failure]', viryaFailureText(report));
+  viryaClearRuntimeFailure();
 }
 
 async function viryaWaitForNativeCore() {
