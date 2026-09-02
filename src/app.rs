@@ -496,6 +496,15 @@ pub fn App() -> impl IntoView {
         });
     });
 
+    // Fans and beacons never see error toasts. Clear the signal on entry
+    // to those modes so a stale error from a staff session doesn't surface
+    // later. Staff/owner modes still get the Toast for diagnosis.
+    Effect::new(move |_| {
+        if !matches!(mode.get(), RootMode::Team | RootMode::StaffGate) {
+            error.set(None);
+        }
+    });
+
     view! {
         <main class="app-shell">
             {move || {
@@ -546,7 +555,14 @@ pub fn App() -> impl IntoView {
                 }.into_any(),
                 }
             }}
-            <Toast error=error />
+            // Error toasts are for staff/owner only. Fans and beacons never
+            // see them — their data refreshes are already silent (keep last
+            // good snapshot on failure), and a red popup on a fan's face
+            // after a successful pin login is the exact experience we must
+            // avoid. Staff sees errors so they can fix them later.
+            <Show when=move || matches!(mode.get(), RootMode::Team | RootMode::StaffGate)>
+                <Toast error=error />
+            </Show>
         </main>
     }
 }

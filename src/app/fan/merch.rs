@@ -192,11 +192,12 @@ fn FanMerchBundles(
                             }).collect_view()}
                         </div>
                     });
+                    let image_loaded = RwSignal::new(false);
                     view! {
                         <article class="fan-merch-card fan-merch-bundle">
                             <div class="bundle-badge">{tr("bundle_badge")}</div>
                             {image_url.map(|url| view! {
-                                <img src=url alt=image_alt style=placeholder width="600" height="600" loading="lazy" decoding="async" referrerpolicy="no-referrer" />
+                                <img src=url alt=image_alt style=placeholder width="600" height="600" loading="lazy" decoding="async" referrerpolicy="no-referrer" class:loaded=move || image_loaded.get() on:load=move |_| image_loaded.set(true) />
                             })}
                             <div class="fan-merch-body">
                                 <div class="fan-merch-heading">
