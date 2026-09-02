@@ -1,9 +1,10 @@
 # Virya Signal — R8/ProGuard keep rules for release builds.
 #
-# Tauri generates proguard-wry.pro automatically (keeps WryActivity, Ipc,
-# RustWebView, etc.). This file covers everything the generated rules do not:
-# the Tauri plugin runtime, Firebase Messaging, our push plugin, and
-# WebView JS interfaces.
+# Tauri generates proguard-wry.pro (keeps WryActivity, Ipc, RustWebView, etc.)
+# and proguard-tauri.pro (keeps TauriActivity.getPluginManager). Both are
+# included in proguardFiles by prepare-android.py. This file covers everything
+# the generated rules do not: the Tauri plugin runtime, Firebase Messaging,
+# our push plugin, and WebView JS interfaces.
 
 # ── Keep line numbers for crash reports ──
 -keepattributes SourceFile,LineNumberTable

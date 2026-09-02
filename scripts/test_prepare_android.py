@@ -110,6 +110,11 @@ dependencies {
             self.assertIn("isMinifyEnabled = true", output)
             self.assertIn("isShrinkResources = true", output)
             self.assertGreaterEqual(output.count("proguardFiles("), 1)
+            # R8 must not strip WryActivity/Ipc/RustWebView — the generated
+            # proguard-wry.pro and proguard-tauri.pro are required in the
+            # release proguardFiles or the app crashes on startup (JNI fails).
+            self.assertIn("proguard-wry.pro", output)
+            self.assertIn("proguard-tauri.pro", output)
 
             properties = (android / "gradle.properties").read_text()
             self.assertIn("org.gradle.caching=true", properties)

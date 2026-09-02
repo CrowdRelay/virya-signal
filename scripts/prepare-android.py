@@ -231,8 +231,11 @@ def _patch_build_type(
     body = _remove_kotlin_call_statements(body, "proguardFiles")
     if proguard:
         body = (
-            f'\n{indent}proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), '
-            f'"proguard-rules.pro")' + body
+            f'\n{indent}proguardFiles('
+            f'getDefaultProguardFile("proguard-android-optimize.txt"), '
+            f'"proguard-rules.pro", '
+            f'"src/main/java/music/virya/signal/generated/proguard-wry.pro", '
+            f'"proguard-tauri.pro")' + body
         )
 
     return source[: opening + 1] + body + source[closing:]
@@ -261,6 +264,11 @@ for fragment in (
         raise SystemExit(f"release build invariant missing: {fragment}")
 if "proguardFiles(" not in release_body:
     raise SystemExit("release build must enable ProGuard files for R8 minification")
+if "proguard-wry.pro" not in release_body:
+    raise SystemExit(
+        "release build must include proguard-wry.pro — without it R8 strips "
+        "WryActivity/Ipc/RustWebView and the app crashes on startup (JNI lookup fails)"
+    )
 
 # Each Kotlin shrinker property must remain on its own physical line. The
 # property matcher above intentionally uses horizontal whitespace only because
