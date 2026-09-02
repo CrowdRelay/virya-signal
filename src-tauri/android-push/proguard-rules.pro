@@ -34,6 +34,13 @@
 # obfuscation threshold.
 -keep class music.virya.signal.** { *; }
 
+# Explicitly keep the id field on WryActivity. proguard-wry.pro keeps
+# getId() the method, but R8 can remove the backing field. Without the
+# field, getId() has nothing to return.
+-keepclassmembers class music.virya.signal.WryActivity {
+  int id;
+}
+
 # ── Virya Signal push plugin ──
 -keep class music.virya.signal.push.** { *; }
 

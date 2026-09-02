@@ -29,6 +29,28 @@ def seed_tauri_conf(root: Path) -> None:
 PUSH_TEMPLATES = SCRIPT.parent.parent / "src-tauri" / "android-push"
 ANDROID_ICONS = SCRIPT.parent.parent / "src-tauri" / "icons" / "android"
 
+MAIN_ACTIVITY_KT = (
+    "package music.virya.signal\n"
+    "\n"
+    "import android.os.Bundle\n"
+    "import androidx.activity.enableEdgeToEdge\n"
+    "\n"
+    "class MainActivity : TauriActivity() {\n"
+    "  override fun onCreate(savedInstanceState: Bundle?) {\n"
+    "    enableEdgeToEdge()\n"
+    "    super.onCreate(savedInstanceState)\n"
+    "  }\n"
+    "}\n"
+)
+
+
+def seed_main_activity(app: Path) -> Path:
+    """Create the generated MainActivity.kt in the app source tree."""
+    main_activity = app / "src" / "main" / "java" / "music" / "virya" / "signal" / "MainActivity.kt"
+    main_activity.parent.mkdir(parents=True, exist_ok=True)
+    main_activity.write_text(MAIN_ACTIVITY_KT, encoding="utf-8")
+    return main_activity
+
 
 class PrepareAndroidTests(unittest.TestCase):
     def test_enforces_safe_release_and_gradle_cache(self) -> None:
@@ -95,6 +117,10 @@ dependencies {
                 '<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application android:label="Virya Signal"><activity android:name=".MainActivity" /></application></manifest>'
             )
 
+            # Tauri generates MainActivity.kt during `tauri android init`.
+            # Model it here so the preparer can patch it with getId().
+            main_activity = seed_main_activity(app)
+
             result = subprocess.run(
                 ["python3", str(scripts / SCRIPT.name)],
                 cwd=root,
@@ -115,6 +141,13 @@ dependencies {
             # release proguardFiles or the app crashes on startup (JNI fails).
             self.assertIn("proguard-wry.pro", output)
             self.assertIn("proguard-tauri.pro", output)
+
+            # tao-0.35.3 calls getId() via JNI on the activity instance.
+            # R8 can strip the inherited getter from WryActivity despite
+            # -keep rules. prepare-android.py must patch MainActivity.kt
+            # to define getId() directly so the JNI lookup succeeds.
+            patched = main_activity.read_text()
+            self.assertIn("fun getId()", patched)
 
             properties = (android / "gradle.properties").read_text()
             self.assertIn("org.gradle.caching=true", properties)
@@ -194,6 +227,7 @@ dependencies {
                 '<data android:scheme="https" android:host="virya.music" android:pathPrefix="/latarnik"/>'
                 '</intent-filter></activity></application></manifest>'
             )
+            seed_main_activity(app)
 
             result = subprocess.run(
                 ["python3", str(scripts / SCRIPT.name)],
@@ -267,6 +301,7 @@ dependencies {
             manifest = app / "src" / "main" / "AndroidManifest.xml"
             manifest.parent.mkdir(parents=True, exist_ok=True)
             manifest.write_text('<manifest xmlns:android="http://schemas.android.com/apk/res/android"><application><activity android:name=".MainActivity" /></application></manifest>')
+            seed_main_activity(app)
             document = {
                 "project_info": {"project_id": "virya-signal"},
                 "client": [{"client_info": {"android_client_info": {"package_name": APPLICATION_ID}}}],
@@ -341,6 +376,7 @@ dependencies {
                 '<manifest xmlns:android="http://schemas.android.com/apk/res/android">'
                 '<application><activity android:name=".MainActivity" /></application></manifest>'
             )
+            seed_main_activity(app)
             # --signing checks the keystore before it reaches the Firebase
             # branch, so the fixture needs one for the refusal under test to be
             # the one that actually fires.

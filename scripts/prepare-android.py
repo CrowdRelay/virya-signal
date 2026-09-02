@@ -342,6 +342,30 @@ if not proguard_source.is_file():
     raise SystemExit(f"missing ProGuard rules: {proguard_source}")
 shutil.copy2(proguard_source, proguard_target)
 
+# Patch MainActivity.kt to define getId() directly on MainActivity.
+# tao-0.35.3 calls getId() via JNI on the activity instance (ndk_glue.rs:391).
+# getId() is inherited from WryActivity (var id: Int = 0), but R8 can strip
+# the inherited method despite -keep rules. Defining it directly on
+# MainActivity ensures the JNI lookup succeeds regardless of R8 behavior.
+main_activity = android / "app" / "src" / "main" / "java" / "music" / "virya" / "signal" / "MainActivity.kt"
+if not main_activity.is_file():
+    raise SystemExit(f"missing MainActivity.kt: {main_activity}")
+main_activity_text = main_activity.read_text(encoding="utf-8")
+if "fun getId()" not in main_activity_text:
+    main_activity_text = main_activity_text.rstrip()
+    if not main_activity_text.endswith("}"):
+        raise SystemExit("MainActivity.kt does not end with closing brace — cannot patch")
+    main_activity_text = main_activity_text[:-1].rstrip()
+    main_activity_text += (
+        "\n"
+        "  // tao-0.35.3 calls getId() via JNI on the activity instance.\n"
+        "  // R8 can strip the inherited getter from WryActivity despite -keep rules.\n"
+        "  // Define it explicitly so the method exists on MainActivity.\n"
+        "  fun getId(): Int = this.id\n"
+        "}\n"
+    )
+    main_activity.write_text(main_activity_text, encoding="utf-8")
+
 # Tauri's generic icon generator uses the full app tile as the adaptive
 # foreground, which makes the Android foreground fully opaque. Keep one audited
 # platform-specific source of truth instead: legacy launchers use the full tile,
