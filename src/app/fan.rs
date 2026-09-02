@@ -313,7 +313,7 @@ fn FanAccess(
     let referral = RwSignal::new(bridge::referral_code_from_location().unwrap_or_default());
     let token = RwSignal::new(String::new());
     let pin = RwSignal::new(String::new());
-    let consent = RwSignal::new(false);
+    let consent = RwSignal::new(true);
     let nearby_enabled = RwSignal::new(true);
     let radius_km = RwSignal::new(150_u16);
     let busy = RwSignal::new(false);
@@ -521,7 +521,21 @@ fn FanAccess(
 
             match bridge::scan_and_confirm_fan().await {
                 Ok(Some(value)) => adopt_fan_session(value, token, pin, confirmation_session),
-                Ok(None) => {}
+                Ok(None) => {
+                    // A cancelled scan is a no-op, but a camera-resume race
+                    // can report a cancellation while the native side actually
+                    // completed a previous attempt. Check before doing nothing.
+                    if let Ok(status) = bridge::invoke_timeout::<FanSessionStatus, _>(
+                        "fan_status",
+                        &EmptyArgs {},
+                        3_000,
+                    )
+                    .await
+                        && status.unlocked
+                    {
+                        adopt_fan_session(status, token, pin, confirmation_session);
+                    }
+                }
                 Err(message) => {
                     if let Ok(status) = bridge::invoke_timeout::<FanSessionStatus, _>(
                         "fan_status",

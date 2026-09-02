@@ -212,6 +212,12 @@ function viryaPermissionState(value) {
 // the cases where it does not.
 function viryaAwaitForegroundSettle(timeoutMs) {
   return new Promise((resolve) => {
+    // If the document is already focused the WebView is in the foreground
+    // and the IPC channel is stable. Skip the wait entirely.
+    if (window.document?.hasFocus?.()) {
+      resolve();
+      return;
+    }
     let settled = false;
     const finish = () => {
       if (settled) return;
@@ -375,6 +381,15 @@ export async function viryaScanAndConfirmFan() {
     throw new Error(viryaTexts.scannerUnavailable);
   }
 
+  // The camera window just closed. The WebView may be mid-resume from the
+  // camera activity, and an IPC call right now can lose its reply channel —
+  // the native command runs but the JS side never sees the result, leaving
+  // the fan on the login form with a consumed token. Wait for the WebView
+  // to settle before confirming. If the document is already focused (no
+  // camera activity was opened, or it already settled), this resolves
+  // instantly.
+  await viryaAwaitForegroundSettle(500);
+
   const confirmed = await core.invoke('fan_confirm_scanned', { token });
   // A camera-resume launcher read can race this native commit. Reconcile once
   // more only after native state is authoritative; a disposed FanAccess owner
@@ -407,6 +422,9 @@ export async function viryaScanAndConfirmBeacon() {
     await core.invoke('beacon_clear_pending_confirmation').catch(() => {});
     throw new Error(viryaTexts.scannerUnavailable);
   }
+
+  // Same camera-resume settle as the fan flow — see viryaScanAndConfirmFan.
+  await viryaAwaitForegroundSettle(500);
 
   const confirmed = await core.invoke('beacon_confirm_scanned', { token });
   // Like fan confirmation, native Stronghold state is committed before camera
