@@ -153,9 +153,17 @@ fn OperatorApp(
     };
 
     // Every panel stays mounted behind its `hidden` wrapper once unlocked, so
-    // switching preserves scroll position instead of rebuilding the DOM.
+    // switching keeps the built DOM and its decoded imagery instead of
+    // rebuilding it. What it does not keep is scroll position: the panels share
+    // one `.content` scroll box, so an offset from a long panel carried into
+    // the next one and opened it mid-page. Each switch starts at the top.
     // Scanner is the deliberate exception: a fresh mount resets scan session
     // state, show-mode gating and any camera edge from the previous shift.
+    let content_ref = NodeRef::<leptos::html::Div>::new();
+    Effect::new(move |_| {
+        tab.track();
+        reset_content_scroll(content_ref);
+    });
     view! {
         <section class="authenticated">
             <header class="topbar">
@@ -176,7 +184,7 @@ fn OperatorApp(
                     <button on:click=refresh_all><span>"↻"</span>{tr("refresh_all_data")}</button>
                 </nav>
             </Show>
-            <div class="content">
+            <div class="content" node_ref=content_ref>
                 <div class="tab-page" class:hidden=move || tab.get() != OperatorTab::Home class:tab-active=move || tab.get() == OperatorTab::Home>
                     <OperatorHome dashboard=dashboard loading=loading />
                 </div>

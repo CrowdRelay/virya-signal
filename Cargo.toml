@@ -14,12 +14,20 @@ serde = { version = "1", features = ["derive"] }
 serde-wasm-bindgen = "0.6"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
-# Pull-to-refresh reads the touch list off the content column's touch events.
-web-sys = { version = "0.3", features = ["Touch", "TouchList"] }
-
-# Only invoked under cfg(debug_assertions); keeping it out of the release
-# dependency graph keeps the size-critical WASM free of the panic formatter.
-[target.'cfg(debug_assertions)'.dependencies]
+# Pull-to-refresh reads the touch list off the content column's touch events,
+# and `Element` so its top check can ask that column for its own `scrollTop`.
+# Leptos enables `Element` as well, but relying on another crate's feature set
+# is how a build breaks on an unrelated bump.
+web-sys = { version = "0.3", features = ["Element", "Touch", "TouchList"] }
+# This was declared under `[target.'cfg(debug_assertions)'.dependencies]`, which
+# Cargo does not support — it resolves `cfg()` against the target platform, so
+# `debug_assertions` never matches. Cargo warned about the section on every
+# build and `cargo tree` showed the crate in the release graph anyway, so it
+# bought nothing it claimed to. It cannot be a dev-dependency either: those are
+# invisible to the binary, and the call lives in `main.rs`.
+# What actually keeps the panic formatter out of the size-critical WASM is the
+# `#[cfg(debug_assertions)]` on that call — a real compile-time cfg. With no
+# reachable caller, release LTO drops the crate.
 console_error_panic_hook = "0.1.7"
 
 [workspace]

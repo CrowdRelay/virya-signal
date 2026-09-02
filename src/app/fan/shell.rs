@@ -58,12 +58,13 @@ fn FanApp(
     let menu_open = RwSignal::new(false);
     let refresh_requested = RwSignal::new(0_u32);
 
+    let content_ref = NodeRef::<leptos::html::Div>::new();
     Effect::new(move |_| {
         persist_fan_tab(tab.get());
         // The old per-tab remount landed every switch at the top of the page.
         // Keep-alive preserves the DOM, so restore that expectation explicitly
         // instead of letting a tall Merch scroll carry into Shows.
-        leptos::prelude::window().scroll_to_with_x_and_y(0.0, 0.0);
+        reset_content_scroll(content_ref);
     });
 
     Effect::new(move |_| {
@@ -321,11 +322,23 @@ fn FanApp(
     // refresh generation as the menu button.
     const PULL_TRIGGER_PX: f64 = 70.0;
     const PULL_FIRE_PX: f64 = 56.0;
-    let near_top = || leptos::prelude::window().scroll_y().unwrap_or(0.0) <= 1.0;
+    // The window never scrolls. The shell is `height: 100dvh; overflow: hidden`
+    // and `.content` is the scroll container, so `window.scrollY` is always 0
+    // and the top check above was always true — a pull anywhere down a long
+    // list fired a full refresh, which is what this was written to prevent.
+    // The handlers are bound to `.content`, so its own `scrollTop` is the
+    // honest answer and needs no DOM lookup.
+    let near_top = |event: &leptos::ev::TouchEvent| {
+        event
+            .current_target()
+            .and_then(|target| target.dyn_into::<web_sys::Element>().ok())
+            .map(|element| element.scroll_top() <= 1)
+            .value_or(true)
+    };
     let pull_origin = RwSignal::new(None::<(i32, i32)>);
     let pull_px = RwSignal::new(0_f64);
     let ptr_start = move |event: leptos::ev::TouchEvent| {
-        if !near_top() {
+        if !near_top(&event) {
             return;
         }
         if let Some(touch) = event.touches().item(0) {
@@ -341,7 +354,7 @@ fn FanApp(
         };
         let dx = (touch.client_x() - origin_x) as f64;
         let dy = (touch.client_y() - origin_y) as f64;
-        if dy <= 0.0 || dx.abs() > dy.abs() || !near_top() {
+        if dy <= 0.0 || dx.abs() > dy.abs() || !near_top(&event) {
             pull_origin.set(None);
             pull_px.set(0.0);
             return;
@@ -381,7 +394,7 @@ fn FanApp(
                     <button on:click=close><span>"×"</span>{tr("close_and_lock_signal")}</button>
                 </nav>
             </Show>
-            <div class="content" on:touchstart=ptr_start on:touchmove=ptr_move on:touchend=ptr_end>
+            <div class="content" node_ref=content_ref on:touchstart=ptr_start on:touchmove=ptr_move on:touchend=ptr_end>
                 <div class="content-refresh-bar" class:active=move || refresh_active.get() aria-hidden="true"></div>
                 <div
                     class="ptr-hint"

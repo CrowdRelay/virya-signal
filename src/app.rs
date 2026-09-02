@@ -84,6 +84,22 @@ thread_local! {
     static LANGUAGE_REFRESH_LISTENER: RefCell<Option<LanguageRefreshListener>> = const { RefCell::new(None) };
 }
 
+/// Send a shell's content column back to the top.
+///
+/// Keep-alive tab pages are siblings inside a single `.content`, so the shell
+/// has one scroll offset for every tab: scroll deep into Merch, switch to
+/// Shows, and Shows opens mid-page. The fan shell tried to correct this with
+/// `window().scroll_to_with_x_and_y(0, 0)`, and the operator shell claimed the
+/// arrangement preserved scroll per panel. Neither held — `.authenticated` is
+/// `height: 100dvh; overflow: hidden`, so the window has nothing to scroll and
+/// that call moved nothing, while per-panel preservation would need per-panel
+/// scroll boxes. Ask the column that actually scrolls.
+fn reset_content_scroll(content: NodeRef<leptos::html::Div>) {
+    if let Some(column) = content.get_untracked() {
+        column.set_scroll_top(0);
+    }
+}
+
 fn install_language_refresh(language_refresh: RwSignal<u32>) {
     LANGUAGE_REFRESH_LISTENER.with(|slot| {
         if slot.borrow().is_some() {

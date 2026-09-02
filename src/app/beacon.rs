@@ -529,6 +529,14 @@ fn BeaconApp(
     };
     let switch_fan = move |_| { menu_open.set(false); mode.set(RootMode::Fan); };
     let refresh_all = move |_| { menu_open.set(false); refresh.update(|value| *value = value.wrapping_add(1)); };
+    // Beacon swaps the panel node outright, but the scroll box it sits in is
+    // the same `.content` every time, so the offset survives the swap and the
+    // next panel opens mid-page.
+    let content_ref = NodeRef::<leptos::html::Div>::new();
+    Effect::new(move |_| {
+        tab.track();
+        reset_content_scroll(content_ref);
+    });
 
     view! {
         <section class="authenticated beacon-authenticated">
@@ -544,7 +552,7 @@ fn BeaconApp(
                     <button on:click=move |_| { menu_open.set(false); mode.set(RootMode::StaffGate); }><span>"◎"</span>{tr("staff_zone")}</button>
                 </nav>
             </Show>
-            <div class="content beacon-content">
+            <div class="content beacon-content" node_ref=content_ref>
                 {move || match tab.get() {
                     BeaconTab::Briefing => view! { <BeaconBriefing home=home news=news requests=requests releases=releases loading=loading_home tab=tab selected_event=selected_event error=error /> }.into_any(),
                     BeaconTab::Radar => view! { <BeaconRadar home=home loading=loading_home tab=tab selected_event=selected_event refresh=refresh error=error /> }.into_any(),

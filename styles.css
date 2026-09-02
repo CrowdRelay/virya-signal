@@ -163,7 +163,23 @@ button:disabled { opacity: .48; cursor: default; }
 .topbar-actions { display: flex; align-items: center; gap: 10px; }
 .topbar-actions button { width: 44px; height: 44px; border: 1px solid var(--border-strong); border-radius: var(--control-radius); background: #111; color: #999; font-size: 18px; }
 .role-pill { padding: 7px 10px; border: 1px solid var(--signal-deep); color: var(--signal-hot); font-size: var(--type-micro); font-weight: 900; letter-spacing: .14em; }
-.content { max-width: 760px; margin: auto; flex: 1; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+/* Hardening for the scroll column. The bottom-nav jitter itself was already
+   cured by moving the nav out of `position: fixed` into this flex column;
+   measured in a harness against the real stylesheet, the nav box is identical
+   (top 732, left 0) across a short, a tall-scrollable and an empty tab both
+   before and after the declarations below, so none of them is the fix.
+   They close the remaining ways this column can misbehave:
+   `min-height: 0` — a flex item's automatic minimum size is its content, so
+   without this a tall route makes the column refuse to shrink and overflow the
+   shell instead of scrolling inside it.
+   `width: 100%` — pins the width rather than leaving it to the shrink-to-fit
+   that `max-width` plus auto margins would otherwise produce.
+   `scrollbar-gutter: stable` — reserves the scrollbar, so arriving on a
+   scrollable route cannot shift the centred column sideways.
+   `margin: 0 auto` — the horizontal centring that was intended; the `auto`
+   shorthand also set main-axis margins, which is harmless here only because
+   flex-grow resolves before auto margins get any free space. */
+.content { max-width: 760px; margin: 0 auto; flex: 1; min-height: 0; width: 100%; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .screen { padding: 22px 20px 48px; }
 .screen-title { margin-bottom: 20px; }
 .screen-title h2 { margin: 6px 0 0; font-size: clamp(32px, 9vw, 44px); line-height: .92; letter-spacing: -.052em; text-transform: uppercase; text-wrap: balance; }
@@ -199,7 +215,13 @@ button:disabled { opacity: .48; cursor: default; }
 .event-card h4 { font-size: 14px; }
 .event-card p, .order-card p { color: var(--muted); font-size: var(--type-meta); margin-top: 4px; }
 .chevron { color: var(--signal-hot); font-size: 28px; }
-.bottom-nav { position: relative; z-index: 40; flex-shrink: 0; height: calc(80px + var(--safe-bottom)); padding: 4px 6px var(--safe-bottom); display: grid; gap: 2px; background: var(--surface); border-top: 1px solid var(--line); }
+/* `flex-shrink: 0` is what keeps the nav at its own height when the content is
+   tall, and being a flex sibling rather than `position: fixed` is what stopped
+   it drifting on route changes. `contain: layout` adds a standing guarantee on
+   top: the nav's internal layout and the content's cannot influence each
+   other, so the jitter — chased through fixed positioning, compositing layers
+   and a deleted animation — cannot return through a change made elsewhere. */
+.bottom-nav { position: relative; z-index: 40; flex-shrink: 0; contain: layout; height: calc(80px + var(--safe-bottom)); padding: 4px 6px var(--safe-bottom); display: grid; gap: 2px; background: var(--surface); border-top: 1px solid var(--line); }
 .bottom-nav.three { grid-template-columns: repeat(3, 1fr); }
 .bottom-nav.four { grid-template-columns: repeat(4, 1fr); }
 .bottom-nav.five { grid-template-columns: repeat(5, 1fr); }
@@ -409,7 +431,11 @@ button:disabled { opacity: .48; cursor: default; }
 .artifact-card p, .artifact-card small { display: block; margin: 4px 0 0; color: var(--muted); }
 .artifact-card em { color: var(--signal-hot); font-style: normal; }
 .area-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 12px; }
-.area-native-screen { padding-bottom: calc(132px + var(--safe-bottom)); }
+/* No bottom reservation: the nav is a flex sibling outside the scroll column,
+   not a fixed bar over it, so it never covers content and already pads the
+   safe area itself. The old `132px + safe-bottom` here is a leftover from the
+   fixed-nav layout and now reads as dead space under the screen. `.screen`
+   supplies the 48px both of these want. */
 .area-native-screen .area-hero-card.compact { padding: 16px; border-radius: var(--control-radius); }
 .area-native-map { position: relative; width: 100%; aspect-ratio: 1.08 / 1; min-height: 0; max-height: 440px; overflow: hidden; border: 1px solid var(--line); border-radius: 6px; background:
   radial-gradient(circle at 50% 42%, #93c6c00d 0 2px, transparent 3px),
@@ -859,7 +885,7 @@ html[data-virya-scanner-active] .app-shell {
 
 
 /* Fan commerce V1 — first-class ticket checkout and store navigation. */
-.fan-ticket-checkout-screen { display: grid; gap: 16px; padding-bottom: calc(132px + var(--safe-bottom)); }
+.fan-ticket-checkout-screen { display: grid; gap: 16px; }
 .checkout-back { justify-self: start; min-height: 44px; border: 1px solid var(--line); border-radius: 2px; background: var(--surface); color: var(--muted); padding: 10px 14px; font-size: var(--type-micro); font-weight: 900; letter-spacing: .1em; }
 .checkout-back:active { color: var(--signal-hot); border-color: var(--signal-deep); }
 .ticket-checkout-hero { border: 1px solid var(--signal-deep); background: linear-gradient(145deg, #10231e, #10100e 68%); padding: 20px; overflow: hidden; position: relative; }
@@ -886,7 +912,7 @@ html[data-virya-scanner-active] .app-shell {
 .ticket-buyer-panel label { display: grid; gap: 7px; color: #999; font-size: var(--type-micro); font-weight: 750; letter-spacing: .05em; text-transform: uppercase; }
 .ticket-buyer-panel p { margin: 0; color: var(--muted); font-size: var(--type-meta); line-height: 1.45; }
 .ticket-buyer-panel .ticket-buy-button { width: 100%; }
-.ticket-checkout-total { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: calc(20px + var(--safe-bottom)); border: 1px solid var(--signal-deep); background: linear-gradient(145deg, #0f1a17, #0e0e0c); padding: 15px; box-shadow: 0 16px 44px #0007; scroll-margin-bottom: calc(112px + var(--safe-bottom)); }
+.ticket-checkout-total { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; border: 1px solid var(--signal-deep); background: linear-gradient(145deg, #0f1a17, #0e0e0c); padding: 15px; box-shadow: 0 16px 44px #0007; scroll-margin-bottom: 20px; }
 .ticket-checkout-total > div { min-width: 0; border-bottom: 1px solid #39331c; padding: 0 3px 11px; }
 .ticket-checkout-total > div:nth-child(2) { text-align: right; }
 .ticket-checkout-total span { display: block; color: var(--muted); font-size: var(--type-micro); text-transform: uppercase; }
@@ -1299,8 +1325,27 @@ html[data-virya-scanner-active] .app-shell {
    preserving scroll position and decoded imagery across switches. */
 .tab-page[hidden] { display: none; }
 .tab-page.hidden { display: none; }
-.tab-page.tab-active { }
-@keyframes tab-enter { from { opacity: 1; } }
+/* Tab entrance, back on — but on the inner screen, never the tab page.
+   This was deleted on the theory that its transform dragged the bottom nav,
+   back when the nav was `position: fixed`. The nav is a flex sibling now, and
+   `.screen` sits inside the scroll column, so the transform cannot reach it:
+   transforms never affect the layout of an ancestor or a sibling. Measured
+   mid-animation against the real stylesheet — `.screen` at
+   `matrix(1,0,0,1,0,6)` while the nav box stayed at top 732, left 0.
+   Composited properties only — opacity and transform — so no layout or paint
+   work happens per frame.
+   Two shells, two ways in: fan and operator keep every tab mounted and toggle
+   `tab-active`, which starts the animation because the selector begins to
+   match; beacon swaps the node outright in a `match`, so the animation runs on
+   mount. Both need naming — a beacon-only omission is why its tabs cut. */
+@media (prefers-reduced-motion: no-preference) {
+  .tab-page.tab-active > .screen,
+  .beacon-content > .screen { animation: tab-enter var(--dur-med) var(--ease-out) both; }
+  @keyframes tab-enter {
+    from { opacity: 0; transform: translate3d(0, 6px, 0); }
+    to { opacity: 1; transform: translate3d(0, 0, 0); }
+  }
+}
 
 /* Pull-to-refresh hint hanging above the fan content column. Decorative glyph
    only; transitions are disabled mid-drag so it tracks the finger exactly. */
@@ -1376,12 +1421,7 @@ html[data-virya-scanner-active] .app-shell {
 
 /* ─── Next-level motion polish ─── */
 
-/* Tab transition: disabled — any transform on the tab page creates a
-   compositing layer that drags the fixed bottom nav on Android WebView. */
-@media (prefers-reduced-motion: no-preference) {
-  .tab-page.tab-active { }
-  @keyframes tab-enter { from { opacity: 1; } }
-}
+
 
 /* Toast entrance: spring pop for tactile confirmation */
 @media (prefers-reduced-motion: no-preference) {
