@@ -533,10 +533,108 @@
     fan_push_take_target: () => null,
     native_crash_report: () => null,
 
-    beacon_home: () => ({}),
-    beacon_news: () => ({ items: [] }),
-    beacon_releases: () => ({ releases: [] }),
-    beacon_press_requests: () => ({ requests: [] }),
+    // Every beacon model is camelCase. `beacon_releases` decodes into
+    // `BeaconReleasesData { campaigns }`, not `releases`, so the old key left
+    // the tab permanently empty — the same shape mistake that made every event
+    // list look like no shows were booked.
+    // `BeaconPressRoomData` is camelCase, like every beacon model.
+    beacon_press_room: () => ({
+      event: { title: "Virya · Hydrozagadka", city: "Warszawa" },
+      assets: [
+        {
+          assetKind: "press_photo",
+          labelPl: "Zdjęcia prasowe (ZIP)",
+          labelEn: "Press photos (ZIP)",
+          url: "https://virya.music/press/photos.zip",
+        },
+        {
+          assetKind: "rider",
+          labelPl: "Rider techniczny",
+          labelEn: "Technical rider",
+          url: "https://virya.music/press/rider.pdf",
+        },
+        {
+          assetKind: "bio",
+          labelPl: "Bio zespołu",
+          labelEn: "Band bio",
+          url: "https://virya.music/press/bio.pdf",
+        },
+      ],
+    }),
+    beacon_push_sync: () => pushStatus(),
+    beacon_home: () => ({
+      // radiusKm must be one of the presets the UI offers and topics must use
+      // the real keys, or every chip renders unselected and the screen looks
+      // like the preferences never saved.
+      preferences: {
+        radiusKm: 100,
+        topics: ["shows", "press_materials", "releases"],
+        nearbyGigsEnabled: true,
+      },
+      nearbyEvents: events.map((event, index) => ({
+        id: event.slug,
+        title: event.title,
+        venue: event.venue,
+        city: event.city.name,
+        startsAt: event.starts_at,
+        distanceKm: [8, 46, 172][index],
+        engagementStatus: index === 0 ? "interested" : null,
+      })),
+    }),
+    beacon_news: () => ({
+      items: [
+        {
+          tag: { pl: "Trasa", en: "Tour" },
+          title: { pl: "Wolne Miasto — druga tura miast", en: "Wolne Miasto — second run of cities" },
+          summary: {
+            pl: "Trzy nowe daty i materiały prasowe do pobrania.",
+            en: "Three new dates and press assets to download.",
+          },
+          url: { pl: "https://virya.music/pl/news/trasa", en: "https://virya.music/en/news/tour" },
+        },
+        {
+          tag: { pl: "Wydawnictwo", en: "Release" },
+          title: { pl: "Singiel „Nocny Kurs\u201d", en: "Single \u201cNocny Kurs\u201d" },
+          summary: { pl: "Premiera w piątek, embargo do czwartku 18:00.", en: "Out Friday, embargo until Thursday 18:00." },
+          url: { pl: "https://virya.music/pl/news/singiel", en: "https://virya.music/en/news/single" },
+        },
+      ],
+    }),
+    beacon_releases: () => ({
+      // `status` vocabularies come from the CrowdRelay CHECK constraints:
+      // press requests are open/resolved/cancelled, release recipients are
+      // eligible/notified/confirmed/prepared/sent/delivered/declined/expired/
+      // cancelled. Inventing values here produces zero counters that look like
+      // an app bug.
+      campaigns: [
+        {
+          campaignId: "rel-wolne-miasto",
+          title: "Wolne Miasto — pakiet promo",
+          productName: "Winyl 180 g",
+          variantLabel: "Edycja prasowa",
+          recipientStatus: "notified",
+          claimDeadline: iso(6),
+        },
+      ],
+    }),
+    beacon_press_requests: () => ({
+      requests: [
+        {
+          eventTitle: "Virya · Hydrozagadka",
+          requestKind: "accreditation",
+          details: "Fotograf + redaktor, wejście od 18:00.",
+          status: "open",
+          resolutionNote: null,
+        },
+        {
+          eventTitle: "Virya · Klub Kwadrat",
+          requestKind: "press_photo",
+          details: null,
+          status: "resolved",
+          resolutionNote: "Materiały wysłane na adres redakcji.",
+        },
+      ],
+    }),
   };
 
   // A floor on every response. Several commands are polled, and a stub that

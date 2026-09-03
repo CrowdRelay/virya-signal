@@ -172,6 +172,11 @@ def main() -> None:
   }};
   const loadWithFallback = (requested) => load(requested).catch(() => load("pl"));
   let ready = loadWithFallback(preferred());
+  // The catalog arrives after first paint, and until it does `text` answers a
+  // miss with the key itself. Without this the app was never told the catalog
+  // had landed, so whichever labels rendered during the load stayed as raw
+  // identifiers. Same event the language switch already uses.
+  void ready.then(() => dispatchReady());
 
   window.__VIRYA_RUNTIME_I18N__ = Object.freeze({{
     ready: () => ready,

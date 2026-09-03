@@ -88,6 +88,18 @@ fn default_beacon_topics() -> Vec<String> {
         .collect()
 }
 
+fn beacon_request_kind_label(kind: &str) -> String {
+    match kind {
+        "press_photo" => tr("latarnik_request_photos").to_owned(),
+        "wav" => "WAV".to_owned(),
+        "clean_version" => tr("latarnik_request_clean").to_owned(),
+        "interview" => tr("latarnik_request_interview").to_owned(),
+        "accreditation" => tr("latarnik_request_accreditation").to_owned(),
+        "custom" => tr("latarnik_request_other").to_owned(),
+        other => other.to_owned(),
+    }
+}
+
 fn beacon_news_text(value: &crate::models::SignalLocalizedText) -> String {
     if i18n::current() == Language::En { value.en.clone() } else { value.pl.clone() }
 }
@@ -815,8 +827,13 @@ fn BeaconPressRoom(
                         let label = if i18n::current() == Language::En { asset.label_en } else { asset.label_pl };
                         let url = asset.url;
                         view! {
+                            // The raw `asset_kind` enum used to sit above the
+                            // label as a badge — a journalist read PRESS_PHOTO
+                            // over the localized asset name, a backend token
+                            // saying nothing the label did not already say in
+                            // their own language, and a new kind upstream would
+                            // simply print itself.
                             <article class="beacon-asset-card">
-                                <span class="cache-badge">{asset.asset_kind.to_uppercase()}</span>
                                 <strong>{label}</strong>
                                 <button class="ghost" on:click=move |_| beacon_open_url(url.clone(), error)>{tr("latarnik_open_asset")}</button>
                             </article>
@@ -935,12 +952,27 @@ fn BeaconAccessHub(
             <div class="section-head"><h3>{tr("latarnik_requests")}</h3></div>
             <div class="card-list">
                 {move || requests.get().map(|data| data.requests.into_iter().map(|request| {
-                    let title = request.event_title.unwrap_or_else(|| request.request_kind.clone());
+                    // The badge printed the raw `status` enum — a Polish
+                    // journalist read OPEN and RESOLVED — and the card never
+                    // said what had been asked for, only which show it was
+                    // about, so an accreditation and a photo request looked
+                    // identical. The status vocabulary is the CHECK constraint
+                    // on viryaos_beacon_press_requests; an unknown value still
+                    // shows through rather than hiding behind a wrong label.
+                    let status_label = match request.status.as_str() {
+                        "open" => tr("latarnik_request_status_open").to_owned(),
+                        "resolved" => tr("latarnik_request_status_resolved").to_owned(),
+                        "cancelled" => tr("latarnik_request_status_cancelled").to_owned(),
+                        other => other.to_owned(),
+                    };
+                    let kind_label = beacon_request_kind_label(&request.request_kind);
+                    let title = request.event_title.unwrap_or_else(|| kind_label.clone());
                     let note = request.resolution_note.unwrap_or_else(|| request.details.unwrap_or_default());
                     view! {
                         <article class="beacon-request-status">
-                            <span class="cache-badge">{request.status.to_uppercase()}</span>
+                            <span class="cache-badge">{status_label}</span>
                             <strong>{title}</strong>
+                            <p class="inline-note">{kind_label}</p>
                             <p>{note}</p>
                         </article>
                     }
@@ -953,7 +985,21 @@ fn BeaconAccessHub(
                     let decline_id = campaign_id.clone();
                     let status = release.recipient_status.clone();
                     let can_respond = matches!(status.as_str(), "eligible" | "notified");
-                    let status_label = status.to_uppercase();
+                    // The raw recipient enum was uppercased and shown as-is,
+                    // so the card said ELIGIBLE or NOTIFIED. Vocabulary is the
+                    // CHECK constraint on the release-recipient table.
+                    let status_label = match status.as_str() {
+                        "eligible" => tr("latarnik_release_status_eligible").to_owned(),
+                        "notified" => tr("latarnik_release_status_notified").to_owned(),
+                        "confirmed" => tr("latarnik_release_status_confirmed").to_owned(),
+                        "prepared" => tr("latarnik_release_status_prepared").to_owned(),
+                        "sent" => tr("latarnik_release_status_sent").to_owned(),
+                        "delivered" => tr("latarnik_release_status_delivered").to_owned(),
+                        "declined" => tr("latarnik_release_status_declined").to_owned(),
+                        "expired" => tr("latarnik_release_status_expired").to_owned(),
+                        "cancelled" => tr("latarnik_release_status_cancelled").to_owned(),
+                        other => other.to_owned(),
+                    };
                     let title = release.title;
                     let decline_title = title.clone();
                     let product = format!("{} · {}", release.product_name, release.variant_label);

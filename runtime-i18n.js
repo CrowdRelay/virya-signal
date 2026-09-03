@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "runtime-i18n-v4-0191b5bd331d5d58";
+  const VERSION = "runtime-i18n-v4-e33c6c60e00ea984";
   const LANGUAGE_STORAGE_KEY = "virya:language:v1";
   const catalogs = Object.create(null);
   const pending = Object.create(null);
@@ -56,6 +56,11 @@
   };
   const loadWithFallback = (requested) => load(requested).catch(() => load("pl"));
   let ready = loadWithFallback(preferred());
+  // The catalog arrives after first paint, and until it does `text` answers a
+  // miss with the key itself. Without this the app was never told the catalog
+  // had landed, so whichever labels rendered during the load stayed as raw
+  // identifiers. Same event the language switch already uses.
+  void ready.then(() => dispatchReady());
 
   window.__VIRYA_RUNTIME_I18N__ = Object.freeze({
     ready: () => ready,

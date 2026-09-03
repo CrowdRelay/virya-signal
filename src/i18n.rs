@@ -120,6 +120,15 @@ pub fn tr(key: &'static str) -> &'static str {
     }
 
     let value = runtime_text_js(language, key);
+    // The runtime catalog is fetched, so `tr` can be called before it has
+    // arrived. The JS side answers a miss with the key itself, and caching that
+    // froze the raw identifier for the life of the WebView: whichever labels
+    // happened to render during the load showed as `type` or `checklist_tab`
+    // and never recovered, even though the catalog held a translation. A miss
+    // is not an answer — return it for this render and ask again next time.
+    if value == key {
+        return key;
+    }
     let value: &'static str = Box::leak(value.into_boxed_str());
     TRANSLATION_CACHE.with(|cache| {
         let mut cache = cache.borrow_mut();

@@ -49,6 +49,9 @@ pub struct BeaconPressRoomEvent {
 #[derive(Clone, Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BeaconPressAsset {
+    // Kept for wire compatibility; the card shows the localized label instead,
+    // so this is never rendered.
+    #[allow(dead_code)]
     pub asset_kind: String,
     pub label_pl: String,
     pub label_en: String,
