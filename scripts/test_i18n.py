@@ -118,6 +118,24 @@ class I18nContracts(unittest.TestCase):
         subprocess.run(["node", "--check", "boot-i18n.js"], check=True, cwd=ROOT)
         subprocess.run(["node", "--check", "runtime-i18n.js"], check=True, cwd=ROOT)
 
+    def test_boot_script_cache_tokens_track_their_own_bytes(self):
+        """Each boot <script> in index.html carries a ?v= token. They were
+        hand-edited literals stuck at 0.4.2 while the app shipped 0.5.x, so a
+        changed boot script kept its old URL. boot-i18n.js changes with every
+        catalog edit, which made this the same staleness as the runtime
+        catalog token."""
+        import hashlib
+
+        index = (ROOT / "index.html").read_text()
+        for name in ("boot-i18n.js", "boot.js", "runtime-i18n.js"):
+            digest = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()[:16]
+            stem = name.removesuffix(".js")
+            self.assertIn(
+                f'<script defer src="{name}?v={stem}-{digest}"></script>',
+                index,
+                f"{name} cache token does not match its bytes",
+            )
+
     def test_runtime_cache_token_tracks_catalog_content(self):
         """The catalogs are fetched with force-cache, so this token is the only
         thing that invalidates them in a WebView that already holds them. It was

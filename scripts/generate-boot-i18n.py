@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from i18n_catalog import load_catalog_pair
@@ -62,6 +63,35 @@ def catalog_version(keys: list[str], pl: list[str], en: list[str]) -> str:
 
 def write_json(name: str, value: object) -> None:
     (ROOT / name).write_text(compact(value) + "\n", encoding="utf-8")
+
+
+# index.html carries a ?v= token per boot script. All three were hand-edited
+# literals reading 0.4.2 while the app shipped 0.5.x, so a changed boot script —
+# boot-i18n.js changes with every catalog edit — kept its old URL and an
+# installed app could keep serving the previous copy from cache. Same rule as
+# the runtime catalog token: derive it from the file's own bytes.
+SCRIPT_TAG = '<script defer src="{name}?v={token}"></script>'
+BOOT_SCRIPTS = ("boot-i18n.js", "boot.js", "runtime-i18n.js")
+
+
+def file_token(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+
+
+def pin_boot_script_tokens() -> None:
+    index = ROOT / "index.html"
+    text = index.read_text(encoding="utf-8")
+    for name in BOOT_SCRIPTS:
+        stem = name.removesuffix(".js")
+        token = f"{stem}-{file_token(ROOT / name)}"
+        pattern = re.compile(
+            r'<script defer src="' + re.escape(name) + r'\?v=[^"]*"></script>'
+        )
+        replacement = SCRIPT_TAG.format(name=name, token=token)
+        text, count = pattern.subn(replacement, text, count=1)
+        if count != 1:
+            raise SystemExit(f"index.html has no versioned <script> for {name}")
+    index.write_text(text, encoding="utf-8")
 
 
 def main() -> None:
@@ -161,6 +191,7 @@ def main() -> None:
 }})();
 '''
     (ROOT / "runtime-i18n.js").write_text(runtime, encoding="utf-8")
+    pin_boot_script_tokens()
 
 
 if __name__ == "__main__":

@@ -321,9 +321,22 @@ if 'data-trunk rel="copy-dir" href="public"' in index:
     raise SystemExit('index.html references the optional public directory')
 if 'class="boot-signal"' not in index or '@keyframes boot-pulse' not in index:
     raise SystemExit('Virya Signal splash LED is missing or not animated')
-boot_i18n_tag = '<script defer src="boot-i18n.js?v=0.4.2-boot-i18n-v3"></script>'
-runtime_i18n_tag = '<script defer src="runtime-i18n.js?v=0.4.2-runtime-i18n-v3"></script>'
-boot_tag = '<script defer src="boot.js?v=0.4.2-startup-v9"></script>'
+# These check load ORDER. They used to pin the exact ?v= token too, which is
+# how the tokens stayed frozen at 0.4.2 while the app shipped 0.5.x: the check
+# actively required them not to move. The token is derived from file content by
+# scripts/generate-boot-i18n.py and pinned by test_i18n; match the script name.
+def boot_script_tag(name: str) -> str:
+    match = re.search(
+        r'<script defer src="' + re.escape(name) + r'\?v=[^"]*"></script>', index
+    )
+    if match is None:
+        raise SystemExit(f'index.html has no versioned <script> for {name}')
+    return match.group(0)
+
+
+boot_i18n_tag = boot_script_tag('boot-i18n.js')
+runtime_i18n_tag = boot_script_tag('runtime-i18n.js')
+boot_tag = boot_script_tag('boot.js')
 if boot_i18n_tag not in index or index.find(boot_i18n_tag) > index.find(boot_tag):
     raise SystemExit('boot translations must load before the boot listener')
 if boot_tag not in index or index.find(boot_tag) > index.find('data-trunk rel="rust"'):

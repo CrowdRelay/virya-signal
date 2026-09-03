@@ -118,7 +118,25 @@ fn WalletCard(wallet: TicketWallet, error: RwSignal<Option<String>>) -> impl Int
         });
     };
     view! {
-        <article class="wallet-card" class:cached=cached><header><div><p class="eyebrow">{wallet.order.status}</p><h3>{wallet.order.event_title}</h3><p>{event_time_location(&wallet.order.starts_at, wallet.order.venue.as_deref())}</p><Show when=move || cached><span class="cache-badge">{tr("wallet_cached_offline")}</span></Show></div><strong>{wallet.order.public_reference}</strong></header><div class="ticket-stack">{wallet.tickets.into_iter().map(|ticket| view! { <WalletTicketCard order_id=order_id.clone() ticket=ticket error=error /> }).collect_view()}</div><button class="text-button" on:click=resend disabled=move || busy.get()>{move || if busy.get() { tr("sending") } else { tr("resend_tickets_by_email") }}</button></article>
+        <article class="wallet-card" class:cached=cached><header><div><p class="eyebrow">{order_status_label(&wallet.order.status)}</p><h3>{wallet.order.event_title}</h3><p>{event_time_location(&wallet.order.starts_at, wallet.order.venue.as_deref())}</p><Show when=move || cached><span class="cache-badge">{tr("wallet_cached_offline")}</span></Show></div><strong>{wallet.order.public_reference}</strong></header><div class="ticket-stack">{wallet.tickets.into_iter().map(|ticket| view! { <WalletTicketCard order_id=order_id.clone() ticket=ticket error=error /> }).collect_view()}</div><button class="text-button" on:click=resend disabled=move || busy.get()>{move || if busy.get() { tr("sending") } else { tr("resend_tickets_by_email") }}</button></article>
+    }
+}
+
+/// The order status arrives as the raw CrowdRelay enum and was printed
+/// straight into the card, so a Polish wallet was headed "PAID". The eight
+/// values are the `ticket_orders.status` CHECK constraint; anything outside it
+/// still shows through rather than being hidden behind a wrong label.
+fn order_status_label(status: &str) -> String {
+    match status {
+        "reserved" => tr("order_status_reserved").to_owned(),
+        "checkout_created" => tr("order_status_checkout_created").to_owned(),
+        "paid" => tr("order_status_paid").to_owned(),
+        "partially_refunded" => tr("order_status_partially_refunded").to_owned(),
+        "refunded" => tr("order_status_refunded").to_owned(),
+        "expired" => tr("order_status_expired").to_owned(),
+        "cancelled" => tr("order_status_cancelled").to_owned(),
+        "payment_failed" => tr("order_status_payment_failed").to_owned(),
+        other => other.to_owned(),
     }
 }
 

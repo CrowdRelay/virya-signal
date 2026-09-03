@@ -266,6 +266,48 @@
     ],
   });
 
+  // One order, two tickets: one with a live QR and one already redeemed, so the
+  // scanned and unscanned rows can be compared side by side.
+  const walletBatch = () => ({
+    wallets: [
+      {
+        order: {
+          order_id: "ord-8842",
+          public_reference: "VRY-8842",
+          event_title: "Virya · Hydrozagadka",
+          venue: "Hydrozagadka",
+          starts_at: iso(12),
+          status: "paid",
+        },
+        tickets: [
+          {
+            ticket_type_name: "Bilet normalny",
+            public_reference: "VRY-8842-1",
+            holder_name: "Kasia",
+            holder_email_masked: "k***@example.com",
+            status: "valid",
+            redeemed_at: null,
+            qr_available: true,
+            qr_expires_at: iso(12),
+          },
+          {
+            ticket_type_name: "Bilet normalny",
+            public_reference: "VRY-8842-2",
+            holder_name: null,
+            holder_email_masked: "k***@example.com",
+            status: "redeemed",
+            redeemed_at: iso(-1),
+            qr_available: false,
+            qr_expires_at: iso(12),
+          },
+        ],
+        cached: false,
+      },
+    ],
+    failed_count: 0,
+    cached_count: 0,
+  });
+
   const fanHome = () => ({
     schema_version: 1,
     generated_at: iso(0),
@@ -325,8 +367,8 @@
     // error here instead of a silently empty panel.
     fan_home: () => fanHome(),
     fan_cached_home: () => fanHome(),
-    fan_wallets: () => ({ wallets: [] }),
-    fan_cached_wallets: () => ({ wallets: [] }),
+    fan_wallets: () => walletBatch(),
+    fan_cached_wallets: () => walletBatch(),
     fan_cached_sections: () => ({ sections: [] }),
     fan_interests: () => ({ interests: [] }),
     fan_referral: () => ({ qualified: 4, pending: 1 }),
