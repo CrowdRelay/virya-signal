@@ -583,7 +583,14 @@ fn FanAccess(
                         // no name. Asking for them anyway is what made the screen
                         // look like the link had done nothing.
                         <Show when=move || !link_pending.get()>
-                            <label>{tr("enter_email_to_start")}<input aria-label=tr("email") type="email" autocomplete="email" placeholder=tr("email_first_hint") prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label>
+                            // The hint is a 56-character sentence — "we will send a
+                            // confirmation link, the rest takes 30 seconds" — and it was the
+                            // input's placeholder. At the field's width it clipped mid-word,
+                            // and a placeholder disappears the moment anyone types, so the
+                            // one line that tells a new fan this is a 30-second link signup
+                            // was never readable. It sits under the field instead.
+                            <label>{tr("enter_email_to_start")}<input aria-label=tr("email") type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label>
+                            <p class="inline-note">{tr("email_first_hint")}</p>
                             <Show when=move || { signup_stage.get() >= 2 }>
                                 <label>{tr("name_optional")}<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/></label>
                             </Show>
