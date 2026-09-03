@@ -600,6 +600,12 @@ fn FanSignal(
                 }.into_any()
             }).value_or_else(|| view! { <Skeleton rows=1 height=96 /> }.into_any())}
             </Show>
+            // Synesthesia sits below "carry the signal" so the primary CTA
+            // (next show + referral benefits) comes first. It is an opt-in
+            // side experience — only people who already engaged with it see
+            // the progress card. Source order matches rendered order (WCAG
+            // 1.3.2, 2.4.3).
+            <SynesthesiaHomeCard home=home error=error />
         </section>
     }
 }

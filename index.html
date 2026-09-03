@@ -1452,8 +1452,6 @@ html[data-virya-scanner-active] .app-shell {
 
 .cache-badge { border: 1px solid var(--line); border-radius: 2px; padding: 5px 8px; font: 750 10px/1 ui-monospace, monospace; letter-spacing: .08em; color: var(--muted); white-space: nowrap; }
 
-.fan-home-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-
 .home-action-card { min-height: 154px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface); padding: 17px; display: flex; flex-direction: column; gap: 9px; box-shadow: var(--shadow-md); }
 
 .home-action-card strong { font-size: 18px; line-height: 1.05; }
@@ -1482,9 +1480,9 @@ html[data-virya-scanner-active] .app-shell {
   .benefits-grid { grid-template-columns: 1fr; }
 }
 
-/* Side album experiment, so it sits after the cards people open Home for.
-   Ordered rather than moved in the markup to keep the Show block intact. */
-.synesthesia-home-card { background: linear-gradient(145deg, rgba(109,162,152,.08), var(--surface) 60%); border-color: color-mix(in srgb, var(--signal) 32%, var(--line)); }
+/* Side album experiment — now rendered below the "carry the signal" block
+   on the Signal tab, not inside the home grid. */
+.synesthesia-home-card { margin-top: 10px; background: linear-gradient(145deg, rgba(109,162,152,.08), var(--surface) 60%); border-color: color-mix(in srgb, var(--signal) 32%, var(--line)); }
 
 .next-show-card { background: linear-gradient(145deg, rgba(132,180,172,.08), var(--surface) 60%); }
 
@@ -1498,7 +1496,6 @@ html[data-virya-scanner-active] .app-shell {
 
 .compact-referral-hero h2 { font-size: 64px; }
 @media (max-width: 620px) {
-  .fan-home-grid { grid-template-columns: 1fr; }
   .home-action-card { min-height: 150px; }
 }
 
