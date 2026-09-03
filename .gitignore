@@ -31,3 +31,6 @@ keystore.properties
 # Local Claude Code context (not part of the product)
 CLAUDE.md
 .claude/
+
+# Preview harness copies dist/ here; it is a build output.
+scripts/ui-preview/serve/
