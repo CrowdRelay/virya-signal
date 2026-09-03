@@ -2,7 +2,7 @@ use wasm_bindgen::JsValue;
 
 use crate::{
     i18n::{self, Language, tr},
-    util::{OptionValueOrElseExt, OptionValueOrExt},
+    util::OptionValueOrExt,
 };
 
 pub(super) fn optional(value: String) -> Option<String> {
@@ -54,12 +54,20 @@ pub(super) fn human_time(value: &str) -> String {
     )
 }
 
+/// City first, then venue. The venue alone was the whole subtitle, and on a
+/// tour every title already carries the venue name — so a list of shows read
+/// "Virya · Hydrozagadka / Hydrozagadka" and dropped the one field that tells
+/// a fan or a staffer which show this is. Either half alone still stands on
+/// its own when the other is missing.
 pub(super) fn event_location(event: &crate::models::PublicEvent) -> String {
-    event
-        .venue
-        .clone()
-        .or_else(|| event.city.as_ref().map(|city| city.name.clone()))
-        .value_or_else(|| tr("details_coming_soon").to_owned())
+    let city = event.city.as_ref().map(|city| city.name.as_str());
+    match (city, event.venue.as_deref()) {
+        (Some(city), Some(venue)) if !city.eq_ignore_ascii_case(venue) => {
+            format!("{city} · {venue}")
+        }
+        (Some(value), _) | (None, Some(value)) => value.to_owned(),
+        (None, None) => tr("details_coming_soon").to_owned(),
+    }
 }
 
 pub(super) fn event_time_location(starts_at: &str, venue: Option<&str>) -> String {

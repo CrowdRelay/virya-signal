@@ -25,6 +25,23 @@
   const log = [];
   window.VIRYA_PREVIEW = { mode, log, missing: new Set() };
 
+  // The root mode the app boots into is read from web storage, not from any
+  // command, so a `?mode=` that only swapped the session fixtures still landed
+  // on the fan portal and staff/owner were unreachable in the preview. Seed the
+  // same keys `src/bridge/navigation.rs` reads. Team is deliberately the
+  // transient sessionStorage key there, so it is seeded there too.
+  try {
+    if (mode === "staff" || mode === "owner") {
+      window.sessionStorage.setItem("virya:root-mode-transient:v1", "team");
+    } else {
+      window.sessionStorage.removeItem("virya:root-mode-transient:v1");
+      window.localStorage.setItem(
+        "virya:root-mode:v1",
+        mode === "beacon" ? "latarnik" : "fan",
+      );
+    }
+  } catch {}
+
   const iso = (offsetDays) =>
     new Date(Date.now() + offsetDays * 86_400_000).toISOString();
 
@@ -80,33 +97,45 @@
   };
 
   // ── content ───────────────────────────────────────────────────────────
+  // `PublicEvent` shape, exactly: `city` is a struct with `name`, not a
+  // string, and `description`/`image_url` carry no serde default. The earlier
+  // fixture was a loose object wrapped in `{ events }`, so every command that
+  // decodes `Vec<PublicEvent>` failed and every event list in the app — fan
+  // and staff — rendered empty. An empty list looks like "no shows booked",
+  // which is why this went unnoticed.
   const events = [
     {
       slug: "virya-warszawa-hydrozagadka",
       title: "Virya · Hydrozagadka",
-      city: "Warszawa",
+      description: "Trasa Wolne Miasto. Support: Nocny Kurs.",
+      city: { name: "Warszawa" },
       venue: "Hydrozagadka",
       starts_at: iso(12),
-      status: "upcoming",
       ticket_url: "https://virya.music/t/wwa",
+      image_url: null,
+      image_thumbnail_url: null,
     },
     {
       slug: "virya-krakow-kwadrat",
       title: "Virya · Klub Kwadrat",
-      city: "Kraków",
+      description: "Trasa Wolne Miasto.",
+      city: { name: "Kraków" },
       venue: "Klub Kwadrat",
       starts_at: iso(26),
-      status: "upcoming",
       ticket_url: "https://virya.music/t/krk",
+      image_url: null,
+      image_thumbnail_url: null,
     },
     {
       slug: "virya-wroclaw-alibi",
       title: "Virya · Alibi",
-      city: "Wrocław",
+      description: null,
+      city: { name: "Wrocław" },
       venue: "Alibi",
       starts_at: iso(54),
-      status: "upcoming",
       ticket_url: null,
+      image_url: null,
+      image_thumbnail_url: null,
     },
   ];
 
@@ -115,6 +144,18 @@
     { slug: "krakow", name: "Kraków", country: "PL" },
     { slug: "wroclaw", name: "Wrocław", country: "PL" },
   ];
+
+  // FanPushStatus is `rename_all = "camelCase"` on the contract side. Most
+  // other payloads here are snake_case; this one is not, and snake_case keys
+  // fail decode with `missing field \`backendEnabled\``.
+  const pushStatus = () => ({
+    supported: true,
+    backendEnabled: true,
+    enabled: true,
+    permission: "granted",
+    transport: "fcm",
+    detail: null,
+  });
 
   const fanHome = () => ({
     schema_version: 1,
@@ -164,10 +205,10 @@
     fan_status: () => launcher[mode]?.fan ?? fanSession(false),
     beacon_status: () => launcher[mode]?.beacon ?? beaconSession(false),
 
-    public_events: () => ({ events }),
+    public_events: () => events,
     public_cities: () => ({ cities }),
-    fan_events: () => ({ events }),
-    fan_cached_events: () => ({ events }),
+    fan_events: () => events,
+    fan_cached_events: () => events,
 
     // Shapes follow `fan_wire.generated.rs`, which is generated from
     // CrowdRelay's OpenAPI — the authoritative contract, not a guess. Optional
@@ -185,16 +226,88 @@
     fan_merch_catalog: () => ({ items: [] }),
     fan_cached_merch_catalog: () => ({ items: [] }),
     fan_merch_bundles: () => ({ bundles: [] }),
-    fan_push_sync: () => null,
+    fan_push_sync: () => pushStatus(),
     fan_push_preferences: () => ({
       shows: true, releases: true, community: false, merch: false,
       quiet_hours_enabled: true, quiet_start: "22:00", quiet_end: "08:00",
       quiet_timezone: "Europe/Warsaw",
     }),
 
-    operator_events: () => ({ events }),
+    // `operator_events` decodes into `Vec<PublicEvent>`, not into a wrapper.
+    // The wrapper shape failed decode silently and left the staff home's
+    // event strip blank, which reads as an empty tour rather than a bad
+    // fixture. Same list, unwrapped.
+    operator_events: () => events,
     operator_ops_overview: () => ({}),
     operator_signal_overview: () => ({}),
+    operator_qr: () => ({
+      events: events.map((e) => ({ slug: e.slug, title: e.title })),
+      campaigns: [
+        {
+          id: "qr-wwa-doors",
+          event_title: "Virya · Hydrozagadka",
+          label: "Wejście / drzwi",
+          max_checkins: 400,
+          checkin_count: 128,
+          active: true,
+          token: "PREVIEW-DOORS-WWA",
+        },
+        {
+          id: "qr-krk-merch",
+          event_title: "Virya · Klub Kwadrat",
+          label: "Stoisko merch",
+          max_checkins: null,
+          checkin_count: 0,
+          active: false,
+          token: null,
+        },
+      ],
+    }),
+    // The cold-start snapshot the native side keeps decrypted. `Option<...>`
+    // on the Rust side, so `null` is the honest "nothing cached yet".
+    operator_cached_sections: () => null,
+    // The show checklist. Items span every section and mix done/pending so
+    // the progress line, the section grouping and a partially-worked list are
+    // all visible at once; an all-pending list hides the done styling.
+    operator_show_checklist: () => ({
+      event_id: "evt-wwa",
+      event_slug: "virya-warszawa-hydrozagadka",
+      event_title: "Virya · Hydrozagadka",
+      starts_at: iso(12),
+      items: [
+        ["setlist_ready", "show_files", "done"],
+        ["show_files_backup_ready", "show_files", "done"],
+        ["laptop_charged_packed", "gear", "done"],
+        ["rack_cables_instruments_packed", "gear", "pending"],
+        ["instrument_spares_packed", "gear", "pending"],
+        ["stage_outfit_packed", "gear", "done"],
+        ["wireless_checked", "gear", "pending"],
+        ["camera_handoff_ready", "media", "pending"],
+        ["merch_packed", "logistics", "done"],
+        ["venue_schedule_confirmed", "logistics", "done"],
+        ["tech_rider_confirmed", "logistics", "pending"],
+        ["staff_assigned", "logistics", "pending"],
+        ["guestlist_checked", "gate", "pending"],
+        ["offline_snapshot_ready", "gate", "done"],
+        ["gate_device_charged", "gate", "done"],
+        ["backup_device_ready", "gate", "pending"],
+        ["network_tested", "gate", "pending"],
+        ["post_show_reconciliation", "post_show", "pending"],
+        ["post_show_report", "post_show", "pending"],
+      ].map(([item_key, section, status], index) => ({
+        item_key,
+        section,
+        sort_order: index,
+        status,
+        note: item_key === "tech_rider_confirmed" ? "Czeka na potwierdzenie z klubu." : null,
+        updated_at: iso(0),
+      })),
+    }),
+
+    // Decodes into `FanPushStatus`, a struct — `null` fails decode and the
+    // staff panel showed the decode error as a toast on every load.
+    operator_push_sync: () => pushStatus(),
+    fan_push_status: () => pushStatus(),
 
     // Deep-link polls. These return `bool` and the app retries on a decode
     // failure, so answering `undefined` span the renderer flat out until it
