@@ -42,6 +42,23 @@
     }
   } catch {}
 
+  // Counts how often a card subtree is torn down and rebuilt. Reading a screen
+  // that is being reconstructed on every arriving data source is a different
+  // problem from a screen that is merely slow, and the two look identical in a
+  // screenshot. `VIRYA_PREVIEW.churn` reports it.
+  const churn = { added: 0, removed: 0 };
+  window.VIRYA_PREVIEW.churn = churn;
+  new MutationObserver((records) => {
+    for (const record of records) {
+      for (const node of record.addedNodes) {
+        if (node.nodeType === 1 && node.matches?.("article")) churn.added += 1;
+      }
+      for (const node of record.removedNodes) {
+        if (node.nodeType === 1 && node.matches?.("article")) churn.removed += 1;
+      }
+    }
+  }).observe(document.documentElement, { childList: true, subtree: true });
+
   const iso = (offsetDays) =>
     new Date(Date.now() + offsetDays * 86_400_000).toISOString();
 
@@ -525,12 +542,21 @@
   // A floor on every response. Several commands are polled, and a stub that
   // answers in the same tick turns a poll into a busy loop — which is exactly
   // what wedged the first run of this harness. Real IPC is never this fast.
-  const tick = () => new Promise((r) => setTimeout(r, 12));
+  //
+  // 12 ms is also far faster than a real CrowdRelay-backed read, and that
+  // difference hides behaviour: overlapping requests never overlap, and
+  // loading states never appear. `?latency=<ms>` (or `?latency=slow`, 220 ms)
+  // models a real round trip when that is what is being looked at.
+  const requested = params.get("latency");
+  const latency = requested === "slow"
+    ? 220
+    : Math.max(12, Math.min(Number(requested) || 12, 5_000));
+  const tick = () => new Promise((r) => setTimeout(r, latency));
 
   const invoke = async (command, args) => {
     await tick();
     const fixture = FIXTURES[command];
-    log.push({ command, args, answered: Boolean(fixture) });
+    log.push({ command, args, answered: Boolean(fixture), at: Math.round(performance.now()) });
     if (!fixture) {
       window.VIRYA_PREVIEW.missing.add(command);
       console.warn("[preview] no fixture for", command);

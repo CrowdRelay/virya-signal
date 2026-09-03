@@ -1,6 +1,14 @@
 #[wasm_bindgen(inline_js = r#"
 const sleep = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
 const latestInvocations = new Map();
+// scope -> { key, promise } for the request currently on the wire. "Latest
+// wins" only ever discarded the losing *result*: every duplicate still crossed
+// into native and still made its own request. A fan cold start issued four
+// simultaneous fan_ticket_sale calls for the same show, twice over, and threw
+// seven of the eight away. Identical command+args for a live scope now join the
+// request already in flight; different args still supersede, so latest-wins is
+// unchanged.
+const inflightInvocations = new Map();
 let invocationSequence = 0;
 
 let viryaTexts = {
@@ -178,11 +186,39 @@ export async function viryaInvoke(command, args, timeoutMs) {
   }
 }
 
+// Args are plain serde-produced objects. If one is ever not stringifiable the
+// call simply does not coalesce, which is exactly the behaviour that shipped
+// before this existed.
+function viryaInflightKey(command, args) {
+  try {
+    return `${command}\u0000${JSON.stringify(args ?? null)}`;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function viryaInvokeLatest(command, args, timeoutMs, scope) {
   const token = ++invocationSequence;
   latestInvocations.set(scope, token);
+  const key = viryaInflightKey(command, args);
+  const existing = key === undefined ? undefined : inflightInvocations.get(scope);
+  let shared;
+  if (existing !== undefined && existing.key === key) {
+    shared = existing.promise;
+  } else {
+    shared = viryaInvoke(command, args, timeoutMs);
+    if (key !== undefined) {
+      const record = { key, promise: shared };
+      inflightInvocations.set(scope, record);
+      // Only the owner clears its own record, so a later request that already
+      // replaced this one is not evicted by its predecessor finishing.
+      void shared.catch(() => {}).then(() => {
+        if (inflightInvocations.get(scope) === record) inflightInvocations.delete(scope);
+      });
+    }
+  }
   try {
-    const value = await viryaInvoke(command, args, timeoutMs);
+    const value = await shared;
     return latestInvocations.get(scope) === token ? value : undefined;
   } catch (error) {
     if (latestInvocations.get(scope) !== token) return undefined;
@@ -199,6 +235,12 @@ export function viryaInvalidateLatest(prefix) {
     // Deletion is enough to make every outstanding token stale and also keeps
     // the registry bounded after logout, account switch and tab changes.
     if (scope.startsWith(prefix)) latestInvocations.delete(scope);
+  }
+  // The in-flight record goes too: after a logout or an account switch, a
+  // repeat of the same command+args is a genuinely new question and must not
+  // be answered by the request that was already on the wire.
+  for (const scope of inflightInvocations.keys()) {
+    if (scope.startsWith(prefix)) inflightInvocations.delete(scope);
   }
 }
 
