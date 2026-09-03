@@ -630,7 +630,6 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "message_order_is_saved_use_the_reopen" => {
             "{message} Zamówienie {} jest zapisane — użyj przycisku ponownego otwarcia płatności."
         }
-        "reward_credits_credits" => "{reward_credits} kredytów",
         "live_count_active_points" => "{live_count} aktywne punkty",
         "voucher_count_rewards" => "{voucher_count} nagrody",
         "community_percent_community" => "{community_percent}% społeczności",
@@ -890,7 +889,6 @@ pub(super) fn text(key: &'static str) -> &'static str {
         }
         "area_point_won" => "PUNKT ODKRYTY",
         "area_point_already_won" => "TEN PUNKT JUŻ MASZ",
-        "area_reward_added" => "Do kolekcji dodano „{track}” i {credits} kredyt nagrody.",
         "area_reward_already_present" => "„{track}” jest już w Twojej kolekcji.",
         "select_an_active_point_first" => "Najpierw wybierz aktywny punkt AREA.",
         "location_accuracy_value" => "Dokładność: ±{accuracy} m",
@@ -1076,6 +1074,12 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "async_io" => "async I/O",
         "area_runtime" => "AREA — źródło stanu",
         "area_credits" => "kredyty",
+        "reward_credits_credits_one" => "{reward_credits} kredyt",
+        "reward_credits_credits_few" => "{reward_credits} kredyty",
+        "reward_credits_credits_many" => "{reward_credits} kredytów",
+        "area_reward_added_one" => "Do kolekcji dodano „{track}” i {credits} kredyt nagrody.",
+        "area_reward_added_few" => "Do kolekcji dodano „{track}” i {credits} kredyty nagrody.",
+        "area_reward_added_many" => "Do kolekcji dodano „{track}” i {credits} kredytów nagrody.",
         "area_vouchers" => "vouchery",
         "area_ticket_rewards" => "nagrody biletowe",
         "area_legacy_imported" => "zaimportowane legacy",

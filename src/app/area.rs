@@ -9,7 +9,8 @@ use crate::{
 };
 
 use super::{
-    AreaClaimArgs, AreaDropArgs, FanLoadingState, Skeleton, open_area_game, refresh_fan_area,
+    AreaClaimArgs, AreaDropArgs, FanLoadingState, Skeleton, open_area_game, plural_key,
+    refresh_fan_area,
 };
 
 #[derive(Clone, Copy)]
@@ -382,7 +383,15 @@ pub(super) fn AreaGameScreen(
                     view! {
                         <div class="area-hero-card compact">
                             <div><p class="eyebrow">{tr("collection_progress")}</p><h3>{format!("{claimed_count} / {collection_size}")}</h3></div>
-                            <strong>{i18n::format("reward_credits_credits", &[reward_credits.to_string()])}</strong>
+                            <strong>{i18n::format(
+                                plural_key(
+                                    i64::from(reward_credits),
+                                    "reward_credits_credits_one",
+                                    "reward_credits_credits_few",
+                                    "reward_credits_credits_many",
+                                ),
+                                &[reward_credits.to_string()],
+                            )}</strong>
                             <div class="area-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow=percent><span style=format!("width:{percent}%")></span></div>
                             <div class="area-stats"><span>{i18n::format("live_count_active_points", &[live_count.to_string()])}</span><span>{i18n::format("community_percent_community", &[wallet.community.percent.round().to_string()])}</span></div>
                         </div>
@@ -490,7 +499,12 @@ pub(super) fn AreaGameScreen(
                                     )
                                 } else {
                                     i18n::format(
-                                        "area_reward_added",
+                                        plural_key(
+                                            i64::from(reward_credits_awarded),
+                                            "area_reward_added_one",
+                                            "area_reward_added_few",
+                                            "area_reward_added_many",
+                                        ),
                                         &[
                                             collectible.track.clone(),
                                             reward_credits_awarded.to_string(),

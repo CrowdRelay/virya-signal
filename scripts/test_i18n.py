@@ -136,6 +136,26 @@ class I18nContracts(unittest.TestCase):
                 f"{name} cache token does not match its bytes",
             )
 
+    def test_pluralized_keys_have_every_polish_form(self):
+        """Polish has three plural forms. A key that is selected by count must
+        exist as _one/_few/_many in both catalogs, or the selector resolves to
+        a missing key and the fan sees the identifier."""
+        source = read_app_source(ROOT)
+        bases = set()
+        for match in re.finditer(
+            r'plural_key\(\s*[^,]+,\s*"([a-z0-9_]+)_one"', source
+        ):
+            bases.add(match.group(1))
+        self.assertTrue(bases, "no pluralized keys found; did plural_key move?")
+        for base in sorted(bases):
+            for form in ("one", "few", "many"):
+                key = f"{base}_{form}"
+                self.assertIn(key, self.pl, f"missing {key} in pl")
+                self.assertIn(key, self.en, f"missing {key} in en")
+            # The unsuffixed key must be gone, or a stale call site keeps
+            # rendering the single form that this replaced.
+            self.assertNotIn(base, self.pl, f"{base} still has an unsuffixed form")
+
     def test_runtime_cache_token_tracks_catalog_content(self):
         """The catalogs are fetched with force-cache, so this token is the only
         thing that invalidates them in a WebView that already holds them. It was

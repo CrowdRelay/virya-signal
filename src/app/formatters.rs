@@ -5,6 +5,30 @@ use crate::{
     util::OptionValueOrExt,
 };
 
+/// Picks the `_one` / `_few` / `_many` variant of a catalog key for a count.
+///
+/// Polish has three plural forms and the catalog held only one, so the AREA
+/// progress card showed the five-or-more form to every fan who had two
+/// credits. English supplies the same string for `_few` and `_many`, which is
+/// why one selector serves both catalogs.
+pub(super) fn plural_key(
+    count: i64,
+    one: &'static str,
+    few: &'static str,
+    many: &'static str,
+) -> &'static str {
+    let n = count.unsigned_abs();
+    let last_two = n % 100;
+    let last = n % 10;
+    if n == 1 {
+        one
+    } else if (2..=4).contains(&last) && !(12..=14).contains(&last_two) {
+        few
+    } else {
+        many
+    }
+}
+
 pub(super) fn optional(value: String) -> Option<String> {
     let value = value.trim().to_owned();
     (!value.is_empty()).then_some(value)
