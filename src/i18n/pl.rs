@@ -105,6 +105,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "Pozostałe zakładki nadal działają niezależnie. Spróbuj odświeżyć za chwilę."
         }
         "signal_tab" => "Sygnał",
+        "checklist_tab" => "Lista",
         "scan_tab" => "Skan",
         "tickets_tab" => "Bilety",
         "shows_tab" => "Koncerty",
@@ -591,6 +592,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "offline_on" => "OFFLINE ON",
         "offline_off" => "OFFLINE OFF",
         "active_status" => "ACTIVE",
+        "active_fans_metric" => "AKTYWNI",
         "closed" => "CLOSED",
         "owner" => "OWNER",
         "staff" => "STAFF",
@@ -941,7 +943,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "area_clue_rzeszow" => "Południowy puls ukrywa się między ruchem a otwartym niebem.",
         "area_clue_bialystok" => "Na skraju lasu cichy sygnał dociera najdalej.",
         "area_clue_torun" => "Spójrz w górę, potem sprowadź orbitę z powrotem na ulicę.",
-        "audience_intelligence" => "Audience Intelligence",
+        "audience_intelligence" => "Wiedza o publiczności",
         "fan_360_summary" => "Fan 360 · agregaty",
         "ticket_buyers" => "kupili bilet",
         "concert_attendees" => "byli na koncercie",
@@ -1259,7 +1261,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "latarnik_request_material" => "Poproś zespół o materiał",
         "latarnik_request_accreditation" => "Akredytacja / guestlista",
         "latarnik_request_photos" => "Zdjęcia prasowe",
-        "latarnik_request_clean" => "Clean version",
+        "latarnik_request_clean" => "Wersja czysta",
         "latarnik_request_interview" => "Wywiad",
         "latarnik_request_other" => "Inny materiał",
         "latarnik_send_request" => "WYŚLIJ PROŚBĘ",

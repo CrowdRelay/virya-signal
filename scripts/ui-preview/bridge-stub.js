@@ -239,7 +239,39 @@
     // fixture. Same list, unwrapped.
     operator_events: () => events,
     operator_ops_overview: () => ({}),
-    operator_signal_overview: () => ({}),
+    operator_signal_overview: () => ({
+      generated_at: iso(0),
+      summary: {
+        total_fans: 4127, active_fans: 3480, pending_fans: 214,
+        unsubscribed_fans: 388, suppressed_fans: 45,
+        marketing_opted_in: 2611, nearby_enabled: 1902,
+      },
+      activity: {
+        new_fans_7d: 96, new_fans_30d: 412,
+        referral_attributions_total: 733, referral_attributions_30d: 88,
+        event_interests_total: 5210, event_interests_30d: 640,
+        nearby_notifications_30d: 1180, pending_city_requests: 7,
+      },
+      top_cities: [
+        { name: "Warszawa", country_code: "PL", active_fans: 1204 },
+        { name: "Kraków", country_code: "PL", active_fans: 731 },
+        { name: "Wrocław", country_code: "PL", active_fans: 508 },
+        { name: "Poznań", country_code: "PL", active_fans: 344 },
+      ],
+      audience: {
+        active_fans: 3480, marketing_consented_fans: 2611,
+        ticket_buyers: 812, attendees: 640,
+        synesthesia_participants: 297, qualified_referrals: 188,
+        paid_ticket_orders: 941,
+      },
+      ticket_revenue: [
+        { currency: "PLN", paid_orders: 941, gross_paid_minor: 18_930_00,
+          refunded_minor: 640_00, after_refunds_minor: 18_290_00 },
+      ],
+      unavailable_sources: [],
+    }),
+    operator_autopilot_overview: () => ({}),
+    operator_autopilot_chief_of_staff: () => ({}),
     operator_qr: () => ({
       events: events.map((e) => ({ slug: e.slug, title: e.title })),
       campaigns: [

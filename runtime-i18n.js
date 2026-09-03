@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const VERSION = "0.4.2-runtime-i18n-v3";
+  const VERSION = "runtime-i18n-v4-f1fa4f545f8c53fd";
   const LANGUAGE_STORAGE_KEY = "virya:language:v1";
   const catalogs = Object.create(null);
   const pending = Object.create(null);

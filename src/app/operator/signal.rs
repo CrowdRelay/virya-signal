@@ -112,7 +112,10 @@ fn SignalOverviewContent(data: OperatorSignalOverview) -> impl IntoView {
     view! {
         <div class="signal-admin-content">
             <div class="stats-grid">
-                <Metric value=summary.active_fans.max(0).to_string() label=tr("active_status")/>
+                // `active_status` is the ACTIVE/CLOSED chip vocabulary for QR
+                // campaigns and is English by design. As a metric label it put a
+                // bare "ACTIVE" between two Polish labels in the Polish UI.
+                <Metric value=summary.active_fans.max(0).to_string() label=tr("active_fans_metric")/>
                 <Metric value=summary.marketing_opted_in.max(0).to_string() label=tr("marketing_consents")/>
                 <Metric value=activity.new_fans_30d.max(0).to_string() label=tr("new_30_days")/>
             </div>

@@ -9,6 +9,7 @@ initial WebView parse while preserving live language switching.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -45,7 +46,18 @@ def compact(value: object) -> str:
     )
 
 
-RUNTIME_VERSION = "0.4.2-runtime-i18n-v3"
+# The runtime catalogs are fetched with `cache: "force-cache"`, so this token is
+# the only thing that can invalidate them in a WebView that already has them.
+# It used to be a hand-edited literal, and it was still "0.4.2" while the app
+# shipped 0.5.x — every string added or corrected in between was invisible to
+# anyone who had already opened the app once. Deriving it from the catalog
+# content means it cannot be forgotten: change a translation, get a new URL.
+RUNTIME_VERSION_PREFIX = "runtime-i18n-v4"
+
+
+def catalog_version(keys: list[str], pl: list[str], en: list[str]) -> str:
+    digest = hashlib.sha256(compact([keys, pl, en]).encode("utf-8")).hexdigest()
+    return f"{RUNTIME_VERSION_PREFIX}-{digest[:16]}"
 
 
 def write_json(name: str, value: object) -> None:
@@ -65,14 +77,17 @@ def main() -> None:
     # Keep the order stable, so the matching PL/EN value arrays can be safely
     # indexed without repeating every verbose message identifier twice.
     keys = sorted(pl)
+    pl_values = [pl[key] for key in keys]
+    en_values = [en[key] for key in keys]
     write_json("runtime-i18n-keys.json", keys)
-    write_json("runtime-i18n-pl.json", [pl[key] for key in keys])
-    write_json("runtime-i18n-en.json", [en[key] for key in keys])
+    write_json("runtime-i18n-pl.json", pl_values)
+    write_json("runtime-i18n-en.json", en_values)
+    runtime_version = catalog_version(keys, pl_values, en_values)
 
     runtime = f'''(() => {{
   "use strict";
 
-  const VERSION = "{RUNTIME_VERSION}";
+  const VERSION = "{runtime_version}";
   const LANGUAGE_STORAGE_KEY = "virya:language:v1";
   const catalogs = Object.create(null);
   const pending = Object.create(null);

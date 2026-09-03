@@ -212,7 +212,19 @@ fn OperatorApp(
             </div>
             <nav class="bottom-nav four primary-four">
                 <NavButton tab=tab own=OperatorTab::Home icon="home" label=tr("home_tab") />
-                <NavButton tab=tab own=OperatorTab::Signal icon="signal" label=tr("signal_tab") />
+                // Signal is owner-only and renders a refusal for staff. As one
+                // of four primary destinations it was a dead end that a staffer
+                // could only discover by tapping it. Staff get the gig
+                // checklist in that slot instead — the thing their shift is
+                // actually made of, and until now buried in the menu.
+                <Show
+                    when=move || owner.get()
+                    fallback=move || view! {
+                        <NavButton tab=tab own=OperatorTab::Checklist icon="check" label=tr("checklist_tab") />
+                    }
+                >
+                    <NavButton tab=tab own=OperatorTab::Signal icon="signal" label=tr("signal_tab") />
+                </Show>
                 <NavButton tab=tab own=OperatorTab::Scan icon="scan" label=tr("scan_tab") />
                 <NavButton tab=tab own=OperatorTab::Tickets icon="ticket" label=tr("tickets_tab") />
             </nav>
@@ -261,6 +273,14 @@ fn NavGlyph(icon: &'static str) -> impl IntoView {
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4V6Z"/>
                 <path d="M9 9v6"/>
+            </svg>
+        }
+        .into_any(),
+        "check" => view! {
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M9 5h9a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H9"/>
+                <path d="M4 8h5M4 12h5M4 16h5"/>
+                <path d="m12 12 2 2 4-4"/>
             </svg>
         }
         .into_any(),

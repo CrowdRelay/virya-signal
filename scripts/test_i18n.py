@@ -1,6 +1,8 @@
 from rust_source_tree import read_rust_module
 import re
+import importlib.util
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -115,6 +117,35 @@ class I18nContracts(unittest.TestCase):
         )
         subprocess.run(["node", "--check", "boot-i18n.js"], check=True, cwd=ROOT)
         subprocess.run(["node", "--check", "runtime-i18n.js"], check=True, cwd=ROOT)
+
+    def test_runtime_cache_token_tracks_catalog_content(self):
+        """The catalogs are fetched with force-cache, so this token is the only
+        thing that invalidates them in a WebView that already holds them. It was
+        a hand-edited literal, pinned at 0.4.2 while the app shipped 0.5.x, and
+        every string changed in between never reached an existing install."""
+        import json
+
+        runtime = (ROOT / "runtime-i18n.js").read_text()
+        self.assertIn('cache: "force-cache"', runtime)
+        match = re.search(r'const VERSION = "([^"]+)";', runtime)
+        self.assertIsNotNone(match)
+        token = match.group(1)
+
+        spec = importlib.util.spec_from_file_location(
+            "generate_boot_i18n", ROOT / "scripts/generate-boot-i18n.py"
+        )
+        generator = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(generator)
+
+        keys = json.loads((ROOT / "runtime-i18n-keys.json").read_text())
+        pl = json.loads((ROOT / "runtime-i18n-pl.json").read_text())
+        en = json.loads((ROOT / "runtime-i18n-en.json").read_text())
+        self.assertEqual(token, generator.catalog_version(keys, pl, en))
+        # A single changed string has to move the token, or the cache never
+        # releases the old catalog.
+        self.assertNotEqual(
+            token, generator.catalog_version(keys, [pl[0] + "!"] + pl[1:], en)
+        )
 
     def test_runtime_catalog_arrays_keep_keys_once_and_values_exact(self):
         import json

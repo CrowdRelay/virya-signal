@@ -107,6 +107,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "The other tabs still work independently. Try refreshing again shortly."
         }
         "signal_tab" => "Signal",
+        "checklist_tab" => "Checklist",
         "scan_tab" => "Scan",
         "tickets_tab" => "Tickets",
         "shows_tab" => "Shows",
@@ -591,6 +592,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "offline_on" => "OFFLINE ON",
         "offline_off" => "OFFLINE OFF",
         "active_status" => "ACTIVE",
+        "active_fans_metric" => "ACTIVE",
         "closed" => "CLOSED",
         "owner" => "OWNER",
         "staff" => "STAFF",
