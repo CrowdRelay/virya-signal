@@ -1322,6 +1322,11 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "affiliate_section_aria" => "VIRYA gear and Thomann affiliate links",
         "affiliate_title" => "Gear we actually use",
         "affiliate_used_live" => "USED LIVE",
+        "affiliate_converter_title" => "Have your own Thomann links?",
+        "affiliate_converter_note" => {
+            "Paste them into our converter and we'll turn them into affiliate links for you."
+        }
+        "affiliate_converter_cta" => "CONVERT YOUR LINKS ↗",
         // ── Three-tier priority dashboard + FanHomeBanner ──
         "tier_priority" => "PRIORITY",
         "tier_active" => "ACTIVE",

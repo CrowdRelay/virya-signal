@@ -42,6 +42,18 @@ fn FanAffiliateGear(error: RwSignal<Option<String>>) -> impl IntoView {
                 />
             </div>
 
+            <div class="affiliate-gear-support">
+                <div>
+                    <strong>{tr("affiliate_converter_title")}</strong>
+                    <p>{tr("affiliate_converter_note")}</p>
+                </div>
+                <ExternalLink
+                    url="https://thomann.virya.music/".to_owned()
+                    label=tr("affiliate_converter_cta")
+                    error=error
+                />
+            </div>
+
             <p class="affiliate-disclosure">{tr("affiliate_disclosure")}</p>
         </section>
     }

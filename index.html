@@ -1322,7 +1322,7 @@ html[data-virya-scanner-active] .app-shell {
 
 
 /* ── FanHomeBanner: priority / next-best-action banner ── */
-.home-banner.priority-banner { display: grid; grid-template-columns: 1fr auto; gap: 12px; border: 1px solid var(--signal-hot); background: linear-gradient(145deg, #0f1a17, #0e0e0c); padding: 14px; margin-bottom: 12px; border-radius: var(--control-radius); box-shadow: 0 8px 28px #0005; }
+.home-banner.priority-banner { display: grid; grid-template-columns: 1fr; gap: 12px; border: 1px solid var(--signal-hot); background: linear-gradient(145deg, #0f1a17, #0e0e0c); padding: 14px; margin-bottom: 12px; border-radius: var(--control-radius); box-shadow: 0 8px 28px #0005; }
 
 .home-banner .banner-content { min-width: 0; }
 
@@ -1334,13 +1334,18 @@ html[data-virya-scanner-active] .app-shell {
 
 .home-banner .banner-cta-text { display: block; margin-top: 8px; color: var(--muted); font-size: .85rem; }
 
-.home-banner .banner-counts { display: grid; gap: 6px; align-content: start; }
+/* Counts sat in a second column beside the action, stacked one per row. Four
+   of them made the card four rows tall, pushed the next show below the fold,
+   and set a running total next to the one thing the card exists to ask for.
+   They are context, so they read as a footer line under the action rather than
+   as a column competing with it. */
+.home-banner .banner-counts { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-subtle); }
 
-.home-banner .banner-counts span { text-align: center; min-width: 48px; }
+.home-banner .banner-counts span { display: inline-flex; align-items: baseline; gap: 5px; }
 
-.home-banner .banner-counts b { display: block; color: var(--signal-hot); font-size: 1.1rem; }
+.home-banner .banner-counts b { color: var(--signal-hot); font-size: 0.95rem; font-variant-numeric: tabular-nums; }
 
-.home-banner .banner-counts small { color: var(--muted); font-size: var(--type-micro); text-transform: uppercase; }
+.home-banner .banner-counts small { color: var(--muted); font-size: var(--type-micro); text-transform: uppercase; letter-spacing: .06em; }
 
 .home-banner .banner-benefits-summary { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 

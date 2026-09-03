@@ -1330,6 +1330,11 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "affiliate_section_aria" => "Sprzęt VIRYA i linki afiliacyjne Thomann",
         "affiliate_title" => "Sprzęt, którego naprawdę używamy",
         "affiliate_used_live" => "UŻYWAMY NA ŻYWO",
+        "affiliate_converter_title" => "Masz własne linki do Thomann?",
+        "affiliate_converter_note" => {
+            "Wklej je w naszym konwerterze, a zamienimy je na linki afiliacyjne za Ciebie."
+        }
+        "affiliate_converter_cta" => "PRZEKONWERTUJ LINKI ↗",
         // ── Three-tier priority dashboard + FanHomeBanner ──
         "tier_priority" => "PRIORYTET",
         "tier_active" => "AKTYWNE",

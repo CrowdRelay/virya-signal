@@ -33,6 +33,19 @@ fn FanHomeBanner(
     view! {
         {move || home.get().and_then(|snapshot| {
             let recommended = snapshot.recommended.clone()?;
+            // Synesthesia is opt-in and lives beside the app, not at the front
+            // of it — the overview below already says so in a comment and then
+            // renders its own progress card for anyone who started a run.
+            // Promoting the same thing into the priority banner put one
+            // optional side experience twice on the first screen, above the
+            // next show, and made a fan who ignores it read a headline about
+            // something they never asked for. The card keeps it; the banner
+            // moves on to whatever is actually next. Suppression is
+            // unconditional: a fan who never started Synesthesia should not
+            // see it as the headline either — they never asked for it.
+            if matches!(recommended.kind, FanRecommendedAction::ContinueSynesthesia) {
+                return None;
+            }
             let label = recommended_action_label(&recommended.kind);
             let counts = snapshot.counts.clone();
             let next_event = snapshot.next_event.clone();
@@ -204,7 +217,6 @@ fn FanHomeOverview(
                         <header class="fan-home-header">
                             <div>
                                 <p class="eyebrow">{tr("your_signal_now")}</p>
-                                <h2>{snapshot.profile.display_name.clone().value_or_else(|| tr("my_signal").to_owned())}</h2>
                                 <p>{city.map(|value| i18n::format("signal_city_context", &[value])).value_or_else(|| tr("signal_home_context").to_owned())}</p>
                             </div>
                             {stale.then(|| view! {
