@@ -113,7 +113,12 @@ jobs:
           if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
             echo "Branch $BRANCH already exists — updating"
             git fetch origin "$BRANCH"
+            # The generated files on main would conflict with the branch checkout.
+            # Stash them, switch, then restore so the regenerated content lands
+            # on the auto branch.
+            git stash
             git checkout "$BRANCH"
+            git stash pop || true
           else
             git checkout -b "$BRANCH"
           fi
