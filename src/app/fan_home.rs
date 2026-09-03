@@ -224,64 +224,6 @@ fn FanHomeOverview(
                             })}
                         </header>
                         <div class="fan-home-grid">
-                            // Synesthesia is a side album experiment, not a primary Home CTA.
-                            // Only people who already engaged with it see the progress card.
-                            <Show when=move || show_synesthesia>
-                                <article class="home-action-card synesthesia-home-card">
-                                    <p class="eyebrow">{tr("synesthesia_eyebrow")}</p>
-                                    <strong>{if synesthesia.completed { tr("journey_completed") } else if synesthesia.started { tr("continue_the_journey") } else { tr("start_the_journey") }}</strong>
-                                    <p>{if synesthesia.completed {
-                                        if synesthesia.linked_at.is_some() { tr("completion_linked_to_signal") } else { tr("completion_saved_link_it_to_signal") }
-                                    } else {
-                                        tr("rooms_completed_count")
-                                    }}</p>
-                                    {synesthesia.client_total_elapsed_ms.map(|elapsed| view! {
-                                        <small>{i18n::format("synesthesia_completed_in_minutes", &[((elapsed / 60_000).max(1)).to_string()])}</small>
-                                    })}
-                                    {synesthesia_summary.clone().map(|summary| view! {
-                                        <small class="synesthesia-best-summary">{summary}</small>
-                                    })}
-                                    {synesthesia.reward_entered.then(|| view! {
-                                        <span class="cache-badge">{tr("reward_entry_confirmed")}</span>
-                                    })}
-                                    {(!synesthesia.completed).then(|| view! {
-                                        <div class="progress-track"><span style=format!("width:{}%", (i32::from(synesthesia.rooms_completed).clamp(0, 11) * 100) / 11)></span></div>
-                                        <small>{format!("{}/11", synesthesia.rooms_completed.clamp(0, 11))}</small>
-                                    })}
-                                    <ExternalLink url="https://synesthesia.virya.music/?source=signal-app&resume=1".to_owned() label=if synesthesia.started { tr("open_synesthesia") } else { tr("enter_synesthesia") } error=error />
-                                    {(bridge::native_available() && synesthesia.leaderboard_published).then(|| view! {
-                                        <button
-                                            class="ghost"
-                                            disabled=move || leaderboard_busy.get()
-                                            on:click=move |_| {
-                                                if leaderboard_busy.get_untracked() {
-                                                    return;
-                                                }
-                                                leaderboard_busy.set(true);
-                                                spawn_local(async move {
-                                                    match bridge::invoke_timeout::<bool, _>(
-                                                        "fan_unpublish_synesthesia_leaderboard",
-                                                        &EmptyArgs {},
-                                                        12_000,
-                                                    )
-                                                    .await
-                                                    {
-                                                        Ok(true) => home.update(|current| {
-                                                            if let Some(snapshot) = current {
-                                                                snapshot.synesthesia.leaderboard_published = false;
-                                                                snapshot.synesthesia.leaderboard_rank = None;
-                                                            }
-                                                        }),
-                                                        Ok(false) => error.set(Some(tr("leaderboard_unpublish_failed").to_owned())),
-                                                        Err(message) => error.set(Some(message)),
-                                                    }
-                                                    leaderboard_busy.set(false);
-                                                });
-                                            }
-                                        >{move || if leaderboard_busy.get() { tr("removing_from_leaderboard") } else { tr("remove_from_leaderboard") }}</button>
-                                    })}
-                                </article>
-                            </Show>
                             {next_event.map(|event| {
                                 let ticket_url = event.ticket_url.clone();
                                 let title = event.title.clone();
@@ -355,6 +297,70 @@ fn FanHomeOverview(
                                     </article>
                                 }
                             })}
+                            // Synesthesia sits after the show deliberately. It is an opt-in
+                            // side experience, and `order: 99` used to move it visually while
+                            // the DOM kept it first — so a screen reader announced it before
+                            // the next show, and a keyboard user tabbed into "open
+                            // Synesthesia" before reaching the show they opened the app for.
+                            // Source order now matches the rendered order (WCAG 1.3.2, 2.4.3).
+                            // Synesthesia is a side album experiment, not a primary Home CTA.
+                            // Only people who already engaged with it see the progress card.
+                            <Show when=move || show_synesthesia>
+                                <article class="home-action-card synesthesia-home-card">
+                                    <p class="eyebrow">{tr("synesthesia_eyebrow")}</p>
+                                    <strong>{if synesthesia.completed { tr("journey_completed") } else if synesthesia.started { tr("continue_the_journey") } else { tr("start_the_journey") }}</strong>
+                                    <p>{if synesthesia.completed {
+                                        if synesthesia.linked_at.is_some() { tr("completion_linked_to_signal") } else { tr("completion_saved_link_it_to_signal") }
+                                    } else {
+                                        tr("rooms_completed_count")
+                                    }}</p>
+                                    {synesthesia.client_total_elapsed_ms.map(|elapsed| view! {
+                                        <small>{i18n::format("synesthesia_completed_in_minutes", &[((elapsed / 60_000).max(1)).to_string()])}</small>
+                                    })}
+                                    {synesthesia_summary.clone().map(|summary| view! {
+                                        <small class="synesthesia-best-summary">{summary}</small>
+                                    })}
+                                    {synesthesia.reward_entered.then(|| view! {
+                                        <span class="cache-badge">{tr("reward_entry_confirmed")}</span>
+                                    })}
+                                    {(!synesthesia.completed).then(|| view! {
+                                        <div class="progress-track"><span style=format!("width:{}%", (i32::from(synesthesia.rooms_completed).clamp(0, 11) * 100) / 11)></span></div>
+                                        <small>{format!("{}/11", synesthesia.rooms_completed.clamp(0, 11))}</small>
+                                    })}
+                                    <ExternalLink url="https://synesthesia.virya.music/?source=signal-app&resume=1".to_owned() label=if synesthesia.started { tr("open_synesthesia") } else { tr("enter_synesthesia") } error=error />
+                                    {(bridge::native_available() && synesthesia.leaderboard_published).then(|| view! {
+                                        <button
+                                            class="ghost"
+                                            disabled=move || leaderboard_busy.get()
+                                            on:click=move |_| {
+                                                if leaderboard_busy.get_untracked() {
+                                                    return;
+                                                }
+                                                leaderboard_busy.set(true);
+                                                spawn_local(async move {
+                                                    match bridge::invoke_timeout::<bool, _>(
+                                                        "fan_unpublish_synesthesia_leaderboard",
+                                                        &EmptyArgs {},
+                                                        12_000,
+                                                    )
+                                                    .await
+                                                    {
+                                                        Ok(true) => home.update(|current| {
+                                                            if let Some(snapshot) = current {
+                                                                snapshot.synesthesia.leaderboard_published = false;
+                                                                snapshot.synesthesia.leaderboard_rank = None;
+                                                            }
+                                                        }),
+                                                        Ok(false) => error.set(Some(tr("leaderboard_unpublish_failed").to_owned())),
+                                                        Err(message) => error.set(Some(message)),
+                                                    }
+                                                    leaderboard_busy.set(false);
+                                                });
+                                            }
+                                        >{move || if leaderboard_busy.get() { tr("removing_from_leaderboard") } else { tr("remove_from_leaderboard") }}</button>
+                                    })}
+                                </article>
+                            </Show>
                         </div>
                     }.into_any()
                 }).value_or_else(|| view! {

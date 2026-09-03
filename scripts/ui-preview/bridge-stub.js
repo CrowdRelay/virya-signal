@@ -28,6 +28,10 @@
   const iso = (offsetDays) =>
     new Date(Date.now() + offsetDays * 86_400_000).toISOString();
 
+  /** Doors open before the set. Equal timestamps are a fixture smell, not data. */
+  const hoursBefore = (isoString, hours) =>
+    new Date(Date.parse(isoString) - hours * 3_600_000).toISOString();
+
   // ── session shapes ────────────────────────────────────────────────────
   const operatorSession = (role) => ({
     configured: true,
@@ -83,7 +87,7 @@
       city: "Warszawa",
       venue: "Hydrozagadka",
       starts_at: iso(12),
-      status: "on_sale",
+      status: "upcoming",
       ticket_url: "https://virya.music/t/wwa",
     },
     {
@@ -92,7 +96,7 @@
       city: "Kraków",
       venue: "Klub Kwadrat",
       starts_at: iso(26),
-      status: "on_sale",
+      status: "upcoming",
       ticket_url: "https://virya.music/t/krk",
     },
     {
@@ -101,7 +105,7 @@
       city: "Wrocław",
       venue: "Alibi",
       starts_at: iso(54),
-      status: "announced",
+      status: "upcoming",
       ticket_url: null,
     },
   ];
@@ -122,9 +126,9 @@
       venue: "Hydrozagadka",
       city: "Warszawa",
       starts_at: iso(12),
-      doors_at: iso(12),
+      doors_at: hoursBefore(iso(12), 1),
       ends_at: null,
-      phase: "on_sale",
+      phase: "upcoming",
       ticket_url: "https://virya.music/t/wwa",
       interested: true,
       has_pass: false,
