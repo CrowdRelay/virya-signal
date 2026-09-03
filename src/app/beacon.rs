@@ -615,6 +615,12 @@ fn BeaconBriefing(
             <div class="section-head"><div><p class="eyebrow">{tr("latarnik_news_label")}</p><h3>{tr("latarnik_news_title")}</h3></div></div>
             <div class="card-list beacon-news-list">
                 <Show when=move || news.get().is_some() fallback=move || view! { <Skeleton rows=2 height=80/> }>
+                    <Show when=move || news.get().is_some_and(|feed| feed.items.is_empty())>
+                        <div class="empty-state compact">
+                            <strong>{tr("latarnik_news_empty")}</strong>
+                            <p>{tr("latarnik_news_empty_hint")}</p>
+                        </div>
+                    </Show>
                     {move || news.get().map(|feed| feed.items.into_iter().take(6).map(|item| {
                         let title=beacon_news_text(&item.title); let summary=beacon_news_text(&item.summary); let url=beacon_news_text(&item.url); let tag=beacon_news_text(&item.tag);
                         view! { <article class="beacon-news-card"><p class="eyebrow">{tag}</p><h3>{title}</h3><p>{summary}</p><button class="ghost" on:click=move |_| beacon_open_url(url.clone(), error)>{tr("latarnik_read")}</button></article> }
@@ -677,6 +683,12 @@ fn BeaconRadar(
             </header>
             <Show when=move || !loading.get() || home.with(|value| value.is_some()) fallback=move || view! { <Skeleton rows=4 height=160/> }>
                 <div class="card-list beacon-event-list">
+                    <Show when=move || home.get().is_some_and(|data| data.nearby_events.is_empty())>
+                        <div class="empty-state">
+                            <strong>{tr("latarnik_radar_empty")}</strong>
+                            <p>{tr("latarnik_radar_empty_hint")}</p>
+                        </div>
+                    </Show>
                     {move || home.get().map(|data| data.nearby_events.into_iter().map(|event| {
                         let event_id = event.id.clone();
                         let selected_id = event_id.clone();
@@ -951,6 +963,12 @@ fn BeaconAccessHub(
             </header>
             <div class="section-head"><h3>{tr("latarnik_requests")}</h3></div>
             <div class="card-list">
+                <Show when=move || requests.get().is_some_and(|data| data.requests.is_empty())>
+                    <div class="empty-state compact">
+                        <strong>{tr("latarnik_requests_empty")}</strong>
+                        <p>{tr("latarnik_requests_empty_hint")}</p>
+                    </div>
+                </Show>
                 {move || requests.get().map(|data| data.requests.into_iter().map(|request| {
                     // The badge printed the raw `status` enum — a Polish
                     // journalist read OPEN and RESOLVED — and the card never
@@ -980,6 +998,12 @@ fn BeaconAccessHub(
             </div>
             <div class="section-head"><h3>{tr("latarnik_release_allocations")}</h3></div>
             <div class="card-list">
+                <Show when=move || releases.get().is_some_and(|data| data.campaigns.is_empty())>
+                    <div class="empty-state compact">
+                        <strong>{tr("latarnik_releases_empty")}</strong>
+                        <p>{tr("latarnik_releases_empty_hint")}</p>
+                    </div>
+                </Show>
                 {move || releases.get().map(|data| data.campaigns.into_iter().map(|release| {
                     let campaign_id = release.campaign_id.clone();
                     let decline_id = campaign_id.clone();

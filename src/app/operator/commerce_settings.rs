@@ -394,30 +394,21 @@ fn OperatorSettings(
     view! {
         <section class="screen">
             <header class="screen-title"><p class="eyebrow">{tr("device_label")}</p><h2>{tr("settings")}</h2></header>
+            <p class="settings-group-label">{tr("settings_group_this_device")}</p>
             <div class="settings-list">
-                <LanguageSwitch />
-                <button type="button" on:click=move |_| {
-                    spawn_local(async move {
-                        if let Err(message) = bridge::invoke_unit(
-                            "open_external_url",
-                            &UrlArgs { url: "https://virya.music/?source=signal-staff-settings" },
-                        ).await {
-                            error.set(Some(message));
-                        }
-                    });
-                }>"Virya.music"</button>
-                <button type="button" on:click=move |_| {
-                    spawn_local(async move {
-                        if let Err(message) = bridge::invoke_unit(
-                            "open_external_url",
-                            &UrlArgs { url: "https://virya.music/staff/commerce/?source=signal-staff-latarnik" },
-                        ).await {
-                            error.set(Some(message));
-                        }
-                    });
-                }>"Latarnik · wydania i network"</button>
-                <article><div><strong>{tr("connection")}</strong><p>{move || status.get().session.map(|s| s.api_base_url).value_or_else(Default::default)}</p></div><span class:online=move || !loading.get().events && !loading.get().qr>{move || if loading.get().events || loading.get().qr { tr("connecting_2") } else { tr("online") }}</span></article>
-                <article><div><strong>{tr("permissions")}</strong><p>{move || status.get().session.map(|s| s.role.label().to_owned()).value_or_else(Default::default)}</p></div></article>
+                <article class="settings-row settings-row-static">
+                    <span class="settings-row-icon" aria-hidden="true">"⌁"</span>
+                    <strong>{tr("connection")}</strong>
+                    <small>{tr("staff_connection_hint")}</small>
+                    <p class="settings-row-value">{move || status.get().session.map(|s| s.api_base_url).value_or_else(Default::default)}</p>
+                    <span class="settings-row-state" class:online=move || !loading.get().events && !loading.get().qr>{move || if loading.get().events || loading.get().qr { tr("connecting_2") } else { tr("online") }}</span>
+                </article>
+                <article class="settings-row settings-row-static">
+                    <span class="settings-row-icon" aria-hidden="true">"⊙"</span>
+                    <strong>{tr("permissions")}</strong>
+                    <small>{tr("staff_permissions_hint")}</small>
+                    <p class="settings-row-value">{move || status.get().session.map(|s| s.role.label().to_owned()).value_or_else(Default::default)}</p>
+                </article>
                 {move || status.get().session.and_then(|session| {
                     let expires_at = session.session_expires_at?;
                     let now = (js_sys::Date::now() / 1_000.0).max(0.0) as u64;
@@ -430,9 +421,61 @@ fn OperatorSettings(
                     };
                     key.map(|key| view! { <p class="security-note warning">{tr(key)}</p> })
                 })}
-                <button on:click=refresh disabled=move || loading.get().events || loading.get().qr>{tr("refresh_all_data")}</button>
-                <button on:click=lock>{tr("lock_panel")}</button>
-                <button class="danger ghost" on:click=forget>{tr("remove_operator_profile")}</button>
+                <LanguageSwitch />
+            </div>
+            <p class="settings-group-label">{tr("settings_group_shortcuts")}</p>
+            <div class="settings-list">
+                <button type="button" class="settings-row" on:click=move |_| {
+                    spawn_local(async move {
+                        if let Err(message) = bridge::invoke_unit(
+                            "open_external_url",
+                            &UrlArgs { url: "https://virya.music/?source=signal-staff-settings" },
+                        ).await {
+                            error.set(Some(message));
+                        }
+                    });
+                }>
+                    <span class="settings-row-icon" aria-hidden="true">"⤴"</span>
+                    <strong>"Virya.music"</strong>
+                    <small>{tr("staff_site_hint")}</small>
+                    <span class="settings-row-chevron" aria-hidden="true">"›"</span>
+                </button>
+                <button type="button" class="settings-row" on:click=move |_| {
+                    spawn_local(async move {
+                        if let Err(message) = bridge::invoke_unit(
+                            "open_external_url",
+                            &UrlArgs { url: "https://virya.music/staff/commerce/?source=signal-staff-latarnik" },
+                        ).await {
+                            error.set(Some(message));
+                        }
+                    });
+                }>
+                    <span class="settings-row-icon" aria-hidden="true">"▤"</span>
+                    <strong>{tr("staff_latarnik_panel")}</strong>
+                    <small>{tr("staff_latarnik_panel_hint")}</small>
+                    <span class="settings-row-chevron" aria-hidden="true">"›"</span>
+                </button>
+            </div>
+            <p class="settings-group-label">{tr("settings_group_session")}</p>
+            <div class="settings-list">
+                <button class="settings-row" on:click=refresh disabled=move || loading.get().events || loading.get().qr>
+                    <span class="settings-row-icon" aria-hidden="true">"⟳"</span>
+                    <strong>{tr("refresh_all_data")}</strong>
+                    <small>{tr("staff_refresh_hint")}</small>
+                    <span class="settings-row-chevron" aria-hidden="true">"›"</span>
+                </button>
+                <button class="settings-row" on:click=lock>
+                    <span class="settings-row-icon" aria-hidden="true">"◫"</span>
+                    <strong>{tr("lock_panel")}</strong>
+                    <small>{tr("staff_lock_hint")}</small>
+                    <span class="settings-row-chevron" aria-hidden="true">"›"</span>
+                </button>
+                <button class="settings-row danger ghost" on:click=forget>
+                    <span class="settings-row-icon" aria-hidden="true">"▨"</span>
+                    <strong>{tr("remove_operator_profile")}</strong>
+                    <small>{tr("staff_forget_hint")}</small>
+                    <span class="settings-row-chevron" aria-hidden="true">"›"</span>
+                </button>
             </div>
             <Show when=move || owner.get()>
                 <AutopilotPanel overview=autopilot loading=autopilot_loading chief=autopilot_chief chief_loading=autopilot_chief_loading refresh_requested=autopilot_refresh_requested error=error />

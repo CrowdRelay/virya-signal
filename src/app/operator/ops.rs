@@ -7,6 +7,7 @@ fn OpsPanel(
     let refresh = move |_| refresh_operator_ops(overview, loading, error);
     view! {
         <section class="ops-panel"><div class="section-head"><div><p class="eyebrow">CONTROL PLANE</p><h3>{tr("queues_and_deliveries")}</h3></div><button class="text-button" on:click=refresh disabled=move || loading.get()>{tr("refresh_2")}</button></div>
+            <p class="panel-hint">{tr("ops_panel_hint")}</p>
             <Show when=move || !loading.get() || overview.with(|value| value.is_some()) fallback=move || view! { <Skeleton rows=2 height=120 /> }>
                 {move || overview.get().map(|data| {
                     let summary = data.summary;

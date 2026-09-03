@@ -89,10 +89,23 @@ fn FanWallet(
 
     view! {
         <section class="screen"><header class="screen-title"><p class="eyebrow">{tr("mobile_wallet")}</p><h2>{tr("tickets_and_entry")}</h2></header><Show when=move || !loading.get().admission_pass fallback=move || view! { <Skeleton rows=1 height=140 /> }>{move || dashboard.with(|state| state.as_ref().and_then(|d| d.admission_pass.clone())).map(|pass| view! { <article class="admission-card"><p class="eyebrow">{tr("virya_admission_pass")}</p><h3>{pass.event_title}</h3><p>{event_time_location(&pass.starts_at, pass.venue.as_deref())}</p><strong>{pass.public_reference}</strong><span>{pass.status}</span><button class="primary" on:click=qr disabled=move || busy.get()>{tr("show_entry_qr")}</button>{move || admission_qr.get().map(|value| view! { <QrPanel svg=value.qr_svg token=value.token expires=value.expires_at /> })}</article> })}
-        <Show when=move || dashboard.with(|state| state.as_ref().is_none_or(|d| d.admission_pass.is_none()))><div class="claim-box"><p class="eyebrow">{tr("did_you_win_an_admission_pass")}</p><h3>{tr("assign_it_to_your_phone")}</h3><textarea rows="3" placeholder=tr("token_from_the_message") prop:value=move || claim_token.get() on:input=move |e| claim_token.set(event_target_value(&e))></textarea><button class="primary" on:click=claim disabled=move || busy.get()>{tr("claim_admission_pass")}</button>{move || claim_status.get().map(|msg| view! { <p class="inline-form-error">{msg}</p> })}</div></Show></Show>
+        <Show when=move || dashboard.with(|state| state.as_ref().is_none_or(|d| d.admission_pass.is_none()))><div class="claim-box"><p class="eyebrow">{tr("did_you_win_an_admission_pass")}</p><h3>{tr("assign_it_to_your_phone")}</h3><p class="field-hint">{tr("claim_pass_hint")}</p><textarea rows="3" placeholder=tr("token_from_the_message") prop:value=move || claim_token.get() on:input=move |e| claim_token.set(event_target_value(&e))></textarea><button class="primary" on:click=claim disabled=move || busy.get()>{tr("claim_admission_pass")}</button>{move || claim_status.get().map(|msg| view! { <p class="inline-form-error">{msg}</p> })}</div></Show></Show>
         <div class="section-head"><h3>{tr("ticket_wallet")}</h3><span>{move || wallets.get().len()}</span></div><Show when=move || !loading.get().wallets fallback=move || view! { <Skeleton rows=2 height=110 /> }><div class="wallet-stack">{move || wallets.get().into_iter().map(|wallet| view! {
             <WalletCard wallet=wallet error=error />
-        }).collect_view()}</div></Show><details class="import-box"><summary>{tr("add_an_existing_order")}</summary><div class="form-grid"><label>"Order ID"<input placeholder=tr("order_uuid") prop:value=move || order_id.get() on:input=move |e| order_id.set(event_target_value(&e))/></label><label>{tr("private_checkout_token")}<textarea rows="3" autocomplete="off" autocapitalize="none" spellcheck="false" prop:value=move || checkout_token.get() on:input=move |e| checkout_token.set(event_target_value(&e))></textarea></label><button class="primary" on:click=import disabled=move || busy.get()>{tr("add_to_wallet")}</button>{move || import_status.get().map(|msg| view! { <p class="inline-form-error">{msg}</p> })}</div></details></section>
+        }).collect_view()}</div></Show><details class="import-box">
+            <summary>
+                <span aria-hidden="true">"⤓"</span>
+                <strong>{tr("add_an_existing_order")}</strong>
+                <small>{tr("import_summary_hint")}</small>
+            </summary>
+            <div class="form-grid">
+                <p class="field-hint">{tr("import_where_to_find")}</p>
+                <label>"Order ID"<input placeholder=tr("order_uuid") prop:value=move || order_id.get() on:input=move |e| order_id.set(event_target_value(&e))/><small class="field-hint">{tr("import_order_id_hint")}</small></label>
+                <label>{tr("private_checkout_token")}<textarea rows="3" autocomplete="off" autocapitalize="none" spellcheck="false" prop:value=move || checkout_token.get() on:input=move |e| checkout_token.set(event_target_value(&e))></textarea><small class="field-hint">{tr("import_token_hint")}</small></label>
+                <button class="primary" on:click=import disabled=move || busy.get()>{tr("add_to_wallet")}</button>
+                {move || import_status.get().map(|msg| view! { <p class="inline-form-error">{msg}</p> })}
+            </div>
+        </details></section>
     }
 }
 
@@ -280,16 +293,49 @@ fn FanProfileScreen(
                 <div class="profile-card"><div class="avatar">"V"</div><div><strong>{profile.display_name.value_or_else(|| tr("virya_fan").to_owned())}</strong><p>{profile.email}</p></div></div>
                 <div class="stats-grid"><Metric value=profile.wallet_count.to_string() label=tr("orders")/><Metric value=if profile.has_admission_pass { "1".to_owned() } else { "0".to_owned() } label=tr("admission_passes")/><Metric value=dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned()) label=tr("referrals")/></div>
             })}
+            <p class="settings-group-label">{tr("settings_group_app")}</p>
             <div class="settings-list">
                 <NativePushControl error=error />
                 <LanguageSwitch />
-                <ExternalLink url="https://virya.music/?source=signal-app-settings".to_owned() label="Virya.music" error=error />
-                <button on:click=refresh disabled=move || { let state = loading.get(); state.events || state.referral || state.interests || state.admission_pass || state.wallets }>{move || { let state = loading.get(); if state.events || state.referral || state.interests || state.admission_pass || state.wallets { tr("refreshing_2") } else { tr("refresh_data") } }}</button>
-                <button on:click=lock>{tr("lock_app")}</button>
-                <button class="danger ghost" on:click=forget>{tr("remove_profile_and_tickets_from_device")}</button>
-                <button class="danger ghost" on:click=delete_account>{tr("delete_virya_account")}</button>
+                <article class="settings-row settings-row-static">
+                    <span class="settings-row-icon" aria-hidden="true">"⤴"</span>
+                    <strong>"Virya.music"</strong>
+                    <small>{tr("settings_site_hint")}</small>
+                    <ExternalLink url="https://virya.music/?source=signal-app-settings".to_owned() label=tr("settings_open_site") error=error />
+                </article>
+                <button
+                    class="settings-row"
+                    on:click=refresh
+                    disabled=move || { let state = loading.get(); state.events || state.referral || state.interests || state.admission_pass || state.wallets }
+                >
+                    <span class="settings-row-icon" aria-hidden="true">"⟳"</span>
+                    <strong>{move || { let state = loading.get(); if state.events || state.referral || state.interests || state.admission_pass || state.wallets { tr("refreshing_2") } else { tr("refresh_data") } }}</strong>
+                    <small>{tr("settings_refresh_hint")}</small>
+                    <span class="settings-row-chevron" aria-hidden="true">"›"</span>
+                </button>
+                <button class="settings-row" on:click=lock>
+                    <span class="settings-row-icon" aria-hidden="true">"◫"</span>
+                    <strong>{tr("lock_app")}</strong>
+                    <small>{tr("settings_lock_hint")}</small>
+                    <span class="settings-row-chevron" aria-hidden="true">"›"</span>
+                </button>
+            </div>
+            <p class="settings-group-label">{tr("settings_group_account")}</p>
+            <div class="settings-list">
+                <button class="settings-row danger ghost" on:click=forget>
+                    <span class="settings-row-icon" aria-hidden="true">"▨"</span>
+                    <strong>{tr("remove_profile_and_tickets_from_device")}</strong>
+                    <small>{tr("settings_forget_hint")}</small>
+                    <span class="settings-row-chevron" aria-hidden="true">"›"</span>
+                </button>
+                <button class="settings-row danger ghost" on:click=delete_account>
+                    <span class="settings-row-icon" aria-hidden="true">"✕"</span>
+                    <strong>{tr("delete_virya_account")}</strong>
+                    <small>{tr("settings_delete_hint")}</small>
+                    <span class="settings-row-chevron" aria-hidden="true">"›"</span>
+                </button>
                 <Show when=move || delete_confirming.get()>
-                    <div class="security-note">
+                    <div class="security-note warning">
                         <p>{tr("delete_account_warning")}</p>
                         <div class="button-row">
                             <button class="danger" on:click=delete_account>{tr("confirm_delete_account")}</button>

@@ -1528,6 +1528,86 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "autopilot_referral_code_detail" => "Issue a referral code to a fan",
         // ── BUNDLE badge ──
         "bundle_badge" => "BUNDLE",
+        // ── Settings rows: every action states its consequence ──
+        "settings_group_app" => "APP",
+        "settings_group_account" => "ACCOUNT AND DATA",
+        "settings_open_site" => "OPEN VIRYA.MUSIC",
+        "settings_site_hint" => "Shows, releases and the full store, opened in your browser.",
+        "settings_refresh_hint" => {
+            "Fetches shows, tickets, rewards and store status from Virya again."
+        }
+        "settings_lock_hint" => "Hides the wallet behind your PIN. Nothing is deleted.",
+        "settings_forget_hint" => {
+            "Clears this phone: profile, tickets and offline copies. Your Virya account stays."
+        }
+        "settings_delete_hint" => {
+            "Permanently removes the Virya account along with its orders and passes."
+        }
+        // ── Wallet: what a token is and where it comes from ──
+        "import_summary_hint" => "Bought a ticket before installing the app? Add it here.",
+        "import_where_to_find" => {
+            "Both values are in the ticket confirmation email from Virya. They stay on this phone and are never shared."
+        }
+        "import_order_id_hint" => "The long identifier from the confirmation email, e.g. 8f2c…",
+        "import_token_hint" => {
+            "The private key from the same email. It unlocks the tickets on this device."
+        }
+        "claim_pass_hint" => {
+            "Paste the token from the message that confirmed the win. The pass moves to this phone and the QR works offline."
+        }
+        // ── Staff settings: same rule, from the operator side ──
+        "settings_group_this_device" => "THIS DEVICE",
+        "settings_group_shortcuts" => "SHORTCUTS",
+        "settings_group_session" => "SESSION",
+        "staff_connection_hint" => "The CrowdRelay instance this device reads and writes.",
+        "staff_permissions_hint" => {
+            "What this paired device is allowed to do at the gate and in sales."
+        }
+        "staff_site_hint" => "The public site: shows, releases and the store.",
+        "staff_latarnik_panel" => "Beacon · releases and network",
+        "staff_latarnik_panel_hint" => {
+            "Web panel for allocations, press requests and the partner network."
+        }
+        "staff_refresh_hint" => "Fetches shows, QR campaigns and sales figures again.",
+        "staff_lock_hint" => "Hides the panel behind the local PIN. The pairing stays.",
+        "staff_forget_hint" => {
+            "Unpairs this device and wipes its local staff data. Pairing again needs a new invite."
+        }
+        // ── Beacon: an empty list used to render as nothing at all ──
+        "latarnik_radar_empty" => "No shows in your radius yet",
+        "latarnik_radar_empty_hint" => {
+            "Nothing is scheduled close enough right now. Widen the radius in settings, or come back — the radar refreshes with every new booking."
+        }
+        "latarnik_news_empty" => "No news right now",
+        "latarnik_news_empty_hint" => {
+            "Announcements, releases and press notes land here as they are published."
+        }
+        "latarnik_requests_empty" => "No press requests yet",
+        "latarnik_requests_empty_hint" => {
+            "Ask for photos, a clean version, an interview or accreditation from a show's press room. Everything you ask for is tracked here."
+        }
+        "latarnik_releases_empty" => "No allocations waiting",
+        "latarnik_releases_empty_hint" => {
+            "When a release is allocated to you, it shows up here with a claim deadline and a delivery form."
+        }
+        // ── Beacon preferences: a picker with no label is a guess ──
+        "latarnik_preferences_hint" => {
+            "These control which shows reach you and how loudly. Change them any time — nothing is sent until you save."
+        }
+        "latarnik_radius_label" => "SEARCH RADIUS",
+        "latarnik_radius_hint" => "How far from your city a show can be and still reach you.",
+        "latarnik_topics_label" => "TOPICS",
+        "latarnik_topics_hint" => {
+            "Pick what you actually cover. Everything else stays out of your briefing."
+        }
+        "latarnik_danger_label" => "LEAVING",
+        "latarnik_danger_hint" => {
+            "Signing out keeps your invite. Leaving the network gives it up, and each option is confirmed before anything happens."
+        }
+        // ── Operator cockpit ──
+        "ops_panel_hint" => {
+            "Live backend queues. Everything here retries on its own; an entry only shows up when it has stopped retrying and needs a manual push."
+        }
         _ => key,
     }
 }

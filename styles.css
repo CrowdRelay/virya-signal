@@ -1472,3 +1472,464 @@ html[data-virya-scanner-active] .app-shell {
     box-shadow: var(--shadow-md);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Premium pass over the outlier surfaces.
+
+   The fan home, storefront and checkout were designed as cards; everything
+   reached less often — empty states, settings rows, security notes, the
+   Beacon surface, the operator cockpit — kept the first-pass treatment:
+   a bare border on a flat surface with left-aligned body text and no
+   affordance. Those screens read as unfinished next to the polished ones,
+   and a block of grey prose never says what it is, what it is for, or what
+   to do next. This section brings them onto the same tokens, gives every
+   informational block an icon well and a hierarchy, and puts a press state
+   on everything that is actually pressable.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Empty states ──
+   Previously a hairline top rule over left-aligned prose: indistinguishable
+   from a paragraph that failed to load. It is a deliberate state, so it gets
+   a deliberate container — dashed, because nothing is here yet — and a glyph
+   that marks it as a state rather than as missing content. The glyph comes
+   from CSS so every one of the dozen call sites gets it without markup. */
+.empty-state {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  margin-top: 12px;
+  padding: 26px 20px 24px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(160deg, color-mix(in srgb, var(--signal) 5%, var(--surface)), var(--surface) 72%);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+}
+.empty-state::before {
+  content: "◌";
+  display: grid;
+  place-content: center;
+  width: 42px;
+  height: 42px;
+  margin-bottom: 12px;
+  border: 1px solid var(--signal-deep);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--signal) 9%, transparent);
+  color: var(--signal-hot);
+  font-size: 26px;
+  line-height: 1;
+}
+.empty-state strong { margin-bottom: 2px; font-size: 17px; letter-spacing: -.015em; }
+.empty-state p { max-width: 46ch; font-size: var(--type-meta); line-height: 1.55; }
+.empty-state > button,
+.empty-state > a { margin-top: 15px; }
+.empty-state.compact { padding: 18px 16px; }
+.empty-state.compact::before { width: 34px; height: 34px; margin-bottom: 9px; font-size: 21px; }
+.empty-state.compact strong { font-size: 15px; }
+
+/* ── Informational notes ──
+   `.security-note` carried the privacy, ownership and warning copy on six
+   screens as an unadorned paragraph behind a 2px rule. Same content, but
+   framed and badged, so it reads as "here is something you should know"
+   instead of as leftover text. */
+/* Not a grid: several call sites put bare text directly inside the element,
+   and an anonymous text run in a grid container is a grid item the selectors
+   below cannot reach. Absolute glyph plus a padded gutter behaves the same
+   for both shapes. */
+.security-note {
+  position: relative;
+  margin-top: 18px;
+  padding: 14px 15px 14px 40px;
+  border: 1px solid var(--border-subtle);
+  border-left: 2px solid var(--signal-deep);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--signal) 4%, var(--surface));
+  color: var(--muted);
+  font-size: var(--type-meta);
+  line-height: 1.55;
+}
+.security-note::before {
+  content: "ⓘ";
+  position: absolute;
+  top: 14px;
+  left: 15px;
+  color: var(--signal-hot);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.security-note > * { margin: 0; }
+.security-note > * + * { margin-top: 10px; }
+.security-note.warning {
+  border-left-color: var(--warning);
+  border-color: color-mix(in srgb, var(--warning) 26%, var(--line));
+  background: color-mix(in srgb, var(--warning) 6%, var(--surface));
+  color: #e6d59a;
+}
+.security-note.warning::before { content: "⚠"; color: var(--warning); }
+.button-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 380px) { .button-row { grid-template-columns: 1fr; } }
+
+/* Field-level help. A label that only names a field says what to type but
+   never where to get it; these carry the "where from" line under it. */
+.field-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--type-micro);
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.5;
+  text-transform: none;
+}
+.form-grid label small,
+.ticket-buyer-panel label small { color: var(--muted); font-weight: 500; letter-spacing: 0; text-transform: none; }
+
+/* ── Settings rows ──
+   A settings list of bare verbs ("Lock app", "Remove profile and tickets")
+   asks the reader to guess the consequence of each, and the destructive ones
+   looked exactly like the harmless ones. Each row now leads with a glyph,
+   states what it does, and carries one line on what happens after — the
+   affordance and the consequence in the same target. */
+.settings-list { gap: 9px; }
+.settings-list article,
+.settings-list button { border-color: var(--border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); }
+.settings-row {
+  display: grid !important;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 13px;
+  min-height: 64px;
+  padding: 14px 15px !important;
+  transition: transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+/* Every cell is pinned. Auto-placement put the trailing chevron — which
+   spans both rows — on the first row it could fit, pushing the title and its
+   description down a row and leaving the glyph floating above the label. */
+.settings-row-icon {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  display: grid;
+  place-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--signal-deep);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--signal) 8%, transparent);
+  color: var(--signal-hot);
+  font-size: 17px;
+  line-height: 1;
+}
+.settings-row strong { grid-column: 2; grid-row: 1; align-self: end; font-size: var(--type-body); font-weight: 800; line-height: 1.2; }
+.settings-row small { grid-column: 2; grid-row: 2; align-self: start; color: var(--muted); font-size: var(--type-micro); font-weight: 500; line-height: 1.45; }
+.settings-row-chevron { grid-column: 3; grid-row: 1 / span 2; color: var(--signal-hot); font-size: 22px; line-height: 1; opacity: .8; }
+/* A row whose action is a link rather than the row itself: no chevron, and
+   the control takes its own full-width line under the copy. */
+.settings-row-static { grid-template-columns: 38px minmax(0, 1fr); }
+.settings-row-static > .ticket-buy-button { grid-column: 1 / -1; width: 100%; margin-top: 8px; }
+/* The value a status row reports — an endpoint, a role — is data to read
+   back, not prose. It gets its own recessed line so a long API base URL
+   cannot wrap through the label above it. */
+/* `word-break: break-all` was set on every paragraph in a settings row so a
+   long API base URL would not overflow. It also applied to the prose beside
+   it, and Polish is long enough to hit it constantly: "powiadomienia" broke
+   as "powiado / mienia" mid-word. Prose wraps on word boundaries; only the
+   value line, which is where the unbreakable URL actually lives, keeps the
+   hard break. */
+.settings-list p { word-break: normal; overflow-wrap: anywhere; }
+.settings-list .settings-row-value {
+  grid-column: 1 / -1;
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--type-micro);
+  line-height: 1.5;
+  word-break: break-all;
+}
+.settings-row-state {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: var(--type-micro);
+  font-weight: 900;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.settings-row-state.online { color: var(--success); }
+.settings-row:active:not(:disabled) { transform: scale(.99); border-color: var(--signal-deep); background: var(--surface-2); }
+.settings-row:disabled .settings-row-icon { border-color: var(--line); color: var(--muted); }
+.settings-row.danger.ghost { border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); background: color-mix(in srgb, var(--danger) 5%, var(--surface)); color: var(--text); }
+.settings-row.danger.ghost .settings-row-icon { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); color: var(--danger); background: color-mix(in srgb, var(--danger) 8%, transparent); }
+.settings-row.danger.ghost .settings-row-chevron { color: var(--danger); }
+.settings-row.danger.ghost strong { color: var(--text); }
+.settings-row.danger.ghost:active:not(:disabled) { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, var(--surface)); }
+.settings-group-label {
+  margin: 22px 0 -2px;
+  color: var(--muted);
+  font-size: var(--type-micro);
+  font-weight: 900;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+@media (hover: hover) and (pointer: fine) {
+  .settings-row:hover:not(:disabled) { border-color: var(--border-strong); background: var(--surface-2); }
+}
+
+/* ── Disclosure blocks ──
+   `<details>` shipped with the browser's default marker and no hint of what
+   was behind it. It is a real control now: a full-width row, a rotating
+   chevron, and a subtitle that says what opening it is for. */
+.import-box {
+  margin-top: 18px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 0;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.import-box > summary {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px 13px;
+  min-height: var(--touch-min);
+  padding: 15px;
+  color: var(--text);
+  font-weight: 800;
+  list-style: none;
+}
+.import-box > summary::-webkit-details-marker { display: none; }
+.import-box > summary::after {
+  content: "⌄";
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  align-self: center;
+  color: var(--signal-hot);
+  font-size: 19px;
+  line-height: 1;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.import-box[open] > summary::after { transform: rotate(180deg); }
+.import-box[open] > summary { border-bottom: 1px solid var(--line); }
+.import-box > summary > span:first-child {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  display: grid;
+  place-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--signal-deep);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--signal) 8%, transparent);
+  color: var(--signal-hot);
+  font-size: 17px;
+  line-height: 1;
+}
+.import-box > summary strong { grid-column: 2; grid-row: 1; align-self: end; font-size: var(--type-body); }
+.import-box > summary small { grid-column: 2; grid-row: 2; align-self: start; color: var(--muted); font-size: var(--type-micro); font-weight: 500; line-height: 1.45; }
+.import-box > summary:active { background: var(--surface-2); }
+.import-box .form-grid { margin: 0; padding: 15px; }
+
+/* ── Generated secrets and codes ──
+   A claim token or an order reference is meant to be read character by
+   character and often copied by hand. Monospace on a raised, bounded panel,
+   with the label above it, instead of loose text on the card background. */
+.token-box {
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--signal-deep);
+  border-radius: var(--radius-md);
+  background: var(--bg-raised);
+  padding: 14px;
+  box-shadow: inset 0 0 26px #0006;
+}
+.token-box strong { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 16px; letter-spacing: .04em; }
+.token-box p { margin: 0; color: var(--muted); line-height: 1.5; }
+.qr-panel { border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
+.mini-qr, .qr-svg { border-radius: var(--radius-sm); }
+
+/* ── Cards that stayed on the hairline border ── */
+.admin-box, .panel, .claim-box { border-color: var(--border-subtle); box-shadow: var(--shadow-md); }
+.admin-box > .eyebrow, .claim-box > .eyebrow { margin-bottom: 2px; }
+.admin-box .inline-note, .panel .inline-note { opacity: 1; color: var(--muted); font-size: var(--type-meta); line-height: 1.5; }
+.profile-card {
+  border-color: var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--signal) 7%, var(--surface)), var(--surface) 68%);
+  box-shadow: var(--shadow-md);
+}
+.profile-card strong { font-size: 18px; letter-spacing: -.01em; }
+.avatar {
+  border-radius: var(--radius-md);
+  background: linear-gradient(150deg, var(--signal-hot), var(--signal-deep));
+  box-shadow: var(--shadow-sm), inset 0 1px 0 #ffffff33;
+}
+.draw-card, .reward-card, .fan-coupon, .artifact-card, .ticket-card, .wallet-card, .campaign-card,
+.revenue-card, .coupon-visual, .admission-card, .signal-admin-toolbar, .signal-city-card,
+.signal-activity-grid article, .ticket-type-card, .ticket-buyer-panel, .ticket-checkout-total,
+.ticket-sale-summary > div, .show-mode-status-grid article, .participation-history {
+  border-radius: var(--radius-md);
+}
+.hero-card, .signal-health-card, .ticket-checkout-hero, .area-hero-card, .scanner-button, .scan-result {
+  border-radius: var(--radius-lg);
+}
+.scan-result { box-shadow: var(--shadow-md); }
+.area-stats span { border-radius: 999px; border-color: var(--border-subtle); }
+/* A metric was a number over a hairline gradient rule with nothing behind it,
+   so a grid of them — the whole autopilot and cockpit read-out — was a field
+   of loose digits with no edges to group them. They are tiles now: the count
+   and its label belong to one object, and a row of them reads as a row. */
+.metric {
+  border: 1px solid var(--border-subtle);
+  border-image: none;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 14px 12px;
+  box-shadow: var(--shadow-sm);
+}
+.metric strong { color: var(--text); }
+.metric span { margin-top: 6px; font-weight: 800; letter-spacing: .05em; line-height: 1.3; }
+/* The grid is three columns because most read-outs have three numbers. The
+   operator home has one, and it sat in the leading third with two empty
+   cells beside it, reading as two tiles that had failed to load. A row fills
+   the width it is given. */
+.stats-grid:has(> :only-child) { grid-template-columns: 1fr; }
+.stats-grid:has(> :nth-child(2):last-child) { grid-template-columns: repeat(2, 1fr); }
+
+/* ── Grouped configuration blocks ──
+   These were the one place still using raw `#ffffff16` over `#ffffff05`,
+   which renders as a grey box with no relationship to anything around it. */
+.advanced-config, .custom-city-fields, .nearby-pref, .beacon-help-box, .participation-history {
+  border-color: var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.show-mode-card {
+  border-color: var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.show-mode-card.show-mode-active {
+  border-color: color-mix(in srgb, var(--signal) 52%, var(--line));
+  background: linear-gradient(150deg, color-mix(in srgb, var(--signal) 7%, var(--surface)), var(--surface) 70%);
+}
+
+/* Pairing used a hardcoded green from outside the palette, so the one
+   moment that confirms a successful trust ceremony looked like a foreign
+   widget. It uses the success token now. */
+.pairing-scanned {
+  border: 1px solid color-mix(in srgb, var(--success) 42%, var(--line));
+  border-radius: var(--radius-md);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--success) 9%, var(--surface)), var(--surface) 70%);
+}
+.pairing-ok { color: var(--success); }
+.pairing-scanned strong { color: var(--success); }
+.pairing-scanned small { color: var(--muted); }
+
+/* ── Operator cockpit ── */
+.ops-item, .signal-city-card, .signal-activity-grid article { border-color: var(--border-subtle); }
+.ops-item { box-shadow: var(--shadow-sm); transition: border-color var(--dur-fast) var(--ease-out); }
+.ops-item:active { border-color: var(--signal-deep); }
+.ops-healthy {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  border-radius: var(--radius-md);
+  color: #a7f3d0;
+  line-height: 1.5;
+}
+.ops-healthy::before {
+  content: "✓";
+  display: grid;
+  place-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(52,211,153,.14);
+  font-size: 15px;
+  line-height: 1;
+}
+.signal-admin-toolbar { border-color: var(--border-subtle); box-shadow: var(--shadow-sm); }
+.signal-health-card { box-shadow: var(--shadow-md); }
+.panel-hint { margin: 5px 0 0; color: var(--muted); font-size: var(--type-meta); line-height: 1.5; max-width: 52ch; }
+
+/* ── Beacon (Latarnik) ──
+   The professional surface shipped in its own grey — #0f0f0d panels behind
+   #2b2a24 borders — which belonged to no palette and read as a debug build
+   next to the fan client. It keeps its gold identity, now expressed through
+   the surface tokens the rest of the app uses, so the accent reads as a
+   deliberate second brand rather than as an unstyled screen. */
+.beacon-authenticated { --beacon-line: color-mix(in srgb, var(--beacon-gold) 24%, var(--line)); }
+.beacon-feature-card, .beacon-news-card, .beacon-event-card, .beacon-request-card,
+.beacon-request-status, .beacon-release-card, .beacon-delivery-form, .beacon-settings,
+.beacon-asset-card {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.beacon-hero {
+  border: 1px solid color-mix(in srgb, #d8b44a 26%, var(--line));
+  border-radius: var(--radius-lg);
+  background: linear-gradient(150deg, rgba(216,180,74,.09), var(--surface) 66%);
+  box-shadow: var(--shadow-md);
+}
+.beacon-feature-card {
+  border-color: color-mix(in srgb, #d8b44a 40%, var(--line));
+  background: linear-gradient(148deg, rgba(216,180,74,.11), var(--surface) 62%);
+  box-shadow: var(--shadow-md);
+}
+.beacon-feature-card .eyebrow { color: #e2c469; }
+.beacon-access-card { border-color: color-mix(in srgb, #d8b44a 30%, var(--line)); background: linear-gradient(150deg, rgba(216,180,74,.08), var(--surface) 70%); }
+.beacon-status-strip article {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 14px 8px;
+  box-shadow: var(--shadow-sm);
+}
+.beacon-status-strip strong { color: #e2c469; }
+.beacon-event-card, .beacon-news-card {
+  transition: transform var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+}
+.beacon-event-card:active, .beacon-news-card:active { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.beacon-event-card.selected {
+  border-color: #d8b44a;
+  background: linear-gradient(150deg, rgba(216,180,74,.08), var(--surface) 68%);
+  box-shadow: inset 0 0 0 1px rgba(216,180,74,.22), var(--shadow-md);
+}
+.beacon-radius button, .beacon-topic-grid button {
+  border-color: var(--border-subtle);
+  background: var(--surface);
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+.beacon-radius button.active, .beacon-topic-grid button.active {
+  border-color: color-mix(in srgb, #d8b44a 55%, var(--line));
+  background: rgba(216,180,74,.12);
+  color: #e8d29a;
+}
+.beacon-pending-invite {
+  border-color: color-mix(in srgb, #d8b44a 40%, var(--line));
+  border-radius: var(--radius-md);
+  background: linear-gradient(150deg, rgba(216,180,74,.10), var(--surface) 68%);
+}
+.beacon-danger-zone { border-top-color: var(--line); }
+@media (hover: hover) and (pointer: fine) {
+  .beacon-event-card:hover, .beacon-news-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+}
+
+/* ── City pickers ── */
+.city-choice-list button, .city-picker-results button {
+  border-color: var(--border-subtle);
+  background: var(--bg-raised);
+  transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+.city-choice-list button:active, .city-picker-results button:active { border-color: var(--signal-deep); background: var(--surface-2); }
+.city-picker-panel { border-color: var(--border-subtle); border-radius: var(--radius-xl); }
+.city-browser-empty, .city-browser-loading { border-color: var(--border-subtle); border-radius: var(--radius-md); background: var(--surface); }

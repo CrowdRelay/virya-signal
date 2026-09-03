@@ -1532,6 +1532,84 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "autopilot_referral_code_detail" => "Wydaj kod polecenia fanowi",
         // ── BUNDLE badge ──
         "bundle_badge" => "ZESTAW",
+        // ── Settings rows: every action states its consequence ──
+        "settings_group_app" => "APLIKACJA",
+        "settings_group_account" => "KONTO I DANE",
+        "settings_open_site" => "OTWÓRZ VIRYA.MUSIC",
+        "settings_site_hint" => "Koncerty, wydawnictwa i pełny sklep — otwarte w przeglądarce.",
+        "settings_refresh_hint" => {
+            "Pobiera z Viryi na nowo koncerty, bilety, nagrody i status sklepu."
+        }
+        "settings_lock_hint" => "Chowa portfel za PIN-em. Nic nie zostaje usunięte.",
+        "settings_forget_hint" => {
+            "Czyści ten telefon: profil, bilety i kopie offline. Konto Virya zostaje."
+        }
+        "settings_delete_hint" => "Trwale usuwa konto Virya razem z zamówieniami i wejściówkami.",
+        // ── Wallet: what a token is and where it comes from ──
+        "import_summary_hint" => "Bilet kupiony przed instalacją aplikacji? Dodaj go tutaj.",
+        "import_where_to_find" => {
+            "Obie wartości są w mailu potwierdzającym bilet od Viryi. Zostają na tym telefonie i nigdzie nie są wysyłane."
+        }
+        "import_order_id_hint" => "Długi identyfikator z maila potwierdzającego, np. 8f2c…",
+        "import_token_hint" => {
+            "Prywatny klucz z tego samego maila. Odblokowuje bilety na tym urządzeniu."
+        }
+        "claim_pass_hint" => {
+            "Wklej token z wiadomości o wygranej. Wejściówka przejdzie na ten telefon, a kod QR zadziała offline."
+        }
+        // ── Staff settings: same rule, from the operator side ──
+        "settings_group_this_device" => "TO URZĄDZENIE",
+        "settings_group_shortcuts" => "SKRÓTY",
+        "settings_group_session" => "SESJA",
+        "staff_connection_hint" => {
+            "Instancja CrowdRelay, z której to urządzenie czyta i do której pisze."
+        }
+        "staff_permissions_hint" => "Co sparowane urządzenie może robić na bramce i w sprzedaży.",
+        "staff_site_hint" => "Publiczna strona: koncerty, wydawnictwa i sklep.",
+        "staff_latarnik_panel" => "Latarnik · wydania i network",
+        "staff_latarnik_panel_hint" => "Panel webowy: przydziały, prośby prasowe i sieć partnerów.",
+        "staff_refresh_hint" => "Pobiera na nowo koncerty, kampanie QR i wyniki sprzedaży.",
+        "staff_lock_hint" => "Chowa panel za lokalnym PIN-em. Parowanie zostaje.",
+        "staff_forget_hint" => {
+            "Rozparowuje to urządzenie i czyści lokalne dane staff. Ponowne parowanie wymaga nowego zaproszenia."
+        }
+        // ── Beacon: an empty list used to render as nothing at all ──
+        "latarnik_radar_empty" => "Na razie brak koncertów w Twoim promieniu",
+        "latarnik_radar_empty_hint" => {
+            "Nic nie jest zaplanowane wystarczająco blisko. Zwiększ promień w ustawieniach albo wróć później — radar odświeża się przy każdej nowej rezerwacji."
+        }
+        "latarnik_news_empty" => "Na razie brak newsów",
+        "latarnik_news_empty_hint" => {
+            "Ogłoszenia, wydawnictwa i noty prasowe pojawiają się tu zaraz po publikacji."
+        }
+        "latarnik_requests_empty" => "Brak próśb prasowych",
+        "latarnik_requests_empty_hint" => {
+            "Poproś o zdjęcia, wersję clean, wywiad lub akredytację w press roomie koncertu. Wszystko, o co poprosisz, śledzisz tutaj."
+        }
+        "latarnik_releases_empty" => "Brak oczekujących przydziałów",
+        "latarnik_releases_empty_hint" => {
+            "Gdy wydawnictwo zostanie Ci przydzielone, pojawi się tu z terminem odbioru i formularzem dostawy."
+        }
+        // ── Beacon preferences: a picker with no label is a guess ──
+        "latarnik_preferences_hint" => {
+            "To ustawia, które koncerty do Ciebie trafiają i jak głośno. Zmieniaj kiedy chcesz — nic nie idzie dalej, dopóki nie zapiszesz."
+        }
+        "latarnik_radius_label" => "PROMIEŃ SZUKANIA",
+        "latarnik_radius_hint" => {
+            "Jak daleko od Twojego miasta może być koncert, żeby do Ciebie trafił."
+        }
+        "latarnik_topics_label" => "TEMATY",
+        "latarnik_topics_hint" => {
+            "Wybierz to, czym faktycznie się zajmujesz. Reszta nie wejdzie do Twojego briefingu."
+        }
+        "latarnik_danger_label" => "ODEJŚCIE",
+        "latarnik_danger_hint" => {
+            "Wylogowanie zostawia zaproszenie. Opuszczenie sieci je oddaje, a każdą opcję potwierdzasz, zanim cokolwiek się stanie."
+        }
+        // ── Operator cockpit ──
+        "ops_panel_hint" => {
+            "Kolejki backendu na żywo. Wszystko ponawia się samo; wpis pojawia się tu dopiero wtedy, gdy przestał się ponawiać i wymaga ręcznego pchnięcia."
+        }
         _ => key,
     }
 }

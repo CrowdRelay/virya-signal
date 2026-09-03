@@ -171,6 +171,9 @@ fn BeaconSettings(
         <article class="beacon-settings">
             <p class="eyebrow">{tr("latarnik_settings")}</p>
             <h3>{tr("latarnik_preferences")}</h3>
+            <p class="field-hint">{tr("latarnik_preferences_hint")}</p>
+            <p class="settings-group-label">{tr("latarnik_radius_label")}</p>
+            <p class="field-hint">{tr("latarnik_radius_hint")}</p>
             <div class="radius-picker beacon-radius">
                 <button class:active=move || radius.get() == 25 on:click=move |_| radius.set(25)>"25 km"</button>
                 <button class:active=move || radius.get() == 50 on:click=move |_| radius.set(50)>"50 km"</button>
@@ -178,6 +181,8 @@ fn BeaconSettings(
                 <button class:active=move || radius.get() == 200 on:click=move |_| radius.set(200)>"200 km"</button>
                 <button class:active=move || radius.get() == 300 on:click=move |_| radius.set(300)>"300 km"</button>
             </div>
+            <p class="settings-group-label">{tr("latarnik_topics_label")}</p>
+            <p class="field-hint">{tr("latarnik_topics_hint")}</p>
             <div class="beacon-topic-grid">
                 <button type="button" class:active=move || topics.get().iter().any(|value| value == "shows") on:click=move |_| toggle_topic("shows")>{tr("latarnik_topic_shows")}</button>
                 <button type="button" class:active=move || topics.get().iter().any(|value| value == "press_materials") on:click=move |_| toggle_topic("press_materials")>{tr("latarnik_topic_press")}</button>
@@ -186,7 +191,7 @@ fn BeaconSettings(
                 <button type="button" class:active=move || topics.get().iter().any(|value| value == "accreditation") on:click=move |_| toggle_topic("accreditation")>{tr("latarnik_topic_accreditation")}</button>
             </div>
             <div class="pref-list"><label class="pref-row"><span class="pref-row-label">{tr("latarnik_nearby_push")}</span><input type="checkbox" class="pref-switch" prop:checked=move || nearby.get() on:change=move |e| nearby.set(event_target_checked(&e))/></label></div>
-            <button class="ghost" disabled=move || busy.get() on:click=save>{tr("save")}</button>
+            <button class="primary" disabled=move || busy.get() on:click=save>{tr("save")}</button>
             <Show when=move || bridge::native_available()>
                 <div class="push-setting-card beacon-push-setting">
                     <div class="push-setting-copy">
@@ -219,6 +224,8 @@ fn BeaconSettings(
                 </div>
             </Show>
             <div class="beacon-danger-zone">
+                <p class="settings-group-label">{tr("latarnik_danger_label")}</p>
+                <p class="field-hint">{tr("latarnik_danger_hint")}</p>
                 <button class="text-button" disabled=move || busy.get() on:click=move |_| danger_action.set(Some(1))>{tr("latarnik_logout_device")}</button>
                 <button class="text-button danger" disabled=move || busy.get() on:click=move |_| danger_action.set(Some(2))>{tr("latarnik_leave")}</button>
                 <button class="text-button danger" disabled=move || busy.get() on:click=move |_| danger_action.set(Some(3))>{tr("latarnik_do_not_contact")}</button>

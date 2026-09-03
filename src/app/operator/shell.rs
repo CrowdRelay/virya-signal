@@ -373,7 +373,7 @@ fn EventCard(event: PublicEvent) -> impl IntoView {
     view! {
         <article class="event-card">
             <div class="date-block"><strong>{event_day}</strong><span>{event_month}</span></div>
-            <div><h4>{title}</h4><p>{location}</p></div><span class="chevron">">"</span>
+            <div><h4>{title}</h4><p>{location}</p></div><span class="chevron" aria-hidden="true">"›"</span>
         </article>
     }
 }
