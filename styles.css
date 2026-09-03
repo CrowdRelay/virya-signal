@@ -337,6 +337,10 @@ button:disabled { opacity: .48; cursor: default; }
 .merch-grid-message .ticket-buy-button { width: 100%; min-height: 48px; border: 1px solid var(--signal-deep); border-radius: 6px; background: #0f1a17; color: var(--signal-hot); padding: 13px 12px; font-size: var(--type-micro); font-weight: 900; }
 .fan-merch-card { position: relative; min-width: 0; height: 100%; border: 1px solid var(--border-strong); border-radius: var(--control-radius); background: var(--surface); overflow: hidden; display: flex; flex-direction: column; contain: layout paint; content-visibility: auto; contain-intrinsic-size: auto 420px; }
 .fan-merch-bundle { border-color: var(--signal-deep); background: linear-gradient(155deg, #0f1a17, #111 54%); }
+/* The badge overlays the product image. A bundle with no image has nothing to
+   overlay, and it landed on top of the title instead — the name was unreadable.
+   With no image it takes its own place in the flow. */
+.fan-merch-card:not(:has(> img)) .bundle-badge { position: static; align-self: start; margin: 11px 11px 0; }
 .bundle-badge { position: absolute; z-index: 2; top: 8px; left: 8px; border: 1px solid var(--signal-deep); border-radius: 999px; background: #0b100fe8; color: var(--signal-hot); padding: 5px 7px; font-size: var(--type-micro); font-weight: 950; letter-spacing: .12em; box-shadow: 0 4px 16px #0008; }
 .fan-merch-card > img { width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; display: block; background: #171715 center/cover no-repeat; opacity: 0; transition: opacity var(--dur-med) var(--ease-out); }
 .fan-merch-card > img.loaded { opacity: 1; }
@@ -358,11 +362,17 @@ button:disabled { opacity: .48; cursor: default; }
 .fan-merch-card .ticket-buy-button:active:not(:disabled) { transform: scale(.965); filter: brightness(.9); }
 .event-description { margin-top: 12px !important; line-height: 1.5; font-size: 12px; }
 .event-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 16px; }
-.event-actions button, .event-actions a, .ticket-pool-status { min-height: 48px; border: 1px solid var(--signal-deep); border-radius: var(--control-radius); background: transparent; color: var(--signal-hot); padding: 12px 10px; text-align: center; font-size: var(--type-micro); font-weight: 900; line-height: 1.3; }
+.event-actions button, .event-actions a { min-height: 48px; border: 1px solid var(--signal-deep); border-radius: var(--control-radius); background: transparent; color: var(--signal-hot); padding: 12px 10px; text-align: center; font-size: var(--type-micro); font-weight: 900; line-height: 1.3; }
 .event-actions button.active { background: var(--signal-hot); color: #080808; }
-.ticket-pool-status { display: grid; place-items: center; color: #aaa; border-color: #3b3932; background: #0d0d0b; cursor: default; }
-.ticket-pool-status.is-loading { color: #a7954d; border-color: var(--signal-deep); }
-.ticket-pool-status.is-warning { color: #c7aa68; border-color: #58451f; background: #171207; }
+/* Ticket availability is a fact about the show, not a thing to press. It used
+   to be a bordered, button-sized box in the primary action slot, so a show with
+   no ticket pool read as a disabled Buy button sitting next to the one control
+   that still worked. It is a status line now, and the remaining action takes
+   the full row. */
+.ticket-pool-status { grid-column: 1 / -1; padding: 2px 0 0; color: var(--muted); font-size: var(--type-meta); font-weight: 600; line-height: 1.4; }
+.event-actions:has(.ticket-pool-status) { grid-template-columns: 1fr; }
+.ticket-pool-status.is-loading { color: #a7954d; }
+.ticket-pool-status.is-warning { color: #c7aa68; }
 .admission-card { border: 1px solid var(--signal-deep); background: linear-gradient(145deg,#0f1f1b,#0e0e0d); padding: 20px; display: grid; gap: 8px; }
 .admission-card h3 { margin: 5px 0 0; font-size: 28px; text-transform: uppercase; }
 .admission-card p { color: #aaa; margin: 0; }

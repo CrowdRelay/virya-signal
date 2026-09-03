@@ -56,7 +56,21 @@ fn FanMerch(
                                         .filter(|variant| variant.active && variant.available)
                                         .cloned()
                                         .collect::<Vec<_>>();
-                                    let has_stock = !available_variants.is_empty();
+                                    // `variants` is optional on the wire, and a
+                                    // product without sizes — a vinyl, a tote —
+                                    // legitimately has none. Requiring one
+                                    // available variant marked every such
+                                    // product out of stock and replaced its buy
+                                    // link with "check again", so it could never
+                                    // be sold from the app. With no variants
+                                    // there is no per-variant stock to consult;
+                                    // the product's own active flag is the
+                                    // answer.
+                                    let has_stock = if product.variants.is_empty() {
+                                        product.active
+                                    } else {
+                                        !available_variants.is_empty()
+                                    };
                                     let preorder = available_variants.iter()
                                         .any(|variant| variant.availability == "preorder");
                                     let low_stock = available_variants.iter()
@@ -158,12 +172,19 @@ fn FanMerchBundles(
                 }.into_any()
             } else {
                 catalog.bundles.into_iter().map(|bundle| {
-                    let availability_label = match bundle.availability.as_str() {
-                        "low_stock" => {tr("low_stock")},
-                        "available" => {tr("available_status")},
-                        _ => {tr("out_of_stock")},
-                    };
+                    // The unknown arm used to fall straight to "out of stock",
+                    // so a vocabulary the store starts sending that this build
+                    // does not know would tell every fan the bundle is sold out
+                    // while `available` said otherwise and the buy link stayed
+                    // live. Unknown means unknown: defer to the boolean.
                     let available = bundle.available;
+                    let availability_label = match bundle.availability.as_str() {
+                        "low_stock" => tr("low_stock"),
+                        "available" => tr("available_status"),
+                        "out_of_stock" | "sold_out" => tr("out_of_stock"),
+                        _ if available => tr("available_status"),
+                        _ => tr("out_of_stock"),
+                    };
                     let product_url = bundle.product_url;
                     let image_url = if bundle.slug == "bundle-stage-pack" {
                         Some(STAGE_PACK_PREVIEW_URL.to_owned())

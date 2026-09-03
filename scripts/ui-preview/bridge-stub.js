@@ -157,6 +157,115 @@
     detail: null,
   });
 
+  const ticketSaleOffer = (slug) => {
+    const event = events.find((candidate) => candidate.slug === slug);
+    return {
+      event_id: `evt-${slug}`,
+      event_slug: slug,
+      event_title: event?.title ?? "Virya",
+      event_status: "upcoming",
+      venue: event?.venue ?? null,
+      timezone: "Europe/Warsaw",
+      starts_at: event?.starts_at ?? iso(12),
+      currency: "PLN",
+      vat_rate_basis_points: 2300,
+      capacity: 400,
+      sold: 268,
+      reserved: 12,
+      available: 120,
+      max_per_order: 6,
+      sales_open_at: iso(-20),
+      sales_close_at: event?.starts_at ?? iso(12),
+      active: true,
+      sales_state: "open",
+      ticket_types: [
+        {
+          id: "tt-normal", slug: "normalny", name: "Bilet normalny",
+          description: "Wejście na koncert.", price_gross_minor: 9900,
+          capacity: 320, sold: 210, reserved: 10, available: 100,
+          sort_order: 0, active: true,
+        },
+        {
+          id: "tt-premium", slug: "premium", name: "Premium + soundcheck",
+          description: "Wcześniejsze wejście i soundcheck.",
+          price_gross_minor: 19900,
+          capacity: 40, sold: 40, reserved: 0, available: 0,
+          sort_order: 1, active: true,
+        },
+      ],
+    };
+  };
+
+  const merchCatalog = () => ({
+    products: [
+      {
+        slug: "tshirt-wolne-miasto",
+        name: "T-shirt Wolne Miasto",
+        description: "Czarny, bawełna organiczna, nadruk z trasy.",
+        image_url: null,
+        placeholder_image_url: null,
+        currency: "PLN",
+        price_gross_minor: 12900,
+        active: true,
+        public: true,
+        variants: [
+          { sku: "TS-S", label: "S", active: true, available: true, availability: "available" },
+          { sku: "TS-M", label: "M", active: true, available: true, availability: "available" },
+          { sku: "TS-L", label: "L", active: true, available: false, availability: "out_of_stock" },
+        ],
+      },
+      {
+        slug: "vinyl-wolne-miasto",
+        name: "Wolne Miasto — winyl",
+        description: "180 g, wkładka z tekstami.",
+        image_url: null,
+        placeholder_image_url: null,
+        currency: "PLN",
+        price_gross_minor: 15900,
+        active: true,
+        public: true,
+        variants: [],
+      },
+      {
+        slug: "tote-signal",
+        name: "Torba Signal",
+        description: null,
+        image_url: null,
+        placeholder_image_url: null,
+        currency: "PLN",
+        price_gross_minor: 6900,
+        active: true,
+        public: true,
+        variants: [],
+      },
+    ],
+  });
+
+  const merchBundles = () => ({
+    bundles: [
+      {
+        slug: "zestaw-trasa",
+        name: "Zestaw trasowy",
+        description: "T-shirt i winyl w jednej paczce.",
+        includes: ["T-shirt Wolne Miasto", "Wolne Miasto — winyl"],
+        image_url: null,
+        placeholder_image_url: null,
+        secondary_image_url: null,
+        product_url: "https://virya.music/sklep/zestaw-trasa",
+        currency: "PLN",
+        price_gross_minor: 24900,
+        original_price_gross_minor: 28800,
+        available: true,
+        availability: "available",
+        variants: [
+          { label: "S", available: true, availability: "available" },
+          { label: "M", available: true, availability: "available" },
+          { label: "L", available: false, availability: "out_of_stock" },
+        ],
+      },
+    ],
+  });
+
   const fanHome = () => ({
     schema_version: 1,
     generated_at: iso(0),
@@ -223,9 +332,24 @@
     fan_referral: () => ({ qualified: 4, pending: 1 }),
     fan_admission_pass: () => null,
     fan_area_wallet: () => null,
-    fan_merch_catalog: () => ({ items: [] }),
-    fan_cached_merch_catalog: () => ({ items: [] }),
-    fan_merch_bundles: () => ({ bundles: [] }),
+    // `MerchCatalog { products }` and `FanMerchBundleCatalog { bundles }` — the
+    // key was `items`, which decodes to an empty catalog, and the store then
+    // renders its outage state. A permanent fake outage is not a screen worth
+    // reviewing.
+    fan_merch_catalog: () => merchCatalog(),
+    fan_cached_merch_catalog: () => merchCatalog(),
+    fan_merch_bundles: () => merchBundles(),
+    // `Option<TicketSaleOffer>`, queried per event. Answering the same offer for
+    // every slug hid the no-ticket-pool branch and made a show with no ticket
+    // link still offer KUP BILET — a fixture artifact that looks exactly like a
+    // real bug. Only the two shows with a ticket URL have a pool. Two ticket
+    // types with different availability, so the sold-out row and the buyable
+    // row can both be looked at.
+    fan_ticket_sale: (args) => (
+      events.find((event) => event.slug === args?.eventSlug)?.ticket_url
+        ? ticketSaleOffer(args.eventSlug)
+        : null
+    ),
     fan_push_sync: () => pushStatus(),
     fan_push_preferences: () => ({
       shows: true, releases: true, community: false, merch: false,
