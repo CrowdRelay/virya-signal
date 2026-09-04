@@ -32,6 +32,7 @@ use super::{
     },
     http::{decode, endpoint},
     retry::retry_idempotent,
+    ticketing::TicketSaleOffer,
 };
 
 pub(super) const FAN_COOKIE: &str = "crowdrelay_fan";
@@ -111,6 +112,11 @@ pub struct CrowdRelayClient {
     meta_fetch: Arc<Mutex<()>>,
     pub(super) fan_home_fetch: Arc<Mutex<()>>,
     pub(super) fan_home_cache: Arc<RwLock<HashMap<String, CacheEntry<FanHomeData>>>>,
+    /// Short-TTL in-memory cache for ticket sale offers, keyed by event slug.
+    /// Prevents duplicate network calls when the event card pool probe and
+    /// the checkout view both request the same offer within a few seconds.
+    #[allow(clippy::type_complexity)]
+    pub(super) ticket_sale_cache: Arc<RwLock<HashMap<String, (Instant, Option<TicketSaleOffer>)>>>,
     pub(super) cache_file: Arc<PathBuf>,
     cache_write: Arc<Mutex<()>>,
     cache_persisting: Arc<AtomicBool>,
@@ -151,6 +157,7 @@ impl CrowdRelayClient {
             meta_fetch: Arc::new(Mutex::new(())),
             fan_home_fetch: Arc::new(Mutex::new(())),
             fan_home_cache: Arc::new(RwLock::new(HashMap::new())),
+            ticket_sale_cache: Arc::new(RwLock::new(HashMap::new())),
             cache_file: Arc::new(cache_file),
             cache_write: Arc::new(Mutex::new(())),
             cache_persisting: Arc::new(AtomicBool::new(false)),

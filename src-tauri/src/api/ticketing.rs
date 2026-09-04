@@ -1,4 +1,4 @@
-use std::{collections::HashSet, time::Duration};
+use std::{collections::HashSet, time::{Duration, Instant}};
 
 use reqwest::header::{ACCEPT, ORIGIN};
 use serde::{Deserialize, Serialize};
@@ -275,18 +275,57 @@ impl CrowdRelayClient {
         self.require_capability(api_base_url, "ticketing_v1")
             .await?;
         let event_slug = segment(event_slug)?;
-        let response = self
-            .http
-            .get(endpoint(
-                api_base_url,
-                &format!("public/events/{event_slug}/tickets"),
-            )?)
-            .header(ACCEPT, "application/json")
-            .timeout(TICKET_SALE_TIMEOUT)
-            .send()
-            .await?;
-        let offer: TicketSaleOffer = decode(response).await?;
-        offer.validate(&event_slug)
+
+        // Short-TTL in-memory cache: the event card pool probe and the
+        // checkout view both call this within seconds of each other. A 30s
+        // cache window eliminates the duplicate network call without risking
+        // stale availability for longer than that.
+        const TICKET_SALE_CACHE_TTL: Duration = Duration::from_secs(30);
+        let now = Instant::now();
+        {
+            let cache = self.ticket_sale_cache.read().await;
+            if let Some((fetched_at, cached)) = cache.get(event_slug.as_str())
+                && now.duration_since(*fetched_at) < TICKET_SALE_CACHE_TTL
+            {
+                if let Some(offer) = cached {
+                    return Ok(offer.clone());
+                }
+                // A cached None means we previously got NotFound; return
+                // it again rather than re-fetching.
+                return Err(AppError::NotFound);
+            }
+        }
+
+        let result = async {
+            let response = self
+                .http
+                .get(endpoint(
+                    api_base_url,
+                    &format!("public/events/{event_slug}/tickets"),
+                )?)
+                .header(ACCEPT, "application/json")
+                .timeout(TICKET_SALE_TIMEOUT)
+                .send()
+                .await?;
+            let offer: TicketSaleOffer = decode(response).await?;
+            offer.validate(&event_slug)
+        }
+        .await;
+
+        // Cache both successes and NotFound so the pool probe and checkout
+        // share one network call. Other errors are not cached.
+        match &result {
+            Ok(offer) => {
+                let mut cache = self.ticket_sale_cache.write().await;
+                cache.insert(event_slug.clone(), (now, Some(offer.clone())));
+            }
+            Err(AppError::NotFound) => {
+                let mut cache = self.ticket_sale_cache.write().await;
+                cache.insert(event_slug.clone(), (now, None));
+            }
+            Err(_) => {}
+        }
+        result
     }
 
     pub async fn start_ticket_checkout(

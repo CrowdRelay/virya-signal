@@ -43,7 +43,18 @@ fn FanEvents(
                 if events.is_empty() {
                     view! { <div class="empty-state"><strong>{tr("no_shows_in_the_calendar")}</strong><p>{tr("new_events_will_appear_here_2")}</p></div> }.into_any()
                 } else {
-                    view! { <div class="card-list fan-event-list">{events.into_iter().enumerate().map(|(i, event)| view! { <div style=format!("--stagger:{}", i.min(7))><FanEventCard event=event checkout_event=checkout_event dashboard=dashboard error=error status=status /></div> }).collect_view()}</div> }.into_any()
+                    // Keyed <For> preserves FanEventCard components across
+                    // re-renders. Without keys, every dashboard update
+                    // destroyed all cards and re-fired their ticket-pool
+                    // probe effects, causing redundant network calls and
+                    // DOM churn.
+                    view! {
+                        <div class="card-list fan-event-list">
+                            <For each=move || events.clone() key=|event| event.slug.clone() let:event>
+                                <FanEventCard event=event checkout_event=checkout_event dashboard=dashboard error=error status=status />
+                            </For>
+                        </div>
+                    }.into_any()
                 }
             }}
         </section>
