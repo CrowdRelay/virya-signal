@@ -448,8 +448,6 @@ struct WireAutopilotActionPayload {
     #[serde(default)]
     priority: Option<u16>,
     #[serde(default)]
-    agent_priority: Option<u8>,
-    #[serde(default)]
     prompt: Option<String>,
     #[serde(default)]
     recommended_action: Option<String>,
@@ -742,7 +740,7 @@ impl WireAutopilotActionPayload {
             "request_agent_run" => AutopilotActionPayload::RequestAgentRun {
                 template_id: required(self.template_id, "template_id")?,
                 prompt: required(self.prompt, "prompt")?,
-                priority: required(self.agent_priority, "priority")?,
+                priority: required(self.priority, "priority")? as u8,
                 tier: required(self.tier, "tier")?,
             },
             "request_community_engagement" => AutopilotActionPayload::RequestCommunityEngagement {

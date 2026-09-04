@@ -145,8 +145,112 @@ fn every_variant_round_trips_through_the_hand_written_deserializer() {
             action_url_path: "action_url_path-21".to_owned(),
             reminder_number: 24,
         },
+        AutopilotActionPayload::VerifyPlaylistPlacement {
+            opportunity_id: "opportunity_id-22".to_owned(),
+            playlist_external_id: "playlist_external_id-22".to_owned(),
+            track_external_id: "track_external_id-22".to_owned(),
+            checkpoint: 3,
+        },
+        AutopilotActionPayload::RequestBeaconInviteBatch {
+            beacon_id: "beacon_id-23".to_owned(),
+            beacon_version: 1023,
+            event_id: "event_id-23".to_owned(),
+            requested_count: 50,
+        },
+        AutopilotActionPayload::RequestOutreachDiscovery {
+            requested_candidates: 25,
+        },
+        AutopilotActionPayload::RequestBookingTargetDiscovery {
+            requested_count: 15,
+        },
+        AutopilotActionPayload::EscalateEditorialPitch {
+            release_id: "release_id-26".to_owned(),
+            title: "title-26".to_owned(),
+            due_at: "due_at-26".to_owned(),
+        },
+        AutopilotActionPayload::CounterLiveOpportunityTerms {
+            opportunity_id: "opportunity_id-27".to_owned(),
+            ask_minor: 50_000,
+            currency: "PLN".to_owned(),
+            round: 2,
+        },
+        AutopilotActionPayload::AcceptLiveOpportunityTerms {
+            opportunity_id: "opportunity_id-28".to_owned(),
+            fee_minor: 45_000,
+            currency: "PLN".to_owned(),
+        },
+        AutopilotActionPayload::RaiseGrowthOpportunity {
+            series_id: "series_id-29".to_owned(),
+            platform: "platform-29".to_owned(),
+            metric_key: "metric_key-29".to_owned(),
+            signal: "signal-29".to_owned(),
+            recommended_action: "recommended_action-29".to_owned(),
+            deviation_basis_points: 1200,
+            priority: 5,
+            template_key: "template_key-29".to_owned(),
+        },
+        AutopilotActionPayload::RaiseGrowthDebt {
+            subject_kind: "subject_kind-30".to_owned(),
+            subject_id: "subject_id-30".to_owned(),
+            debt_kind: "debt_kind-30".to_owned(),
+            recommended_action: "recommended_action-30".to_owned(),
+            overdue_basis_points: 800,
+            outstanding_items: 3,
+            tracked_items: 10,
+            priority: 7,
+            template_key: "template_key-30".to_owned(),
+        },
+        AutopilotActionPayload::IssueReferralCode {
+            fan_id: "fan_id-31".to_owned(),
+        },
+        AutopilotActionPayload::RunPlayStep {
+            play_id: "play_id-32".to_owned(),
+            play_kind: "play_kind-32".to_owned(),
+            step_index: 1,
+            step_kind: "step_kind-32".to_owned(),
+            event_id: Some("event_id-32".to_owned()),
+            fan_id: None,
+            template_key: "template_key-32".to_owned(),
+        },
+        AutopilotActionPayload::RequestAgentContent {
+            template_id: Some("template_id-33".to_owned()),
+            task_id: "task_id-33".to_owned(),
+            draft: json!({"subject": "draft subject", "body": "draft body"}),
+        },
+        AutopilotActionPayload::RequestOutreachTarget {
+            task_id: "task_id-34".to_owned(),
+            target_kind: "press".to_owned(),
+            display_name: "Metal Hammer PL".to_owned(),
+            contact_email: Some("editor@metalhammer.example".to_owned()),
+            contact_domain: Some("metalhammer.example".to_owned()),
+            why_fit: "Covers Polish metal scene".to_owned(),
+            evidence_urls: json!(["https://example.invalid/article-1"]),
+            subreddit: Some("r/metalpoland".to_owned()),
+        },
+        AutopilotActionPayload::RequestAgentRun {
+            template_id: "template_id-35".to_owned(),
+            prompt: "Find press contacts for Polish metal scene".to_owned(),
+            priority: 2,
+            tier: "standard".to_owned(),
+        },
+        AutopilotActionPayload::RequestCommunityEngagement {
+            target_id: "target_id-36".to_owned(),
+            platform: "reddit".to_owned(),
+            subreddit: Some("r/metalpoland".to_owned()),
+            title: "New Virya show announced".to_owned(),
+            body: "Share your thoughts".to_owned(),
+            smart_link: Some("https://virya.music/s/show-36".to_owned()),
+        },
+        AutopilotActionPayload::RequestSignalPush {
+            task_id: "task_id-37".to_owned(),
+            title: "Show near you".to_owned(),
+            body: "Virya is playing in your city".to_owned(),
+            target_path: Some("/events/show-37".to_owned()),
+            event_id: Some("event_id-37".to_owned()),
+            segment: Some("nearby_warsaw".to_owned()),
+        },
     ];
-    assert_eq!(samples.len(), 22, "all payload variants must be covered");
+    assert_eq!(samples.len(), 38, "all payload variants must be covered");
     for sample in &samples {
         let (encoded, re_encoded) = round_trip(sample);
         assert_eq!(
@@ -185,6 +289,22 @@ fn every_variant_tag_is_accepted() {
         "prepare_funding_package",
         "submit_funding_application",
         "send_team_assignment_email",
+        "verify_playlist_placement",
+        "request_beacon_invite_batch",
+        "request_outreach_discovery",
+        "request_booking_target_discovery",
+        "escalate_editorial_pitch",
+        "counter_live_opportunity_terms",
+        "accept_live_opportunity_terms",
+        "raise_growth_opportunity",
+        "raise_growth_debt",
+        "issue_referral_code",
+        "run_play_step",
+        "request_agent_content",
+        "request_outreach_target",
+        "request_agent_run",
+        "request_community_engagement",
+        "request_signal_push",
     ];
     // A recognised tag with no fields decodes to `Unrecognized` carrying that
     // same tag — it is modellable in principle, just not with this body. A tag
