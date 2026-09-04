@@ -768,11 +768,41 @@ pub struct OperatorSignalOverview {
     #[serde(default)]
     pub top_cities: Vec<SignalCitySummary>,
     #[serde(default)]
+    pub retention_loop: SignalRetentionLoop,
+    #[serde(default)]
     pub audience: AudienceSummary,
     #[serde(default)]
     pub ticket_revenue: Vec<AudienceRevenueSummary>,
     #[serde(default)]
     pub unavailable_sources: Vec<String>,
+}
+
+/// Every stage between a fan naming a city and a push reaching their device.
+/// The operator screen showed only the moderation queue, which is the one stage
+/// that does not block delivery -- a city can be approved and still reach
+/// nobody because it has no coordinates.
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct SignalRetentionLoop {
+    #[serde(default)]
+    pub cities_awaiting_coordinates: i64,
+    #[serde(default)]
+    pub cities_resolved: i64,
+    #[serde(default)]
+    pub fans_with_coordinates: i64,
+    #[serde(default)]
+    pub nearby_eligible_fans: i64,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub notifications_created: i64,
+    #[serde(default)]
+    pub pushes_queued: i64,
+    #[serde(default)]
+    pub pushes_sent: i64,
+    #[serde(default)]
+    pub pushes_delivered: i64,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub pushes_failed: i64,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]

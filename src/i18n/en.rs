@@ -912,6 +912,13 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "could_not_refresh_orders_count_other_tickets_remain_available" => {
             "Could not refresh {count} orders. Your other tickets remain available."
         }
+        "retention_loop" => "Retention loop",
+        "retention_loop_hint" => "city → coordinates → push",
+        "cities_with_coordinates" => "cities located / waiting",
+        "fans_with_coordinates" => "fans with a located city",
+        "eligible_fans" => "fans the loop can reach",
+        "pushes_delivered_of_sent" => "pushes delivered / sent",
+        "pushes_queued" => "pushes waiting to send",
         "audience_intelligence" => "Audience Intelligence",
         "fan_360_summary" => "Fan 360 · aggregates",
         "ticket_buyers" => "ticket buyers",

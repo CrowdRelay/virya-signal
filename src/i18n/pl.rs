@@ -914,6 +914,13 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "could_not_refresh_orders_count_other_tickets_remain_available" => {
             "Nie udało się odświeżyć {count} zamówień. Pozostałe bilety są nadal dostępne."
         }
+        "retention_loop" => "Pętla retencji",
+        "retention_loop_hint" => "miasto → współrzędne → push",
+        "cities_with_coordinates" => "miasta z lokalizacją / czekające",
+        "fans_with_coordinates" => "fani z miastem na mapie",
+        "eligible_fans" => "fani w zasięgu pętli",
+        "pushes_delivered_of_sent" => "pushe dostarczone / wysłane",
+        "pushes_queued" => "pushe czekające na wysyłkę",
         "audience_intelligence" => "Wiedza o publiczności",
         "fan_360_summary" => "Fan 360 · agregaty",
         "ticket_buyers" => "kupili bilet",

@@ -59,6 +59,7 @@ fn SignalOverviewContent(data: OperatorSignalOverview) -> impl IntoView {
     let summary = data.summary;
     let activity = data.activity;
     let audience = data.audience;
+    let retention = data.retention_loop;
     let ticket_revenue = data.ticket_revenue;
     let has_ticket_revenue = !ticket_revenue.is_empty();
     let confirmation_base = summary.active_fans.saturating_add(summary.pending_fans);
@@ -140,6 +141,18 @@ fn SignalOverviewContent(data: OperatorSignalOverview) -> impl IntoView {
                 <article><strong>{format!("{} / {}", activity.event_interests_30d.max(0), activity.event_interests_total.max(0))}</strong><span>{tr("show_interests")}</span></article>
                 <article><strong>{activity.nearby_notifications_30d.max(0)}</strong><span>{tr("nearby_notifications_2")}</span></article>
                 <article><strong>{activity.pending_city_requests.max(0)}</strong><span>{tr("cities_awaiting_moderation")}</span></article>
+            </div>
+            // The moderation queue above is not the blocker: the nearby-show
+            // query gates on coordinates, so a city can be approved and reach
+            // nobody. These are the stages that decide whether a fan hears
+            // anything at all.
+            <div class="section-head"><h3>{tr("retention_loop")}</h3><span>{tr("retention_loop_hint")}</span></div>
+            <div class="signal-activity-grid">
+                <article><strong>{format!("{} / {}", retention.cities_resolved.max(0), retention.cities_awaiting_coordinates.max(0))}</strong><span>{tr("cities_with_coordinates")}</span></article>
+                <article><strong>{retention.fans_with_coordinates.max(0)}</strong><span>{tr("fans_with_coordinates")}</span></article>
+                <article><strong>{retention.nearby_eligible_fans.max(0)}</strong><span>{tr("eligible_fans")}</span></article>
+                <article><strong>{format!("{} / {}", retention.pushes_delivered.max(0), retention.pushes_sent.max(0))}</strong><span>{tr("pushes_delivered_of_sent")}</span></article>
+                <article><strong>{retention.pushes_queued.max(0)}</strong><span>{tr("pushes_queued")}</span></article>
             </div>
             <div class="section-head"><h3>{tr("audience_intelligence")}</h3><span>{tr("fan_360_summary")}</span></div>
             <div class="signal-activity-grid">
