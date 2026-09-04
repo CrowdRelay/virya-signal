@@ -131,7 +131,18 @@ fn public_point(id: &str) -> Option<AreaPublicPoint> {
 fn map_position(drop: &AreaDrop) -> (i16, i16) {
     public_point(&drop.id)
         .map(|point| (point.map_x, point.map_y))
-        .unwrap_or_else(|| (drop.map_x.clamp(6, 94), drop.map_y.clamp(8, 92)))
+        // The clamp has to leave room for the marker itself, not just keep its
+        // anchor point on the map: it is 44px wide and centred on that point,
+        // the selected one adds a 5px ring, and a label hangs 14px below it.
+        // The map clips its overflow, so 6/94 put the marker's right edge and
+        // the selected ring past the boundary -- on a 335px map the ring and
+        // the number under it were sliced off the one marker the fan is
+        // actually reading. 27px of half-marker plus ring is 8% of that width
+        // and more on a narrow phone, so 10/90 across and 10/86 down keeps the
+        // whole thing inside without moving a marker far enough to misplace it.
+        // The bottom is the tighter bound because the label hangs under the
+        // marker rather than inside it.
+        .unwrap_or_else(|| (drop.map_x.clamp(10, 90), drop.map_y.clamp(10, 86)))
 }
 
 fn approximate_position(drop: &AreaDrop) -> (f64, f64) {
@@ -528,7 +539,13 @@ pub(super) fn AreaGameScreen(
                         })}
 
                         <div class="area-actions area-native-actions">
-                            <button type="button" class="primary" disabled=move || locating.get() on:click=locate>{move || if locating.get() { tr("locating_you") } else { tr("locate_nearest_point") }}</button>
+                            // Secondary on purpose. The selected point's card
+                            // above already carries the filled action that
+                            // wins the fan a drop; two identical primaries in
+                            // one column made "find the nearest point" look
+                            // like the same weight as claiming the one they
+                            // are standing at, so neither read as the answer.
+                            <button type="button" class="ghost area-locate-action" disabled=move || locating.get() on:click=locate>{move || if locating.get() { tr("locating_you") } else { tr("locate_nearest_point") }}</button>
                             <button type="button" class="ghost" on:click=refresh disabled=move || loading.get().area>{tr("refresh_progress")}</button>
                             <button type="button" class="ghost" on:click=move |_| open_area_game(error)>{tr("open_full_area_game")}</button>
                         </div>

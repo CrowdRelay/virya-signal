@@ -1347,13 +1347,13 @@ html[data-virya-scanner-active] .app-shell {
    `matrix(1,0,0,1,0,6)` while the nav box stayed at top 732, left 0.
    Composited properties only — opacity and transform — so no layout or paint
    work happens per frame.
-   Two shells, two ways in: fan and operator keep every tab mounted and toggle
-   `tab-active`, which starts the animation because the selector begins to
-   match; beacon swaps the node outright in a `match`, so the animation runs on
-   mount. Both need naming — a beacon-only omission is why its tabs cut. */
+   All three shells now keep every tab mounted and toggle `tab-active`, which
+   starts the animation because the selector begins to match. Beacon used to
+   swap the node outright in a `match`, so it needed a second selector and paid
+   a full rebuild — scroll position and decoded imagery included — on every
+   tap. One rule covers all three now. */
 @media (prefers-reduced-motion: no-preference) {
-  .tab-page.tab-active > .screen,
-  .beacon-content > .screen { animation: tab-enter var(--dur-med) var(--ease-out) both; }
+  .tab-page.tab-active > .screen { animation: tab-enter var(--dur-med) var(--ease-out) both; }
   @keyframes tab-enter {
     from { opacity: 0; transform: translate3d(0, 6px, 0); }
     to { opacity: 1; transform: translate3d(0, 0, 0); }
@@ -1970,3 +1970,10 @@ html[data-virya-scanner-active] .app-shell {
 .location-setting .radius-picker { margin-top: 2px; }
 .location-setting .security-note { grid-column: 1 / -1; margin-top: 12px; }
 .location-setting .inline-form-error { grid-column: 1 / -1; }
+
+/* Locating is the strongest of the secondary actions on the AREA screen -- it
+   is what a fan with no point selected reaches for -- so it leads the ghost
+   group with the accent border rather than blending into refresh and
+   open-the-full-game. */
+.area-locate-action { border-color: var(--signal-deep); color: var(--signal-hot); }
+.area-locate-action:active:not(:disabled) { border-color: var(--signal-hot); background: color-mix(in srgb, var(--signal) 10%, transparent); }

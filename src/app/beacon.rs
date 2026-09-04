@@ -565,12 +565,24 @@ fn BeaconApp(
                 </nav>
             </Show>
             <div class="content beacon-content" node_ref=content_ref>
-                {move || match tab.get() {
-                    BeaconTab::Briefing => view! { <BeaconBriefing home=home news=news requests=requests releases=releases loading=loading_home tab=tab selected_event=selected_event error=error /> }.into_any(),
-                    BeaconTab::Radar => view! { <BeaconRadar home=home loading=loading_home tab=tab selected_event=selected_event refresh=refresh error=error /> }.into_any(),
-                    BeaconTab::Press => view! { <BeaconPressRoom press_room=press_room selected_event=selected_event requests=requests refresh=refresh error=error /> }.into_any(),
-                    BeaconTab::Access => view! { <BeaconAccessHub home=home requests=requests releases=releases refresh=refresh error=error /> }.into_any(),
-                }}
+                // Every tab stays mounted and inactive ones collapse, the way
+                // the fan and operator shells already work. Swapping the node
+                // on each tap rebuilt the whole screen: scroll position went
+                // back to the top, decoded imagery was thrown away and paid
+                // for again, and the tap had a visible cost that the other two
+                // shells do not have.
+                <div class="tab-page" class:hidden=move || tab.get() != BeaconTab::Briefing class:tab-active=move || tab.get() == BeaconTab::Briefing>
+                    <BeaconBriefing home=home news=news requests=requests releases=releases loading=loading_home tab=tab selected_event=selected_event error=error />
+                </div>
+                <div class="tab-page" class:hidden=move || tab.get() != BeaconTab::Radar class:tab-active=move || tab.get() == BeaconTab::Radar>
+                    <BeaconRadar home=home loading=loading_home tab=tab selected_event=selected_event refresh=refresh error=error />
+                </div>
+                <div class="tab-page" class:hidden=move || tab.get() != BeaconTab::Press class:tab-active=move || tab.get() == BeaconTab::Press>
+                    <BeaconPressRoom press_room=press_room selected_event=selected_event requests=requests refresh=refresh tab=tab error=error />
+                </div>
+                <div class="tab-page" class:hidden=move || tab.get() != BeaconTab::Access class:tab-active=move || tab.get() == BeaconTab::Access>
+                    <BeaconAccessHub home=home requests=requests releases=releases refresh=refresh error=error />
+                </div>
             </div>
             <nav class="bottom-nav four primary-four beacon-bottom-nav">
                 <BeaconNav tab=tab own=BeaconTab::Briefing icon="◉" label=tr("latarnik_tab_briefing")/>
@@ -733,6 +745,7 @@ fn BeaconPressRoom(
     selected_event: RwSignal<Option<String>>,
     requests: RwSignal<Option<BeaconPressRequestsData>>,
     refresh: RwSignal<u32>,
+    tab: RwSignal<BeaconTab>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let request_kind = RwSignal::new("press_photo".to_owned());
@@ -745,6 +758,14 @@ fn BeaconPressRoom(
 
     Effect::new(move |_| {
         refresh.get();
+        // This screen is mounted from the moment the shell is, so without the
+        // tab check it would fetch a press room for every event the fan picks
+        // on the radar, whether or not they ever open this tab. The section
+        // stays owned here rather than in the shell's loader because it is
+        // keyed on the selected event, not only on the refresh generation.
+        if tab.get() != BeaconTab::Press {
+            return;
+        }
         let event_selected = selected_event.get().is_some();
         let current_kind = request_kind.get_untracked();
         if event_selected && current_kind == "press_photo" {

@@ -1830,8 +1830,7 @@ html[data-virya-scanner-active] .app-shell {
 
 .tab-page.hidden { display: none; }
 @media (prefers-reduced-motion: no-preference) {
-  .tab-page.tab-active > .screen,
-  .beacon-content > .screen { animation: tab-enter var(--dur-med) var(--ease-out) both; }
+  .tab-page.tab-active > .screen { animation: tab-enter var(--dur-med) var(--ease-out) both; }
   @keyframes tab-enter {
     from { opacity: 0; transform: translate3d(0, 6px, 0); }
     to { opacity: 1; transform: translate3d(0, 0, 0); }
@@ -2505,6 +2504,15 @@ html[data-virya-scanner-active] .app-shell {
 .location-setting .security-note { grid-column: 1 / -1; margin-top: 12px; }
 
 .location-setting .inline-form-error { grid-column: 1 / -1; }
+
+
+/* Locating is the strongest of the secondary actions on the AREA screen -- it
+   is what a fan with no point selected reaches for -- so it leads the ghost
+   group with the accent border rather than blending into refresh and
+   open-the-full-game. */
+.area-locate-action { border-color: var(--signal-deep); color: var(--signal-hot); }
+
+.area-locate-action:active:not(:disabled) { border-color: var(--signal-hot); background: color-mix(in srgb, var(--signal) 10%, transparent); }
     </style>
     <!-- The inline splash owns first paint. App styles load in parallel and are
          activated by boot.js well before the larger WASM module can mount. -->
