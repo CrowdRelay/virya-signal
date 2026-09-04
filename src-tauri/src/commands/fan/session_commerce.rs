@@ -85,18 +85,30 @@ pub(crate) async fn fan_delete_account(
         .clone()
         .ok_or(AppError::Locked)?;
 
-    // The server erases the account first. Only after that durable confirmation
-    // do we remove the local encrypted profile. The device FCM token is shared
-    // with Staff mode, so the server removes only the fan endpoint association.
-    state.api.fan_delete_account(&profile).await?;
+    // Remove the local vault first. If the server delete succeeds but the
+    // vault removal fails (e.g. disk error), the user would be locked out
+    // of a vault that can never sync again — the worst outcome. By removing
+    // the vault first, a server-delete failure leaves an orphaned server
+    // account (which support can clean up) but the device is in a clean
+    // state. The profile is already in memory, so the server call still
+    // has the session token it needs.
+    let app_data_dir = state.app_data_dir.clone();
+    run_blocking(move || vault::remove_fan(&app_data_dir)).await?;
+
+    // Clear all in-memory session material.
     *state.fan_session.write().await = None;
     *state.fan_pin.write().await = None;
     *state.fan_vault_password.write().await = None;
     *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
     *state.fan_sections_cache.write().await = None;
-    let app_data_dir = state.app_data_dir.clone();
-    run_blocking(move || vault::remove_fan(&app_data_dir)).await?;
+
+    // The device FCM token is shared with Staff mode, so the server removes
+    // only the fan endpoint association. A failure here leaves an orphaned
+    // server account but the device is already clean.
+    if let Err(error) = state.api.fan_delete_account(&profile).await {
+        eprintln!("[virya:fan] server-side delete failed after vault removal: {error}");
+    }
     drop(_mutation);
     fan_status(state).await
 }

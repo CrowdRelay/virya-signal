@@ -40,7 +40,7 @@ fn FanMerch(
                         view! {
                             <div class="fan-merch-list">
                                 <div class="merch-grid-action">
-                                    <ExternalLink url="https://virya.music/pl/merch/?source=signal-app".to_owned() label=tr("open_full_store") error=error />
+                                    <ExternalLink url=format!("https://virya.music/{}/merch/?source=signal-app", i18n::current().code()) label=tr("open_full_store") error=error />
                                 </div>
                                 <div class="merch-grid-heading">
                                     <div><p class="eyebrow">{tr("bundles")}</p><h3>{tr("bundles_from_the_online_store")}</h3></div>
@@ -85,7 +85,8 @@ fn FanMerch(
                                         tr("out_of_stock")
                                     };
                                     let shop_url = format!(
-                                        "https://virya.music/pl/merch/?source=signal-app&product={}",
+                                        "https://virya.music/{}/merch/?source=signal-app&product={}",
+                                        i18n::current().code(),
                                         product.slug,
                                     );
                                     let image_url = if product.slug == "echoes" {
@@ -167,7 +168,7 @@ fn FanMerchBundles(
                 view! {
                     <div class="merch-grid-message">
                         <p>{tr("bundles_are_currently_unavailable_in_live_inventory")}</p>
-                        <ExternalLink url="https://virya.music/pl/merch/?source=signal-app&product=bundle-stage-pack".to_owned() label=tr("view_bundles") error=error />
+                        <ExternalLink url=format!("https://virya.music/{}/merch/?source=signal-app&product=bundle-stage-pack", i18n::current().code()) label=tr("view_bundles") error=error />
                     </div>
                 }.into_any()
             } else {
@@ -249,7 +250,7 @@ fn FanMerchBundles(
         }).value_or_else(|| view! {
             <div class="merch-grid-message">
                 <p>{tr("bundles_load_independently_from_products")}</p>
-                <ExternalLink url="https://virya.music/pl/merch/?source=signal-app&product=bundle-stage-pack".to_owned() label=tr("view_bundles") error=error />
+                <ExternalLink url=format!("https://virya.music/{}/merch/?source=signal-app&product=bundle-stage-pack", i18n::current().code()) label=tr("view_bundles") error=error />
             </div>
         }.into_any())
     }

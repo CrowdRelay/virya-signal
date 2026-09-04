@@ -1,4 +1,7 @@
-use std::{collections::HashSet, time::{Duration, Instant}};
+use std::{
+    collections::HashSet,
+    time::{Duration, Instant},
+};
 
 use reqwest::header::{ACCEPT, ORIGIN};
 use serde::{Deserialize, Serialize};

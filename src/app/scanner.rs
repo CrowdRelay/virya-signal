@@ -129,12 +129,17 @@ fn Scanner(
     };
 
     let scan = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        busy.set(true);
         spawn_local(async move {
             match bridge::scan_qr().await {
                 Ok(Some(code)) => redeem_code(code),
                 Ok(None) => {}
                 Err(message) => error.set(Some(message)),
             }
+            busy.set(false);
         });
     };
     let manual_submit = move |_| redeem_code(manual.get().trim().to_owned());

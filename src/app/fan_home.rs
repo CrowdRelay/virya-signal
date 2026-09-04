@@ -101,13 +101,6 @@ fn FanHomeBanner(
                         }.into_any()
                     })
                 }
-                FanRecommendedAction::ContinueSynesthesia => Some(view! {
-                    <ExternalLink
-                        url="https://synesthesia.virya.music/?source=signal-app&resume=1".to_owned()
-                        label=tr("continue_synesthesia")
-                        error=RwSignal::new(None)
-                    />
-                }.into_any()),
                 FanRecommendedAction::ExploreSignal => {
                     let counts_clone = counts.clone();
                     let referral = snapshot.referral.clone();
@@ -274,7 +267,7 @@ fn FanHomeOverview(
                                             // the details button beside it. The external link is only a
                                             // fallback for shows we do not sell ourselves, so a fan is
                                             // never pushed out to a resale page for a ticket Virya has.
-                                            {(is_upcoming && ticket_sale_active).then(|| {
+                                            {(is_upcoming && ticket_sale_active && !admission_ready).then(|| {
                                                 let event_slug = event_slug.clone();
                                                 let event_preview = event_preview.clone();
                                                 view! {

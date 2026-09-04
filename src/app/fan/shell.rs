@@ -288,6 +288,13 @@ fn FanApp(
 
     let open_latarnik = move |_| {
         menu_open.set(false);
+        // Lock the fan session before leaving Fan mode so the session
+        // does not stay unlocked in memory while the user is in Latarnik.
+        spawn_local(async move {
+            if let Ok(value) = bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
+                let _ = status.try_set(value);
+            }
+        });
         mode.set(RootMode::Latarnik);
     };
 
@@ -390,7 +397,16 @@ fn FanApp(
                     <button class:active=move || tab.get() == FanTab::Profile on:click=move |_| { tab.set(FanTab::Profile); menu_open.set(false); }><span>"◎"</span>{tr("profile_tab")}</button>
                     <button on:click=refresh_all><span>"↻"</span>{tr("refresh_all_data")}</button>
                     <button on:click=open_latarnik><span>"◉"</span>{tr("latarnik_zone")}</button>
-                    <button on:click=move |_| { menu_open.set(false); mode.set(RootMode::StaffGate); }><span>"⌁"</span>{tr("staff_zone")}</button>
+                    <button on:click=move |_| {
+                        menu_open.set(false);
+                        // Lock the fan session before entering Staff mode.
+                        spawn_local(async move {
+                            if let Ok(value) = bridge::invoke::<FanSessionStatus, _>("fan_lock", &EmptyArgs {}).await {
+                                let _ = status.try_set(value);
+                            }
+                        });
+                        mode.set(RootMode::StaffGate);
+                    }><span>"⌁"</span>{tr("staff_zone")}</button>
                     <button on:click=close><span>"×"</span>{tr("close_and_lock_signal")}</button>
                 </nav>
             </Show>
@@ -579,22 +595,29 @@ fn FanSignal(
                             {move || share_status.get().map(|message| view! { <small class="success">{message}</small> })}
                         </div>
                     </article>
-                    <div class="section-head"><h3>{tr("active_draws")}</h3><span>{draw_count}</span></div>
-                    <div class="card-list">{draws.into_iter().map(|draw| {
-                        let proof_url = (!draw.slug.is_empty()).then(|| format!(
-                            "https://virya.music/pl/dowody/losowania/{}/?source=signal-app",
-                            draw.slug,
-                        ));
+                    {if draw_count > 0 {
                         view! {
-                            <article class="draw-card">
-                                <div><p class="eyebrow">{draw.prize_kind}</p><strong>{draw.name}</strong><span>{i18n::format("draw", &[human_time(&draw.draw_at).to_string()])}</span></div>
-                                <div class="draw-actions">
-                                    <div class="entry-count"><b>{draw.total_entries}</b><small>{tr("entries_2")}</small></div>
-                                    {proof_url.map(|url| view! { <ExternalLink url=url label=tr("proof") error=error /> })}
-                                </div>
-                            </article>
-                        }
-                    }).collect_view()}</div>
+                            <div class="section-head"><h3>{tr("active_draws")}</h3><span>{draw_count}</span></div>
+                            <div class="card-list">{draws.into_iter().map(|draw| {
+                                let proof_url = (!draw.slug.is_empty()).then(|| format!(
+                                    "https://virya.music/{}/dowody/losowania/{}/?source=signal-app",
+                                    i18n::current().code(),
+                                    draw.slug,
+                                ));
+                                view! {
+                                    <article class="draw-card">
+                                        <div><p class="eyebrow">{draw.prize_kind}</p><strong>{draw.name}</strong><span>{i18n::format("draw", &[human_time(&draw.draw_at).to_string()])}</span></div>
+                                        <div class="draw-actions">
+                                            <div class="entry-count"><b>{draw.total_entries}</b><small>{tr("entries_2")}</small></div>
+                                            {proof_url.map(|url| view! { <ExternalLink url=url label=tr("proof") error=error /> })}
+                                        </div>
+                                    </article>
+                                }
+                            }).collect_view()}</div>
+                        }.into_any()
+                    } else {
+                        view! { <span></span> }.into_any()
+                    }}
                     {coupons_view}
                     {rewards_view}
                 }.into_any()
