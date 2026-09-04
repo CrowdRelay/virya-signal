@@ -141,6 +141,18 @@ class UiAsyncStabilityContracts(unittest.TestCase):
             "refresh_requested.update(|value| *value = value.wrapping_add(1).max(1))",
             fan_bump,
         )
+        # Staff zone leaves Fan mode the same way and carries the same risk, so
+        # it gets the same guard. It was written inline in the menu rather than
+        # as a named closure, which is how it escaped this contract entirely
+        # while its twin above was covered.
+        staff = fan_shell.split('}><span>"\u2301"</span>{tr("staff_zone")}', 1)[0]
+        staff = staff.rsplit("<button on:click=move |_| {", 1)[1]
+        self.assertIn("menu_open.set(false)", staff)
+        self.assertIn("fan_lock", staff)
+        staff_task = staff.split("spawn_local(async move {", 1)
+        if len(staff_task) > 1:
+            self.assertNotIn("mode.set", staff_task[1].split("});", 1)[0])
+
         operator_refresh = operator_shell.split("let refresh_all", 1)[1].split("on_cleanup", 1)[0]
         self.assertIn("refresh_requested.update", operator_refresh)
 
