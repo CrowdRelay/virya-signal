@@ -1666,13 +1666,14 @@ html[data-virya-scanner-active] .app-shell {
 .settings-row.danger.ghost strong { color: var(--text); }
 .settings-row.danger.ghost:active:not(:disabled) { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 10%, var(--surface)); }
 .settings-group-label {
-  margin: 22px 0 -2px;
+  margin: 22px 0 6px;
   color: var(--muted);
   font-size: var(--type-micro);
   font-weight: 900;
   letter-spacing: .16em;
   text-transform: uppercase;
 }
+.settings-list { margin-bottom: 18px; }
 @media (hover: hover) and (pointer: fine) {
   .settings-row:hover:not(:disabled) { border-color: var(--border-strong); background: var(--surface-2); }
 }

@@ -289,10 +289,12 @@ fn FanProfileScreen(
     view! {
         <section class="screen">
             <header class="screen-title"><p class="eyebrow">{tr("my_profile")}</p><h2>{tr("signal_settings")}</h2></header>
+            <Show when=move || status.get().session.is_some() fallback=move || view! { <Skeleton rows=1 height=96 /> }>
             {move || status.get().session.map(|profile| view! {
                 <div class="profile-card"><div class="avatar">"V"</div><div><strong>{profile.display_name.value_or_else(|| tr("virya_fan").to_owned())}</strong><p>{profile.email}</p></div></div>
                 <div class="stats-grid"><Metric value=profile.wallet_count.to_string() label=tr("orders")/><Metric value=if profile.has_admission_pass { "1".to_owned() } else { "0".to_owned() } label=tr("admission_passes")/><Metric value=dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned()) label=tr("referrals")/></div>
             })}
+            </Show>
             <p class="settings-group-label">{tr("settings_group_app")}</p>
             <div class="settings-list">
                 <NativePushControl error=error />

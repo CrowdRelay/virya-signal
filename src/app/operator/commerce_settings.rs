@@ -127,11 +127,13 @@ fn Tickets(
                 <div class="section-head"><h3>{tr("recent_orders")}</h3><span>{data.recent_orders.len()}</span></div>
                 <div class="card-list">{data.recent_orders.into_iter().map(|order| view! { <article class="order-card"><div><strong>{order.public_reference}</strong><p>{order.buyer_name.value_or(order.buyer_email_masked)}</p></div><span>{money(order.amount_gross_minor, &order.currency)}</span></article> }).collect_view()}</div>
             })}
-            <Show when=move || event_slug.get().is_empty() && overview.get().is_none()>
-                <div class="empty-state">
-                    <strong>{tr("ticketing_pick_show")}</strong>
-                    <p>{tr("ticketing_pick_show_hint")}</p>
-                </div>
+            <Show when=move || !loading.get().events fallback=move || view! { <Skeleton rows=2 height=120 /> }>
+                <Show when=move || event_slug.get().is_empty() && overview.get().is_none()>
+                    <div class="empty-state">
+                        <strong>{tr("ticketing_pick_show")}</strong>
+                        <p>{tr("ticketing_pick_show_hint")}</p>
+                    </div>
+                </Show>
             </Show>
             <Show when=move || owner.get()>
                 <div class="admin-box">

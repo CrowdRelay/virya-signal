@@ -963,6 +963,7 @@ fn BeaconAccessHub(
             </header>
             <div class="section-head"><h3>{tr("latarnik_requests")}</h3></div>
             <div class="card-list">
+                <Show when=move || requests.get().is_some() fallback=move || view! { <Skeleton rows=2 height=80/> }>
                 <Show when=move || requests.get().is_some_and(|data| data.requests.is_empty())>
                     <div class="empty-state compact">
                         <strong>{tr("latarnik_requests_empty")}</strong>
@@ -995,9 +996,11 @@ fn BeaconAccessHub(
                         </article>
                     }
                 }).collect_view())}
+                </Show>
             </div>
             <div class="section-head"><h3>{tr("latarnik_release_allocations")}</h3></div>
             <div class="card-list">
+                <Show when=move || releases.get().is_some() fallback=move || view! { <Skeleton rows=2 height=80/> }>
                 <Show when=move || releases.get().is_some_and(|data| data.campaigns.is_empty())>
                     <div class="empty-state compact">
                         <strong>{tr("latarnik_releases_empty")}</strong>
@@ -1047,6 +1050,7 @@ fn BeaconAccessHub(
                         </article>
                     }
                 }).collect_view())}
+                </Show>
             </div>
             <Show when=move || decline_candidate.get().is_some()>
                 {move || decline_candidate.get().map(|(_, title)| view! {
