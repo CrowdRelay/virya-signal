@@ -1952,6 +1952,21 @@ html[data-virya-scanner-active] .app-shell {
 /* The location setting carries a form rather than a single action, so it lays
    its fields out under the copy instead of beside a chevron. */
 .location-setting .location-fields { grid-column: 1 / -1; margin-top: 12px; }
+/* The toggle is a `label` inside a `.form-grid`, and `.form-grid label` is one
+   specificity step above `.pref-row` -- so the generic field styling won,
+   stacking the switch under a shouty uppercase caption instead of leaving it
+   on the trailing edge. Restore the row it is supposed to be. */
+.location-setting .location-fields label.pref-row {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--text);
+  font-size: var(--type-body);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
 .location-setting .radius-picker { margin-top: 2px; }
 .location-setting .security-note { grid-column: 1 / -1; margin-top: 12px; }
 .location-setting .inline-form-error { grid-column: 1 / -1; }
