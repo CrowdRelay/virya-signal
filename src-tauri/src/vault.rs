@@ -683,32 +683,72 @@ fn save_bytes_with_password_at(
     let key_provider = KeyProvider::try_from(Zeroizing::new(password.to_vec()))
         .map_err(|_| AppError::StrongholdClient)?;
     let _snapshot = lock_snapshot();
+
+    // Back up the existing vault before writing, so a crash during commit
+    // does not destroy the only copy. The backup is restored on failure
+    // and removed on success. Callers that already do their own backup
+    // (replace_fan, save_verified) move the vault away before reaching
+    // here, so had_existing is false and this is a no-op for them.
+    let vault_backup = backup_path(vault_path);
+    let had_existing = vault_path.exists();
+    if had_existing {
+        remove_if_present(&vault_backup)?;
+        move_if_present(vault_path, &vault_backup)?;
+    }
+
     let stronghold = Stronghold::default();
-    let client = if vault_path.exists() {
-        stronghold
-            .load_client_from_snapshot(client_path, &key_provider, &snapshot_path)
-            .map_err(|_| AppError::StrongholdClient)?
+    let client = if had_existing {
+        let backup_snapshot = SnapshotPath::from_path(&vault_backup);
+        match stronghold.load_client_from_snapshot(client_path, &key_provider, &backup_snapshot) {
+            Ok(client) => client,
+            Err(_) => {
+                let _ = move_if_present(&vault_backup, vault_path);
+                return Err(AppError::StrongholdClient);
+            }
+        }
     } else {
-        stronghold
-            .create_client(client_path)
-            .map_err(|_| AppError::StrongholdClient)?
+        match stronghold.create_client(client_path) {
+            Ok(client) => client,
+            Err(_) => return Err(AppError::StrongholdClient),
+        }
     };
-    client
+    if client
         .store()
         .insert(profile_key.to_vec(), bytes.to_vec(), None)
-        .map_err(|_| AppError::StrongholdClient)?;
-    stronghold
-        .write_client(client_path)
-        .map_err(|_| AppError::StrongholdClient)?;
-    stronghold
+        .is_err()
+    {
+        if had_existing {
+            let _ = move_if_present(&vault_backup, vault_path);
+        }
+        return Err(AppError::StrongholdClient);
+    }
+    if stronghold.write_client(client_path).is_err() {
+        if had_existing {
+            let _ = move_if_present(&vault_backup, vault_path);
+        }
+        return Err(AppError::StrongholdClient);
+    }
+    if stronghold
         .commit_with_keyprovider(&snapshot_path, &key_provider)
-        .map_err(|_| AppError::StrongholdClient)?;
+        .is_err()
+    {
+        // The commit may have left a partial vault file. Remove it and
+        // restore the backup so the next read sees the pre-write state.
+        if had_existing {
+            let _ = remove_if_present(vault_path);
+            let _ = move_if_present(&vault_backup, vault_path);
+        }
+        return Err(AppError::StrongholdClient);
+    }
     set_private_permissions(vault_path)?;
     OpenOptions::new()
         .read(true)
         .write(true)
         .open(vault_path)?
         .sync_all()?;
+    if had_existing {
+        let _ = remove_if_present(&vault_backup);
+    }
     Ok(())
 }
 

@@ -697,6 +697,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         }
         "native_error_forbidden" => "Ta operacja wymaga roli owner",
         "native_error_conflict" => "Konflikt",
+        "native_error_already_configured" => "Profil jest już skonfigurowany na tym urządzeniu",
         "native_error_not_found" => "Nie znaleziono danych",
         "native_error_crowdrelay" => "CrowdRelay",
         "native_error_network" => "Błąd sieci",

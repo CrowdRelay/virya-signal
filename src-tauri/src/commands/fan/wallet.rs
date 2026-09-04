@@ -89,13 +89,19 @@ pub(crate) async fn fan_wallets(state: State<'_, AppState>) -> Result<WalletBatc
         .iter()
         .map(|wallet| wallet.order_id.clone())
         .collect::<std::collections::HashSet<_>>();
-    let mut cached_tokens = state.wallet_qr_tokens.write().await;
-    cached_tokens.retain(|order_id, _| configured_orders.contains(order_id));
-    cached_tokens.extend(wallet_tokens);
-    drop(cached_tokens);
+
+    // The QR token write and the vault persistence must both be inside
+    // `fan_mutation` so that `fan_lock` (which now acquires the same lock)
+    // cannot clear `wallet_qr_tokens` between our read and write, leaving
+    // QR secrets in memory after logout.
+    let _mutation = state.fan_mutation.lock().await;
+    {
+        let mut cached_tokens = state.wallet_qr_tokens.write().await;
+        cached_tokens.retain(|order_id, _| configured_orders.contains(order_id));
+        cached_tokens.extend(wallet_tokens);
+    }
 
     if !live_snapshots.is_empty() {
-        let _mutation = state.fan_mutation.lock().await;
         let latest = fan_profile(&state).await?;
         if latest.fan_session_token == profile.fan_session_token {
             let configured = latest
@@ -132,6 +138,7 @@ pub(crate) async fn fan_wallets(state: State<'_, AppState>) -> Result<WalletBatc
             *state.fan_session.write().await = Some(Arc::new(updated));
         }
     }
+    drop(_mutation);
 
     Ok(WalletBatch {
         failed_count: failed_orders.len(),

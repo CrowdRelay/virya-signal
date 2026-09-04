@@ -55,17 +55,21 @@ pub(crate) async fn fan_unlock(
 
 #[tauri::command]
 pub(crate) async fn fan_lock(state: State<'_, AppState>) -> Result<FanSessionStatus, AppError> {
-    // Locking only drops in-memory session material, so it deliberately does not
-    // queue behind `fan_mutation`. The push reconciliation spawned by unlock can
-    // hold that lock for the length of several network calls, and "log me out"
-    // must not wait for it. An in-flight mutation already owns a cloned profile;
-    // anything starting after this point sees a locked session.
+    // Locking must serialize with `fan_mutation` so that an in-flight
+    // `fan_unlock` (Argon2 + vault load) or `fan_wallets` (QR token write)
+    // cannot write the session back after we clear it. The push
+    // reconciliation spawned by unlock runs AFTER `fan_mutation` is dropped,
+    // so it does not hold this lock; the only long holder is
+    // `fan_delete_account` (server round-trip), which is an edge case where
+    // waiting is acceptable.
+    let _mutation = state.fan_mutation.lock().await;
     *state.fan_session.write().await = None;
     *state.fan_pin.write().await = None;
     *state.fan_vault_password.write().await = None;
     *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
     *state.fan_sections_cache.write().await = None;
+    drop(_mutation);
     fan_status(state).await
 }
 
@@ -220,6 +224,16 @@ pub(crate) async fn fan_signup(
     pin: String,
 ) -> Result<FanAuthResult, AppError> {
     let _mutation = state.fan_mutation.lock().await;
+    // Reject signup if a fan vault already exists. The UI gates signup to
+    // `!configured`, but a direct command call could otherwise overwrite the
+    // profile while leaving stale `FAN_HOME_CACHE_KEY` /
+    // `FAN_SECTIONS_CACHE_KEY` entries from the previous account, leaking
+    // cross-account data through the cache.
+    if vault::fan_exists(&state.app_data_dir) {
+        return Err(AppError::Conflict(
+            crate::i18n::tr("native_error_already_configured").into(),
+        ));
+    }
     validate_fan_signup(&mut input, &pin)?;
     let pin = Zeroizing::new(pin);
     let (result, session_token) = state.api.fan_signup(&input).await?;
