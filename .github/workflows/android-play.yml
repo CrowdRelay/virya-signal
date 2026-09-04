@@ -307,13 +307,13 @@ jobs:
         run: |
           echo "GOOGLE_PLAY_UPLOAD=PASS package=music.virya.signal track=${{ needs.prepare.outputs.play_track }} status=${{ needs.prepare.outputs.play_status }} version=${{ needs.prepare.outputs.version }} versionCode=${PROMOTED_ANDROID_VERSION_CODE} sha=${GITHUB_SHA}"
 
-      - name: Report production Virya Signal release to CrowdRelay ledger
-        if: needs.prepare.outputs.play_track == 'production'
+      - name: Report Virya Signal release to CrowdRelay ledger
         continue-on-error: true
         env:
-          CROWDRELAY_BASE_URL: ${{ vars.CROWDRELAY_PRODUCTION_BASE_URL }}
+          CROWDRELAY_BASE_URL: ${{ secrets.CROWDRELAY_BASE_URL }}
           CROWDRELAY_COMMERCE_API_KEY: ${{ secrets.CROWDRELAY_COMMERCE_API_KEY }}
           COMPONENT_VERSION: ${{ needs.prepare.outputs.version }}
+          PLAY_TRACK: ${{ needs.prepare.outputs.play_track }}
           PLAY_STATUS: ${{ needs.prepare.outputs.play_status }}
         shell: bash
         run: |
@@ -333,10 +333,11 @@ jobs:
             --arg lock "${lock_sha}" \
             --arg artifact_manifest "${manifest_sha}" \
             --arg rollout "${PLAY_STATUS}" \
+            --arg track "${PLAY_TRACK}" \
             --arg version_code "${PROMOTED_ANDROID_VERSION_CODE}" \
-            '{component_key:"virya-signal",environment:"production",source_sha:$sha,artifact_digest:("sha256:"+$artifact_manifest),deploy_ref:$ref,version:$version,manifest_sha:null,metadata:{reporter:"github-actions",channel:"google-play-production",rollout_status:$rollout,android_version_code:$version_code,dependency_lock_sha256:$lock,artifact_manifest_sha256:$artifact_manifest,push_firebase_configured:true},observed_at:(now|todateiso8601)}' | \
+            '{component_key:"virya-signal",environment:"production",source_sha:$sha,artifact_digest:("sha256:"+$artifact_manifest),deploy_ref:$ref,version:$version,manifest_sha:null,metadata:{reporter:"github-actions",channel:("google-play-"+$track),rollout_status:$rollout,android_version_code:$version_code,dependency_lock_sha256:$lock,artifact_manifest_sha256:$artifact_manifest,push_firebase_configured:true},observed_at:(now|todateiso8601)}' | \
             curl --fail-with-body --silent --show-error --max-time 15 \
               -H 'content-type: application/json' \
               -H "Authorization: Bearer ${CROWDRELAY_COMMERCE_API_KEY}" \
               --data-binary @- "${CROWDRELAY_BASE_URL%/}/v1/internal/autopilot/release-components"
-          echo "VIRYA_SIGNAL_RELEASE_LEDGER=PASS sha=${GITHUB_SHA} version=${COMPONENT_VERSION} versionCode=${PROMOTED_ANDROID_VERSION_CODE} channel=google-play-production status=${PLAY_STATUS}"
+          echo "VIRYA_SIGNAL_RELEASE_LEDGER=PASS sha=${GITHUB_SHA} version=${COMPONENT_VERSION} versionCode=${PROMOTED_ANDROID_VERSION_CODE} track=${PLAY_TRACK} status=${PLAY_STATUS}"

@@ -280,10 +280,9 @@ jobs:
           fi
 
       - name: Report Virya Signal release to CrowdRelay ledger
-        if: ${{ (inputs.play_track || 'internal') == 'production' }}
         continue-on-error: true
         env:
-          CROWDRELAY_BASE_URL: ${{ vars.CROWDRELAY_PRODUCTION_BASE_URL }}
+          CROWDRELAY_BASE_URL: ${{ secrets.CROWDRELAY_BASE_URL }}
           CROWDRELAY_COMMERCE_API_KEY: ${{ secrets.CROWDRELAY_COMMERCE_API_KEY }}
           COMPONENT_VERSION: ${{ needs.meta.outputs.version }}
         shell: bash
