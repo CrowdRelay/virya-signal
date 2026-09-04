@@ -201,6 +201,7 @@ fn FanHomeOverview(
                     let stale = snapshot.stale;
                     let next_event = snapshot.next_event.clone();
                     let city = snapshot.profile.primary_city.clone();
+                    let no_city = city.as_ref().is_none_or(|value| value.trim().is_empty());
                     view! {
                         <FanHomeBanner home=home tab=tab focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview />
                         <header class="fan-home-header">
@@ -212,6 +213,26 @@ fn FanHomeOverview(
                                 <span class="cache-badge">{tr("cached_data")}</span>
                             })}
                         </header>
+                        // A fan with no city is unreachable by the nearby-show
+                        // loop, and the commonest way to become one is to buy a
+                        // ticket without ever signing up: that path creates an
+                        // active fan and no city interest. Nothing told them,
+                        // and the only place to set a city used to be a signup
+                        // they had already skipped.
+                        {no_city.then(|| view! {
+                            <button
+                                type="button"
+                                class="home-banner priority-banner set-city-banner"
+                                on:click=move |_| tab.set(FanTab::Profile)
+                            >
+                                <div class="banner-content">
+                                    <p class="eyebrow">{tr("set_city_eyebrow")}</p>
+                                    <strong>{tr("set_city_title")}</strong>
+                                    <p class="banner-reason">{tr("set_city_reason")}</p>
+                                    <span class="banner-cta">{tr("set_city_cta")}</span>
+                                </div>
+                            </button>
+                        })}
                         {next_event.map(|event| {
                                 let ticket_url = event.ticket_url.clone();
                                 let title = event.title.clone();

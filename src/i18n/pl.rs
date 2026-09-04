@@ -914,42 +914,6 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "could_not_refresh_orders_count_other_tickets_remain_available" => {
             "Nie udało się odświeżyć {count} zamówień. Pozostałe bilety są nadal dostępne."
         }
-        "area_city_wroclaw" => "Wrocław",
-        "area_city_poznan" => "Poznań",
-        "area_city_gdansk" => "Gdańsk",
-        "area_city_warsaw" => "Warszawa",
-        "area_city_katowice" => "Katowice",
-        "area_city_krakow" => "Kraków",
-        "area_city_lodz" => "Łódź",
-        "area_city_szczecin" => "Szczecin",
-        "area_city_lublin" => "Lublin",
-        "area_city_rzeszow" => "Rzeszów",
-        "area_city_bialystok" => "Białystok",
-        "area_city_torun" => "Toruń",
-        "area_region_lower_silesia" => "Dolny Śląsk",
-        "area_region_greater_poland" => "Wielkopolska",
-        "area_region_pomerania" => "Pomorze",
-        "area_region_masovia" => "Mazowsze",
-        "area_region_silesia" => "Śląsk",
-        "area_region_lesser_poland" => "Małopolska",
-        "area_region_lodz" => "Łódzkie",
-        "area_region_west_pomerania" => "Zachodniopomorskie",
-        "area_region_lublin" => "Lubelskie",
-        "area_region_subcarpathia" => "Podkarpackie",
-        "area_region_podlasie" => "Podlaskie",
-        "area_region_kuyavia_pomerania" => "Kujawsko-Pomorskie",
-        "area_clue_wroclaw" => "Sygnał zbiera się gdzieś pomiędzy betonem, wodą i hałasem.",
-        "area_clue_poznan" => "Idź za złotym sygnałem. Zostaw oczywistą trasę za sobą.",
-        "area_clue_gdansk" => "Szukaj echa tam, gdzie stal spotyka sól.",
-        "area_clue_warsaw" => "Najgłośniejsze miasto ukrywa najcichszą transmisję.",
-        "area_clue_katowice" => "Przemysłowy puls czeka tuż pod powierzchnią.",
-        "area_clue_krakow" => "Stary kamień. Nowy hałas. Jedna linia zamknięta w środku.",
-        "area_clue_lodz" => "Idź za nicią przez cegłę, tory i miasto wymyślone na nowo.",
-        "area_clue_szczecin" => "Sygnał płynie w głąb lądu od wody ułożonej jak labirynt.",
-        "area_clue_lublin" => "Słuchaj tam, gdzie stare bramy niosą nową częstotliwość.",
-        "area_clue_rzeszow" => "Południowy puls ukrywa się między ruchem a otwartym niebem.",
-        "area_clue_bialystok" => "Na skraju lasu cichy sygnał dociera najdalej.",
-        "area_clue_torun" => "Spójrz w górę, potem sprowadź orbitę z powrotem na ulicę.",
         "audience_intelligence" => "Wiedza o publiczności",
         "fan_360_summary" => "Fan 360 · agregaty",
         "ticket_buyers" => "kupili bilet",
@@ -1608,6 +1572,13 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "latarnik_danger_hint" => {
             "Wylogowanie zostawia zaproszenie. Opuszczenie sieci je oddaje, a każdą opcję potwierdzasz, zanim cokolwiek się stanie."
         }
+        // ── Prompt a fan with no city: the nearby loop cannot reach them ──
+        "set_city_eyebrow" => "KONCERTY W POBLIŻU",
+        "set_city_title" => "Podaj swoje miasto",
+        "set_city_reason" => {
+            "Damy znać o koncercie tylko wtedy, gdy wiemy, gdzie jesteś. To jedna linijka, a zmienisz ją, kiedy się przeprowadzisz."
+        }
+        "set_city_cta" => "USTAW MIASTO",
         // ── Location: stored and reachable are different answers ──
         "location_heading" => "Miasto i koncerty w pobliżu",
         "location_hint" => {

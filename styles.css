@@ -1977,3 +1977,8 @@ html[data-virya-scanner-active] .app-shell {
    open-the-full-game. */
 .area-locate-action { border-color: var(--signal-deep); color: var(--signal-hot); }
 .area-locate-action:active:not(:disabled) { border-color: var(--signal-hot); background: color-mix(in srgb, var(--signal) 10%, transparent); }
+
+/* The city prompt is a banner-shaped button, so it needs the banner's own
+   left-aligned text rather than a control's centred label. */
+.set-city-banner { width: 100%; text-align: left; border-color: var(--signal-deep); }
+.set-city-banner .banner-cta { display: inline-block; margin-top: 12px; }

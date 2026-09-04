@@ -912,42 +912,6 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "could_not_refresh_orders_count_other_tickets_remain_available" => {
             "Could not refresh {count} orders. Your other tickets remain available."
         }
-        "area_city_wroclaw" => "Wroclaw",
-        "area_city_poznan" => "Poznan",
-        "area_city_gdansk" => "Gdansk",
-        "area_city_warsaw" => "Warsaw",
-        "area_city_katowice" => "Katowice",
-        "area_city_krakow" => "Krakow",
-        "area_city_lodz" => "Lodz",
-        "area_city_szczecin" => "Szczecin",
-        "area_city_lublin" => "Lublin",
-        "area_city_rzeszow" => "Rzeszow",
-        "area_city_bialystok" => "Bialystok",
-        "area_city_torun" => "Torun",
-        "area_region_lower_silesia" => "Lower Silesia",
-        "area_region_greater_poland" => "Greater Poland",
-        "area_region_pomerania" => "Pomerania",
-        "area_region_masovia" => "Masovia",
-        "area_region_silesia" => "Silesia",
-        "area_region_lesser_poland" => "Lesser Poland",
-        "area_region_lodz" => "Lodz region",
-        "area_region_west_pomerania" => "West Pomerania",
-        "area_region_lublin" => "Lublin region",
-        "area_region_subcarpathia" => "Subcarpathia",
-        "area_region_podlasie" => "Podlasie",
-        "area_region_kuyavia_pomerania" => "Kuyavia-Pomerania",
-        "area_clue_wroclaw" => "A signal is forming somewhere between concrete, water and noise.",
-        "area_clue_poznan" => "Follow the gold signal. Leave the obvious route behind.",
-        "area_clue_gdansk" => "Look for the echo where steel meets salt.",
-        "area_clue_warsaw" => "The loudest city hides its quietest transmission.",
-        "area_clue_katowice" => "An industrial pulse is waiting below the surface.",
-        "area_clue_krakow" => "Old stone. New noise. One line locked inside.",
-        "area_clue_lodz" => "Follow the thread through brick, rails and reinvention.",
-        "area_clue_szczecin" => "The signal drifts inland from water shaped like a maze.",
-        "area_clue_lublin" => "Listen where old gates carry a new frequency.",
-        "area_clue_rzeszow" => "A southern pulse hides between motion and open sky.",
-        "area_clue_bialystok" => "At the forest's edge, the quiet signal travels furthest.",
-        "area_clue_torun" => "Look up, then follow the orbit back to the street.",
         "audience_intelligence" => "Audience Intelligence",
         "fan_360_summary" => "Fan 360 · aggregates",
         "ticket_buyers" => "ticket buyers",
@@ -1606,6 +1570,13 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "latarnik_danger_hint" => {
             "Signing out keeps your invite. Leaving the network gives it up, and each option is confirmed before anything happens."
         }
+        // ── Prompt a fan with no city: the nearby loop cannot reach them ──
+        "set_city_eyebrow" => "SHOWS NEAR YOU",
+        "set_city_title" => "Tell us your city",
+        "set_city_reason" => {
+            "We only announce a show when we know where you are. It takes one line and you can change it whenever you move."
+        }
+        "set_city_cta" => "SET MY CITY",
         // ── Location: stored and reachable are different answers ──
         "location_heading" => "City and nearby shows",
         "location_hint" => {
