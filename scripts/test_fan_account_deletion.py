@@ -11,8 +11,21 @@ class FanAccountDeletionUiContract(unittest.TestCase):
         self.assertIn('fan_account_deletion_v1', api)
         self.assertIn('Method::DELETE', api)
         self.assertIn('"me/account"', api)
-        self.assertIn('state.api.fan_delete_account(&profile).await?', commands)
         self.assertIn('vault::remove_fan', commands)
+        # The local vault goes first and the server call cannot abort it. The
+        # other order has a worse failure: a server delete that succeeds while
+        # vault removal fails leaves the device holding a vault for an account
+        # that no longer exists, which nobody can recover. This way a failed
+        # server delete leaves an orphaned account support can clean up, and
+        # the device is already clean -- so the call is deliberately not `?`.
+        deletion = commands.split('pub(crate) async fn fan_delete_account', 1)[1]
+        deletion = deletion.split('pub(crate) async fn', 1)[0]
+        self.assertLess(
+            deletion.index('vault::remove_fan'),
+            deletion.index('state.api.fan_delete_account(&profile)'),
+        )
+        self.assertIn('if let Err(error) = state.api.fan_delete_account(&profile).await', deletion)
+        self.assertNotIn('state.api.fan_delete_account(&profile).await?', deletion)
         self.assertIn('fan_delete_account,', lib)
 
     def test_ui_uses_two_step_confirmation(self):

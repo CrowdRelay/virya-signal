@@ -92,7 +92,11 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         self.assertGreaterEqual(fan.count('bridge::invalidate_latest("launcher:")'), 3)
         self.assertIn("status_refresh.update", fan)
         self.assertIn("invoke_timeout::<FanSessionStatus", fan)
-        self.assertIn("status.set(value)", fan)
+        # `try_set` rather than `set`: these commits can land after the fan tree
+        # has been torn down, and a disposed signal must degrade rather than
+        # panic. What matters here is that the authenticated answer is what gets
+        # committed, not which setter spells it.
+        self.assertIn("status.try_set(value)", fan)
         self.assertIn("status_refresh=status_refresh", fan)
 
     def test_staff_bootstrap_does_not_treat_placeholder_dashboard_as_loaded(self) -> None:
@@ -108,8 +112,23 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         operator_shell = (ROOT / "src/app/operator/shell.rs").read_text(encoding="utf-8")
         latarnik = fan_shell.split("let open_latarnik", 1)[1].split("let refresh_all", 1)[0]
         self.assertIn("mode.set(RootMode::Latarnik)", latarnik)
-        self.assertNotIn("spawn_local", latarnik)
         self.assertLess(latarnik.index("menu_open.set(false)"), latarnik.index("mode.set(RootMode::Latarnik)"))
+        # Leaving Fan mode locks the fan session first, which is a native round
+        # trip and therefore has to be spawned. This used to ban `spawn_local`
+        # outright, which was a proxy for the thing that actually matters: the
+        # mode switch must not sit inside the task. If it did, leaving the zone
+        # would depend on a command completing, and a failed or slow lock would
+        # strand the user in a menu that had already closed. The lock is
+        # fire-and-forget beside the switch, not in front of it.
+        spawned = latarnik.split("spawn_local(async move {", 1)
+        if len(spawned) > 1:
+            body = spawned[1].split("});", 1)[0]
+            self.assertIn("fan_lock", body)
+            self.assertNotIn("mode.set", body)
+            self.assertLess(
+                latarnik.index("spawn_local(async move {"),
+                latarnik.index("mode.set(RootMode::Latarnik)"),
+            )
         # The keep-alive refactor moved the refresh bump into a shared
         # `request_full_refresh` closure; the menu must still call it after
         # closing, and the closure itself must stay latest-wins.

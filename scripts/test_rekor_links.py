@@ -17,7 +17,10 @@ class RekorLinkTests(unittest.TestCase):
 
     def test_fan_draw_card_opens_public_proof(self):
         app = read_app_source(ROOT)
-        self.assertIn("/pl/dowody/losowania/{}/?source=signal-app", app)
+        # The locale is the fan's, not a hardcoded /pl/: an English fan
+        # following a proof link must not land on a Polish page.
+        self.assertIn("https://virya.music/{}/dowody/losowania/{}/?source=signal-app", app)
+        self.assertIn("i18n::current().code()", app)
         self.assertIn('label=tr("proof")', app)
         self.assertIn("open_external_url", app)
 
