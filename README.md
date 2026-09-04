@@ -8,14 +8,18 @@ Signal is the phone-side surface of the same system virya.music serves in a brow
 
 - fan identity and recovery;
 - concerts, tickets, merch, AREA and Synesthesia entry;
+- fan affiliate program;
 - staff operations overview and ticket/admission scanning;
-- campaigns, commerce and diagnostics;
-- ViryaOS exception cockpit / Chief of Staff;
+- staff commerce settings, signal management, and beacons;
+- autopilot chief of staff brief — needs-attention count, active plays, and decision summary;
 - growth intelligence: the deterministic brain dispatches LLM workers
-  (Reddit scanning, press pitches, social posts, community engagement) and
-  the Signal app surfaces growth metrics and community engagement drafts;
+  (Reddit scanning, press pitches, social posts, community engagement,
+  Discord/Telegram posting, audience research) and the Signal app surfaces
+  growth metrics and community engagement drafts;
+- operator autopilot cards, labels, and checklist;
 - bounded offline caches and degraded public-data behavior;
-- native-only credential and secret handling through Stronghold.
+- native-only credential and secret handling through Stronghold;
+- Android Play Store publishing pipeline (internal track → production promotion).
 
 ## Tech stack
 
