@@ -58,6 +58,7 @@ fn autopilot_action_kind_label(kind: &str) -> &'static str {
         "referral.code.issue" => tr("autopilot_action_referral_code_issue"),
         "play.step.run" => tr("autopilot_action_play_step_run"),
         "agent.content.request" => tr("autopilot_action_agent_content_request"),
+        "outreach.target.request" => tr("autopilot_action_outreach_target_request"),
         "agent.run.request" => tr("autopilot_action_agent_run_request"),
         "community.engage.request" => tr("autopilot_action_community_engage_request"),
         "signal.push.request" => tr("autopilot_action_signal_push_request"),
@@ -202,6 +203,9 @@ fn autopilot_payload_detail(payload: &AutopilotActionPayload) -> String {
         }
         AutopilotActionPayload::RequestAgentContent { template_id, .. } => {
             template_id.as_deref().unwrap_or("draft").to_owned()
+        }
+        AutopilotActionPayload::RequestOutreachTarget { target_kind, display_name, .. } => {
+            format!("{target_kind} · {display_name}")
         }
         AutopilotActionPayload::RequestAgentRun { template_id, tier, .. } => {
             format!("{template_id} · {tier}")

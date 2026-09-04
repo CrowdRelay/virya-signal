@@ -1520,6 +1520,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "autopilot_action_referral_code_issue" => "Issue referral code",
         "autopilot_action_play_step_run" => "Run play step",
         "autopilot_action_agent_content_request" => "Agent content request",
+        "autopilot_action_outreach_target_request" => "Outreach target to verify",
         "autopilot_action_agent_run_request" => "Agent run request",
         "autopilot_action_community_engage_request" => "Community engagement",
         "autopilot_action_signal_push_request" => "Signal push notification",

@@ -1524,6 +1524,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "autopilot_action_referral_code_issue" => "Wydanie kodu polecenia",
         "autopilot_action_play_step_run" => "Krok kampanii",
         "autopilot_action_agent_content_request" => "Żądanie treści agenta",
+        "autopilot_action_outreach_target_request" => "Cel outreach do weryfikacji",
         "autopilot_action_agent_run_request" => "Uruchomienie agenta",
         "autopilot_action_community_engage_request" => "Zaangażowanie społeczności",
         "autopilot_action_signal_push_request" => "Powiadomienie push",

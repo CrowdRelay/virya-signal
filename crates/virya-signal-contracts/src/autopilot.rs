@@ -251,6 +251,25 @@ pub enum AutopilotActionPayload {
         task_id: String,
         draft: JsonValue,
     },
+    /// An agent found an outreach target -- press contact, station, community
+    /// -- that a human must verify before the growth loop uses it. Approving it
+    /// only flips a staging row from proposed to promoted, so nothing leaves
+    /// the system on approval and the decision is reversible.
+    RequestOutreachTarget {
+        task_id: String,
+        target_kind: String,
+        display_name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        contact_email: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        contact_domain: Option<String>,
+        #[serde(default)]
+        why_fit: String,
+        #[serde(default)]
+        evidence_urls: JsonValue,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        subreddit: Option<String>,
+    },
     RequestAgentRun {
         template_id: String,
         prompt: String,
@@ -452,6 +471,18 @@ struct WireAutopilotActionPayload {
     step_kind: Option<String>,
     #[serde(default)]
     subreddit: Option<String>,
+    #[serde(default)]
+    target_kind: Option<String>,
+    #[serde(default)]
+    display_name: Option<String>,
+    #[serde(default)]
+    contact_email: Option<String>,
+    #[serde(default)]
+    contact_domain: Option<String>,
+    #[serde(default)]
+    why_fit: Option<String>,
+    #[serde(default)]
+    evidence_urls: Option<JsonValue>,
     #[serde(default)]
     subject_id: Option<String>,
     #[serde(default)]
@@ -696,6 +727,18 @@ impl WireAutopilotActionPayload {
                 task_id: required(self.task_id, "task_id")?,
                 draft: required(self.draft, "draft")?,
             },
+            "request_outreach_target" => AutopilotActionPayload::RequestOutreachTarget {
+                task_id: required(self.task_id, "task_id")?,
+                target_kind: required(self.target_kind, "target_kind")?,
+                display_name: required(self.display_name, "display_name")?,
+                contact_email: self.contact_email,
+                contact_domain: self.contact_domain,
+                // Optional on the wire: an agent that found a target without a
+                // rationale still produces an actionable row.
+                why_fit: self.why_fit.unwrap_or_default(),
+                evidence_urls: self.evidence_urls.unwrap_or(JsonValue::Null),
+                subreddit: self.subreddit,
+            },
             "request_agent_run" => AutopilotActionPayload::RequestAgentRun {
                 template_id: required(self.template_id, "template_id")?,
                 prompt: required(self.prompt, "prompt")?,
@@ -795,6 +838,7 @@ impl AutopilotActionPayload {
             Self::IssueReferralCode { .. } => "referral.code.issue",
             Self::RunPlayStep { .. } => "play.step.run",
             Self::RequestAgentContent { .. } => "agent.content.request",
+            Self::RequestOutreachTarget { .. } => "outreach.target.request",
             Self::RequestAgentRun { .. } => "agent.run.request",
             Self::RequestCommunityEngagement { .. } => "community.engage.request",
             Self::RequestSignalPush { .. } => "signal.push.request",
