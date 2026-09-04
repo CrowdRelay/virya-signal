@@ -335,14 +335,16 @@ fn FanAccess(
             .await
             {
                 Ok(value) => {
-                    pin.set(String::new());
+                    let _ = pin.try_set(String::new());
                     bridge::invalidate_latest("launcher:");
-                    status.set(value);
+                    let _ = status.try_set(value);
                     status_refresh.update(|generation| *generation = generation.wrapping_add(1));
                 }
-                Err(message) => error.set(Some(message)),
+                Err(message) => {
+                    let _ = error.try_set(Some(message));
+                }
             }
-            busy.set(false);
+            let _ = busy.try_set(false);
         });
     };
 
@@ -374,17 +376,17 @@ fn FanAccess(
             {
                 Ok(value) => value.city_slug,
                 Err(message) => {
-                    error.set(Some(i18n::format(
+                    let _ = error.try_set(Some(i18n::format(
                         "could_not_save_city_message",
                         std::slice::from_ref(&message),
                     )));
-                    busy.set(false);
+                    let _ = busy.try_set(false);
                     return;
                 }
             };
             if city_slug.trim().is_empty() {
-                error.set(Some(tr("select_a_city_or_enter_your_own").to_owned()));
-                busy.set(false);
+                let _ = error.try_set(Some(tr("select_a_city_or_enter_your_own").to_owned()));
+                let _ = busy.try_set(false);
                 return;
             }
             let input = FanSignupInput {
@@ -409,7 +411,7 @@ fn FanAccess(
             {
                 Ok(result) => {
                     if result.session_created {
-                        pin.set(String::new());
+                        let _ = pin.try_set(String::new());
                         bridge::invalidate_latest("launcher:");
                         match bridge::invoke_timeout::<FanSessionStatus, _>(
                             "fan_status",
@@ -418,12 +420,16 @@ fn FanAccess(
                         )
                         .await
                         {
-                            Ok(value) => status.set(value),
-                            Err(message) => error.set(Some(message)),
+                            Ok(value) => {
+                                let _ = status.try_set(value);
+                            }
+                            Err(message) => {
+                                let _ = error.try_set(Some(message));
+                            }
                         }
                         status_refresh.update(|value| *value = value.wrapping_add(1));
                     } else {
-                        access_mode.set(FanAccessMode::Confirm);
+                        let _ = access_mode.try_set(FanAccessMode::Confirm);
                         let message = match result.email_queued {
                             Some(true)
                                 if result.email_kind.as_deref() == Some("session_recovery") =>
@@ -444,12 +450,14 @@ fn FanAccess(
                             }
                             None => { tr("request_was_accepted_check_your_inbox_and") }.to_owned(),
                         };
-                        error.set(Some(message));
+                        let _ = error.try_set(Some(message));
                     }
                 }
-                Err(message) => error.set(Some(message)),
+                Err(message) => {
+                    let _ = error.try_set(Some(message));
+                }
             }
-            busy.set(false);
+            let _ = busy.try_set(false);
         });
     };
 
@@ -488,12 +496,14 @@ fn FanAccess(
             .await
             {
                 Ok(()) => {
-                    access_mode.set(FanAccessMode::Confirm);
-                    error.set(Some(tr("if_this_email_is_registered_in_virya").to_owned()));
+                    let _ = access_mode.try_set(FanAccessMode::Confirm);
+                    let _ = error.try_set(Some(tr("if_this_email_is_registered_in_virya").to_owned()));
                 }
-                Err(message) => error.set(Some(message)),
+                Err(message) => {
+                    let _ = error.try_set(Some(message));
+                }
             }
-            busy.set(false);
+            let _ = busy.try_set(false);
         });
     };
 
@@ -573,6 +583,7 @@ fn FanAccess(
             </header>
             <Show when=move || status.get().configured fallback=move || view! {
                 <div class="access-card fan-card">
+                    {move || error.get().map(|msg| view! { <p class="inline-form-error" role="alert">{msg}</p> })}
                     <div class="segmented">
                         <button class:active=move || access_mode.get() == FanAccessMode::Signup on:click=move |_| access_mode.set(FanAccessMode::Signup)>{tr("get_started")}</button>
                         <button class:active=move || access_mode.get() == FanAccessMode::Confirm on:click=move |_| access_mode.set(FanAccessMode::Confirm)>{tr("i_have_a_code")}</button>
@@ -660,6 +671,7 @@ fn FanAccess(
                 </div>
             }>
                 <div class="access-card fan-card">
+                    {move || error.get().map(|msg| view! { <p class="inline-form-error" role="alert">{msg}</p> })}
                     <Show when=move || recovery_open.get() fallback=move || view! {
                         <>
                             <p class="lock-copy">{tr("your_profile_and_tickets_are_encrypted_on")}</p>

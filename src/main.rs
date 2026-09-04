@@ -76,7 +76,6 @@ fn main() {
     #[cfg(debug_assertions)]
     console_error_panic_hook::set_once();
     i18n::initialize();
-    bridge::install_runtime_guards();
     virya_boot_phase("wasm-entered");
     // The catalog loader starts while the browser fetches/instantiates WASM.
     // Waiting here keeps the first rendered tree in the selected language
@@ -90,6 +89,11 @@ fn main() {
     // so nothing is given up.
     app::spawn_lifecycle_task(async {
         i18n::wait_for_runtime_catalog().await;
+        // Install runtime guards after the catalog has loaded so `tr()`
+        // returns real translations, not raw keys that would overwrite the
+        // English defaults in the JS bridge. The boot shell handles any
+        // error that occurs before this point.
+        bridge::install_runtime_guards();
         schedule_mount();
     });
 }
