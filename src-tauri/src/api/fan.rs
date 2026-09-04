@@ -11,8 +11,8 @@ use crate::{
     AppError,
     models::{
         AdmissionPass, FanAuthResult, FanConfirmationInput, FanEventInterest, FanHomeData,
-        FanProfile, FanPushPreferences, FanPushPreferencesUpdate, FanSignupInput, PublicEvent,
-        ReferralProgress,
+        FanLocationState, FanProfile, FanPushPreferences, FanPushPreferencesUpdate, FanSignupInput,
+        PublicEvent, ReferralProgress,
     },
 };
 
@@ -482,6 +482,30 @@ impl super::CrowdRelayClient {
             .fan_json(profile, Method::POST, "me/push/preferences", Some(&body))
             .await?;
         Ok(wire.into())
+    }
+
+    /// Sets the fan's city and nearby-show preference against a proved session.
+    ///
+    /// Signup is the only other writer and refuses to touch an address that is
+    /// already active, so before this existed a fan who bought a ticket or
+    /// moved city could never establish a location -- and nearby delivery is
+    /// keyed on one. The reply reports whether targeting can actually work, so
+    /// the app can stop implying shows are on their way when the chosen city
+    /// has no coordinates yet.
+    pub async fn fan_set_location(
+        &self,
+        profile: &FanProfile,
+        city_slug: &str,
+        nearby_gigs_enabled: bool,
+        radius_km: u16,
+    ) -> Result<FanLocationState, AppError> {
+        let body = serde_json::json!({
+            "city_slug": city_slug,
+            "nearby_gigs_enabled": nearby_gigs_enabled,
+            "radius_km": radius_km,
+        });
+        self.fan_json(profile, Method::POST, "me/location", Some(&body))
+            .await
     }
 
     pub async fn fan_disable_android_push(

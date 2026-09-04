@@ -1948,3 +1948,10 @@ html[data-virya-scanner-active] .app-shell {
 .admin-box hr { margin: 8px 0 4px; }
 .admin-box .form-grid { gap: 12px; }
 .admin-box .security-note { margin-top: 4px; }
+
+/* The location setting carries a form rather than a single action, so it lays
+   its fields out under the copy instead of beside a chevron. */
+.location-setting .location-fields { grid-column: 1 / -1; margin-top: 12px; }
+.location-setting .radius-picker { margin-top: 2px; }
+.location-setting .security-note { grid-column: 1 / -1; margin-top: 12px; }
+.location-setting .inline-form-error { grid-column: 1 / -1; }

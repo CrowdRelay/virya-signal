@@ -1605,6 +1605,19 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "latarnik_danger_hint" => {
             "Signing out keeps your invite. Leaving the network gives it up, and each option is confirmed before anything happens."
         }
+        // ── Location: stored and reachable are different answers ──
+        "location_heading" => "City and nearby shows",
+        "location_hint" => {
+            "Where to look for shows worth telling you about. You can change it whenever you move."
+        }
+        "location_city_required" => "Enter your city first.",
+        "location_save" => "SAVE LOCATION",
+        "location_saved" => "Location saved.",
+        "location_active" => "On. We will tell you about shows near {0}.",
+        "location_muted" => "Saved. Nearby show alerts are off, so we will stay quiet.",
+        "location_not_targetable" => {
+            "Saved, but {0} is not on our map yet, so we cannot reach you there. It goes into the queue and alerts start once it is added."
+        }
         // ── Ticketing: labelled fields, and a confirm before turning a fan away ──
         "ticketing_pick_show" => "Pick a show to see its numbers",
         "ticketing_pick_show_hint" => {

@@ -1,5 +1,21 @@
 include!("fan_wire.generated.rs");
 
+/// What the server says about a fan's location targeting after a change.
+///
+/// `targeting_ready` is the field that matters. A city a fan requested has no
+/// coordinates until somebody geocodes it, and proximity delivery needs them,
+/// so "saved" and "will actually reach you" are different answers. The app used
+/// to only be able to say the first.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FanLocationState {
+    pub city_slug: String,
+    pub city_name: String,
+    pub nearby_gigs_enabled: bool,
+    pub radius_km: u16,
+    pub targeting_ready: bool,
+}
+
 /// Typed navigation target shared by push/App Links and Fan Home actions.
 /// Parsing exact query keys avoids bugs such as `not_event=` matching `event=`.
 #[derive(Clone, Debug, PartialEq, Eq)]

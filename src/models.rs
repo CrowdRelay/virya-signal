@@ -405,6 +405,8 @@ pub struct RequestedCityInput {
     pub country_code: String,
 }
 
+pub use virya_signal_contracts::fan::FanLocationState;
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct RequestedCityResult {
     pub city_slug: String,

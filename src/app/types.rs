@@ -296,6 +296,14 @@ pub(super) struct RequestedCityArgs<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(super) struct FanLocationArgs<'a> {
+    pub city_slug: &'a str,
+    pub nearby_gigs_enabled: bool,
+    pub radius_km: u16,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct UrlArgs<'a> {
     pub url: &'a str,
 }

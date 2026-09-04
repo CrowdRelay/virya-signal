@@ -467,3 +467,23 @@ pub(crate) async fn fan_push_update_preferences(
     let profile = fan_profile(&state).await?;
     state.api.fan_update_push_preferences(&profile, &preferences).await
 }
+
+/// Stores the fan's city and nearby-show preference.
+///
+/// Serialized behind `fan_mutation` with the other fan writes, and the reply is
+/// the server's own view rather than what the app asked for: the answer to
+/// "will this reach me" is the server's to give.
+#[tauri::command]
+pub(crate) async fn fan_set_location(
+    state: State<'_, AppState>,
+    city_slug: String,
+    nearby_gigs_enabled: bool,
+    radius_km: u16,
+) -> Result<FanLocationState, AppError> {
+    let _mutation = state.fan_mutation.lock().await;
+    let profile = fan_profile(&state).await?;
+    state
+        .api
+        .fan_set_location(&profile, city_slug.trim(), nearby_gigs_enabled, radius_km)
+        .await
+}

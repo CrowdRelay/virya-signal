@@ -1607,6 +1607,21 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "latarnik_danger_hint" => {
             "Wylogowanie zostawia zaproszenie. Opuszczenie sieci je oddaje, a każdą opcję potwierdzasz, zanim cokolwiek się stanie."
         }
+        // ── Location: stored and reachable are different answers ──
+        "location_heading" => "Miasto i koncerty w pobliżu",
+        "location_hint" => {
+            "Gdzie szukać koncertów, o których warto Ci powiedzieć. Możesz to zmienić, kiedy się przeprowadzisz."
+        }
+        "location_city_required" => "Najpierw podaj miasto.",
+        "location_save" => "ZAPISZ LOKALIZACJĘ",
+        "location_saved" => "Lokalizacja zapisana.",
+        "location_active" => "Włączone. Damy znać o koncertach w okolicy: {0}.",
+        "location_muted" => {
+            "Zapisane. Powiadomienia o koncertach w pobliżu są wyłączone, więc nie będziemy pisać."
+        }
+        "location_not_targetable" => {
+            "Zapisane, ale {0} nie ma jeszcze na naszej mapie, więc nie dotrzemy tam do Ciebie. Miasto trafia do kolejki, a powiadomienia ruszą po jego dodaniu."
+        }
         // ── Ticketing: labelled fields, and a confirm before turning a fan away ──
         "ticketing_pick_show" => "Wybierz koncert, żeby zobaczyć liczby",
         "ticketing_pick_show_hint" => {

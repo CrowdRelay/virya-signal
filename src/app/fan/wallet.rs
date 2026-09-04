@@ -299,6 +299,7 @@ fn FanProfileScreen(
             <div class="settings-list">
                 <NativePushControl error=error />
                 <LanguageSwitch />
+                <FanLocationSetting error=error />
                 <article class="settings-row settings-row-static">
                     <span class="settings-row-icon" aria-hidden="true">"⤴"</span>
                     <strong>"Virya.music"</strong>
@@ -349,6 +350,119 @@ fn FanProfileScreen(
             <AnonymousFeedback error=error />
             <p class="security-note">{tr("fan_session_admission_pass_and_private_wallet")}</p>
         </section>
+    }
+}
+
+/// Lets a fan set their city and nearby-show preference after signup.
+///
+/// Signup was the only place this could ever be set, and the server refuses to
+/// change it from an unauthenticated repeat submission -- so a fan who bought a
+/// ticket, or one who moved, had no way to establish a location at all, and
+/// nearby delivery is keyed on one. The reply carries the server's own verdict
+/// on whether targeting can work: a city nobody has put on the map yet cannot
+/// reach anybody, and saying "saved" without saying that is how a fan ends up
+/// waiting for shows that were never coming.
+#[component]
+fn FanLocationSetting(error: RwSignal<Option<String>>) -> impl IntoView {
+    let city = RwSignal::new(String::new());
+    let region = RwSignal::new(String::new());
+    let nearby = RwSignal::new(true);
+    let radius = RwSignal::new(150_u16);
+    let busy = RwSignal::new(false);
+    let stored = RwSignal::new(None::<FanLocationState>);
+    let inline_status = RwSignal::new(None::<String>);
+
+    let save = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        let name = city.get_untracked().trim().to_owned();
+        if name.is_empty() {
+            inline_status.set(Some(tr("location_city_required").to_owned()));
+            return;
+        }
+        let requested = RequestedCityInput {
+            name,
+            region: optional(region.get_untracked().trim().to_owned()),
+            country_code: "PL".to_owned(),
+        };
+        let enabled = nearby.get_untracked();
+        let km = radius.get_untracked();
+        inline_status.set(None);
+        busy.set(true);
+        spawn_local(async move {
+            // Same two steps signup takes: name the city, then attach to the
+            // slug it resolves to. A city nobody has approved yet still
+            // resolves, which is exactly why the second call reports whether
+            // it can be targeted.
+            let slug = match bridge::invoke::<RequestedCityResult, _>(
+                "request_city",
+                &RequestedCityArgs { input: &requested },
+            )
+            .await
+            {
+                Ok(value) => value.city_slug,
+                Err(message) => {
+                    inline_status.set(Some(message));
+                    busy.set(false);
+                    return;
+                }
+            };
+            match bridge::invoke::<FanLocationState, _>(
+                "fan_set_location",
+                &FanLocationArgs {
+                    city_slug: &slug,
+                    nearby_gigs_enabled: enabled,
+                    radius_km: km,
+                },
+            )
+            .await
+            {
+                Ok(value) => {
+                    error.set(Some(tr("location_saved").to_owned()));
+                    stored.set(Some(value));
+                }
+                Err(message) => inline_status.set(Some(message)),
+            }
+            busy.set(false);
+        });
+    };
+
+    view! {
+        <article class="settings-row settings-row-static location-setting">
+            <span class="settings-row-icon" aria-hidden="true">"⌖"</span>
+            <strong>{tr("location_heading")}</strong>
+            <small>{tr("location_hint")}</small>
+            <div class="form-grid location-fields">
+                <label>{tr("city")}<input placeholder=tr("e_g_bielawa") prop:value=move || city.get() on:input=move |e| city.set(event_target_value(&e))/></label>
+                <label>{tr("province_region_optional")}<input placeholder=tr("lower_silesia") prop:value=move || region.get() on:input=move |e| region.set(event_target_value(&e))/></label>
+                <label class="pref-row pref-row-inline"><span class="pref-row-label">{tr("notify_me_about_nearby_shows")}</span><input type="checkbox" class="pref-switch" prop:checked=move || nearby.get() on:change=move |e| nearby.set(event_target_checked(&e))/></label>
+                <Show when=move || nearby.get()>
+                    <div class="radius-picker">
+                        <button type="button" class:active=move || radius.get()==50 on:click=move |_| radius.set(50)>"50 km"</button>
+                        <button type="button" class:active=move || radius.get()==100 on:click=move |_| radius.set(100)>"100 km"</button>
+                        <button type="button" class:active=move || radius.get()==150 on:click=move |_| radius.set(150)>"150 km"</button>
+                        <button type="button" class:active=move || radius.get()==250 on:click=move |_| radius.set(250)>"250 km"</button>
+                    </div>
+                </Show>
+                <button type="button" class="primary" disabled=move || busy.get() on:click=save>
+                    {move || if busy.get() { tr("sending_2") } else { tr("location_save") }}
+                </button>
+            </div>
+            {move || stored.get().map(|value| {
+                // The distinction the old UI could not draw: stored is not the
+                // same as reachable.
+                let (class, message) = if !value.nearby_gigs_enabled {
+                    ("security-note", tr("location_muted").to_owned())
+                } else if value.targeting_ready {
+                    ("security-note", i18n::format("location_active", std::slice::from_ref(&value.city_name)))
+                } else {
+                    ("security-note warning", i18n::format("location_not_targetable", std::slice::from_ref(&value.city_name)))
+                };
+                view! { <p class=class>{message}</p> }
+            })}
+            {move || inline_status.get().map(|msg| view! { <p class="inline-form-error">{msg}</p> })}
+        </article>
     }
 }
 

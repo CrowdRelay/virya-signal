@@ -25,7 +25,7 @@ use crate::{
         BeaconHomeData, BeaconMutationResult, BeaconPressRequestsData, BeaconPressRoomData,
         BeaconReleasesData, BeaconSessionStatus, CouponEnvelope, CreateQrCampaignInput,
         DashboardData, EventCity, FanAuthResult, FanConfirmationInput, FanDashboardData,
-        FanEventInterest, FanHomeData, FanMerchBundleCatalog, FanPushPreferences,
+        FanEventInterest, FanHomeData, FanLocationState, FanMerchBundleCatalog, FanPushPreferences,
         FanPushPreferencesUpdate, FanPushStatus, FanSessionStatus, FanSignupInput, FanTarget,
         IssuePassInput, IssuedPass, MerchCatalog, OperatorAutopilotOverview, OperatorOpsOverview,
         OperatorProfileInput, OperatorRole, OperatorSignalOverview, OpsDeliveryItem, OpsOutboxItem,
