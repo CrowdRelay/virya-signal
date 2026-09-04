@@ -259,7 +259,7 @@ fn Scanner(
 
     view! {
         <section class="screen">
-            <header class="screen-title"><p class="eyebrow">GATE MODE</p><h2>{tr("scan_entry")}</h2></header>
+            <header class="screen-title"><p class="eyebrow">{tr("gate_mode_eyebrow")}</p><h2>{tr("scan_entry")}</h2><p class="screen-copy">{tr("scan_entry_purpose")}</p></header>
             <label class="select-label">{tr("show")}<select disabled=move || loading.get().events prop:value=move || event_slug.get() on:change=select_event><option value="">{move || if loading.get().events { tr("loading_shows") } else { tr("select_an_event") }}</option><For each=move || operator_events(dashboard) key=|event| event.slug.clone() children=move |event| view! { <option value=event.slug.clone()>{event.title}</option> } /></select></label>
             <article class:show-mode-active=move || offline.get() class="show-mode-card">
                 <div class="section-head"><div><p class="eyebrow">OFFLINE SHOW MODE</p><h3>{move || if offline.get() { tr("gate_works_locally") } else { tr("works_without_lte") }}</h3></div><button type="button" class:active=move || offline.get() disabled=move || !show_mode.get().prepared || busy.get() on:click=move |_| offline.update(|value| *value = !*value)>{move || if offline.get() { tr("offline_on") } else { tr("offline_off") }}</button></div>
@@ -287,7 +287,16 @@ fn Scanner(
                 <Show when=move || !show_message.get().is_empty()><small>{move || show_message.get()}</small></Show>
             </article>
             <button class="scanner-button" on:click=scan disabled=move || busy.get()><span class="scanner-frame"></span><strong>{move || if busy.get() { tr("verifying") } else if offline.get() { tr("scan_locally") } else { tr("open_camera") }}</strong><small>{move || if offline.get() { tr("durable_t1_ticket_qr_only") } else { tr("ticket_or_admission_pass_qr") }}</small></button>
-            <Show when=move || !offline.get()><div class="manual-row"><input placeholder=tr("qr_code_or_admission_pass_number") prop:value=move || manual.get() on:input=move |e| manual.set(event_target_value(&e))/><button on:click=manual_submit disabled=move || busy.get()>{tr("check")}</button></div></Show>
+            <Show when=move || !offline.get()>
+                <p class="field-hint manual-row-hint">{tr("scan_manual_hint")}</p>
+                <div class="manual-row"><input aria-label=tr("qr_code_or_admission_pass_number") placeholder=tr("qr_code_or_admission_pass_number") prop:value=move || manual.get() on:input=move |e| manual.set(event_target_value(&e))/><button on:click=manual_submit disabled=move || busy.get()>{tr("check")}</button></div>
+            </Show>
+            <Show when=move || result.get().is_none()>
+                <div class="empty-state compact">
+                    <strong>{tr("scan_idle")}</strong>
+                    <p>{tr("scan_idle_hint")}</p>
+                </div>
+            </Show>
             {move || result.get().map(|entry| {
                 let success = matches!(
                     entry.status.as_str(),

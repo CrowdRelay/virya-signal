@@ -1604,6 +1604,59 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "latarnik_danger_hint" => {
             "Signing out keeps your invite. Leaving the network gives it up, and each option is confirmed before anything happens."
         }
+        // ── Ticketing: labelled fields, and a confirm before turning a fan away ──
+        "ticketing_pick_show" => "Pick a show to see its numbers",
+        "ticketing_pick_show_hint" => {
+            "Sales, orders, issued passes and gate check-ins are all per show. Choose one above and refresh."
+        }
+        "pass_fan_email_label" => "Fan email",
+        "pass_fan_email_hint" => "Where the claim token is sent. The pass belongs to this address.",
+        "pass_pool_label" => "Pool",
+        "pass_pool_hint" => {
+            "Which pool the pass is drawn from. Leave 'tickets' unless you run a separate pool."
+        }
+        "pass_issued_eyebrow" => "PASS ISSUED",
+        "pass_issued_hint" => {
+            "Send the claim token to the fan. They paste it in Signal and the pass moves to their phone."
+        }
+        "pass_revoke_heading" => "Revoke a pass",
+        "pass_revoke_label" => "Pass number",
+        "pass_revoke_hint" => "The public VRY reference, not the claim token.",
+        "pass_revoke_confirm" => {
+            "Revoking {0} turns that person away at the door. This cannot be undone from the app."
+        }
+        "pass_revoke_confirm_action" => "Yes, revoke it",
+        // ── QR campaigns ──
+        "qr_campaigns_purpose" => {
+            "A campaign is one entrance at one show: a QR code that opens for a window you set and closes on its own."
+        }
+        "qr_campaigns_empty" => "No campaigns yet",
+        "qr_campaigns_empty_hint" => {
+            "Create one above and its QR token appears here, ready to print or show at the door."
+        }
+        "campaign_token_label" => "QR TOKEN",
+        "campaign_token_hint" => {
+            "This is what the code encodes. Treat it like a key: anyone holding it can check in."
+        }
+        "disable_campaign_confirm" => {
+            "Disabling closes this entrance immediately. Check-ins already made are kept; new ones are refused."
+        }
+        "disable_campaign_confirm_action" => "Yes, disable it",
+        // ── Merch desk ──
+        "discount_code_hint" => "The code the fan shows you, from the app or an email.",
+        "sale_number_hint" => {
+            "Your reference for this sale, so a redemption can be traced back to it."
+        }
+        // ── Gate ──
+        "gate_mode_eyebrow" => "GATE MODE",
+        "scan_entry_purpose" => {
+            "Pick the show, then scan. Every decision is final at the door, so the result says exactly what to do."
+        }
+        "scan_manual_hint" => "Camera not cooperating? Type the code instead.",
+        "scan_idle" => "Nothing scanned yet",
+        "scan_idle_hint" => {
+            "The result lands here: green means let them in, red means turn them away, amber means look closer."
+        }
         // ── Operator cockpit ──
         "ops_panel_hint" => {
             "Live backend queues. Everything here retries on its own; an entry only shows up when it has stopped retrying and needs a manual push."

@@ -13,6 +13,9 @@ fn Tickets(
     let pool_slug = RwSignal::new("tickets".to_owned());
     let revoke_ref = RwSignal::new(String::new());
     let issued = RwSignal::new(None::<IssuedPass>);
+    // Revoking a pass turns a real person away at the door. It used to be one
+    // tap on a field that is easy to paste the wrong value into.
+    let revoke_confirming = RwSignal::new(false);
 
     let load = move |_| {
         let slug = event_slug.get();
@@ -88,7 +91,11 @@ fn Tickets(
             )
             .await
             {
-                Ok(_) => error.set(Some(tr("admission_pass_has_been_revoked").to_owned())),
+                Ok(_) => {
+                    revoke_confirming.set(false);
+                    revoke_ref.set(String::new());
+                    error.set(Some(tr("admission_pass_has_been_revoked").to_owned()));
+                }
                 Err(message) => error.set(Some(message)),
             }
             busy.set(false);
@@ -120,7 +127,49 @@ fn Tickets(
                 <div class="section-head"><h3>{tr("recent_orders")}</h3><span>{data.recent_orders.len()}</span></div>
                 <div class="card-list">{data.recent_orders.into_iter().map(|order| view! { <article class="order-card"><div><strong>{order.public_reference}</strong><p>{order.buyer_name.value_or(order.buyer_email_masked)}</p></div><span>{money(order.amount_gross_minor, &order.currency)}</span></article> }).collect_view()}</div>
             })}
-            <Show when=move || owner.get()><div class="admin-box"><p class="eyebrow">{tr("owner_only_eyebrow")}</p><h3>{tr("manual_admission_pass")}</h3><p class="inline-note">{tr("admission_pass_number_is_a_safe_public")}</p><input placeholder="fan@email.com" prop:value=move || fan_email.get() on:input=move |e| fan_email.set(event_target_value(&e))/><input placeholder=tr("pool_slug_placeholder") prop:value=move || pool_slug.get() on:input=move |e| pool_slug.set(event_target_value(&e))/><button class="primary" on:click=issue disabled=move || busy.get()>{tr("issue_pass")}</button>{move || issued.get().map(|pass| view! { <div class="token-box"><strong>{pass.public_reference}</strong><p>{tr("claim_token_label")}: {pass.claim_token}</p></div> })}<hr/><input placeholder=tr("admission_pass_number_e_g_vry") prop:value=move || revoke_ref.get() on:input=move |e| revoke_ref.set(event_target_value(&e))/><button class="danger" on:click=revoke disabled=move || busy.get()>{tr("revoke")}</button></div></Show>
+            <Show when=move || event_slug.get().is_empty() && overview.get().is_none()>
+                <div class="empty-state">
+                    <strong>{tr("ticketing_pick_show")}</strong>
+                    <p>{tr("ticketing_pick_show_hint")}</p>
+                </div>
+            </Show>
+            <Show when=move || owner.get()>
+                <div class="admin-box">
+                    <p class="eyebrow">{tr("owner_only_eyebrow")}</p>
+                    <h3>{tr("manual_admission_pass")}</h3>
+                    <p class="inline-note">{tr("admission_pass_number_is_a_safe_public")}</p>
+                    <div class="form-grid">
+                        <label>{tr("pass_fan_email_label")}<input type="email" autocomplete="off" placeholder="fan@email.com" prop:value=move || fan_email.get() on:input=move |e| fan_email.set(event_target_value(&e))/><small class="field-hint">{tr("pass_fan_email_hint")}</small></label>
+                        <label>{tr("pass_pool_label")}<input placeholder=tr("pool_slug_placeholder") prop:value=move || pool_slug.get() on:input=move |e| pool_slug.set(event_target_value(&e))/><small class="field-hint">{tr("pass_pool_hint")}</small></label>
+                        <button class="primary" on:click=issue disabled=move || busy.get()>{tr("issue_pass")}</button>
+                    </div>
+                    {move || issued.get().map(|pass| view! {
+                        <div class="token-box">
+                            <p class="eyebrow">{tr("pass_issued_eyebrow")}</p>
+                            <strong>{pass.public_reference}</strong>
+                            <p>{tr("claim_token_label")}: {pass.claim_token}</p>
+                            <small>{tr("pass_issued_hint")}</small>
+                        </div>
+                    })}
+                    <hr/>
+                    <h3>{tr("pass_revoke_heading")}</h3>
+                    <div class="form-grid">
+                        <label>{tr("pass_revoke_label")}<input placeholder=tr("admission_pass_number_e_g_vry") prop:value=move || revoke_ref.get() on:input=move |e| revoke_ref.set(event_target_value(&e))/><small class="field-hint">{tr("pass_revoke_hint")}</small></label>
+                        <Show
+                            when=move || revoke_confirming.get()
+                            fallback=move || view! { <button class="danger ghost" on:click=move |_| revoke_confirming.set(true) disabled=move || busy.get() || revoke_ref.get().trim().is_empty()>{tr("revoke")}</button> }
+                        >
+                            <div class="security-note warning">
+                                <p>{i18n::format("pass_revoke_confirm", std::slice::from_ref(&revoke_ref.get()))}</p>
+                                <div class="button-row">
+                                    <button class="danger" on:click=revoke disabled=move || busy.get()>{tr("pass_revoke_confirm_action")}</button>
+                                    <button class="ghost" on:click=move |_| revoke_confirming.set(false)>{tr("cancel")}</button>
+                                </div>
+                            </div>
+                        </Show>
+                    </div>
+                </div>
+            </Show>
         </section>
     }
 }
@@ -156,7 +205,7 @@ fn Discounts(error: RwSignal<Option<String>>) -> impl IntoView {
         });
     };
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">{tr("merch_desk_eyebrow")}</p><h2>{tr("redeem_a_discount")}</h2></header><div class="coupon-visual"><span>%</span><div><strong>{tr("virya_signal")}</strong><p>{tr("fan_coupon_controlled_use")}</p></div></div><div class="form-grid panel"><label>{tr("discount_code")}<input autocapitalize="characters" placeholder="VIRYA-…" prop:value=move || code.get() on:input=move |e| code.set(event_target_value(&e))/></label><label>{tr("sale_number")}<input placeholder="MERCH-WRO-001" prop:value=move || order.get() on:input=move |e| order.set(event_target_value(&e))/></label><button class="primary" on:click=redeem disabled=move || busy.get()>{tr("redeem_coupon")}</button></div>{move || result.get().map(|envelope| view! { <article class="scan-result scan-success"><strong>{tr("coupon_redeemed")}</strong><span>{envelope.result.status}</span><p>{i18n::format("usage", &[envelope.result.used_count.to_string(), envelope.result.max_uses.to_string()])}</p></article> })}</section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">{tr("merch_desk_eyebrow")}</p><h2>{tr("redeem_a_discount")}</h2></header><div class="coupon-visual"><span>%</span><div><strong>{tr("virya_signal")}</strong><p>{tr("fan_coupon_controlled_use")}</p></div></div><div class="form-grid panel"><label>{tr("discount_code")}<input autocapitalize="characters" placeholder="VIRYA-…" prop:value=move || code.get() on:input=move |e| code.set(event_target_value(&e))/><small class="field-hint">{tr("discount_code_hint")}</small></label><label>{tr("sale_number")}<input placeholder="MERCH-WRO-001" prop:value=move || order.get() on:input=move |e| order.set(event_target_value(&e))/><small class="field-hint">{tr("sale_number_hint")}</small></label><button class="primary" on:click=redeem disabled=move || busy.get()>{tr("redeem_coupon")}</button></div>{move || result.get().map(|envelope| view! { <article class="scan-result scan-success"><strong>{tr("coupon_redeemed")}</strong><span>{envelope.result.status}</span><p>{i18n::format("usage", &[envelope.result.used_count.to_string(), envelope.result.max_uses.to_string()])}</p></article> })}</section>
     }
 }
 
@@ -228,7 +277,14 @@ fn Campaigns(
     };
 
     view! {
-        <section class="screen"><header class="screen-title"><p class="eyebrow">{tr("concert_signal_eyebrow")}</p><h2>{tr("qr_campaigns")}</h2></header><div class="form-grid panel"><label>{tr("show")}<select disabled=move || loading.get().qr prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">{move || if loading.get().qr { tr("loading_campaigns") } else { tr("select_a_show_2") }}</option><For each=move || operator_qr_events(dashboard) key=|event| event.slug.clone() children=move |event| view! { <option value=event.slug.clone()>{event.title}</option> } /></select></label><label>{tr("point_campaign_name")}<input prop:value=move || label.get() on:input=move |e| label.set(event_target_value(&e))/></label><div class="two-cols"><label>{tr("valid_from")}<input type="datetime-local" prop:value=move || valid_from.get() on:input=move |e| valid_from.set(event_target_value(&e))/></label><label>{tr("valid_until")}<input type="datetime-local" prop:value=move || valid_until.get() on:input=move |e| valid_until.set(event_target_value(&e))/></label></div><label>{tr("check_in_limit_optional")}<input inputmode="numeric" prop:value=move || max_checkins.get() on:input=move |e| max_checkins.set(event_target_value(&e))/></label><button class="primary" on:click=create disabled=move || busy.get() || loading.get().qr>{tr("create_campaign")}</button></div><div class="section-head"><h3>{tr("active_and_historical")}</h3></div><Show when=move || !loading.get().qr fallback=move || view! { <Skeleton rows=2 height=96 /> }><div class="card-list"><For each=move || operator_campaigns(dashboard) key=|campaign| campaign.id.clone() children=move |campaign| view! { <CampaignCard campaign=campaign dashboard=dashboard loading=loading error=error /> } /></div></Show></section>
+        <section class="screen"><header class="screen-title"><p class="eyebrow">{tr("concert_signal_eyebrow")}</p><h2>{tr("qr_campaigns")}</h2><p class="screen-copy">{tr("qr_campaigns_purpose")}</p></header><div class="form-grid panel"><label>{tr("show")}<select disabled=move || loading.get().qr prop:value=move || event_slug.get() on:change=move |e| event_slug.set(event_target_value(&e))><option value="">{move || if loading.get().qr { tr("loading_campaigns") } else { tr("select_a_show_2") }}</option><For each=move || operator_qr_events(dashboard) key=|event| event.slug.clone() children=move |event| view! { <option value=event.slug.clone()>{event.title}</option> } /></select></label><label>{tr("point_campaign_name")}<input prop:value=move || label.get() on:input=move |e| label.set(event_target_value(&e))/></label><div class="two-cols"><label>{tr("valid_from")}<input type="datetime-local" prop:value=move || valid_from.get() on:input=move |e| valid_from.set(event_target_value(&e))/></label><label>{tr("valid_until")}<input type="datetime-local" prop:value=move || valid_until.get() on:input=move |e| valid_until.set(event_target_value(&e))/></label></div><label>{tr("check_in_limit_optional")}<input inputmode="numeric" prop:value=move || max_checkins.get() on:input=move |e| max_checkins.set(event_target_value(&e))/></label><button class="primary" on:click=create disabled=move || busy.get() || loading.get().qr>{tr("create_campaign")}</button></div><div class="section-head"><h3>{tr("active_and_historical")}</h3></div><Show when=move || !loading.get().qr fallback=move || view! { <Skeleton rows=2 height=96 /> }>
+            <Show when=move || operator_campaigns(dashboard).is_empty()>
+                <div class="empty-state">
+                    <strong>{tr("qr_campaigns_empty")}</strong>
+                    <p>{tr("qr_campaigns_empty_hint")}</p>
+                </div>
+            </Show>
+            <div class="card-list"><For each=move || operator_campaigns(dashboard) key=|campaign| campaign.id.clone() children=move |campaign| view! { <CampaignCard campaign=campaign dashboard=dashboard loading=loading error=error /> } /></div></Show></section>
     }
 }
 
@@ -239,10 +295,16 @@ fn CampaignCard(
     loading: RwSignal<OperatorLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
-    let id = campaign.id.clone();
+    // The id used to be a `String` cloned inside the handler, which made the
+    // handler `FnOnce` — fine for one button, but the confirm step renders it
+    // from a `Show` fallback that has to be callable more than once. A signal
+    // is `Copy`, so the handler is too.
+    let id = RwSignal::new(campaign.id.clone());
     let active = campaign.active;
+    // Disabling a campaign closes a live entrance mid-show. It was one tap.
+    let confirming = RwSignal::new(false);
     let revoke = move |_| {
-        let campaign_id = id.clone();
+        let campaign_id = id.get_untracked();
         spawn_local(async move {
             match bridge::invoke_unit(
                 "revoke_qr_campaign",
@@ -253,6 +315,7 @@ fn CampaignCard(
             .await
             {
                 Ok(_) => {
+                    confirming.set(false);
                     error.set(Some(tr("campaign_has_been_disabled").to_owned()));
                     refresh_operator_qr(dashboard, loading, error);
                 }
@@ -262,15 +325,24 @@ fn CampaignCard(
     };
     let revoke_button = if active {
         Some(view! {
-            <button class="danger ghost" on:click=revoke>
-                {tr("disable_campaign")}
-            </button>
+            <Show
+                when=move || confirming.get()
+                fallback=move || view! { <button class="danger ghost" on:click=move |_| confirming.set(true)>{tr("disable_campaign")}</button> }
+            >
+                <div class="security-note warning">
+                    <p>{tr("disable_campaign_confirm")}</p>
+                    <div class="button-row">
+                        <button class="danger" on:click=revoke>{tr("disable_campaign_confirm_action")}</button>
+                        <button class="ghost" on:click=move |_| confirming.set(false)>{tr("cancel")}</button>
+                    </div>
+                </div>
+            </Show>
         })
     } else {
         None
     };
     view! {
-        <article class="campaign-card"><div class="campaign-head"><div><strong>{campaign.label}</strong><p>{campaign.event_title}</p></div><span class:online=active class:offline=!active>{if active { tr("active_status") } else { tr("closed") }}</span></div><div class="campaign-stats"><span>{i18n::format("check_ins_2", &[campaign.checkin_count.to_string()])}</span><span>{campaign.max_checkins.map(|v| i18n::format("limit_v", &[v.to_string()])).value_or_else(|| tr("no_limit").to_owned())}</span></div>{campaign.token.map(|token| view! { <code>{token}</code> })}{revoke_button}</article>
+        <article class="campaign-card"><div class="campaign-head"><div><strong>{campaign.label}</strong><p>{campaign.event_title}</p></div><span class:online=active class:offline=!active>{if active { tr("active_status") } else { tr("closed") }}</span></div><div class="campaign-stats"><span>{i18n::format("check_ins_2", &[campaign.checkin_count.to_string()])}</span><span>{campaign.max_checkins.map(|v| i18n::format("limit_v", &[v.to_string()])).value_or_else(|| tr("no_limit").to_owned())}</span></div>{campaign.token.map(|token| view! { <div class="campaign-token"><p class="eyebrow">{tr("campaign_token_label")}</p><code>{token}</code><small>{tr("campaign_token_hint")}</small></div> })}{revoke_button}</article>
     }
 }
 

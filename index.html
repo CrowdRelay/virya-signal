@@ -2456,6 +2456,28 @@ html[data-virya-scanner-active] .app-shell {
 .city-picker-panel { border-color: var(--border-subtle); border-radius: var(--radius-xl); }
 
 .city-browser-empty, .city-browser-loading { border-color: var(--border-subtle); border-radius: var(--radius-md); background: var(--surface); }
+
+
+/* The QR token is the thing the printed code encodes — a key, not a caption.
+   It shipped as a bare `<code>` block under the stats with nothing saying
+   what it was or that it should be guarded. */
+.campaign-token { display: grid; gap: 6px; }
+
+.campaign-token .eyebrow { letter-spacing: .16em; }
+
+.campaign-token code { margin: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); }
+
+.campaign-token small { color: var(--muted); font-size: var(--type-micro); line-height: 1.45; }
+
+.manual-row-hint { margin-top: 14px; }
+
+/* An admin box holds two unrelated operations separated by a rule. Give the
+   second one air, so "issue" and "revoke" cannot be read as one flow. */
+.admin-box hr { margin: 8px 0 4px; }
+
+.admin-box .form-grid { gap: 12px; }
+
+.admin-box .security-note { margin-top: 4px; }
     </style>
     <!-- The inline splash owns first paint. App styles load in parallel and are
          activated by boot.js well before the larger WASM module can mount. -->
@@ -2475,7 +2497,7 @@ html[data-virya-scanner-active] .app-shell {
          fetches the selected language in parallel with WASM discovery. -->
     <script defer src="boot-i18n.js?v=boot-i18n-dec0abe9582398e7"></script>
     <script defer src="boot.js?v=boot-5eae656949da7c30"></script>
-    <script defer src="runtime-i18n.js?v=runtime-i18n-99c20538527513c6"></script>
+    <script defer src="runtime-i18n.js?v=runtime-i18n-ab1788ebea79aa8c"></script>
     <link data-trunk rel="rust" data-wasm-opt="z" data-wasm-opt-params="--enable-bulk-memory --enable-bulk-memory-opt --enable-nontrapping-float-to-int" />
   </head>
   <body>

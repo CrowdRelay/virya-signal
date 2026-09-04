@@ -599,9 +599,9 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "order_status_payment_failed" => "Płatność nieudana",
         "offline_on" => "OFFLINE ON",
         "offline_off" => "OFFLINE OFF",
-        "active_status" => "ACTIVE",
+        "active_status" => "AKTYWNA",
         "active_fans_metric" => "AKTYWNI",
-        "closed" => "CLOSED",
+        "closed" => "ZAMKNIĘTA",
         "owner" => "OWNER",
         "staff" => "STAFF",
         "staff_session_expired_pair_again" => {
@@ -1605,6 +1605,59 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "latarnik_danger_label" => "ODEJŚCIE",
         "latarnik_danger_hint" => {
             "Wylogowanie zostawia zaproszenie. Opuszczenie sieci je oddaje, a każdą opcję potwierdzasz, zanim cokolwiek się stanie."
+        }
+        // ── Ticketing: labelled fields, and a confirm before turning a fan away ──
+        "ticketing_pick_show" => "Wybierz koncert, żeby zobaczyć liczby",
+        "ticketing_pick_show_hint" => {
+            "Sprzedaż, zamówienia, wydane wejściówki i wejścia na bramce liczone są per koncert. Wybierz jeden powyżej i odśwież."
+        }
+        "pass_fan_email_label" => "E-mail fana",
+        "pass_fan_email_hint" => "Tam trafia token odbioru. Wejściówka należy do tego adresu.",
+        "pass_pool_label" => "Pula",
+        "pass_pool_hint" => {
+            "Z której puli pochodzi wejściówka. Zostaw „tickets”, chyba że prowadzisz osobną pulę."
+        }
+        "pass_issued_eyebrow" => "WEJŚCIÓWKA WYDANA",
+        "pass_issued_hint" => {
+            "Wyślij fanowi token odbioru. Wkleja go w Sygnale i wejściówka przechodzi na jego telefon."
+        }
+        "pass_revoke_heading" => "Unieważnij wejściówkę",
+        "pass_revoke_label" => "Numer wejściówki",
+        "pass_revoke_hint" => "Publiczny numer VRY, nie token odbioru.",
+        "pass_revoke_confirm" => {
+            "Unieważnienie {0} oznacza, że ta osoba nie wejdzie. Z aplikacji nie da się tego cofnąć."
+        }
+        "pass_revoke_confirm_action" => "Tak, unieważnij",
+        // ── QR campaigns ──
+        "qr_campaigns_purpose" => {
+            "Kampania to jedno wejście na jednym koncercie: kod QR, który otwiera się w ustawionym oknie i sam się zamyka."
+        }
+        "qr_campaigns_empty" => "Brak kampanii",
+        "qr_campaigns_empty_hint" => {
+            "Utwórz kampanię powyżej, a jej token QR pojawi się tutaj — gotowy do druku albo pokazania na bramce."
+        }
+        "campaign_token_label" => "TOKEN QR",
+        "campaign_token_hint" => {
+            "To właśnie koduje QR. Traktuj jak klucz: kto go ma, ten może odbić wejście."
+        }
+        "disable_campaign_confirm" => {
+            "Wyłączenie natychmiast zamyka to wejście. Dotychczasowe wejścia zostają, nowe będą odrzucane."
+        }
+        "disable_campaign_confirm_action" => "Tak, wyłącz",
+        // ── Merch desk ──
+        "discount_code_hint" => "Kod, który fan pokazuje — z aplikacji albo z maila.",
+        "sale_number_hint" => {
+            "Twój numer tej sprzedaży, żeby dało się powiązać z nią wykorzystanie kodu."
+        }
+        // ── Gate ──
+        "gate_mode_eyebrow" => "TRYB BRAMKI",
+        "scan_entry_purpose" => {
+            "Wybierz koncert i skanuj. Na bramce każda decyzja jest ostateczna, więc wynik mówi wprost, co zrobić."
+        }
+        "scan_manual_hint" => "Kamera nie współpracuje? Wpisz kod ręcznie.",
+        "scan_idle" => "Nic jeszcze nie zeskanowane",
+        "scan_idle_hint" => {
+            "Wynik pojawi się tutaj: zielony — wpuszczasz, czerwony — nie wpuszczasz, bursztynowy — sprawdź dokładniej."
         }
         // ── Operator cockpit ──
         "ops_panel_hint" => {
