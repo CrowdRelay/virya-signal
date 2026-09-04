@@ -6,7 +6,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class AudienceOverviewContract(unittest.TestCase):
     def test_models_keep_native_ipc_parity(self):
-        web = (ROOT / "src/models.rs").read_text()
+        # `read_rust_module` on both sides: the web model tree splits across
+        # `include!`d files to stay under the modularity limit, and the
+        # invariant is that the types exist in it, not in one particular file.
+        web = read_rust_module(ROOT, "src/models.rs")
         native = read_rust_module(ROOT, "src-tauri/src/models.rs")
         for marker in ["pub struct AudienceSummary", "pub struct AudienceRevenueSummary", "pub ticket_revenue: Vec<AudienceRevenueSummary>"]:
             self.assertIn(marker, web)
