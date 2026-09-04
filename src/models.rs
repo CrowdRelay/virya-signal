@@ -454,8 +454,8 @@ pub struct FanDashboardData {
 }
 
 /// The operator panels the native side keeps in its encrypted snapshot. Read
-/// once when Latarnik unlocks so events, QR, Signal, autopilot, chief of staff
-/// and ops paint from disk while their live requests are still in flight.
+/// once when Latarnik unlocks so events, QR and Signal paint from disk while
+/// their live requests are still in flight.
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct OperatorSectionsSnapshot {
     #[serde(default)]
@@ -464,12 +464,6 @@ pub struct OperatorSectionsSnapshot {
     pub qr: Option<ConcertQrOverview>,
     #[serde(default)]
     pub signal: Option<OperatorSignalOverview>,
-    #[serde(default)]
-    pub autopilot: Option<OperatorAutopilotOverview>,
-    #[serde(default)]
-    pub chief: Option<AutopilotChiefOfStaff>,
-    #[serde(default)]
-    pub ops: Option<OperatorOpsOverview>,
 }
 
 /// The dashboard fragments the native side keeps in its encrypted snapshot.
@@ -710,67 +704,7 @@ pub struct AreaCollectible {
     pub riddle: String,
 }
 
-// Operator responses keep diagnostics that are not shown on the compact screen yet.
-pub use virya_signal_contracts::ops::*;
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct OpsOutboxItem {
-    pub id: String,
-    pub event_type: String,
-    #[allow(dead_code)]
-    pub status: String,
-    pub attempts: i32,
-    pub max_attempts: i32,
-    pub last_error_kind: Option<String>,
-    #[allow(dead_code)]
-    pub dead_at: Option<String>,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct OpsDeliveryItem {
-    pub id: String,
-    pub event_type: String,
-    pub endpoint_name: String,
-    pub endpoint_active: bool,
-    #[allow(dead_code)]
-    pub status: String,
-    pub attempt_count: i32,
-    pub max_attempts: i32,
-    #[allow(dead_code)]
-    pub last_response_status: Option<i16>,
-    pub last_error_kind: Option<String>,
-    #[allow(dead_code)]
-    pub dead_at: Option<String>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize)]
-pub struct OperatorOpsOverview {
-    #[serde(default)]
-    pub summary: OpsSummary,
-    #[serde(default)]
-    pub dead_deliveries: Vec<OpsDeliveryItem>,
-    #[serde(default)]
-    pub dead_outbox: Vec<OpsOutboxItem>,
-    #[serde(default)]
-    pub unavailable_sources: Vec<String>,
-}
-
-pub use virya_signal_contracts::autopilot::*;
-
 include!("models/operator_signal.rs");
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct OpsRetryResult {
-    #[allow(dead_code)]
-    pub operation_id: String,
-    #[allow(dead_code)]
-    pub target_type: String,
-    #[allow(dead_code)]
-    pub target_id: String,
-    #[allow(dead_code)]
-    pub status: String,
-    pub replayed: bool,
-}
 
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct EventMerchPickupItem {

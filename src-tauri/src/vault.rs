@@ -13,9 +13,9 @@ use zeroize::Zeroizing;
 use crate::{
     AppError,
     models::{
-        AdmissionPass, AreaWallet, AutopilotChiefOfStaff, BeaconProfile, ConcertQrOverview,
-        FanEventInterest, FanHomeData, FanProfile, OperatorAutopilotOverview, OperatorOpsOverview,
-        OperatorProfile, OperatorSignalOverview, PublicEvent, ReferralProgress, ShowModeStore,
+        AdmissionPass, AreaWallet, BeaconProfile, ConcertQrOverview, FanEventInterest, FanHomeData,
+        FanProfile, OperatorProfile, OperatorSignalOverview, PublicEvent, ReferralProgress,
+        ShowModeStore,
     },
 };
 
@@ -252,7 +252,7 @@ pub fn load_operator_signal_cache_with_password(
 /// Every operator panel that had no cold-start path of its own. The signal
 /// aggregate keeps its separate key because that one is also a network-failure
 /// fallback; this record exists purely so a cold Latarnik paints from disk
-/// instead of holding six skeletons until six requests answer.
+/// instead of holding skeletons until its requests answer.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct OperatorSectionsCacheSnapshot {
     pub stored_at_unix_secs: u64,
@@ -262,12 +262,6 @@ pub struct OperatorSectionsCacheSnapshot {
     pub qr: Option<ConcertQrOverview>,
     #[serde(default)]
     pub signal: Option<OperatorSignalOverview>,
-    #[serde(default)]
-    pub autopilot: Option<OperatorAutopilotOverview>,
-    #[serde(default)]
-    pub chief: Option<AutopilotChiefOfStaff>,
-    #[serde(default)]
-    pub ops: Option<OperatorOpsOverview>,
 }
 
 pub fn save_operator_sections_cache_with_password(

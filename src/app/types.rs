@@ -221,13 +221,6 @@ pub(super) struct CampaignIdArgs<'a> {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct RetryArgs<'a> {
-    pub target_kind: &'a str,
-    pub target_id: &'a str,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
 pub(super) struct FanSignupArgs<'a> {
     pub input: &'a FanSignupInput,
     pub pin: &'a str,
@@ -327,28 +320,4 @@ pub(super) struct AreaClaimArgs<'a> {
     pub drop_id: &'a str,
     pub challenge: &'a str,
     pub samples: &'a [crate::models::AreaPositionSample],
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct AutopilotAuthorityArgs<'a> {
-    pub context: &'a str,
-    pub enabled: bool,
-    pub autonomy_level: &'a str,
-    pub minimum_confidence_basis_points: u16,
-    pub max_actions_24h: u32,
-    pub expected_version: i64,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct AutopilotActionArgs<'a> {
-    pub action_id: &'a str,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct AutopilotAssignArgs<'a> {
-    pub action_id: &'a str,
-    pub member_key: &'a str,
 }

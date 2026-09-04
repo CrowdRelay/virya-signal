@@ -372,65 +372,8 @@ fn OperatorSettings(
     loading: RwSignal<OperatorLoadingState>,
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
-    let autopilot = RwSignal::new(None::<OperatorAutopilotOverview>);
-    let autopilot_loading = RwSignal::new(false);
-    let autopilot_chief = RwSignal::new(None::<AutopilotChiefOfStaff>);
-    let autopilot_chief_loading = RwSignal::new(false);
-    let autopilot_refresh_requested = RwSignal::new(0_u32);
-    let ops = RwSignal::new(None::<OperatorOpsOverview>);
-    let ops_loading = RwSignal::new(false);
-    // Initial owner control-plane reads are one-shot per Settings mount.
-    // A failed request must not retrigger itself through the loading signals and
-    // spam the shared error toast; explicit Refresh remains the retry path.
-    let owner_control_plane_requested = RwSignal::new(false);
-    let owner = Signal::derive(move || {
-        status
-            .get()
-            .session
-            .is_some_and(|session| session.role == OperatorRole::Owner)
-    });
-    Effect::new(move |_| {
-        let is_owner = owner.get();
-        if !is_owner {
-            owner_control_plane_requested.set(false);
-            return;
-        }
-        if owner_control_plane_requested.get_untracked() {
-            return;
-        }
-        owner_control_plane_requested.set(true);
-        refresh_operator_autopilot(autopilot, autopilot_loading, error);
-        refresh_operator_chief(autopilot_chief, autopilot_chief_loading, error);
-        refresh_operator_ops(ops, ops_loading, error);
-        // Paint the control-plane panels from the last session's snapshot while
-        // the three live reads run, and only where nothing newer has landed.
-        with_operator_cached_sections(move |snapshot| {
-            if snapshot.autopilot.is_some() && autopilot.get_untracked().is_none() {
-                autopilot.set(snapshot.autopilot);
-            }
-            if snapshot.chief.is_some() && autopilot_chief.get_untracked().is_none() {
-                autopilot_chief.set(snapshot.chief);
-            }
-            if snapshot.ops.is_some() && ops.get_untracked().is_none() {
-                ops.set(snapshot.ops);
-            }
-        });
-    });
-    Effect::new(move |_| {
-        let generation = autopilot_refresh_requested.get();
-        if generation == 0 || !owner.get() {
-            return;
-        }
-        refresh_operator_autopilot(autopilot, autopilot_loading, error);
-        refresh_operator_chief(autopilot_chief, autopilot_chief_loading, error);
-    });
     let refresh = move |_| {
         refresh_operator_parts(dashboard, loading, error);
-        if owner.get_untracked() {
-            refresh_operator_autopilot(autopilot, autopilot_loading, error);
-            refresh_operator_chief(autopilot_chief, autopilot_chief_loading, error);
-            refresh_operator_ops(ops, ops_loading, error);
-        }
     };
     let lock = move |_| {
         // Optimistic on purpose: the vault lock has no remote leg, so drop the
@@ -551,10 +494,6 @@ fn OperatorSettings(
                     <span class="settings-row-chevron" aria-hidden="true">"›"</span>
                 </button>
             </div>
-            <Show when=move || owner.get()>
-                <AutopilotPanel overview=autopilot loading=autopilot_loading chief=autopilot_chief chief_loading=autopilot_chief_loading refresh_requested=autopilot_refresh_requested error=error />
-                <OpsPanel overview=ops loading=ops_loading error=error />
-            </Show>
             <AnonymousFeedback error=error />
             <p class="security-note">{tr("operator_token_is_stored_in_an_encrypted")}</p>
         </section>

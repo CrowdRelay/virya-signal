@@ -1,44 +1,3 @@
-pub use virya_signal_contracts::ops::*;
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct OpsOutboxItem {
-    pub id: String,
-    pub event_type: String,
-    pub status: String,
-    pub attempts: i32,
-    pub max_attempts: i32,
-    pub last_error_kind: Option<String>,
-    pub dead_at: Option<String>,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct OpsDeliveryItem {
-    pub id: String,
-    pub event_type: String,
-    pub endpoint_name: String,
-    pub endpoint_active: bool,
-    pub status: String,
-    pub attempt_count: i32,
-    pub max_attempts: i32,
-    pub last_response_status: Option<i16>,
-    pub last_error_kind: Option<String>,
-    pub dead_at: Option<String>,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct OperatorOpsOverview {
-    #[serde(default)]
-    pub summary: OpsSummary,
-    #[serde(default)]
-    pub dead_deliveries: Vec<OpsDeliveryItem>,
-    #[serde(default)]
-    pub dead_outbox: Vec<OpsOutboxItem>,
-    #[serde(default)]
-    pub unavailable_sources: Vec<String>,
-}
-
-pub use virya_signal_contracts::autopilot::*;
-
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct OperatorSignalOverview {
     #[serde(default)]
@@ -132,13 +91,4 @@ pub struct SignalCitySummary {
     pub name: String,
     pub country_code: String,
     pub active_fans: i64,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct OpsRetryResult {
-    pub operation_id: String,
-    pub target_type: String,
-    pub target_id: String,
-    pub status: String,
-    pub replayed: bool,
 }

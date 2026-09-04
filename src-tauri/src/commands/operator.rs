@@ -9,10 +9,9 @@ use zeroize::Zeroizing;
 use crate::{
     AppError, AppState,
     models::{
-        AutopilotAuthorityRequest, AutopilotChiefOfStaff, AutopilotMutation, ConcertQrOverview,
-        CreateQrCampaignInput, FanPushStatus, IssuePassInput, OperatorAutopilotOverview,
-        OperatorOpsOverview, OperatorProfile, OperatorSignalOverview, OpsRetryResult, PublicEvent,
-        SessionStatus, ShowChecklist, StaffEventDashboard, TicketingOverview,
+        ConcertQrOverview, CreateQrCampaignInput, FanPushStatus, IssuePassInput, OperatorProfile,
+        OperatorSignalOverview, PublicEvent, SessionStatus, ShowChecklist, StaffEventDashboard,
+        TicketingOverview,
     },
     session::{
         load_operator_signal_cache, operator_profile, persist_operator_signal_cache, run_blocking,
@@ -729,126 +728,4 @@ pub(crate) async fn operator_signal_overview(
         }
         Err(error) => Err(error),
     }
-}
-
-#[tauri::command]
-pub(crate) async fn operator_ops_overview(
-    app: AppHandle,
-    state: State<'_, AppState>,
-) -> Result<OperatorOpsOverview, AppError> {
-    let profile = operator_profile(&state).await?;
-    let overview = state.api.operator_ops_overview(&profile).await?;
-    remember_operator_sections(app, {
-        let overview = overview.clone();
-        move |snapshot| snapshot.ops = Some(overview)
-    });
-    Ok(overview)
-}
-
-#[tauri::command]
-pub(crate) async fn operator_autopilot_overview(
-    app: AppHandle,
-    state: State<'_, AppState>,
-) -> Result<OperatorAutopilotOverview, AppError> {
-    let profile = operator_profile(&state).await?;
-    let overview = state.api.operator_autopilot_overview(&profile).await?;
-    remember_operator_sections(app, {
-        let overview = overview.clone();
-        move |snapshot| snapshot.autopilot = Some(overview)
-    });
-    Ok(overview)
-}
-
-#[tauri::command]
-pub(crate) async fn operator_autopilot_chief_of_staff(
-    app: AppHandle,
-    state: State<'_, AppState>,
-) -> Result<AutopilotChiefOfStaff, AppError> {
-    let profile = operator_profile(&state).await?;
-    let chief = state
-        .api
-        .operator_autopilot_chief_of_staff(&profile)
-        .await?;
-    remember_operator_sections(app, {
-        let chief = chief.clone();
-        move |snapshot| snapshot.chief = Some(chief)
-    });
-    Ok(chief)
-}
-
-#[tauri::command]
-pub(crate) async fn operator_autopilot_set_authority(
-    state: State<'_, AppState>,
-    context: String,
-    enabled: bool,
-    autonomy_level: String,
-    minimum_confidence_basis_points: u16,
-    max_actions_24h: u32,
-    expected_version: i64,
-) -> Result<AutopilotMutation, AppError> {
-    let profile = operator_profile(&state).await?;
-    state
-        .api
-        .operator_autopilot_set_authority(
-            &profile,
-            context.trim(),
-            AutopilotAuthorityRequest {
-                enabled,
-                autonomy_level,
-                minimum_confidence_basis_points,
-                max_actions_24h,
-                expected_version,
-            },
-        )
-        .await
-}
-
-#[tauri::command]
-pub(crate) async fn operator_autopilot_assign(
-    state: State<'_, AppState>,
-    action_id: String,
-    member_key: String,
-) -> Result<AutopilotMutation, AppError> {
-    let profile = operator_profile(&state).await?;
-    state
-        .api
-        .operator_autopilot_assign(&profile, action_id.trim(), member_key.trim())
-        .await
-}
-
-#[tauri::command]
-pub(crate) async fn operator_autopilot_approve(
-    state: State<'_, AppState>,
-    action_id: String,
-) -> Result<AutopilotMutation, AppError> {
-    let profile = operator_profile(&state).await?;
-    state
-        .api
-        .operator_autopilot_approve(&profile, action_id.trim())
-        .await
-}
-
-#[tauri::command]
-pub(crate) async fn operator_autopilot_cancel(
-    state: State<'_, AppState>,
-    action_id: String,
-) -> Result<AutopilotMutation, AppError> {
-    let profile = operator_profile(&state).await?;
-    state
-        .api
-        .operator_autopilot_cancel(&profile, action_id.trim())
-        .await
-}
-
-#[tauri::command]
-pub(crate) async fn operator_retry(
-    state: State<'_, AppState>,
-    target_kind: String,
-    target_id: String,
-) -> Result<OpsRetryResult, AppError> {
-    let profile = operator_profile(&state).await?;
-    state
-        .api
-        .operator_retry(&profile, target_kind.trim(), target_id.trim())
-        .await
 }
