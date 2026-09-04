@@ -23,9 +23,6 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         guarded = (
             "refresh_operator_events",
             "refresh_operator_qr",
-            "refresh_operator_autopilot",
-            "refresh_operator_chief",
-            "refresh_operator_ops",
             "refresh_fan_home",
             "refresh_fan_events",
             "refresh_fan_merch",
@@ -261,17 +258,6 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         self.assertIn("if initial_load {", app)
         self.assertIn("if completed && initial_load", app)
         self.assertIn("A transient resume failure must never tear down", app)
-
-    def test_autopilot_mutations_refresh_from_stable_settings_owner(self) -> None:
-        settings = (ROOT / "src/app/operator/commerce_settings.rs").read_text(encoding="utf-8")
-        autopilot = (ROOT / "src/app/operator/autopilot.rs").read_text(encoding="utf-8")
-        cards = (ROOT / "src/app/operator/autopilot_cards.rs").read_text(encoding="utf-8")
-        self.assertIn("autopilot_refresh_requested", settings)
-        self.assertIn("refresh_requested.update", autopilot)
-        self.assertIn("let busy = RwSignal::new(false)", autopilot)
-        self.assertIn("let busy = RwSignal::new(false)", cards)
-        set_policy = function_body(autopilot, "set_autopilot_policy")
-        self.assertNotIn("loading.set(true)", set_policy)
 
     def test_staff_checklist_push_has_bounded_resume_recovery(self) -> None:
         checklist = (ROOT / "src/app/operator/checklist.rs").read_text(encoding="utf-8")

@@ -19,7 +19,6 @@ def require(text: str, needle: str, label: str) -> None:
 fan = module(ROOT / "src-tauri/src/commands/fan.rs")
 models = module(ROOT / "src-tauri/src/models.rs")
 operator = module(ROOT / "src/app/operator.rs")
-contracts = (ROOT / "crates/virya-signal-contracts/src/ops.rs").read_text(encoding="utf-8")
 push_plugin = (ROOT / "src-tauri/src/push_plugin.rs").read_text(encoding="utf-8")
 kotlin_plugin = (ROOT / "src-tauri/android-push/SignalPushPlugin.kt").read_text(encoding="utf-8")
 kotlin_service = (ROOT / "src-tauri/android-push/ViryaFirebaseMessagingService.kt").read_text(encoding="utf-8")
@@ -37,9 +36,6 @@ for needle in (
     require(models, needle, f"shared-push-{needle}")
 if "virya_signal_contracts::push::*" in models:
     raise SystemExit("SIGNAL_PUSH_CONTROL=FAIL wildcard-push-reexport")
-for needle in ("push.pending", "push.processing", "push.dead", "push.delivered_24h"):
-    require(operator, needle, needle)
-require(contracts, "pub push: QueueSummary", "ops-push-summary")
 require(push_plugin, "SignalPushPlugin", "android-fcm-plugin")
 for needle in (
     "FirebaseMessaging.getInstance().token",
@@ -97,4 +93,4 @@ if "push_enable_after_settings.try_set(false)" in operator_resume.split('"operat
     raise SystemExit("SIGNAL_PUSH_CONTROL=FAIL staff push retry intent is cleared before enable resolves")
 for needle in ("SignalPushPlugin.kt", "ViryaFirebaseMessagingService.kt", "virya_signal_notification.xml", "android.permission.POST_NOTIFICATIONS"):
     require(android_prepare, needle, f"android-stage-{needle}")
-print("SIGNAL_PUSH_CONTROL=PASS native=permission+token+deep-link+install-id+fcm-service operator=queue-health contract=ops-summary")
+print("SIGNAL_PUSH_CONTROL=PASS native=permission+token+deep-link+install-id+fcm-service")

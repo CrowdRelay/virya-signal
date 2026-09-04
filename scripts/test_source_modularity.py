@@ -8,7 +8,6 @@ CONTRACT = {
     "src/app/fan.rs": ["fan/shell.rs", "fan/merch.rs", "fan/events.rs", "fan/wallet.rs"],
     "src/app/operator.rs": [
         "operator/shell.rs", "operator/signal.rs", "operator/commerce_settings.rs",
-        "operator/autopilot.rs", "operator/ops.rs",
     ],
     "src-tauri/src/models.rs": [
         "models/session_fan.rs", "models/commerce_events.rs", "models/area.rs",

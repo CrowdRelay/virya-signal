@@ -474,8 +474,7 @@ if 'trunk build --release' not in check_workflow or 'scripts/check-web-dist.py d
     raise SystemExit('CI must enforce the optimized frontend size budget')
 # The WASM UI is linted on its own target in the webassembly job. Every other
 # workspace member must be reachable from `cargo test`, or its tests silently
-# stop running: the autopilot payload wire contract guards a hand-written
-# Deserialize and lived outside CI entirely.
+# stop running.
 workspace_members = re.findall(r'^\s*members\s*=\s*\[(.*?)\]', (root / 'Cargo.toml').read_text(), re.S | re.M)
 member_paths = re.findall(r'"([^"]+)"', workspace_members[0]) if workspace_members else []
 tested_packages = set(re.findall(r'-p\s+([a-z0-9-]+)', check_workflow))
@@ -662,16 +661,6 @@ for typed_contract in [
         raise SystemExit(f'heavy IPC response lost its typed DTO: {typed_contract}')
 if 'pub city: Option<serde_json::Value>' in read_rust_module(root, 'src-tauri/src/models.rs'):
     raise SystemExit('public event city must stay typed across the native/WebView boundary')
-
-native_models = read_rust_module(root, 'src-tauri/src/models.rs')
-shared_ops = (root / 'crates/virya-signal-contracts/src/ops.rs').read_text()
-for source_name, source in [('native models', native_models), ('WASM models', ui_models)]:
-    if 'pub use virya_signal_contracts::ops::*;' not in source:
-        raise SystemExit(f'{source_name} must consume the shared ops telemetry contract')
-if '#[serde(default)]\n    pub errors_4xx: u64' not in shared_ops:
-    raise SystemExit('shared ops models must decode CrowdRelay errors_4xx telemetry compatibly')
-if 'summary.http.errors_4xx.to_string()' not in ui:
-    raise SystemExit('staff Ops UI must surface CrowdRelay 4xx telemetry separately from 5xx')
 
 for cache_contract in [
     'shared-key: android-${{ inputs.target_arch }}',

@@ -186,9 +186,6 @@ class FanErrorSilenceTests(unittest.TestCase):
             "refresh_operator_events",
             "refresh_operator_qr",
             "refresh_operator_signal",
-            "refresh_operator_autopilot",
-            "refresh_operator_chief",
-            "refresh_operator_ops",
         ]
         at_least_one = False
         for fn_name in operator_fns:

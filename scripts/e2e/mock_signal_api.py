@@ -37,8 +37,6 @@ def json_bytes(value: object) -> bytes:
 
 class State:
     offline_file: Path | None = None
-    autopilot_level = "off"
-    autopilot_version = 1
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -168,20 +166,6 @@ class Handler(BaseHTTPRequestHandler):
             self._reply(HTTPStatus.OK, {"active_fans": 7, "marketing_consented_fans": 8, "ticket_buyers": 2, "attendees": 2, "synesthesia_participants": 3, "qualified_referrals": 3, "paid_ticket_orders": 2})
         elif path == "/v1/admin/analytics/revenue":
             self._reply(HTTPStatus.OK, [{"currency": "PLN", "paid_orders": 2, "gross_paid_minor": 6000, "refunded_minor": 0, "after_refunds_minor": 6000}])
-        elif path == "/v1/admin/autopilot/overview":
-            self._reply(HTTPStatus.OK, {
-                "runtime_enabled": True,
-                "policies": [{
-                    "context": "release",
-                    "enabled": State.autopilot_level != "off",
-                    "autonomy_level": "observe" if State.autopilot_level == "off" else State.autopilot_level,
-                    "minimum_confidence": 8000,
-                    "max_actions_24h": 20,
-                    "version": State.autopilot_version,
-                }],
-            })
-        elif path == "/v1/admin/autopilot/chief-of-staff":
-            self._reply(HTTPStatus.OK, {})
         elif path == "/v1/admin/ops/overview":
             self._reply(HTTPStatus.OK, {})
         elif re.fullmatch(r"/v1/staff/ecosystem/checklists/[A-Za-z0-9_-]+", path):
@@ -214,21 +198,6 @@ class Handler(BaseHTTPRequestHandler):
                 self._reply(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": "invalid_handoff"})
         elif path in {"/v1/me/push/register", "/v1/me/push/unregister", "/v1/staff/push/register", "/v1/staff/push/unregister"}:
             self._reply(HTTPStatus.OK, {"registered": True})
-        elif re.fullmatch(r"/v1/admin/autopilot/policies/[a-z_]+", path):
-            requested = str(body.get("autonomy_level", "")).strip() if isinstance(body, dict) else ""
-            enabled = bool(body.get("enabled")) if isinstance(body, dict) else False
-            expected = int(body.get("expected_version", 0)) if isinstance(body, dict) else 0
-            if expected != State.autopilot_version or requested not in {"observe", "recommend", "require_approval", "bounded_auto"}:
-                self._reply(HTTPStatus.CONFLICT, {"error": "synthetic_autopilot_conflict"})
-                return
-            State.autopilot_level = requested if enabled else "off"
-            State.autopilot_version += 1
-            self._reply(HTTPStatus.OK, {
-                "operation_id": f"e2e-autopilot-{State.autopilot_version}",
-                "target_id": path.rsplit("/", 1)[-1],
-                "status": "completed",
-                "replayed": False,
-            })
         else:
             self._reply(HTTPStatus.OK, {})
 

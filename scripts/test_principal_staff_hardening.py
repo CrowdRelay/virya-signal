@@ -82,14 +82,6 @@ class PrincipalStaffHardeningTests(unittest.TestCase):
             "issue_pass",
             "revoke_pass",
             "operator_signal_overview",
-            "operator_ops_overview",
-            "operator_autopilot_overview",
-            "operator_autopilot_chief_of_staff",
-            "operator_autopilot_set_authority",
-            "operator_autopilot_assign",
-            "operator_autopilot_approve",
-            "operator_autopilot_cancel",
-            "operator_retry",
         )
         for index, name in enumerate(owner_only):
             start = api.index(f"pub async fn {name}")

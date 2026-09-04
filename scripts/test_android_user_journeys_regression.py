@@ -181,16 +181,6 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         shell_sync = shell.split('"operator_push_sync"', 1)[1].split(');', 1)[0]
         self.assertIn('15_000', shell_sync)
 
-    def test_autopilot_policy_rekeys_on_version_and_mutation_has_terminal_timeout(self):
-        src = read('src/app/operator/autopilot.rs')
-        self.assertIn('key=|policy| format!("{}:{}", policy.context, policy.version)', src)
-        self.assertIn('bridge::invoke_timeout::<AutopilotMutation, _>(', src)
-        mutation = src.split('fn set_autopilot_policy(', 1)[1].split('fn assign_autopilot_action(', 1)[0]
-        self.assertIn('"operator_autopilot_set_authority"', mutation)
-        self.assertIn('15_000', mutation)
-        policy_card = src.split('fn AutopilotPolicyCard(', 1)[1].split('include!("autopilot_cards.rs")', 1)[0]
-        self.assertEqual(policy_card.count('type="button"'), 5)
-
     def test_android_e2e_mock_reads_each_post_body_once(self):
         mock = read('scripts/e2e/mock_signal_api.py')
         post = mock.split('    def do_POST(self)', 1)[1].split('    def do_PATCH(self)', 1)[0]
@@ -232,16 +222,6 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         self.assertIn('"Połączenie"', block)
         self.assertIn('"OPEN STAFF ZONE"', block)
         self.assertIn('assert_absent', block)
-
-    def test_android_e2e_exercises_autopilot_mutation(self):
-        journey = read('scripts/e2e/android_journeys.py')
-        mock = read('scripts/e2e/mock_signal_api.py')
-        self.assertIn('def owner_autopilot_mode_changes', journey)
-        self.assertIn('owner_autopilot_mode_changes(d)', journey)
-        self.assertIn('/v1/admin/autopilot/overview', mock)
-        self.assertIn('/v1/admin/autopilot/policies/', mock)
-        self.assertIn('def fan_recovery_qr', journey)
-        self.assertIn('d.tap(["SKANUJ QR", "SCAN QR"]', journey)
 
     def test_android_e2e_uses_firebase_config_and_checks_runtime_initialization(self):
         workflow = read('.github/workflows/android-e2e.yml')
@@ -299,7 +279,7 @@ class AndroidUserJourneysRegression(unittest.TestCase):
         support = read('src/app/support.rs')
         shell = read('src/app/fan/shell.rs')
         home = read('src/app/fan_home.rs')
-        body = support.split('fn refresh_operator_signal(', 1)[1].split('fn refresh_operator_autopilot(', 1)[0]
+        body = support.split('fn refresh_operator_signal(', 1)[1].split('fn refresh_fan_home(', 1)[0]
         self.assertIn('spawn_lifecycle_task(async move {', body)
         self.assertIn('let _ = loading.try_set(false);', body)
         self.assertIn('focused_event_slug.set(None);', shell)

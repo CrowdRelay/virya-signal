@@ -317,19 +317,6 @@ def owner_online_and_offline_cache(d: Device, offline_file: Path) -> None:
 
 
 
-def owner_autopilot_mode_changes(d: Device) -> None:
-    d.tap(["Otwórz menu", "Open menu"], timeout=10)
-    d.tap(["Ustawienia", "Settings"], timeout=10)
-    d.assert_text(["Autonomiczne operacje", "Autonomous operations"], timeout=20)
-    d.assert_text(["off ·", "off |"], timeout=10)
-    d.tap(["OBSERWUJ", "OBSERVE"], timeout=10)
-    # Same context key remains stable; the card must re-key on version or the
-    # stale component keeps rendering OFF and sends the old expectedVersion.
-    d.assert_text(["observe ·", "observe |"], timeout=20)
-    d.tap(["REKOMENDUJ", "RECOMMEND"], timeout=10)
-    d.assert_text(["recommend ·", "recommend |"], timeout=20)
-    d.snapshot("owner-autopilot-mutation")
-
 def staff_checklist_never_hangs(d: Device) -> None:
     d.tap(["Otwórz menu", "Open menu"], timeout=10)
     d.tap(["CHECKLISTA KONCERTOWA", "GIG CHECKLIST"], timeout=10)
@@ -359,7 +346,6 @@ def main() -> None:
         open_staff_and_configure_owner(d)
         staff_language_switch_preserves_session(d)
         owner_online_and_offline_cache(d, offline_file)
-        owner_autopilot_mode_changes(d)
         staff_checklist_never_hangs(d)
     except Exception:
         d.snapshot("failure")
@@ -372,7 +358,7 @@ def main() -> None:
     fatal = [line for line in logcat.splitlines() if "FATAL EXCEPTION" in line or "ANR in music.virya.signal" in line or "Render process gone" in line]
     if fatal:
         raise JourneyError("native/WebView crash detected:\n" + "\n".join(fatal[-20:]))
-    print("VIRYA_SIGNAL_ANDROID_E2E=PASS journeys=fan_auth,fan_recovery,synesthesia_app_link,event_detail,native_settings,staff_language,owner_online,owner_offline,owner_autopilot,staff_checklist")
+    print("VIRYA_SIGNAL_ANDROID_E2E=PASS journeys=fan_auth,fan_recovery,synesthesia_app_link,event_detail,native_settings,staff_language,owner_online,owner_offline,staff_checklist")
 
 
 if __name__ == "__main__":

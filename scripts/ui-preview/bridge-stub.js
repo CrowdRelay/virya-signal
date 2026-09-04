@@ -524,8 +524,6 @@
       ],
       unavailable_sources: [],
     }),
-    operator_autopilot_overview: () => ({}),
-    operator_autopilot_chief_of_staff: () => ({}),
     operator_qr: () => ({
       events: events.map((e) => ({ slug: e.slug, title: e.title })),
       campaigns: [
