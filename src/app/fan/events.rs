@@ -7,14 +7,24 @@ fn FanEvents(
     checkout_event: RwSignal<Option<PublicEvent>>,
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
-    #[prop(optional)]
     status: RwSignal<crate::models::FanSessionStatus>,
 ) -> impl IntoView {
+    // The list has to come through a memo. Reading `dashboard` directly in the
+    // render closure tied the whole list to every field of the dashboard, so
+    // tapping "interested" — which writes `dashboard.interests` — tore down and
+    // rebuilt every card. Each rebuilt card ran `on_cleanup` (invalidating its
+    // ticket-pool scope) and then re-fired its probe, turning one tap into one
+    // network round trip per show on screen. The memo compares the event list
+    // itself, so an interests write no longer reaches it.
+    let events = Memo::new(move |_| fan_events(dashboard, public));
+    // `loading` is one struct for eight sections, so reading `.events` off it
+    // raw made the warm-up's merch/wallet/area flags rebuild this list too.
+    let events_loading = Memo::new(move |_| loading.get().events);
     view! {
         <section class="screen">
             <header class="screen-title"><p class="eyebrow">{tr("where_we_play")}</p><h2>{tr("shows_tab")}</h2></header>
             {move || {
-                let events = fan_events(dashboard, public);
+                let events = events.get();
                 if let Some(slug) = focused_event_slug.get() {
                     let resolved = events
                         .iter()
@@ -37,7 +47,7 @@ fn FanEvents(
                         }.into_any();
                     }
                 }
-                if loading.get().events {
+                if events_loading.get() {
                     return view! { <Skeleton rows=3 height=280 /> }.into_any();
                 }
                 if events.is_empty() {
@@ -75,7 +85,6 @@ fn FanEventCard(
     checkout_event: RwSignal<Option<PublicEvent>>,
     dashboard: RwSignal<Option<FanDashboardData>>,
     error: RwSignal<Option<String>>,
-    #[prop(optional)]
     status: RwSignal<crate::models::FanSessionStatus>,
 ) -> impl IntoView {
     let should_probe_pool = event.ticket_url.is_none();

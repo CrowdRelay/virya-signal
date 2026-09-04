@@ -54,6 +54,10 @@ fn FanApp(
     let area = RwSignal::new(None::<AreaWallet>);
     let loading = RwSignal::new(FanLoadingState::all());
 
+    // The unlock gate reports its own failures inline. Anything it left behind
+    // must not surface as the first thing a fan sees after a successful unlock.
+    error.set(None);
+
     let loaded = RwSignal::new(FanLoadedState::default());
     let menu_open = RwSignal::new(false);
     let refresh_requested = RwSignal::new(0_u32);
@@ -298,6 +302,63 @@ fn FanApp(
         mode.set(RootMode::Latarnik);
     };
 
+    // System back on Android used to close the app from anywhere — mid-checkout,
+    // with the menu open, on the Merch tab. Every dismissible layer now costs
+    // one back press before the app itself does. One guard entry is held while
+    // any layer is open; consuming it closes the topmost layer, and the effect
+    // re-arms for whatever is still open underneath.
+    let back_guard_armed = RwSignal::new(false);
+    let close_top_layer = move || {
+        if menu_open.get_untracked() {
+            menu_open.set(false);
+        } else if checkout_event.get_untracked().is_some() {
+            checkout_event.set(None);
+        } else if focused_event_slug.get_untracked().is_some() {
+            focused_event_slug.set(None);
+            focused_event_preview.set(None);
+        } else if tab.get_untracked() != FanTab::Signal {
+            tab.set(FanTab::Signal);
+        }
+    };
+    Effect::new(move |_| {
+        let open = menu_open.get()
+            || checkout_event.with(Option::is_some)
+            || focused_event_slug.with(Option::is_some)
+            || tab.get() != FanTab::Signal;
+        if open && !back_guard_armed.get_untracked() {
+            back_guard_armed.set(true);
+            bridge::push_back_guard();
+        } else if !open {
+            // The guard entry is already gone once back consumed it. Nothing to
+            // unwind here: dropping the flag is what lets the next layer re-arm.
+            back_guard_armed.set(false);
+        }
+    });
+    let back_handler_id = bridge::install_back_handler(move || {
+        if back_guard_armed.try_get_untracked() != Some(true) {
+            return;
+        }
+        let _ = back_guard_armed.try_set(false);
+        close_top_layer();
+    });
+    on_cleanup(move || {
+        bridge::uninstall_back_handler(back_handler_id);
+        // Leaving Fan mode with a layer open would strand its guard entry, and
+        // the next back press in Latarnik or Staff would be swallowed by it.
+        if back_guard_armed.try_get_untracked() == Some(true) {
+            bridge::go_back();
+        }
+    });
+    // Keyboard parity for the same layers, for anyone on a desktop WebView.
+    // It goes through history rather than closing the layer directly, so the
+    // guard entry is consumed and the two paths can never disagree about how
+    // many back presses are left.
+    let dismiss_on_escape = move |event: leptos::ev::KeyboardEvent| {
+        if event.key() == "Escape" && back_guard_armed.get_untracked() {
+            bridge::go_back();
+        }
+    };
+
     let request_full_refresh = move || {
         bridge::invalidate_latest("fan:");
         refresh_requested.update(|value| *value = value.wrapping_add(1).max(1));
@@ -385,7 +446,7 @@ fn FanApp(
     // nothing but the first paint of rarely visited tabs happens.
 
     view! {
-        <section class="authenticated fan-authenticated">
+        <section class="authenticated fan-authenticated" tabindex="-1" on:keydown=dismiss_on_escape>
             <header class="topbar fan-topbar">
                 <div><p class="eyebrow">{tr("virya_signal")}</p><strong>{move || status.get().session.and_then(|s| s.display_name).value_or_else(|| tr("my_signal").to_owned())}</strong></div>
                 <div class="topbar-actions"><button class="menu-trigger" aria-label=tr("open_menu") aria-expanded=move || menu_open.get() on:click=move |_| menu_open.update(|value| *value = !*value)><i></i><i></i><i></i></button></div>
@@ -394,7 +455,6 @@ fn FanApp(
                 <div class="overflow-backdrop" on:click=move |_| menu_open.set(false)></div>
                 <nav class="overflow-menu">
                     <button class:active=move || tab.get() == FanTab::Game on:click=move |_| { tab.set(FanTab::Game); menu_open.set(false); }><span>"◇"</span>{tr("area_game_tab")}</button>
-                    <button class:active=move || tab.get() == FanTab::Profile on:click=move |_| { tab.set(FanTab::Profile); menu_open.set(false); }><span>"◎"</span>{tr("profile_tab")}</button>
                     <button on:click=refresh_all><span>"↻"</span>{tr("refresh_all_data")}</button>
                     <button on:click=open_latarnik><span>"◉"</span>{tr("latarnik_zone")}</button>
                     <button on:click=move |_| {
@@ -459,7 +519,22 @@ fn FanApp(
                     <FanProfileScreen status=status dashboard=dashboard wallets=wallets area=area loading=loading error=error />
                 </div>
             </div>
-            <nav class="bottom-nav four primary-four"><FanNavButton tab=tab own=FanTab::Signal icon="signal" label=tr("signal_tab")/><FanNavButton tab=tab own=FanTab::Events icon="events" label=tr("shows_tab")/><FanNavButton tab=tab own=FanTab::Merch icon="shop" label=tr("store_tab")/><FanNavButton tab=tab own=FanTab::Wallet icon="ticket" label=tr("tickets_tab")/></nav>
+            // Confirmations for what the fan just did — saved a show, imported
+            // a wallet, opened Stripe, set a city — and the real failures of
+            // those same actions. Transient background noise stays suppressed:
+            // refreshes keep the last good snapshot and retry on their own.
+            <Toast error=error suppress_transient=true />
+            // Profile sat behind the hamburger, which is where a fan looks last
+            // and where the account, notification and language settings are not
+            // expected to live. AREA stays in the menu — it is an opt-in side
+            // game, and the Profile screen links to it as well.
+            <nav class="bottom-nav five" aria-label=tr("primary_navigation")>
+                <FanNavButton tab=tab own=FanTab::Signal icon="signal" label=tr("signal_tab")/>
+                <FanNavButton tab=tab own=FanTab::Events icon="events" label=tr("shows_tab")/>
+                <FanNavButton tab=tab own=FanTab::Merch icon="shop" label=tr("store_tab")/>
+                <FanNavButton tab=tab own=FanTab::Wallet icon="ticket" label=tr("tickets_tab")/>
+                <FanNavButton tab=tab own=FanTab::Profile icon="profile" label=tr("profile_tab")/>
+            </nav>
         </section>
     }
 }

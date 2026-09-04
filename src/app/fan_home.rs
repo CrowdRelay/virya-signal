@@ -10,6 +10,24 @@ fn event_phase_label(phase: &str) -> &'static str {
     }
 }
 
+/// The Events tab is driven by `PublicEvent`, and Home carries the same show as
+/// a `FanHomeEvent`. Handing the tab a preview built here is what lets a banner
+/// tap paint the detail view before its own fetch answers — the three call
+/// sites built the identical struct by hand, one field at a time.
+fn home_event_preview(event: &virya_signal_contracts::fan::FanHomeEvent) -> PublicEvent {
+    PublicEvent {
+        slug: event.slug.clone(),
+        title: event.title.clone(),
+        description: None,
+        city: event.city.clone().map(|name| EventCity { name }),
+        venue: event.venue.clone(),
+        starts_at: event.starts_at.clone(),
+        ticket_url: event.ticket_url.clone(),
+        image_url: None,
+        image_thumbnail_url: None,
+    }
+}
+
 fn recommended_action_label(action: &FanRecommendedAction) -> &'static str {
     match action {
         FanRecommendedAction::ContinueSynesthesia => tr("action_continue_synesthesia"),
@@ -55,43 +73,12 @@ fn FanHomeBanner(
                         {tr("action_open_wallet")} " →"
                     </button>
                 }.into_any()),
-                FanRecommendedAction::GetTicket | FanRecommendedAction::FollowNextEvent => {
+                FanRecommendedAction::GetTicket
+                | FanRecommendedAction::FollowNextEvent
+                | FanRecommendedAction::OpenLiveEvent => {
                     next_event.map(|event| {
                         let event_slug = event.slug.clone();
-                        let event_preview = PublicEvent {
-                            slug: event.slug.clone(),
-                            title: event.title.clone(),
-                            description: None,
-                            city: event.city.clone().map(|name| EventCity { name }),
-                            venue: event.venue.clone(),
-                            starts_at: event.starts_at.clone(),
-                            ticket_url: event.ticket_url.clone(),
-                            image_url: None,
-                            image_thumbnail_url: None,
-                        };
-                        view! {
-                            <button class="banner-cta" on:click=move |_| {
-                                focused_event_preview.set(Some(event_preview.clone()));
-                                focused_event_slug.set(Some(event_slug.clone()));
-                                tab.set(FanTab::Events);
-                            }>{label} " →"</button>
-                        }.into_any()
-                    })
-                }
-                FanRecommendedAction::OpenLiveEvent => {
-                    next_event.map(|event| {
-                        let event_slug = event.slug.clone();
-                        let event_preview = PublicEvent {
-                            slug: event.slug.clone(),
-                            title: event.title.clone(),
-                            description: None,
-                            city: event.city.clone().map(|name| EventCity { name }),
-                            venue: event.venue.clone(),
-                            starts_at: event.starts_at.clone(),
-                            ticket_url: event.ticket_url.clone(),
-                            image_url: None,
-                            image_thumbnail_url: None,
-                        };
+                        let event_preview = home_event_preview(&event);
                         view! {
                             <button class="banner-cta" on:click=move |_| {
                                 focused_event_preview.set(Some(event_preview.clone()));
@@ -237,17 +224,7 @@ fn FanHomeOverview(
                                 let ticket_url = event.ticket_url.clone();
                                 let title = event.title.clone();
                                 let event_slug = event.slug.clone();
-                                let event_preview = PublicEvent {
-                                    slug: event.slug.clone(),
-                                    title: event.title.clone(),
-                                    description: None,
-                                    city: event.city.clone().map(|name| EventCity { name }),
-                                    venue: event.venue.clone(),
-                                    starts_at: event.starts_at.clone(),
-                                    ticket_url: event.ticket_url.clone(),
-                                    image_url: None,
-                                    image_thumbnail_url: None,
-                                };
+                                let event_preview = home_event_preview(&event);
                                 let is_live = event.phase == "live";
                                 let is_afterglow = event.phase == "afterglow";
                                 let is_upcoming = event.phase == "upcoming";

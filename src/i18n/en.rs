@@ -1499,6 +1499,13 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "settings_group_account" => "ACCOUNT AND DATA",
         "settings_open_site" => "OPEN VIRYA.MUSIC",
         "settings_site_hint" => "Shows, releases and the full store, opened in your browser.",
+        "primary_navigation" => "Primary navigation",
+        "settings_area_hint" => "Collect points at shows and trade them for rewards.",
+        "settings_open_area" => "Open AREA",
+        "profile_danger_zone" => "Remove data or delete the account",
+        "profile_danger_zone_hint" => "Irreversible. Open only if that is what you want.",
+        "profile_signal_active" => "Signal active",
+        "profile_admission_ready" => "Admission pass ready",
         "settings_refresh_hint" => {
             "Fetches shows, tickets, rewards and store status from Virya again."
         }

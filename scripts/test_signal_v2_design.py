@@ -26,6 +26,34 @@ def contrast(a: str, b: str) -> float:
     la, lb = luminance(a), luminance(b)
     return (max(la, lb) + .05) / (min(la, lb) + .05)
 
+def resolve_colour(value: str) -> str | None:
+    """Resolve a border declaration to a hex colour.
+
+    Handles the two forms this stylesheet uses: a bare `var(--token)` and
+    `color-mix(in srgb, <colour> <percent>%, <colour>)`. Returns None for
+    anything else so the caller can treat it as unverifiable rather than pass.
+    """
+    value = value.strip().removeprefix("1px solid ").strip()
+    mix = re.fullmatch(
+        r"color-mix\(in srgb, *(\S+) *(\d+)%, *(.+?)\)", value
+    )
+    if mix:
+        first, weight, second = resolve_colour(mix.group(1)), int(mix.group(2)), resolve_colour(mix.group(3))
+        if first is None or second is None:
+            return None
+        share = weight / 100
+        channels = [
+            round(int(first.lstrip("#")[i:i + 2], 16) * share
+                  + int(second.lstrip("#")[i:i + 2], 16) * (1 - share))
+            for i in (0, 2, 4)
+        ]
+        return "#" + "".join(f"{c:02x}" for c in channels)
+    var = re.fullmatch(r"var\((--[a-z0-9-]+)\)", value)
+    if var:
+        return token(var.group(1))
+    return value if re.fullmatch(r"#[0-9a-fA-F]{6}", value) else None
+
+
 class SignalV2DesignContract(unittest.TestCase):
     def test_shared_virya_brand_tokens_match_web_v2(self) -> None:
         expected = {
@@ -57,12 +85,18 @@ class SignalV2DesignContract(unittest.TestCase):
 
         WCAG 1.4.11 asks 3:1 where a border is the only thing marking a control.
         """
+        # Checked against every surface a control can sit on, not just
+        # `--surface`. A single-surface check passed at 3.11:1 while the same
+        # border sat at 2.86:1 on `--surface-2` (the settings-row hover state)
+        # and 2.67:1 on `--surface-3` — the check said compliant and the screen
+        # was not.
         surface = token("--surface")
-        self.assertGreaterEqual(
-            contrast(token("--border-strong"), surface),
-            3.0,
-            "--border-strong marks controls; below 3:1 a field stops reading as a field",
-        )
+        for name in ("--bg", "--bg-raised", "--surface", "--surface-2", "--surface-3"):
+            self.assertGreaterEqual(
+                contrast(token("--border-strong"), token(name)),
+                3.0,
+                f"--border-strong marks controls; below 3:1 on {name} a field stops reading as a field",
+            )
         # Dividers are decorative and sit lower on purpose, but must still be
         # separable from the surface they divide.
         self.assertGreaterEqual(
@@ -70,6 +104,42 @@ class SignalV2DesignContract(unittest.TestCase):
             1.4,
             "--border-subtle is invisible against its own surface",
         )
+
+    def test_every_control_border_clears_three_to_one(self) -> None:
+        """`--line` is a shared brand token pinned at 1.37:1 against `--surface`.
+
+        That is fine for a divider and not fine for a control, where the border
+        is the whole affordance (WCAG 1.4.11). Raising `--line` is a brand
+        decision that has to land in the web app at the same time, so controls
+        take `--border-strong` instead and the divider keeps its value.
+
+        The check resolves what the border actually renders as rather than
+        banning a token by name: a `color-mix()` that is mostly gold is a
+        visible border even though `--line` appears in it.
+        """
+        surface = token("--surface")
+        # The element/class name has to stand on its own: `.selected` and
+        # `.city-picker-results` are not controls, and matching `select` inside
+        # them made the check report cards it has nothing to say about.
+        control_rules = re.findall(
+            r"^([^{}\n]*(?<![\w-])(?:button|input|textarea|select)(?![\w-])[^{}\n]*)\{([^}]*)\}",
+            CSS,
+            re.MULTILINE,
+        )
+        offenders = []
+        for selector, body in control_rules:
+            # A disabled control is exempt: 1.4.11 does not apply to it, and
+            # the muted border is what marks it as disabled. `:active` is the
+            # transient press state, not the resting affordance a fan scans.
+            if ":disabled" in selector or ":active" in selector:
+                continue
+            for match in re.finditer(r"border(?:-color)?: *([^;]+)", body):
+                colour = resolve_colour(match.group(1))
+                # `transparent`, `currentColor` and gradients do not resolve to
+                # a fixed pair, so they are not judged here.
+                if colour is not None and contrast(colour, surface) < 3.0:
+                    offenders.append(f"{selector.strip()} -> {match.group(1).strip()}")
+        self.assertEqual(offenders, [], "control borders must reach 3:1 against their surface")
 
     def test_hover_is_gated_behind_a_pointer_that_can_hover(self) -> None:
         """A tapped element keeps :hover until something else is tapped.
@@ -104,8 +174,18 @@ class SignalV2DesignContract(unittest.TestCase):
         self.assertNotIn('class="signal-steps"', FAN)
 
     def test_primary_mobile_nav_stays_small_and_clear(self) -> None:
-        self.assertIn('<nav class="bottom-nav four primary-four">', SHELL)
-        for tab in ("FanTab::Signal", "FanTab::Events", "FanTab::Merch", "FanTab::Wallet"):
+        # Five is the ceiling. Profile joined the bar because account,
+        # notification and language settings behind a hamburger is where a fan
+        # looks last; AREA stays in the overflow menu as the opt-in side game.
+        self.assertIn('<nav class="bottom-nav five"', SHELL)
+        self.assertNotIn('class="bottom-nav six', SHELL)
+        for tab in (
+            "FanTab::Signal",
+            "FanTab::Events",
+            "FanTab::Merch",
+            "FanTab::Wallet",
+            "FanTab::Profile",
+        ):
             self.assertIn(tab, SHELL)
 
     def test_long_lists_keep_rendering_guards(self) -> None:

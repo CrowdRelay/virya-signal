@@ -276,6 +276,13 @@ fn NavGlyph(icon: &'static str) -> impl IntoView {
             </svg>
         }
         .into_any(),
+        "profile" => view! {
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <circle cx="12" cy="8" r="3.5"/>
+                <path d="M5 20v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/>
+            </svg>
+        }
+        .into_any(),
         "check" => view! {
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M9 5h9a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H9"/>

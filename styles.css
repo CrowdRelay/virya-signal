@@ -20,7 +20,7 @@
   --line: #27322f;
   --border-subtle: #2e3a36;
   --border-default: var(--line);
-  --border-strong: #5a6864;
+  --border-strong: #657370;
   --muted: #98a5a0;
   --bg-raised: #0b100f;
   --text: #eef4f1;
@@ -113,7 +113,7 @@ a { color: inherit; text-decoration: none; }
 .pin-field { gap: 6px !important; padding: 12px; border: 1px solid var(--border-strong); border-radius: var(--control-radius); background: var(--bg-raised); }
 .pin-field-label { color: var(--text); font-size: var(--type-meta); font-weight: 900; letter-spacing: .055em; }
 .pin-field small { color: var(--muted); font-size: var(--type-micro); font-weight: 500; letter-spacing: 0; line-height: 1.45; text-transform: none; }
-.pin-field input { margin-top: 3px; border-color: var(--signal-deep); background: var(--bg); font-size: 1.05rem; font-weight: 800; letter-spacing: .16em; }
+.pin-field input { margin-top: 3px; border-color: var(--signal); background: var(--bg); font-size: 1.05rem; font-weight: 800; letter-spacing: .16em; }
 input, textarea, select { width: 100%; min-width: 0; min-height: 48px; border: 1px solid var(--border-strong); border-radius: var(--control-radius); color: #f5f5ef; background: #0e0e0c; padding: 13px 15px; outline: none; font-size: 16px; transition: border-color .2s, box-shadow .2s, background .2s; }
 input::placeholder, textarea::placeholder { color: #7d8985; }
 /* Hover is wrapped: on a touch screen a tapped element keeps its hover state
@@ -243,7 +243,7 @@ button:disabled { opacity: .48; cursor: default; }
 .menu-trigger { width: 44px; min-width: 44px; display: grid !important; place-content: center; gap: 5px; border-radius: 2px; border-color: var(--border-strong) !important; background: var(--surface) !important; }
 .menu-trigger i { display: block; width: 21px; height: 2px; border-radius: 2px; background: var(--signal-hot); box-shadow: 0 0 10px #93c6c033; }
 .menu-trigger[aria-expanded="true"] { background: #0f1a17 !important; border-color: var(--signal-hot) !important; }
-.scanner-button { margin-top: 14px; width: 100%; min-height: 300px; border: 1px solid var(--signal-deep); background: linear-gradient(145deg, var(--surface), #090b0a); color: var(--text); display: grid; place-content: center; justify-items: center; gap: 14px; }
+.scanner-button { margin-top: 14px; width: 100%; min-height: 300px; border: 1px solid var(--signal); background: linear-gradient(145deg, var(--surface), #090b0a); color: var(--text); display: grid; place-content: center; justify-items: center; gap: 14px; }
 .scanner-frame { width: 142px; height: 142px; border: 2px solid var(--signal-hot); }
 .scanner-button strong { color: var(--signal-hot); letter-spacing: .08em; }
 .scanner-button small { color: #8f8f88; }
@@ -287,7 +287,7 @@ button:disabled { opacity: .48; cursor: default; }
 .online { color: var(--success); }
 .offline { color: #98a5a0; }
 .settings-list { display: grid; gap: 8px; }
-.settings-list article, .settings-list button { min-height: 52px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); padding: 16px; text-align: left; }
+.settings-list article, .settings-list button { min-height: 52px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface); color: var(--text); padding: 16px; text-align: left; }
 .settings-list article { display: flex; justify-content: space-between; gap: 12px; }
 .settings-list p { margin: 5px 0 0; color: var(--muted); font-size: var(--type-meta); word-break: break-all; }
 .security-note { margin-top: 18px; padding: 15px; border-left: 2px solid var(--signal-hot); color: var(--muted); font-size: var(--type-meta); line-height: 1.5; }
@@ -362,7 +362,7 @@ button:disabled { opacity: .48; cursor: default; }
 .fan-merch-card .ticket-buy-button:active:not(:disabled) { transform: scale(.965); filter: brightness(.9); }
 .event-description { margin-top: 12px !important; line-height: 1.5; font-size: 12px; }
 .event-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 16px; }
-.event-actions button, .event-actions a { min-height: 48px; border: 1px solid var(--signal-deep); border-radius: var(--control-radius); background: transparent; color: var(--signal-hot); padding: 12px 10px; text-align: center; font-size: var(--type-micro); font-weight: 900; line-height: 1.3; }
+.event-actions button, .event-actions a { min-height: 48px; border: 1px solid var(--signal); border-radius: var(--control-radius); background: transparent; color: var(--signal-hot); padding: 12px 10px; text-align: center; font-size: var(--type-micro); font-weight: 900; line-height: 1.3; }
 .event-actions button.active { background: var(--signal-hot); color: #080808; }
 /* Ticket availability is a fact about the show, not a thing to press. It used
    to be a bordered, button-sized box in the primary action slot, so a show with
@@ -627,7 +627,7 @@ button:disabled { opacity: .48; cursor: default; }
   align-items: center;
   justify-content: center;
   gap: 5px;
-  border: 1px solid #2a2a27;
+  border: 1px solid var(--border-strong);
   border-radius: var(--control-radius);
   background: var(--surface);
   color: #999;
@@ -729,7 +729,7 @@ html[data-virya-scanner-active] .app-shell {
   justify-content: space-between;
   gap: 12px;
   padding: 11px 13px;
-  border: 1px solid #30302d;
+  border: 1px solid var(--border-strong);
   background: #090909;
   color: #f5f5ef;
   text-align: left;
@@ -989,7 +989,7 @@ html[data-virya-scanner-active] .app-shell {
 .language-setting { display: grid; gap: 12px; align-items: center; }
 .language-setting p { margin: 4px 0 0; color: var(--muted); font-size: .82rem; line-height: 1.45; }
 .language-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; }
-.language-switch button { min-height: 48px; border-radius: var(--control-radius); border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-weight: 800; letter-spacing: .08em; }
+.language-switch button { min-height: 48px; border-radius: var(--control-radius); border: 1px solid var(--border-strong); background: var(--surface); color: var(--muted); font-weight: 800; letter-spacing: .08em; }
 .language-switch button.active { border-color: var(--signal-hot); background: #93c6c018; color: var(--signal-hot); }
 
 /* Runtime network state — lives outside the Leptos tree so it also works while
@@ -1299,8 +1299,8 @@ html[data-virya-scanner-active] .app-shell {
 .beacon-pending-invite { padding: 13px; border: 1px solid var(--signal-deep); border-radius: 6px; background: #93c6c00a; }
 .beacon-pending-invite p { margin: 5px 0 0; color: var(--muted); }
 .beacon-radius { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 7px; }
-.beacon-radius button, .beacon-topic-grid button { min-height: 40px; border: 1px solid #2e2d27; border-radius: 6px; background: #11110f; color: var(--muted); }
-.beacon-radius button.active, .beacon-topic-grid button.active { border-color: var(--signal-deep); background: #93c6c012; color: #bddbd5; }
+.beacon-radius button, .beacon-topic-grid button { min-height: 40px; border: 1px solid var(--border-strong); border-radius: 6px; background: #11110f; color: var(--muted); }
+.beacon-radius button.active, .beacon-topic-grid button.active { border-color: var(--signal); background: #93c6c012; color: #bddbd5; }
 .beacon-topic-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .beacon-bottom-nav .beacon-nav-glyph { display: block; font-size: 19px; line-height: 1; }
 .beacon-feature-card, .beacon-news-card, .beacon-event-card, .beacon-request-card,
@@ -1592,7 +1592,7 @@ html[data-virya-scanner-active] .app-shell {
    affordance and the consequence in the same target. */
 .settings-list { gap: 9px; }
 .settings-list article,
-.settings-list button { border-color: var(--border-subtle); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); }
+.settings-list button { border-color: var(--border-strong); border-radius: var(--radius-md); box-shadow: var(--shadow-sm); }
 .settings-row {
   display: grid !important;
   grid-template-columns: 38px minmax(0, 1fr) auto;
@@ -1906,7 +1906,7 @@ html[data-virya-scanner-active] .app-shell {
   box-shadow: inset 0 0 0 1px rgba(216,180,74,.22), var(--shadow-md);
 }
 .beacon-radius button, .beacon-topic-grid button {
-  border-color: var(--border-subtle);
+  border-color: var(--border-strong);
   background: var(--surface);
   transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
 }
@@ -1927,7 +1927,7 @@ html[data-virya-scanner-active] .app-shell {
 
 /* ── City pickers ── */
 .city-choice-list button, .city-picker-results button {
-  border-color: var(--border-subtle);
+  border-color: var(--border-strong);
   background: var(--bg-raised);
   transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
 }
@@ -1982,3 +1982,99 @@ html[data-virya-scanner-active] .app-shell {
    left-aligned text rather than a control's centred label. */
 .set-city-banner { width: 100%; text-align: left; border-color: var(--signal-deep); }
 .set-city-banner .banner-cta { display: inline-block; margin-top: 12px; }
+
+/* Profile hero. The old header was a flat card with a hardcoded "V" avatar and
+   the fan's name; the metrics under it repeated Signal-tab numbers with no
+   answer to the question the screen is opened with — is my Signal working, and
+   what do I hold. The hero carries identity and state together, and the metric
+   strip runs four across so the AREA claim count sits beside the rest instead
+   of only existing inside the side game. */
+.fan-profile-screen .profile-hero {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 17px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: linear-gradient(145deg, rgba(132,180,172,.09), var(--surface) 62%);
+  box-shadow: var(--shadow-md);
+}
+.fan-profile-screen .profile-hero .avatar {
+  flex: 0 0 auto;
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 1px rgba(147,198,192,.35), 0 8px 24px rgba(0,0,0,.4);
+}
+.profile-hero-copy { min-width: 0; display: grid; gap: 3px; }
+.profile-hero-copy strong { font-size: var(--type-body); font-weight: 850; line-height: 1.2; }
+.profile-hero-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--type-meta);
+  overflow-wrap: anywhere;
+}
+.profile-hero-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.cache-badge.is-live { border-color: var(--signal-deep); color: var(--signal-hot); }
+/* Four across is 84px a column on a 375px screen, and the Polish labels
+   ("ZAMÓWIENIA", "WEJŚCIÓWKI") clip inside that. Two by two until there is
+   room for one row. */
+.stats-grid.four { grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 540px) {
+  .stats-grid.four { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* Wiping a wallet used to be one tap away at the bottom of the screen a fan
+   scrolls to change the language. It costs a deliberate open first now. */
+.settings-danger-zone { margin-top: 4px; }
+.settings-danger-zone > summary {
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 13px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border-strong));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--danger) 5%, var(--surface));
+  cursor: pointer;
+  list-style: none;
+}
+.settings-danger-zone > summary::-webkit-details-marker { display: none; }
+.settings-danger-zone > summary strong {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: end;
+  font-size: var(--type-body);
+  font-weight: 800;
+  line-height: 1.2;
+}
+.settings-danger-zone > summary small {
+  grid-column: 2;
+  grid-row: 2;
+  align-self: start;
+  color: var(--muted);
+  font-size: var(--type-micro);
+  line-height: 1.45;
+}
+.settings-danger-zone > summary .settings-row-icon {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border-strong));
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+.settings-danger-zone > summary::after {
+  content: "\2039";
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+  transform: rotate(-90deg);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.settings-danger-zone[open] > summary::after { transform: rotate(90deg); }
+.settings-danger-zone > summary { grid-template-columns: 38px minmax(0, 1fr) auto; }
+.settings-danger-zone[open] > summary { margin-bottom: 9px; }
+@media (prefers-reduced-motion: reduce) {
+  .settings-danger-zone > summary::after { transition: none; }
+}

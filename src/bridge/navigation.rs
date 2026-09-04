@@ -43,6 +43,26 @@ export function viryaWriteRootMode(value) {
   } catch {}
 }
 
+// Android's back gesture is handled by the WebView: tao's activity calls
+// `goBack()` when there is history to go back to, and finishes the activity
+// otherwise. With a single-document app there is never any history, so back
+// closed the app from the middle of checkout. One guard entry is pushed while
+// any dismissible layer is open; back consumes it, the app closes that layer,
+// and a still-open layer below pushes the next guard.
+export function viryaPushBackGuard() {
+  try { window.history?.pushState({ virya: 'back-guard' }, ''); } catch {}
+}
+
+export function viryaGoBack() {
+  try { window.history?.back(); } catch {}
+}
+
+export function viryaInstallBackHandler(callback) {
+  const handler = () => { try { callback(); } catch {} };
+  try { window.addEventListener('popstate', handler); } catch { return () => {}; }
+  return () => { try { window.removeEventListener('popstate', handler); } catch {} };
+}
+
 "#)]
 extern "C" {
     #[wasm_bindgen(js_name = viryaReadFanTab)]
@@ -56,4 +76,13 @@ extern "C" {
 
     #[wasm_bindgen(js_name = viryaWriteRootMode)]
     fn write_root_mode_js(value: &str);
+
+    #[wasm_bindgen(js_name = viryaPushBackGuard)]
+    fn push_back_guard_js();
+
+    #[wasm_bindgen(js_name = viryaGoBack)]
+    fn go_back_js();
+
+    #[wasm_bindgen(js_name = viryaInstallBackHandler)]
+    fn install_back_handler_js(callback: &js_sys::Function) -> js_sys::Function;
 }

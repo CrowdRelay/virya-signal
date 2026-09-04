@@ -224,6 +224,17 @@ fn QrPanel(svg: Option<String>, token: String, expires: String) -> impl IntoView
     view! { <div class="qr-panel">{svg.map(|markup| view! { <div class="qr-svg" inner_html=markup></div> })}<code>{token}</code><small>{i18n::format("valid_until_2", &[human_time(&expires).to_string()])}</small></div> }
 }
 
+/// First letter for the profile avatar. The card used to print a hardcoded "V"
+/// for every fan, so two accounts on one device looked identical.
+fn profile_initial(display_name: &str, email: &str) -> String {
+    display_name
+        .chars()
+        .chain(email.chars())
+        .find(|character| character.is_alphanumeric())
+        .map(|character| character.to_uppercase().to_string())
+        .value_or_else(|| "V".to_owned())
+}
+
 #[component]
 fn FanProfileScreen(
     status: RwSignal<FanSessionStatus>,
@@ -287,12 +298,39 @@ fn FanProfileScreen(
     };
     let cancel_delete = move |_| delete_confirming.set(false);
     view! {
-        <section class="screen">
+        <section class="screen fan-profile-screen">
             <header class="screen-title"><p class="eyebrow">{tr("my_profile")}</p><h2>{tr("signal_settings")}</h2></header>
-            <Show when=move || status.get().session.is_some() fallback=move || view! { <Skeleton rows=1 height=96 /> }>
-            {move || status.get().session.map(|profile| view! {
-                <div class="profile-card"><div class="avatar">"V"</div><div><strong>{profile.display_name.value_or_else(|| tr("virya_fan").to_owned())}</strong><p>{profile.email}</p></div></div>
-                <div class="stats-grid"><Metric value=profile.wallet_count.to_string() label=tr("orders")/><Metric value=if profile.has_admission_pass { "1".to_owned() } else { "0".to_owned() } label=tr("admission_passes")/><Metric value=dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned()) label=tr("referrals")/></div>
+            <Show when=move || status.get().session.is_some() fallback=move || view! { <Skeleton rows=1 height=170 /> }>
+            {move || status.get().session.map(|profile| {
+                let display_name = profile.display_name.clone().value_or_else(|| tr("virya_fan").to_owned());
+                let initial = profile_initial(&display_name, &profile.email);
+                let has_pass = profile.has_admission_pass;
+                view! {
+                    // The old header was an avatar, a name and an email over a
+                    // flat card, and the three metrics under it repeated
+                    // numbers the fan had already read on Signal. The hero now
+                    // answers the question this screen is opened with — is my
+                    // Signal working, and what do I hold — before the settings.
+                    <article class="profile-hero">
+                        <div class="avatar" aria-hidden="true">{initial}</div>
+                        <div class="profile-hero-copy">
+                            <strong>{display_name}</strong>
+                            <p>{profile.email}</p>
+                            <div class="profile-hero-badges">
+                                <span class="cache-badge is-live">{tr("profile_signal_active")}</span>
+                                {has_pass.then(|| view! {
+                                    <span class="cache-badge">{tr("profile_admission_ready")}</span>
+                                })}
+                            </div>
+                        </div>
+                    </article>
+                    <div class="stats-grid four">
+                        <Metric value=profile.wallet_count.to_string() label=tr("orders")/>
+                        <Metric value=if has_pass { "1".to_owned() } else { "0".to_owned() } label=tr("admission_passes")/>
+                        <Metric value=dashboard.with(|state| state.as_ref().map(|d| d.referral.qualified_referrals.to_string())).value_or_else(|| "—".to_owned()) label=tr("referrals")/>
+                        <Metric value=area.with(|state| state.as_ref().map(|wallet| wallet.claims.len().to_string())).value_or_else(|| "—".to_owned()) label=tr("counts_claims")/>
+                    </div>
+                }
             })}
             </Show>
             <p class="settings-group-label">{tr("settings_group_app")}</p>
@@ -300,6 +338,17 @@ fn FanProfileScreen(
                 <NativePushControl error=error />
                 <LanguageSwitch />
                 <FanLocationSetting error=error />
+                // AREA lives in the overflow menu, which is the one place a fan
+                // does not look. The side game gets a row here so it is
+                // reachable without knowing the hamburger holds it.
+                <article class="settings-row settings-row-static">
+                    <span class="settings-row-icon" aria-hidden="true">"◇"</span>
+                    <strong>{tr("area_game_tab")}</strong>
+                    <small>{tr("settings_area_hint")}</small>
+                    <button class="ticket-buy-button" type="button" on:click=move |_| open_area_game(error)>
+                        {tr("settings_open_area")}
+                    </button>
+                </article>
                 <article class="settings-row settings-row-static">
                     <span class="settings-row-icon" aria-hidden="true">"⤴"</span>
                     <strong>"Virya.music"</strong>
@@ -324,29 +373,39 @@ fn FanProfileScreen(
                 </button>
             </div>
             <p class="settings-group-label">{tr("settings_group_account")}</p>
-            <div class="settings-list">
-                <button class="settings-row danger ghost" on:click=forget>
-                    <span class="settings-row-icon" aria-hidden="true">"▨"</span>
-                    <strong>{tr("remove_profile_and_tickets_from_device")}</strong>
-                    <small>{tr("settings_forget_hint")}</small>
-                    <span class="settings-row-chevron" aria-hidden="true">"›"</span>
-                </button>
-                <button class="settings-row danger ghost" on:click=delete_account>
-                    <span class="settings-row-icon" aria-hidden="true">"✕"</span>
-                    <strong>{tr("delete_virya_account")}</strong>
-                    <small>{tr("settings_delete_hint")}</small>
-                    <span class="settings-row-chevron" aria-hidden="true">"›"</span>
-                </button>
-                <Show when=move || delete_confirming.get()>
-                    <div class="security-note warning">
-                        <p>{tr("delete_account_warning")}</p>
-                        <div class="button-row">
-                            <button class="danger" on:click=delete_account>{tr("confirm_delete_account")}</button>
-                            <button class="ghost" on:click=cancel_delete>{tr("cancel_delete_account")}</button>
+            // Both rows are one tap from wiping a wallet, and they used to sit
+            // open at the bottom of a screen a fan scrolls to change the
+            // language. Folded away, they cost a deliberate open first.
+            <details class="settings-danger-zone">
+                <summary>
+                    <span class="settings-row-icon" aria-hidden="true">"⚠"</span>
+                    <strong>{tr("profile_danger_zone")}</strong>
+                    <small>{tr("profile_danger_zone_hint")}</small>
+                </summary>
+                <div class="settings-list">
+                    <button class="settings-row danger ghost" on:click=forget>
+                        <span class="settings-row-icon" aria-hidden="true">"▨"</span>
+                        <strong>{tr("remove_profile_and_tickets_from_device")}</strong>
+                        <small>{tr("settings_forget_hint")}</small>
+                        <span class="settings-row-chevron" aria-hidden="true">"›"</span>
+                    </button>
+                    <button class="settings-row danger ghost" on:click=delete_account>
+                        <span class="settings-row-icon" aria-hidden="true">"✕"</span>
+                        <strong>{tr("delete_virya_account")}</strong>
+                        <small>{tr("settings_delete_hint")}</small>
+                        <span class="settings-row-chevron" aria-hidden="true">"›"</span>
+                    </button>
+                    <Show when=move || delete_confirming.get()>
+                        <div class="security-note warning">
+                            <p>{tr("delete_account_warning")}</p>
+                            <div class="button-row">
+                                <button class="danger" on:click=delete_account>{tr("confirm_delete_account")}</button>
+                                <button class="ghost" on:click=cancel_delete>{tr("cancel_delete_account")}</button>
+                            </div>
                         </div>
-                    </div>
-                </Show>
-            </div>
+                    </Show>
+                </div>
+            </details>
             <AnonymousFeedback error=error />
             <p class="security-note">{tr("fan_session_admission_pass_and_private_wallet")}</p>
         </section>

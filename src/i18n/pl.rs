@@ -1503,6 +1503,13 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "settings_group_account" => "KONTO I DANE",
         "settings_open_site" => "OTWÓRZ VIRYA.MUSIC",
         "settings_site_hint" => "Koncerty, wydawnictwa i pełny sklep — otwarte w przeglądarce.",
+        "primary_navigation" => "Nawigacja główna",
+        "settings_area_hint" => "Zbieraj punkty na koncertach i wymieniaj je na nagrody.",
+        "settings_open_area" => "Otwórz AREA",
+        "profile_danger_zone" => "Usuń dane lub konto",
+        "profile_danger_zone_hint" => "Nieodwracalne. Otwórz tylko, jeśli tego chcesz.",
+        "profile_signal_active" => "Sygnał aktywny",
+        "profile_admission_ready" => "Wejściówka gotowa",
         "settings_refresh_hint" => {
             "Pobiera z Viryi na nowo koncerty, bilety, nagrody i status sklepu."
         }

@@ -41,6 +41,11 @@ jobs:
         run: |
           python3 scripts/static-check.py
           python3 -m unittest discover -s scripts -p 'test_*.py'
+          # `unittest discover` imports this one and finds no TestCase in it,
+          # so it counted as a passing file while never running: the module
+          # limit it enforces had been breached for three files by the time
+          # anyone ran it by hand. A script-style check has to be invoked.
+          python3 scripts/test_source_modularity.py
           bash -n scripts/*.sh
           node scripts/test-boot.mjs
           # The critical CSS inlined in index.html is generated from styles.css

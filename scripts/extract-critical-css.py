@@ -56,7 +56,6 @@ CRITICAL_SELECTORS = [
     ".bottom-nav.five",
     ".bottom-nav.six",
     ".bottom-nav button",
-    ".bottom-nav button:active",
     ".bottom-nav button.active",
     ".nav-icon",
     ".skeleton-stack",
@@ -69,65 +68,70 @@ CRITICAL_SELECTORS = [
     "@keyframes skeleton-shimmer",
     "@keyframes fade-in",
     "@keyframes ripple",
-    "@keyframes nav-activate",
-    "@keyframes tab-enter",
     "@keyframes list-item-enter",
 ]
+# Entries that match nothing are dead weight and hide the fact that a rule was
+# renamed, so `--check` fails on them. `.bottom-nav button:active` and
+# `@keyframes nav-activate` were already gone from styles.css; `tab-enter`
+# lives inside a media query, and only top-level rules are eligible here.
 
 # Custom properties from :root that are needed for critical rendering.
 # The full :root block is included via the :root selector above.
 
 
-def extract_rules(css: str) -> str:
-    """Extract all rules whose selector matches the critical list."""
-    # Parse top-level rules (at-rules and rule blocks).
+def normalize_selector(selector: str) -> str:
+    """Collapse whitespace so `a,  b` and `a, b` compare equal."""
+    return re.sub(r"\s+", " ", selector.strip())
+
+
+def extract_rules(css: str) -> tuple[str, list[str]]:
+    """Extract the rules whose selector is exactly one of the critical ones.
+
+    Returns the CSS text and the critical selectors that matched nothing.
+
+    The match is on the whole normalized selector, not a substring of it. It
+    used to be `critical in selector_part`, and the list contains `a` and
+    `button` — so every selector carrying the letter `a` (`.fan-event-card`,
+    `.wallet-card`, `@media …`) qualified. 111 KiB of a 123 KiB stylesheet
+    ended up inlined in index.html, parsed once from the document and again
+    from the deferred sheet, which is the opposite of what critical CSS is for.
+    """
+    # Comments are stripped first. A comment sitting between two rules would
+    # otherwise be read as part of the next rule's selector, so a documented
+    # rule silently stopped qualifying as critical — which is what happened to
+    # `.content` and every `@keyframes` block on this list.
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    wanted = {normalize_selector(sel) for sel in CRITICAL_SELECTORS}
+    matched: set[str] = set()
     rules: list[str] = []
     i = 0
     depth = 0
     start = 0
-    in_at_rule = False
-    at_rule_header = ""
 
     while i < len(css):
         char = css[i]
         if char == "{":
-            if depth == 0 and in_at_rule:
-                # Start of at-rule body
-                depth = 1
-            elif depth == 0:
-                # Start of a normal rule
-                depth = 1
-            else:
-                depth += 1
+            depth = 1 if depth == 0 else depth + 1
         elif char == "}":
             depth -= 1
             if depth == 0:
                 block = css[start : i + 1]
-                selector_part = block[: block.index("{")].strip()
-                # Check if this rule's selector matches any critical selector
-                if in_at_rule:
-                    # Include keyframes and supports that are in the critical list
-                    if any(sel in selector_part for sel in CRITICAL_SELECTORS):
-                        rules.append(block)
-                    in_at_rule = False
-                    at_rule_header = ""
-                else:
-                    # Normal rule — check selector
-                    for critical in CRITICAL_SELECTORS:
-                        if critical in selector_part:
-                            rules.append(block)
-                            break
+                selector_part = normalize_selector(block[: block.index("{")])
+                # An at-rule's own body carries nested selectors this top-level
+                # pass never sees, so only at-rules named outright (the
+                # keyframes above) qualify — a `@media` block is not critical
+                # unless somebody adds its exact header to the list.
+                if selector_part in wanted:
+                    matched.add(selector_part)
+                    rules.append(block)
                 start = i + 1
-        elif char == "@" and depth == 0:
-            in_at_rule = True
-            at_rule_header = ""
-            start = i
         i += 1
 
-    return "\n".join(rules)
+    unmatched = [sel for sel in CRITICAL_SELECTORS if normalize_selector(sel) not in matched]
+    return "\n".join(rules), unmatched
 
 
-def extract_critical_css() -> str:
+def extract_critical_css() -> tuple[str, list[str]]:
     """Extract the critical CSS from styles.css."""
     css = CSS_PATH.read_text(encoding="utf-8")
     return extract_rules(css)
@@ -179,7 +183,14 @@ def main() -> int:
     parser.add_argument("--check", action="store_true", help="verify inline CSS is current")
     args = parser.parse_args()
 
-    critical = extract_critical_css()
+    critical, unmatched = extract_critical_css()
+
+    # A selector that matches nothing is either a typo or a rule that has been
+    # renamed since. Either way the inline block quietly lost a rule it was
+    # supposed to carry, so this is a failure, not a warning.
+    if unmatched:
+        print("CRITICAL_CSS=UNMATCHED " + ", ".join(unmatched))
+        return 1
 
     if args.check:
         if check_index_html(critical):

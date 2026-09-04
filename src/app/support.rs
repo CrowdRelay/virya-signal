@@ -35,6 +35,8 @@ fn is_success_message(msg: &str) -> bool {
         tr("we_resent_the_wallet_by_email"),
         tr("synesthesia_result_saved_in_signal"),
         tr("feedback_was_sent_anonymously_thank_you"),
+        tr("location_saved"),
+        tr("admission_pass_assigned_to_this_device"),
     ];
     if exact.contains(&display) {
         return true;
@@ -71,8 +73,17 @@ pub fn Skeleton(
     }
 }
 
+/// `suppress_transient` keeps network blips, timeouts and cancellations off the
+/// surface while still showing the two things a fan must see: the confirmation
+/// for something they just did, and a real failure of it. Fan-facing writes
+/// (saving a show, importing a wallet, opening Stripe, setting a city) all
+/// reported through this signal and nothing rendered it in fan mode, so every
+/// one of those confirmations was written and thrown away.
 #[component]
-fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
+fn Toast(
+    error: RwSignal<Option<String>>,
+    #[prop(default = false)] suppress_transient: bool,
+) -> impl IntoView {
     // Each toast owns its dismissal generation. An older timeout must never
     // clear a newer message that replaced it before the five-second window.
     let dismiss_generation = RwSignal::new(0_u64);
@@ -107,8 +118,11 @@ fn Toast(error: RwSignal<Option<String>>) -> impl IntoView {
             msg.as_ref().is_some_and(|m| is_transient_kind(error_kind(m)))
         })
     };
+    // A suppressed message still expires on its own timer above, so nothing
+    // stays wedged in the signal waiting for a reader that never comes.
+    let visible = move || error.get().is_some() && !(suppress_transient && is_transient());
     view! {
-        <Show when=move || error.get().is_some()>
+        <Show when=visible>
             <button
                 class="toast"
                 class:toast-success=is_success

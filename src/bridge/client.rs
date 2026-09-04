@@ -125,6 +125,75 @@ pub fn set_fan_tab_state(value: &str) {
     write_fan_tab_js(value);
 }
 
+/// Pushes one history entry so the next system back gesture lands in the app
+/// instead of closing it. Paired with [`install_back_handler`].
+pub fn push_back_guard() {
+    push_back_guard_js();
+}
+
+/// Consumes one history entry, which is what fires the `popstate` handler.
+pub fn go_back() {
+    go_back_js();
+}
+
+struct BackHandler {
+    remove: js_sys::Function,
+    _closure: Closure<dyn FnMut()>,
+}
+
+impl Drop for BackHandler {
+    fn drop(&mut self) {
+        let _ = self.remove.call0(&JsValue::UNDEFINED);
+    }
+}
+
+thread_local! {
+    static BACK_HANDLER: std::cell::RefCell<Option<(u64, BackHandler)>> =
+        const { std::cell::RefCell::new(None) };
+    static NEXT_BACK_HANDLER_ID: std::cell::Cell<u64> = const { std::cell::Cell::new(1) };
+}
+
+/// Registers `handler` for `popstate`, replacing any previous one, and returns
+/// the id that owns it. The wasm-bindgen closure is neither `Send` nor `Sync`,
+/// so it stays in a thread-local slot and only the id crosses the Leptos
+/// cleanup boundary — the same shape `install_resume_refresh` uses.
+pub fn install_back_handler(handler: impl FnMut() + 'static) -> u64 {
+    let id = NEXT_BACK_HANDLER_ID.with(|next| {
+        let id = next.get();
+        next.set(id.wrapping_add(1).max(1));
+        id
+    });
+    let closure = Closure::<dyn FnMut()>::new(handler);
+    let remove = install_back_handler_js(closure.as_ref().unchecked_ref());
+    // Replacing the slot drops the previous handler, which detaches its own
+    // listener. Built before the borrow so that drop cannot run inside it.
+    let installed = (
+        id,
+        BackHandler {
+            remove,
+            _closure: closure,
+        },
+    );
+    let previous = BACK_HANDLER.with(|slot| slot.borrow_mut().replace(installed));
+    drop(previous);
+    id
+}
+
+/// Detaches the handler only if `id` still owns the slot. A rebuilt shell
+/// installs before the old one's cleanup runs, and an unconditional uninstall
+/// there would tear the live handler back off.
+pub fn uninstall_back_handler(id: u64) {
+    let handler = BACK_HANDLER.with(|slot| {
+        let mut slot = slot.borrow_mut();
+        if slot.as_ref().is_some_and(|(current, _)| *current == id) {
+            slot.take()
+        } else {
+            None
+        }
+    });
+    drop(handler);
+}
+
 pub fn root_mode_state() -> String {
     read_root_mode_js()
 }

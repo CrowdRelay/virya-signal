@@ -247,7 +247,9 @@ for contract in (
         raise SystemExit(f'staff PIN regression contract is missing from UI: {contract}')
 operator_command = (root / 'src-tauri/src/commands/operator.rs').read_text()
 validation = (root / 'src-tauri/src/validation.rs').read_text()
-vault = (root / 'src-tauri/src/vault.rs').read_text()
+# The tests it asserts on live in `vault/tests.rs`, so read the logical
+# module rather than the one file.
+vault = read_rust_module(root, 'src-tauri/src/vault.rs')
 if 'vault::save_verified' not in operator_command:
     raise SystemExit('staff pairing must verify the persisted vault before reporting success')
 if 'validate_new_operator_pin(&pin)?;' not in operator_command:
@@ -598,7 +600,9 @@ if native_dependencies.get('iota_stronghold') != '2.1.0' or 'tauri-plugin-strong
 futures_util = native_dependencies.get('futures-util', {})
 if futures_util.get('default-features') is not False or futures_util.get('features') != ['alloc']:
     raise SystemExit('native stream utilities must not enable the futures executor')
-vault = (root / 'src-tauri/src/vault.rs').read_text()
+# The tests it asserts on live in `vault/tests.rs`, so read the logical
+# module rather than the one file.
+vault = read_rust_module(root, 'src-tauri/src/vault.rs')
 if 'getrandom::fill(&mut salt)' not in vault or 'rand::' in vault:
     raise SystemExit('vault salt must come directly from the operating-system RNG')
 native_src = '\\n'.join(
