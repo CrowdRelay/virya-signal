@@ -560,6 +560,20 @@ fn FanSignal(
     error: RwSignal<Option<String>>,
 ) -> impl IntoView {
     let share_status = RwSignal::new(None::<String>);
+    // Reading `dashboard` straight in the render closure tied this whole block —
+    // benefits hero, draws, coupons, rewards — to every field of the dashboard.
+    // Saving a show writes `dashboard.interests` from the Shows tab, and because
+    // tabs stay mounted, that rebuilt this hidden screen's DOM on every tap.
+    let referral_progress =
+        Memo::new(move |_| dashboard.with(|state| state.as_ref().map(|data| data.referral.clone())));
+    let copyable_referral_code = Memo::new(move |_| {
+        dashboard.with(|state| {
+            state
+                .as_ref()
+                .map(|data| data.referral.referral_code.trim().to_owned())
+                .filter(|code| !code.is_empty())
+        })
+    });
     let copy_referral = move |_| {
         let Some(referral_code) = dashboard
             .get_untracked()
@@ -583,7 +597,7 @@ fn FanSignal(
         <section class="screen fan-screen">
             <FanHomeOverview home=home loading=loading tab=tab focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview error=error />
             <Show when=move || !loading.get().referral fallback=move || view! { <Skeleton rows=1 height=180 /> }>
-            {move || dashboard.with(|state| state.as_ref().map(|data| data.referral.clone())).map(|referral| {
+            {move || referral_progress.get().map(|referral| {
                 let draw_count = referral.draw_entries.len();
                 let referral_code = referral.referral_code.clone();
                 let share_url = (!referral_code.trim().is_empty()).then(|| {
@@ -641,9 +655,16 @@ fn FanSignal(
                                 class="referral-code-copy"
                                 type="button"
                                 on:click=copy_referral
-                                disabled=move || dashboard.with(|state| state.as_ref().is_none_or(|data| data.referral.referral_code.trim().is_empty()))
+                                disabled=move || copyable_referral_code.with(Option::is_none)
                             >
-                                {move || dashboard.with(|state| state.as_ref().map(|d| i18n::format("code", std::slice::from_ref(&d.referral.referral_code))).value_or_else(|| tr("referral_code_loading").to_owned()))}
+                                // A dashboard that has landed with a blank code
+                                // rendered the label as a bare "Code:" followed
+                                // by nothing — a button that looks broken rather
+                                // than one still waiting. Blank is absent.
+                                {move || copyable_referral_code.with(|code| code
+                                    .as_ref()
+                                    .map(|value| i18n::format("code", std::slice::from_ref(value)))
+                                    .value_or_else(|| tr("referral_code_loading").to_owned()))}
                             </button>
                             {share_url.as_ref().map(|url| {
                                 let share_url = url.clone();

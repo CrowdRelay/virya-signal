@@ -68,7 +68,14 @@ button, a { touch-action: manipulation; }
 button { cursor: pointer; }
 button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--signal-hot); outline-offset: 2px; border-radius: 2px; }
 a { color: inherit; text-decoration: none; }
-.app-shell { min-height: 100dvh; background: var(--bg); }
+/* The staff entry button anchors to this. It used to be `position: fixed`, so
+   it kept its screen slot while the access screen scrolled underneath and
+   parked itself on top of the "BILETY I NAGRODY" headline — an opaque control
+   sitting across the first words a new fan reads. It belongs to the top of the
+   screen, so it scrolls away with it. `position: relative` does not create a
+   containing block for `position: fixed`, so the toast and the bottom nav are
+   unaffected. */
+.app-shell { min-height: 100dvh; background: var(--bg); position: relative; }
 .signal-mark { height: 36px; display: flex; gap: 5px; align-items: center; }
 .signal-mark.small { height: 25px; justify-content: flex-start; }
 .signal-mark span { display: block; width: 4px; background: var(--signal-hot); animation: pulse .8s ease-in-out 4 alternate; }
@@ -92,7 +99,7 @@ a { color: inherit; text-decoration: none; }
 .mode-card p:not(.eyebrow) { color: #9c9c94; margin: 0; line-height: 1.45; }
 .mode-card > strong { grid-column: 2; color: var(--signal-hot); font-size: var(--type-meta); letter-spacing: .1em; }
 .launcher-foot { margin: 0; color: var(--muted); text-align: center; font-size: var(--type-micro); letter-spacing: .18em; }
-.staff-entry-button { position: fixed; z-index: 35; top: max(17px, env(safe-area-inset-top)); right: 16px; min-height: 44px; border: 1px solid var(--border-strong); border-radius: 2px; background: var(--surface); color: var(--muted); padding: 11px 13px; display: inline-flex; align-items: center; gap: 7px; font-size: var(--type-micro); font-weight: 900; letter-spacing: .1em; }
+.staff-entry-button { position: absolute; z-index: 35; top: max(17px, env(safe-area-inset-top)); right: 16px; min-height: 44px; border: 1px solid var(--border-strong); border-radius: 2px; background: var(--surface); color: var(--muted); padding: 11px 13px; display: inline-flex; align-items: center; gap: 7px; font-size: var(--type-micro); font-weight: 900; letter-spacing: .1em; }
 .staff-entry-button:active { color: var(--signal-hot); border-color: var(--signal-deep); background: var(--surface-2); }
 .staff-entry-button span { color: var(--signal-hot); font-size: 14px; line-height: 1; }
 .access-screen, .fan-access { min-height: 100dvh; padding: max(76px, calc(env(safe-area-inset-top) + 58px)) 20px 38px; display: flex; flex-direction: column; justify-content: safe center; position: relative; }
@@ -1248,6 +1255,15 @@ html[data-virya-scanner-active] .app-shell {
   text-align: left;
   cursor: copy;
 }
+/* `cursor: copy` is the only thing that said this button copies, and a phone
+   has no cursor. The glyph says it on the device the app actually ships to. */
+.referral-code-copy:not(:disabled)::after {
+  content: "\29C9";
+  margin-left: 8px;
+  opacity: .75;
+  font-size: .9em;
+}
+.referral-code-copy { display: inline-flex; align-items: center; }
 .referral-code-copy:disabled { cursor: default; opacity: .72; }
 .referral-copy-status { display: block; margin-top: 6px; color: #9bd5ab; }
 
@@ -2027,3 +2043,20 @@ html[data-virya-scanner-active] .app-shell {
 @media (prefers-reduced-motion: reduce) {
   .settings-danger-zone > summary::after { transition: none; }
 }
+
+/* The partner path, under the fan's own. It carried no styling of its own and
+   sat flush against the list above it, so its eyebrow read as a fourth bullet
+   of that list rather than the start of a different offer. */
+.latarnik-entry {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+.latarnik-entry p { margin: 0; color: var(--muted); font-size: var(--type-meta); line-height: 1.5; }
+.latarnik-entry .eyebrow { color: var(--muted); }
+/* `.text-button` is full width and centres its label, which read as a stray
+   centred line inside an otherwise left-aligned block. */
+.latarnik-entry .text-button { width: auto; margin-top: 4px; padding-left: 0; padding-right: 14px; text-align: left; }

@@ -137,6 +137,24 @@ fn Toast(
     }
 }
 
+/// Runs `action` when Enter is pressed in a field.
+///
+/// None of the access fields sit inside a `<form>`, so the browser's implicit
+/// submit never existed: a fan who typed their PIN and pressed the keyboard's
+/// Go key got nothing and had to reach for the button. On a screen that is
+/// opened several times a day that is the difference between two gestures and
+/// one.
+fn on_enter(
+    mut action: impl FnMut() + 'static,
+) -> impl FnMut(leptos::ev::KeyboardEvent) + 'static {
+    move |event: leptos::ev::KeyboardEvent| {
+        if event.key() == "Enter" {
+            event.prevent_default();
+            action();
+        }
+    }
+}
+
 /// Classifies an error by kind and returns the appropriate display timeout.
 /// Transient/network errors get a shorter window (2.5s) because they're
 /// noisy and self-resolving. Real errors and success messages get 5s.

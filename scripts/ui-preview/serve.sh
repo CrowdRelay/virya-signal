@@ -25,7 +25,7 @@ p.write_text(s.replace(anchor, anchor + '<script src="/bridge-stub.js"></script>
 PY
 
 echo "http://127.0.0.1:$PORT/index.html?mode=fan"
-echo "modes: fan-out | fan | beacon | staff | owner"
+echo "modes: fan-out | fan-locked | fan | beacon | staff | owner   (add &link=1 for a pending confirmation link)"
 # No-store on everything. The browser cached the stub, the wasm and the runtime
 # i18n catalogs across restarts, so a rebuilt fix could appear not to have
 # worked — which is worse than no preview at all, because it looks like a bug

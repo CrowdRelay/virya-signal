@@ -16,7 +16,7 @@
  * truncation or rhythm, which is what a UI pass is for.
  *
  * `VIRYA_PREVIEW.mode` selects who is signed in. Set it before load:
- *   fan-out | fan | beacon | staff | owner
+ *   fan-out | fan-locked | fan | beacon | staff | owner
  */
 (() => {
   const params = new URLSearchParams(location.search);
@@ -105,8 +105,22 @@
   // empty session.
   const noOperator = () => ({ configured: false, unlocked: false, session: null });
 
+  // A fan whose vault exists but is locked. Neither `fan` nor `fan-out`
+  // reaches the PIN prompt or the "a login link is waiting" panel, which are
+  // the two screens every returning fan sees before anything else.
+  const lockedFanSession = () => ({ configured: true, unlocked: false, session: null });
+
+  // Session state the preview mutates, so an unlock or a confirmation behaves
+  // like one: it persists for the rest of the page's life.
+  let fanUnlocked = mode === "fan";
+  const unlockFan = () => {
+    fanUnlocked = true;
+    return fanSession(true);
+  };
+
   const launcher = {
     "fan-out": { operator: noOperator(), fan: fanSession(false), beacon: beaconSession(false) },
+    "fan-locked": { operator: noOperator(), fan: lockedFanSession(), beacon: beaconSession(false) },
     fan: { operator: noOperator(), fan: fanSession(true), beacon: beaconSession(false) },
     beacon: { operator: noOperator(), fan: fanSession(false), beacon: beaconSession(true) },
     staff: { operator: operatorSession("staff"), fan: fanSession(false), beacon: beaconSession(false) },
@@ -368,9 +382,15 @@
   // falls through to the default below and is recorded, so a blank panel can be
   // traced to the command that was never answered rather than guessed at.
   const FIXTURES = {
-    launcher_status: () => launcher[mode] ?? launcher.fan,
+    // Unlocking has to stick. `fan_unlock` answered with an unlocked session
+    // while `fan_status` kept answering from the fixture, so the app mounted
+    // the fan shell and the next status read threw it straight back to the PIN
+    // prompt — an unlock loop no device has.
+    launcher_status: () => (fanUnlocked
+      ? { ...(launcher[mode] ?? launcher.fan), fan: fanSession(true) }
+      : (launcher[mode] ?? launcher.fan)),
     session_status: () => launcher[mode]?.operator ?? noOperator(),
-    fan_status: () => launcher[mode]?.fan ?? fanSession(false),
+    fan_status: () => (fanUnlocked ? fanSession(true) : (launcher[mode]?.fan ?? fanSession(false))),
     beacon_status: () => launcher[mode]?.beacon ?? beaconSession(false),
 
     public_events: () => events,
@@ -388,7 +408,28 @@
     fan_cached_wallets: () => walletBatch(),
     fan_cached_sections: () => ({ sections: [] }),
     fan_interests: () => ({ interests: [] }),
-    fan_referral: () => ({ qualified: 4, pending: 1 }),
+    // `ReferralProgress`, exactly: `referral_code` carries no serde default, so
+    // the old `{ qualified, pending }` object failed to decode and the referral
+    // block rendered with a blank code and an empty draws list — which reads as
+    // "this fan has no code" rather than "the fixture is wrong shape".
+    fan_referral: () => ({
+      referral_code: "KASIA-7QX2",
+      qualified_referrals: 4,
+      pending_referrals: 1,
+      draw_entries: [
+        {
+          slug: "wejsciowka-hydrozagadka",
+          name: "Wejściówka na Hydrozagadkę",
+          prize_kind: "Wejściówka",
+          draw_at: "2026-09-14T18:00:00Z",
+          total_entries: 128,
+        },
+      ],
+      coupons: [{ code: "VIRYA-10", discount_percent: 10, status: "aktywny" }],
+      physical_rewards: [
+        { item_name: "Koszulka Virya", sku: "TS-BLK-L", status: "wysłana" },
+      ],
+    }),
     fan_admission_pass: () => null,
     // `AreaWallet` is camelCase. `null` renders the AREA outage state, which
     // is not a screen worth reviewing. Three drops: one claimable, one already
@@ -597,7 +638,16 @@
     // stopped compositing. "Nothing pending" is `false`.
     fan_take_synesthesia_app_link: () => false,
     beacon_take_app_link: () => false,
-    fan_take_confirm_link: () => false,
+    // `?link=1` models a confirmation link Android routed into the app: the
+    // token stays native, so the only thing the WebView learns is that one is
+    // waiting. Pair it with `?mode=fan-locked` for the returning-fan path.
+    fan_take_confirm_link: () => params.get("link") === "1",
+    fan_confirm_link: () => unlockFan(),
+    fan_confirm: () => unlockFan(),
+    fan_unlock: () => unlockFan(),
+    fan_lock: () => { fanUnlocked = false; return launcher[mode]?.fan ?? fanSession(false); },
+    fan_request_access: () => null,
+    fan_signup: () => ({ session_created: false, email_queued: true, email_kind: "confirmation", retry_after_seconds: null }),
     fan_push_take_target: () => null,
     native_crash_report: () => null,
 

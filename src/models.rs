@@ -486,7 +486,7 @@ pub struct FanEventInterest {
     pub event: PublicEvent,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct ReferralProgress {
     pub referral_code: String,
     #[serde(default)]
@@ -503,7 +503,7 @@ pub struct ReferralProgress {
     pub physical_rewards: Vec<PhysicalRewardGrant>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct WeightedDrawEntry {
     #[serde(default)]
     pub slug: String,
@@ -513,14 +513,14 @@ pub struct WeightedDrawEntry {
     pub total_entries: u32,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct MerchCoupon {
     pub code: String,
     pub discount_percent: u32,
     pub status: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct PhysicalRewardGrant {
     pub item_name: String,
     pub sku: String,

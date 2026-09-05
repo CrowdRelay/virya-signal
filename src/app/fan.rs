@@ -324,7 +324,7 @@ fn FanAccess(
 
     let open_latarnik = move |_| mode.set(RootMode::Latarnik);
 
-    let unlock = move |_| {
+    let run_unlock = move || {
         let current_pin = pin.get();
         busy.set(true);
         spawn_local(async move {
@@ -348,7 +348,7 @@ fn FanAccess(
         });
     };
 
-    let signup = move |_| {
+    let run_signup = move || {
         if !consent.get() {
             error.set(Some(
                 tr("marketing_consent_is_required_to_join_signal").to_owned(),
@@ -461,20 +461,50 @@ fn FanAccess(
         });
     };
 
+    // Stage two opens below the fold, so advancing used to leave the fan
+    // looking at the same email field with the next step off screen. Focusing
+    // the first field of the new stage both continues the flow and scrolls it
+    // into view.
+    let city_ref = NodeRef::<leptos::html::Input>::new();
+    Effect::new(move |_| {
+        if signup_stage.get() >= 2
+            && access_mode.get() == FanAccessMode::Signup
+            && let Some(element) = city_ref.get()
+        {
+            let _ = element.focus();
+        }
+    });
+
+    let unlock_pin_ref = NodeRef::<leptos::html::Input>::new();
+    Effect::new(move |_| {
+        // Only when the field is actually on screen: a configured fan that is
+        // not being asked for a link is looking at the PIN prompt.
+        if status.get().configured
+            && !link_pending.get()
+            && !recovery_open.get()
+            && let Some(element) = unlock_pin_ref.get()
+        {
+            let _ = element.focus();
+        }
+    });
+
     let confirmation_session = FanConfirmationSession {
         status,
         status_refresh,
     };
 
-    let confirm = move |_| {
+    let run_confirm = move || {
         if link_pending.get_untracked() {
             submit_fan_confirm_link(token, pin, busy, confirmation_session, error);
             return;
         }
         submit_fan_confirmation(email, name, token, pin, busy, confirmation_session, error);
     };
+    let unlock = move |_| run_unlock();
+    let signup = move |_| run_signup();
+    let confirm = move |_| run_confirm();
 
-    let request_access = move |_| {
+    let run_request_access = move || {
         if busy.get_untracked() {
             return;
         }
@@ -506,6 +536,7 @@ fn FanAccess(
             let _ = busy.try_set(false);
         });
     };
+    let request_access = move |_| run_request_access();
 
     let scan_confirmation = move |_| {
         if busy.get_untracked() {
@@ -575,11 +606,6 @@ fn FanAccess(
                     <span><b aria-hidden="true">"▣"</b>{tr("tickets_and_qr_codes_on_your_phone")}</span>
                     <span><b aria-hidden="true">"✦"</b>{tr("rewards_for_simple_actions")}</span>
                 </div>
-                <div class="latarnik-entry">
-                    <p class="eyebrow">{tr("latarnik_zone")}</p>
-                    <p>{tr("latarnik_short_pitch")}</p>
-                    <button type="button" class="text-button" on:click=open_latarnik>{tr("open_latarnik")}</button>
-                </div>
             </header>
             <Show when=move || status.get().configured fallback=move || view! {
                 <div class="access-card fan-card">
@@ -600,7 +626,7 @@ fn FanAccess(
                             // and a placeholder disappears the moment anyone types, so the
                             // one line that tells a new fan this is a 30-second link signup
                             // was never readable. It sits under the field instead.
-                            <label>{tr("enter_email_to_start")}<input aria-label=tr("email") type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label>
+                            <label>{tr("enter_email_to_start")}<input aria-label=tr("email") type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e)) on:keydown=on_enter(move || { if !busy.get_untracked() && !email.get_untracked().trim().is_empty() && signup_stage.get_untracked() < 2 { signup_stage.set(2); } })/></label>
                             <p class="inline-note">{tr("email_first_hint")}</p>
                             <Show when=move || { signup_stage.get() >= 2 }>
                                 <label>{tr("name_optional")}<input prop:value=move || name.get() on:input=move |e| name.set(event_target_value(&e))/></label>
@@ -625,7 +651,7 @@ fn FanAccess(
                                 <label class="pin-field">
                                     <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
                                     <small id="fan-confirm-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
-                                    <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-confirm-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e)))/>
+                                    <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-confirm-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) on:keydown=on_enter(move || { if !busy.get_untracked() && new_operator_pin_is_valid(&pin.get_untracked()) && (link_pending.get_untracked() || !token.get_untracked().trim().is_empty()) { run_confirm(); } })/>
                                 </label>
                                 <p class="confirmation-note">{tr("pin_encrypts_your_profile_on_this_device")}</p>
                                 <button class="primary" disabled=move || busy.get() || (!link_pending.get() && token.get().trim().is_empty()) || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_enter")}</button>
@@ -638,7 +664,7 @@ fn FanAccess(
                                     <>
                                         <p class="signup-details-hint">{tr("signup_details_hint")}</p>
                                         <div class="custom-city-fields city-stable-entry">
-                                            <label>{tr("city")}<input placeholder=tr("e_g_bielawa") prop:value=move || custom_city_name.get() on:input=move |e| custom_city_name.set(event_target_value(&e))/></label>
+                                            <label>{tr("city")}<input node_ref=city_ref placeholder=tr("e_g_bielawa") prop:value=move || custom_city_name.get() on:input=move |e| custom_city_name.set(event_target_value(&e))/></label>
                                             <label>{tr("province_region_optional")}<input placeholder=tr("lower_silesia") prop:value=move || custom_region.get() on:input=move |e| custom_region.set(event_target_value(&e))/></label>
                                             <p class="inline-note">{tr("enter_your_city_manually_we_will_match")}</p>
                                         </div>
@@ -657,7 +683,7 @@ fn FanAccess(
                                         <label class="pin-field">
                                             <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
                                             <small id="fan-signup-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
-                                            <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-signup-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e)))/>
+                                            <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-signup-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) on:keydown=on_enter(move || { if !busy.get_untracked() && new_operator_pin_is_valid(&pin.get_untracked()) { run_signup(); } })/>
                                         </label>
                                         <div class="pref-list"><label class="pref-row"><span class="pref-row-label">{tr("i_want_to_receive_information_about_virya")}</span><input type="checkbox" class="pref-switch" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/></label></div>
                                         <button class="primary" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=signup>{tr("join_signal")}</button>
@@ -672,6 +698,15 @@ fn FanAccess(
             }>
                 <div class="access-card fan-card">
                     {move || error.get().map(|msg| view! { <p class="inline-form-error" role="alert">{msg}</p> })}
+                    // A fan who already has a profile on this device and asked
+                    // for a login link landed here: the link was collected, the
+                    // token stayed native, and this branch never looked at
+                    // `link_pending`. The screen said "enter your PIN" — the one
+                    // thing they had just told us they could not do — and the
+                    // recovery panel's confirm stayed disabled forever, because
+                    // it required a token the link had deliberately kept out of
+                    // the WebView. The arriving link now owns the screen.
+                    <Show when=move || link_pending.get() && !recovery_open.get() fallback=move || view! {
                     <Show when=move || recovery_open.get() fallback=move || view! {
                         <>
                             <p class="lock-copy">{tr("your_profile_and_tickets_are_encrypted_on")}</p>
@@ -679,7 +714,11 @@ fn FanAccess(
                                 <label class="pin-field">
                                     <span class="pin-field-label">{tr("fan_app_unlock_pin")}</span>
                                     <small id="fan-unlock-pin-help">{tr("enter_the_pin_created_for_this_fan")}</small>
-                                    <input type="password" autocomplete="current-password" inputmode="numeric" pattern="[0-9]*" placeholder=tr("your_pin") aria-describedby="fan-unlock-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e))/>
+                                    // The lock screen has exactly one field and
+                                    // is the first thing every launch shows.
+                                    // Landing in it costs the fan a tap that has
+                                    // no other possible target.
+                                    <input node_ref=unlock_pin_ref type="password" autocomplete="current-password" inputmode="numeric" pattern="[0-9]*" placeholder=tr("your_pin") aria-describedby="fan-unlock-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e)) on:keydown=on_enter(move || { if !busy.get_untracked() && pin.get_untracked().chars().count() >= 4 { run_unlock(); } })/>
                                 </label>
                                 <button class="primary" disabled=move || busy.get() || pin.get().chars().count() < 4 on:click=unlock>{tr("open_my_signal")}</button>
                                 <button type="button" class="text-button recovery-link" on:click=move |_| recovery_open.set(true)>{tr("i_forgot_my_pin_sign_in_again")}</button>
@@ -688,7 +727,7 @@ fn FanAccess(
                     }>
                         <div class="form-grid recovery-panel">
                             <div class="recovery-heading"><p class="eyebrow">{tr("access_recovery")}</p><h3>{tr("create_a_new_pin")}</h3><p>{tr("enter_your_email_request_a_fresh_link")}</p></div>
-                            <label>{tr("email")}<input aria-label=tr("email") type="email" autocomplete="email" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e))/></label>
+                            <label>{tr("email")}<input aria-label=tr("email") type="email" autocomplete="email" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e)) on:keydown=on_enter(move || { if !busy.get_untracked() && !email.get_untracked().trim().is_empty() { run_request_access(); } })/></label>
                             <button type="button" class="ghost" disabled=move || busy.get() || email.get().trim().is_empty() on:click=request_access>{tr("send_login_link")}</button>
                             <label>{tr("email_link_or_code")}<textarea aria-label=tr("email_link_or_code") rows="3" autocomplete="one-time-code" spellcheck="false" autocapitalize="none" placeholder=tr("paste_link_or_code") prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
                             <div class="confirmation-actions single">
@@ -697,14 +736,47 @@ fn FanAccess(
                             <label class="pin-field">
                                 <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
                                 <small id="fan-recovery-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
-                                <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-recovery-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e)))/>
+                                <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-recovery-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) on:keydown=on_enter(move || { if !busy.get_untracked() && new_operator_pin_is_valid(&pin.get_untracked()) && (link_pending.get_untracked() || !token.get_untracked().trim().is_empty()) { run_confirm(); } })/>
                             </label>
-                            <button class="primary" disabled=move || busy.get() || token.get().trim().is_empty() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_set_new_pin")}</button>
+                            // A link Android routed here leaves nothing to paste,
+                            // so requiring a token would disable this button for
+                            // exactly the fan the link was sent to.
+                            <button class="primary" disabled=move || busy.get() || (!link_pending.get() && token.get().trim().is_empty()) || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_set_new_pin")}</button>
                             <button type="button" class="text-button" on:click=move |_| recovery_open.set(false)>{tr("back_to_pin_login")}</button>
+                        </div>
+                    </Show>
+                    }>
+                        <div class="form-grid recovery-panel">
+                            <div class="recovery-heading">
+                                <p class="eyebrow">{tr("access_recovery")}</p>
+                                <h3>{tr("link_from_the_email_is_ready")}</h3>
+                                <p>{tr("set_a_pin_and_enter_signal")}</p>
+                            </div>
+                            <label class="pin-field">
+                                <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
+                                <small id="fan-link-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
+                                <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-link-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) on:keydown=on_enter(move || { if !busy.get_untracked() && new_operator_pin_is_valid(&pin.get_untracked()) { run_confirm(); } })/>
+                            </label>
+                            <p class="confirmation-note">{tr("pin_encrypts_your_profile_on_this_device")}</p>
+                            <button class="primary" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_enter")}</button>
+                            // The old PIN still works until the link is spent,
+                            // so a fan who tapped the link by accident is not
+                            // trapped in a screen with no way back.
+                            <button type="button" class="text-button" on:click=move |_| link_pending.set(false)>{tr("back_to_pin_login")}</button>
                         </div>
                     </Show>
                 </div>
             </Show>
+            // Latarnik is the press/partner path. It used to sit between the
+            // headline and the sign-in card, so the first screen of a fan app
+            // spent its best position pitching a zone almost no fan wants. It
+            // follows the fan's own action now, in source order as well as on
+            // screen (WCAG 1.3.2).
+            <div class="latarnik-entry">
+                <p class="eyebrow">{tr("latarnik_zone")}</p>
+                <p>{tr("latarnik_short_pitch")}</p>
+                <button type="button" class="text-button" on:click=open_latarnik>{tr("open_latarnik")}</button>
+            </div>
         </section>
     }
 }
