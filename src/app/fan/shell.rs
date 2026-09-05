@@ -21,8 +21,8 @@ fn persist_fan_tab(tab: FanTab) {
     bridge::set_fan_tab_state(value);
 }
 
-fn fan_tab_for_push_target(target: &str) -> FanTab {
-    match FanTarget::parse(target) {
+fn fan_tab_for_target(target: &FanTarget) -> FanTab {
+    match target {
         FanTarget::Area => FanTab::Game,
         FanTarget::Merch => FanTab::Merch,
         FanTarget::Event(_) => FanTab::Events,
@@ -86,7 +86,20 @@ fn FanApp(
             return;
         };
         push_target.set(None);
-        tab.set(fan_tab_for_push_target(&target));
+        let target = FanTarget::parse(&target);
+        // The tab moves first: the shell clears a focused show whenever the tab
+        // is not Events, and setting the slug before the tab would hand that
+        // rule a slug to throw away.
+        tab.set(fan_tab_for_target(&target));
+        // `FanTarget::Event` carries the slug the notification was about, and
+        // it used to be dropped on the floor: a push saying tickets for one
+        // show had gone on sale opened the list of every show instead. The
+        // preview is cleared so the detail view resolves against the real
+        // event once the list lands, rather than painting a stale card.
+        if let FanTarget::Event(Some(slug)) = target {
+            focused_event_preview.set(None);
+            focused_event_slug.set(Some(slug));
+        }
     });
 
     Effect::new(move |_| {

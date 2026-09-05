@@ -215,11 +215,15 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         self.assertIn('"fan_push_take_target"', app)
         self.assertIn("push_target=push_target", app)
         self.assertIn("push_target=push_target", fan)
-        self.assertIn("fan_tab_for_push_target", shell)
+        self.assertIn("fan_tab_for_target", shell)
         # Routing moved from substring matching to typed FanTarget parsing, which
         # matches the exact query key instead of letting "not_event=" through.
-        self.assertIn("FanTarget::parse(target)", shell)
+        self.assertIn("FanTarget::parse(&target)", shell)
         self.assertIn("FanTarget::Event(_) => FanTab::Events", shell)
+        # The slug the notification carried has to reach the focused show. It
+        # used to be discarded, so a push about one show opened the whole list.
+        self.assertIn("if let FanTarget::Event(Some(slug)) = target", shell)
+        self.assertIn("focused_event_slug.set(Some(slug))", shell)
         self.assertIn("override fun onNewIntent", plugin)
         self.assertIn("takeLaunchTarget", plugin)
         self.assertIn('putExtra("virya_push_target_path", targetPath)', service)

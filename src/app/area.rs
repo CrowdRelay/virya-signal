@@ -160,29 +160,41 @@ fn approximate_position(drop: &AreaDrop) -> (f64, f64) {
 }
 
 fn find_drop(area: RwSignal<Option<AreaWallet>>, id: &str) -> Option<AreaDrop> {
-    area.get()
-        .and_then(|wallet| wallet.drops.into_iter().find(|drop| drop.id.as_str() == id))
+    area.with(|wallet| {
+        wallet
+            .as_ref()
+            .and_then(|wallet| wallet.drops.iter().find(|drop| drop.id.as_str() == id))
+            .cloned()
+    })
 }
 
+/// `with` rather than `get`: `get` clones the whole `AreaWallet` — every drop,
+/// claim and voucher — and the map calls these two once per marker for its
+/// live and claimed classes. Twelve markers meant twenty-four full wallet
+/// clones per render pass, for two booleans.
 fn live(area: RwSignal<Option<AreaWallet>>, id: &str) -> bool {
-    area.get().is_some_and(|wallet| {
-        wallet
-            .drops
-            .iter()
-            .find(|drop| drop.id.as_str() == id)
-            .is_some_and(|drop| drop.active && !drop.full)
-            || wallet.live_drops.iter().any(|drop| drop.id == id)
+    area.with(|wallet| {
+        wallet.as_ref().is_some_and(|wallet| {
+            wallet
+                .drops
+                .iter()
+                .find(|drop| drop.id.as_str() == id)
+                .is_some_and(|drop| drop.active && !drop.full)
+                || wallet.live_drops.iter().any(|drop| drop.id == id)
+        })
     })
 }
 
 fn claimed(area: RwSignal<Option<AreaWallet>>, id: &str) -> bool {
-    area.get().is_some_and(|wallet| {
-        wallet.claims.iter().any(|claim| claim.drop_id == id)
-            || wallet
-                .drops
-                .iter()
-                .find(|drop| drop.id.as_str() == id)
-                .is_some_and(|drop| drop.claimed)
+    area.with(|wallet| {
+        wallet.as_ref().is_some_and(|wallet| {
+            wallet.claims.iter().any(|claim| claim.drop_id == id)
+                || wallet
+                    .drops
+                    .iter()
+                    .find(|drop| drop.id.as_str() == id)
+                    .is_some_and(|drop| drop.claimed)
+        })
     })
 }
 
@@ -272,6 +284,16 @@ pub(super) fn AreaGameScreen(
                 .map(|drop| drop.id.clone())
         });
         selected.set(initial);
+    });
+
+    // The win card is about the point that was just claimed. It used to stay on
+    // screen after the fan moved to another marker, sitting under that marker's
+    // card and crediting it with a drop it never won.
+    Effect::new(move |_| {
+        selected.track();
+        if result.try_get_untracked().flatten().is_some() {
+            let _ = result.try_set(None);
+        }
     });
 
     let refresh = move |_| refresh_fan_area(area, loading, error);
@@ -550,9 +572,14 @@ pub(super) fn AreaGameScreen(
                             <button type="button" class="ghost" on:click=move |_| open_area_game(error)>{tr("open_full_area_game")}</button>
                         </div>
                         <p class="security-note">{tr("area_location_privacy")}</p>
-                        {wallet.drops.iter().all(|drop| !drop.active || drop.full).then(|| view! {
-                            <p class="inline-note">{tr("no_active_area_points_now")}</p>
-                        })}
+                        // `live` also honours `live_drops`, so testing `drops`
+                        // alone announced "no active points" on top of a map
+                        // with a live marker on it.
+                        {(wallet.drops.iter().all(|drop| !live(area, &drop.id))
+                            && wallet.live_drops.is_empty())
+                            .then(|| view! {
+                                <p class="inline-note">{tr("no_active_area_points_now")}</p>
+                            })}
                     }.into_any()
                 }).value_or_else(|| view! { <div class="empty-state"><strong>{tr("area_is_temporarily_unavailable")}</strong><p>{tr("refresh_the_data_or_open_the_full")}</p><button class="primary" on:click=move |_| open_area_game(error)>{tr("open_area")}</button></div> }.into_any())}
             </Show>
