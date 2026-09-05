@@ -11,7 +11,7 @@ CONTRACT = {
     ],
     "src-tauri/src/models.rs": [
         "models/session_fan.rs", "models/commerce_events.rs", "models/area.rs",
-        "models/ops_signal.rs", "models/showmode_inputs.rs", "models/tests.rs",
+        "models/signal.rs", "models/showmode_inputs.rs", "models/tests.rs",
     ],
     "src-tauri/src/commands/fan.rs": [
         "fan/push.rs", "fan/session_commerce.rs", "fan/wallet.rs", "fan/tests.rs",

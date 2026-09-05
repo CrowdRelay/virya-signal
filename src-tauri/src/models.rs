@@ -245,7 +245,7 @@ pub use staff_pairing::{StaffPairingExchange, StaffPairingPayload};
 include!("models/session_fan.rs");
 include!("models/commerce_events.rs");
 include!("models/area.rs");
-include!("models/ops_signal.rs");
+include!("models/signal.rs");
 include!("models/showmode_inputs.rs");
 include!("models/tests.rs");
 include!("models/beacon.rs");

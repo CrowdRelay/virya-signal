@@ -492,7 +492,6 @@
     // event strip blank, which reads as an empty tour rather than a bad
     // fixture. Same list, unwrapped.
     operator_events: () => events,
-    operator_ops_overview: () => ({}),
     operator_signal_overview: () => ({
       generated_at: iso(0),
       summary: {

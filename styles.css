@@ -434,7 +434,7 @@ button:disabled { opacity: .48; cursor: default; }
 .area-progress span { display: block; height: 100%; background: var(--signal-hot); transition: width .25s ease; }
 .area-stats { display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted); font-size: var(--type-micro); text-transform: uppercase; }
 .area-stats span { border: 1px solid var(--line); padding: 7px 9px; }
-.artifact-list, .ops-list { display: grid; gap: 9px; }
+.artifact-list { display: grid; gap: 9px; }
 .artifact-card { border: 1px solid var(--line); background: var(--surface); padding: 14px; display: grid; grid-template-columns: 38px 1fr auto; gap: 12px; align-items: start; content-visibility: auto; contain-intrinsic-size: auto 105px; }
 .artifact-card > span { color: var(--signal-hot); font-size: 22px; font-weight: 900; }
 .artifact-card strong { text-transform: uppercase; }
@@ -498,16 +498,6 @@ button:disabled { opacity: .48; cursor: default; }
 .area-win-card h3 { color: var(--success); font-size: 22px; text-transform: uppercase; }
 .area-win-card p, .area-win-card small { color: #aab9ad; line-height: 1.45; }
 .warning { border-color: rgba(251,191,36,.32); background: rgba(251,191,36,.07); }
-.ops-panel { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 20px; }
-.ops-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-.ops-item { border: 1px solid var(--line); background: var(--surface); padding: 13px; display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; border-radius: var(--radius-md); }
-.ops-item p, .ops-item small { display: block; margin: 4px 0 0; color: var(--muted); word-break: break-word; }
-.ops-item button { min-height: 44px; padding: 10px 13px; }
-.ops-item-info { border: 0; background: transparent; text-align: left; padding: 0; cursor: pointer; display: block; min-width: 0; }
-.ops-item-info strong { font-size: .92rem; }
-.ops-item-info p { font-size: var(--type-meta); }
-.ops-item-info:active { opacity: .7; }
-.ops-healthy { border: 1px solid rgba(52,211,153,.25); background: rgba(52,211,153,.06); color: #a7f3d0; padding: 14px; }
 
 @media (min-width: 720px) {
   .mode-grid { grid-template-columns: 1fr 1fr; }
@@ -1059,24 +1049,6 @@ html[data-virya-scanner-active] .app-shell {
 .compact-referral-hero h2 { font-size: 64px; }
 @media (max-width: 620px) {
   .home-action-card { min-height: 150px; }
-}
-
-.autopilot-attention { position: relative; overflow: hidden; }
-.autopilot-attention::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--line); }
-.autopilot-attention.attention-overdue::before,
-.autopilot-attention.attention-critical::before { background: var(--danger); }
-.autopilot-attention.attention-today::before,
-.autopilot-attention.attention-soon::before { background: var(--signal-hot); }
-
-.autopilot-policies { gap: 10px; }
-.autopilot-policy-card { grid-template-columns: minmax(0, 1fr); }
-.autopilot-policy-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
-.autopilot-policy-actions .text-button { width: auto; min-width: 74px; margin-top: 0; }
-.autopilot-policy-actions .text-button.active { border-color: var(--signal-hot); background: color-mix(in srgb, var(--signal-hot) 9%, transparent); }
-.autopilot-pending-card { align-items: start; }
-@media (max-width: 680px) {
-  .autopilot-pending-card { grid-template-columns: 1fr; }
-  .autopilot-policy-actions { justify-content: flex-start; }
 }
 
 /* Cross-product continuity: participation, never XP. */
@@ -1780,7 +1752,7 @@ html[data-virya-scanner-active] .app-shell {
 .scan-result { box-shadow: var(--shadow-md); }
 .area-stats span { border-radius: 999px; border-color: var(--border-subtle); }
 /* A metric was a number over a hairline gradient rule with nothing behind it,
-   so a grid of them — the whole autopilot and cockpit read-out — was a field
+   so a grid of them — the whole Signal read-out — was a field
    of loose digits with no edges to group them. They are tiles now: the count
    and its label belong to one object, and a row of them reads as a row. */
 .metric {
@@ -1832,30 +1804,7 @@ html[data-virya-scanner-active] .app-shell {
 .pairing-scanned strong { color: var(--success); }
 .pairing-scanned small { color: var(--muted); }
 
-/* ── Operator cockpit ── */
-.ops-item, .signal-city-card, .signal-activity-grid article { border-color: var(--border-subtle); }
-.ops-item { box-shadow: var(--shadow-sm); transition: border-color var(--dur-fast) var(--ease-out); }
-.ops-item:active { border-color: var(--signal-deep); }
-.ops-healthy {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-  border-radius: var(--radius-md);
-  color: #a7f3d0;
-  line-height: 1.5;
-}
-.ops-healthy::before {
-  content: "✓";
-  display: grid;
-  place-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: rgba(52,211,153,.14);
-  font-size: 15px;
-  line-height: 1;
-}
+.signal-city-card, .signal-activity-grid article { border-color: var(--border-subtle); }
 .signal-admin-toolbar { border-color: var(--border-subtle); box-shadow: var(--shadow-sm); }
 .signal-health-card { box-shadow: var(--shadow-md); }
 .panel-hint { margin: 5px 0 0; color: var(--muted); font-size: var(--type-meta); line-height: 1.5; max-width: 52ch; }
