@@ -145,7 +145,10 @@ pub(super) struct PinArgs<'a> {
 #[serde(rename_all = "camelCase")]
 pub(super) struct FanConfirmLinkArgs<'a> {
     pub api_base_url: &'a str,
-    pub pin: &'a str,
+    /// `None` asks the device to seal the vault password instead of deriving
+    /// it from a PIN, which is what lets a mailed link land inside the app with
+    /// nothing else asked of the fan.
+    pub pin: Option<&'a str>,
 }
 
 #[derive(Serialize)]
@@ -223,7 +226,9 @@ pub(super) struct CampaignIdArgs<'a> {
 #[serde(rename_all = "camelCase")]
 pub(super) struct FanSignupArgs<'a> {
     pub input: &'a FanSignupInput,
-    pub pin: &'a str,
+    /// `None` hands the vault password to the device keystore instead of
+    /// deriving it from a PIN, the same choice the mailed link offers.
+    pub pin: Option<&'a str>,
 }
 
 #[derive(Serialize)]

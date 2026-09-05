@@ -1,10 +1,14 @@
 #[tauri::command]
 pub(crate) async fn fan_status(state: State<'_, AppState>) -> Result<FanSessionStatus, AppError> {
+    let mode = crate::device_unlock::effective_mode(&state).await;
     let session = state.fan_session.read().await;
     Ok(FanSessionStatus {
         configured: vault::fan_exists(&state.app_data_dir),
         unlocked: session.is_some(),
         session: session.as_ref().map(|profile| profile.as_ref().into()),
+        pin_unlock: mode.pin,
+        device_unlock: mode.device,
+        device_unlock_supported: state.device_unlock_supported,
     })
 }
 
@@ -76,6 +80,7 @@ pub(crate) async fn fan_lock(state: State<'_, AppState>) -> Result<FanSessionSta
 #[tauri::command]
 pub(crate) async fn fan_delete_account(
     state: State<'_, AppState>,
+    app: AppHandle,
 ) -> Result<FanSessionStatus, AppError> {
     let _mutation = state.fan_mutation.lock().await;
     let profile = state
@@ -94,6 +99,7 @@ pub(crate) async fn fan_delete_account(
     // has the session token it needs.
     let app_data_dir = state.app_data_dir.clone();
     run_blocking(move || vault::remove_fan(&app_data_dir)).await?;
+    forget_device_unlock(&state, &app).await;
 
     // Clear all in-memory session material.
     *state.fan_session.write().await = None;
@@ -116,6 +122,7 @@ pub(crate) async fn fan_delete_account(
 #[tauri::command]
 pub(crate) async fn fan_forget(
     state: State<'_, AppState>,
+    app: AppHandle,
 ) -> Result<FanSessionStatus, AppError> {
     let _mutation = state.fan_mutation.lock().await;
     let profile = state
@@ -147,14 +154,30 @@ pub(crate) async fn fan_forget(
     *state.fan_sections_cache.write().await = None;
     let app_data_dir = state.app_data_dir.clone();
     run_blocking(move || vault::remove_fan(&app_data_dir)).await?;
+    // The seal outlives the snapshot it opens unless it is dropped with it. A
+    // leftover keystore key and unlock record would then be offered to the next
+    // fan on this device as a way into a vault that is gone.
+    forget_device_unlock(&state, &app).await;
     drop(_mutation);
     fan_status(state).await
 }
 
+/// What will open this vault after it is written.
+///
+/// A confirmation can arrive with a PIN the fan chose, or with nothing at all
+/// when they took the mailed link and the device can seal a password for them.
+/// Both end in the same 32 bytes handed to the snapshot layer; only the source
+/// differs, so this is the one place that has to know which it was.
+pub(crate) enum FanCredential {
+    Pin(Zeroizing<String>),
+    Device,
+}
+
 async fn persist_confirmed_fan(
     state: &AppState,
+    app: &AppHandle,
     input: FanConfirmationInput,
-    pin: Zeroizing<String>,
+    credential: FanCredential,
 ) -> Result<(), AppError> {
     let (_result, session_token, canonical_email, canonical_name) =
         state.api.fan_confirm(&input).await?;
@@ -173,16 +196,56 @@ async fn persist_confirmed_fan(
     };
     let app_data_dir = state.app_data_dir.clone();
     let stored_profile = profile.clone();
-    let vault_pin = pin.clone();
-    // replace_fan already derived this password to encrypt the vault. Argon2
-    // dominates the confirm step, so deriving it a second time from the same
-    // pin and salt doubled the wait before the app could show anything.
-    let vault_password = run_blocking(move || {
-        vault::replace_fan(&app_data_dir, vault_pin.as_str(), &stored_profile)
-    })
-    .await?;
+    let (vault_password, session_pin) = match credential {
+        FanCredential::Pin(pin) => {
+            let vault_pin = pin.clone();
+            // replace_fan already derived this password to encrypt the vault.
+            // Argon2 dominates the confirm step, so deriving it a second time
+            // from the same pin and salt doubled the wait before the app could
+            // show anything.
+            let password = run_blocking(move || {
+                vault::replace_fan(&app_data_dir, vault_pin.as_str(), &stored_profile)
+            })
+            .await?;
+            crate::device_unlock::write_mode(
+                state,
+                crate::device_unlock::UnlockMode {
+                    pin: true,
+                    device: false,
+                },
+            )
+            .await?;
+            // A PIN confirmation replaces whatever opened this vault before it,
+            // so a seal left from an earlier account would open a snapshot that
+            // no longer exists.
+            let _ = crate::device_unlock::forget(app, &state.app_data_dir);
+            (password, Some(pin))
+        }
+        FanCredential::Device => {
+            let password = vault::random_vault_password()?;
+            let sealing = password.clone();
+            let write_dir = app_data_dir.clone();
+            run_blocking(move || {
+                vault::replace_fan_with_password(&write_dir, sealing.as_ref(), &stored_profile)
+            })
+            .await?;
+            // Sealing after the vault is written: a seal for a snapshot that
+            // failed to land is a key to nothing, and the vault write is the
+            // step that can still fail on a full disk.
+            crate::device_unlock::seal(app, &state.app_data_dir, password.as_ref())?;
+            crate::device_unlock::write_mode(
+                state,
+                crate::device_unlock::UnlockMode {
+                    pin: false,
+                    device: true,
+                },
+            )
+            .await?;
+            (password, None)
+        }
+    };
     *state.fan_session.write().await = Some(Arc::new(profile));
-    *state.fan_pin.write().await = Some(pin);
+    *state.fan_pin.write().await = session_pin;
     *state.fan_vault_password.write().await = Some(vault_password);
     state.wallet_qr_tokens.write().await.clear();
     // A different fan now owns this vault; the previous fan's panels must not
@@ -202,20 +265,34 @@ pub(crate) async fn fan_prepare_confirmation(
     validate_api_base(&api_base_url)?;
 
     if pin.is_empty() {
-        let pending = state.pending_fan_confirmation.lock().await;
-        if pending
-            .as_ref()
-            .is_some_and(|pending| pending.api_base_url == api_base_url)
+        // A repeat prepare for the same endpoint keeps whatever credential the
+        // first one recorded. The borrow ends here so the write below is not
+        // taken against a lock this scope still holds.
         {
-            return Ok(());
+            let pending = state.pending_fan_confirmation.lock().await;
+            if pending
+                .as_ref()
+                .is_some_and(|pending| pending.api_base_url == api_base_url)
+            {
+                return Ok(());
+            }
         }
-        return Err(AppError::InvalidPin);
+        // Otherwise an empty PIN means the fan asked this device to hold the
+        // password. Without a keystore there is nothing to hold it with.
+        if !state.device_unlock_supported {
+            return Err(AppError::InvalidPin);
+        }
+        *state.pending_fan_confirmation.lock().await = Some(PendingFanConfirmation {
+            api_base_url,
+            pin: None,
+        });
+        return Ok(());
     }
 
     validate_pin(&pin)?;
     *state.pending_fan_confirmation.lock().await = Some(PendingFanConfirmation {
         api_base_url,
-        pin: Zeroizing::new(pin),
+        pin: Some(Zeroizing::new(pin)),
     });
     Ok(())
 }
@@ -230,69 +307,15 @@ pub(crate) async fn fan_clear_pending_confirmation(
 }
 
 #[tauri::command]
-pub(crate) async fn fan_signup(
-    state: State<'_, AppState>,
-    mut input: FanSignupInput,
-    pin: String,
-) -> Result<FanAuthResult, AppError> {
-    let _mutation = state.fan_mutation.lock().await;
-    // Reject signup if a fan vault already exists. The UI gates signup to
-    // `!configured`, but a direct command call could otherwise overwrite the
-    // profile while leaving stale `FAN_HOME_CACHE_KEY` /
-    // `FAN_SECTIONS_CACHE_KEY` entries from the previous account, leaking
-    // cross-account data through the cache.
-    if vault::fan_exists(&state.app_data_dir) {
-        return Err(AppError::Conflict(
-            crate::i18n::tr("native_error_already_configured").into(),
-        ));
-    }
-    validate_fan_signup(&mut input, &pin)?;
-    let pin = Zeroizing::new(pin);
-    let (result, session_token) = state.api.fan_signup(&input).await?;
-    if let Some(session_token) = session_token {
-        let profile = FanProfile {
-            api_base_url: input.api_base_url,
-            area_wallet_id: uuid::Uuid::new_v4().to_string(),
-            email: input.email,
-            display_name: input.display_name,
-            fan_session_token: session_token,
-            push_enabled: false,
-            push_last_sync_ok: false,
-            pass_session_token: None,
-            wallets: Vec::new(),
-            cached_wallets: Vec::new(),
-            cached_wallet_qr: Vec::new(),
-        };
-        let app_data_dir = state.app_data_dir.clone();
-        let stored_profile = profile.clone();
-        let vault_pin = pin.clone();
-        let vault_password = run_blocking(move || {
-            vault::save_fan(&app_data_dir, vault_pin.as_str(), &stored_profile)
-        })
-        .await?;
-        *state.fan_session.write().await = Some(Arc::new(profile));
-        *state.fan_pin.write().await = Some(pin);
-        *state.fan_vault_password.write().await = Some(vault_password);
-        *state.pending_fan_confirmation.lock().await = None;
-        state.wallet_qr_tokens.write().await.clear();
-    } else {
-        *state.pending_fan_confirmation.lock().await = Some(PendingFanConfirmation {
-            api_base_url: input.api_base_url.clone(),
-            pin,
-        });
-    }
-    Ok(result)
-}
-
-#[tauri::command]
 pub(crate) async fn fan_confirm(
     state: State<'_, AppState>,
+    app: AppHandle,
     mut input: FanConfirmationInput,
     pin: String,
 ) -> Result<FanSessionStatus, AppError> {
     let _mutation = state.fan_mutation.lock().await;
     validate_fan_confirmation(&mut input, &pin)?;
-    persist_confirmed_fan(&state, input, Zeroizing::new(pin)).await?;
+    persist_confirmed_fan(&state, &app, input, FanCredential::Pin(Zeroizing::new(pin))).await?;
     *state.pending_fan_confirmation.lock().await = None;
     drop(_mutation);
     fan_status(state).await
@@ -324,8 +347,9 @@ pub(crate) async fn fan_take_confirm_link(
 #[tauri::command]
 pub(crate) async fn fan_confirm_link(
     state: State<'_, AppState>,
+    app: AppHandle,
     mut api_base_url: String,
-    pin: String,
+    pin: Option<String>,
 ) -> Result<FanSessionStatus, AppError> {
     let _mutation = state.fan_mutation.lock().await;
     if state.fan_session.read().await.is_some() {
@@ -349,8 +373,24 @@ pub(crate) async fn fan_confirm_link(
         display_name: None,
         token: token.to_string(),
     };
-    validate_fan_confirmation(&mut input, &pin)?;
-    persist_confirmed_fan(&state, input, Zeroizing::new(pin)).await?;
+    // No PIN means the fan took the link and the device seals the password for
+    // them. That is only offered where a keystore can actually hold it — the
+    // alternative would be a vault password sitting on disk in the clear, which
+    // is worse than any prompt.
+    let credential = match pin {
+        Some(pin) => {
+            validate_fan_confirmation(&mut input, &pin)?;
+            FanCredential::Pin(Zeroizing::new(pin))
+        }
+        None => {
+            if !state.device_unlock_supported {
+                return Err(AppError::InvalidPin);
+            }
+            validate_fan_confirmation_token_only(&mut input)?;
+            FanCredential::Device
+        }
+    };
+    persist_confirmed_fan(&state, &app, input, credential).await?;
     *state.pending_fan_confirm_token.lock().await = None;
     *state.pending_fan_confirmation.lock().await = None;
     drop(_mutation);
@@ -360,6 +400,7 @@ pub(crate) async fn fan_confirm_link(
 #[tauri::command]
 pub(crate) async fn fan_confirm_scanned(
     state: State<'_, AppState>,
+    app: AppHandle,
     token: String,
 ) -> Result<FanSessionStatus, AppError> {
     let _mutation = state.fan_mutation.lock().await;
@@ -381,8 +422,19 @@ pub(crate) async fn fan_confirm_scanned(
         display_name: None,
         token,
     };
-    validate_fan_confirmation(&mut input, pin.as_str())?;
-    persist_confirmed_fan(&state, input, pin).await?;
+    // The credential was chosen when the scan was prepared, so the camera path
+    // does not ask again — it spends whatever the fan already picked.
+    let credential = match pin {
+        Some(pin) => {
+            validate_fan_confirmation(&mut input, pin.as_str())?;
+            FanCredential::Pin(pin)
+        }
+        None => {
+            validate_fan_confirmation_token_only(&mut input)?;
+            FanCredential::Device
+        }
+    };
+    persist_confirmed_fan(&state, &app, input, credential).await?;
     *state.pending_fan_confirmation.lock().await = None;
     drop(_mutation);
     fan_status(state).await

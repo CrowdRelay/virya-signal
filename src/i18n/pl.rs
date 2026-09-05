@@ -1325,6 +1325,20 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "settings_group_account" => "KONTO I DANE",
         "settings_open_site" => "OTWÓRZ VIRYA.MUSIC",
         "settings_site_hint" => "Koncerty, wydawnictwa i pełny sklep — otwarte w przeglądarce.",
+        "signup_details_hint_no_pin" => "Jeszcze jeden krok — wybierz miasto.",
+        "enter_without_a_pin" => "Wejdź bez PIN-u",
+        "device_unlock_explainer" => {
+            "Ten telefon trzyma Twój profil za własnym kluczem sprzętowym, więc Signal otwiera się od razu. Chroni go blokada ekranu telefonu."
+        }
+        "prefer_a_pin_instead" => "Wolę ustawić PIN",
+        "device_unlock_row_title" => "Wejście bez PIN-u",
+        "device_unlock_row_hint" => {
+            "Klucz sprzętowy tego telefonu otwiera Twój profil. Wyłącz, aby wrócić do PIN-u."
+        }
+        "device_unlock_turn_off" => "Wyłącz i ustaw PIN",
+        "device_unlock_turn_on" => "Pomiń PIN na tym telefonie",
+        "device_unlock_is_on" => "Włączone na tym telefonie",
+        "device_unlock_is_off" => "Wyłączone — Signal poprosi o PIN",
         "email_button_or_scan_hint" => "Czytasz na innym urządzeniu? Zeskanuj kod QR z wiadomości.",
         "scan_the_code_from_the_email" => "Wyceluj aparat w kod QR z wiadomości.",
         "primary_navigation" => "Nawigacja główna",

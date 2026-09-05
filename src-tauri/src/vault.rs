@@ -918,6 +918,18 @@ fn password(pin: &str, salt: &[u8; SALT_BYTES]) -> Result<Zeroizing<Vec<u8>>, Ap
     Ok(output)
 }
 
+/// Writes an owner-only file, replacing whatever was there.
+///
+/// `create_private_file` refuses to overwrite on purpose — it creates vault
+/// snapshots and salts, where clobbering an existing one is a bug. The unlock
+/// records beside the vault are the opposite: they are rewritten whenever the
+/// fan changes how they get in.
+pub(crate) fn write_private_file(path: &Path, contents: &[u8]) -> Result<(), AppError> {
+    remove_if_present(path)?;
+    create_private_file(path, contents)?;
+    Ok(())
+}
+
 fn create_private_file(path: &Path, contents: &[u8]) -> Result<(), std::io::Error> {
     let mut options = OpenOptions::new();
     options.write(true).create_new(true);
@@ -946,4 +958,5 @@ fn set_private_permissions(path: &Path) -> Result<(), AppError> {
     Ok(())
 }
 
+include!("vault/device_password.rs");
 include!("vault/tests.rs");

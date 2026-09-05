@@ -176,6 +176,19 @@ pub struct FanSessionStatus {
     pub configured: bool,
     pub unlocked: bool,
     pub session: Option<FanSummary>,
+    /// How this device can be opened. A vault sealed without a PIN cannot be
+    /// opened by one, and a PIN tried against it fails exactly like a wrong PIN
+    /// — so the screen has to know which prompt is the true one rather than
+    /// guessing from a failure.
+    #[serde(default)]
+    pub pin_unlock: bool,
+    #[serde(default)]
+    pub device_unlock: bool,
+    /// Whether this device could seal a password at all. False on a build or a
+    /// device with no usable keystore, where the PIN is the only offer worth
+    /// making.
+    #[serde(default)]
+    pub device_unlock_supported: bool,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]

@@ -6,7 +6,7 @@
 
 #[cfg(target_os = "android")]
 mod android {
-    use serde::Deserialize;
+    use serde::{Deserialize, Serialize};
     use tauri::{
         AppHandle, Manager, Runtime,
         plugin::{Builder, PluginHandle, TauriPlugin},
@@ -45,6 +45,26 @@ mod android {
         app_link: String,
         #[serde(default)]
         rejected: bool,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct DeviceSecretSupport {
+        #[serde(default)]
+        supported: bool,
+    }
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct DeviceSecretResponse {
+        #[serde(default)]
+        value: String,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct DeviceSecretArgs<'a> {
+        value: &'a str,
     }
 
     pub struct SignalPush<R: Runtime>(PluginHandle<R>);
@@ -153,6 +173,65 @@ mod android {
             return Err("invalid_synesthesia_app_link".to_owned());
         }
         Ok(Some(link.to_owned()))
+    }
+
+    /// Whether this device can seal a secret with a hardware-backed key.
+    ///
+    /// False on anything without a usable keystore — an emulator image with no
+    /// keymaster, a device where key generation is refused — and the fan keeps
+    /// the PIN in that case rather than being handed a weaker seal.
+    pub fn device_secret_supported<R: Runtime>(app: &AppHandle<R>) -> bool {
+        handle(app)
+            .0
+            .run_mobile_plugin::<DeviceSecretSupport>("deviceSecretSupported", ())
+            .map(|response| response.supported)
+            .unwrap_or(false)
+    }
+
+    /// Seals a secret with the keystore. The returned string is ciphertext and
+    /// is the only form that is ever written to disk.
+    pub fn seal_device_secret<R: Runtime>(
+        app: &AppHandle<R>,
+        value: &str,
+    ) -> Result<String, String> {
+        let response = handle(app)
+            .0
+            .run_mobile_plugin::<DeviceSecretResponse>(
+                "sealDeviceSecret",
+                DeviceSecretArgs { value },
+            )
+            .map_err(|error| error.to_string())?;
+        if response.value.is_empty() {
+            return Err("device_secret_seal_failed".to_owned());
+        }
+        Ok(response.value)
+    }
+
+    pub fn open_device_secret<R: Runtime>(
+        app: &AppHandle<R>,
+        sealed: &str,
+    ) -> Result<String, String> {
+        let response = handle(app)
+            .0
+            .run_mobile_plugin::<DeviceSecretResponse>(
+                "openDeviceSecret",
+                DeviceSecretArgs { value: sealed },
+            )
+            .map_err(|error| error.to_string())?;
+        if response.value.is_empty() {
+            return Err("device_secret_open_failed".to_owned());
+        }
+        Ok(response.value)
+    }
+
+    /// Deletes the keystore key. The sealed file is worthless without it, so
+    /// this is what actually makes a forgotten secret unrecoverable.
+    pub fn clear_device_secret<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+        handle(app)
+            .0
+            .run_mobile_plugin::<serde_json::Value>("clearDeviceSecret", ())
+            .map(|_| ())
+            .map_err(|error| error.to_string())
     }
 
     /// The mailed confirmation link. Android hands it over exactly once, the

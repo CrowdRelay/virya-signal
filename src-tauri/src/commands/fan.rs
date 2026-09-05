@@ -26,8 +26,8 @@ use crate::{
     },
     session::{fan_profile, persist_fan, run_blocking},
     validation::{
-        bounded_secret, validate_api_base, validate_fan_confirmation, validate_fan_signup,
-        validate_pin,
+        bounded_secret, validate_api_base, validate_fan_confirmation,
+        validate_fan_confirmation_token_only, validate_fan_signup, validate_pin,
     },
     vault,
 };
@@ -38,5 +38,7 @@ const NATIVE_PUSH_INSTALLATION_FILE: &str = "push-installation-id-v1";
 
 include!("fan/push.rs");
 include!("fan/session_commerce.rs");
+include!("fan/device_unlock.rs");
+include!("fan/signup.rs");
 include!("fan/wallet.rs");
 include!("fan/tests.rs");

@@ -200,19 +200,23 @@ fn submit_fan_confirmation_values(
 }
 
 /// Spends a confirmation link Android handed to the app. The token stayed
-/// native, so the only thing this sends is the PIN the fan just chose.
+/// native, so the only thing this sends is how the fan wants the vault sealed.
+///
+/// `None` means device unlock: the native side generates the password and hands
+/// it to the keystore, and the fan is never asked for anything.
 fn submit_fan_confirm_link(
     token: RwSignal<String>,
     pin: RwSignal<String>,
     busy: RwSignal<bool>,
     session: FanConfirmationSession,
     error: RwSignal<Option<String>>,
+    with_pin: bool,
 ) {
     if busy.get_untracked() {
         return;
     }
     let current_pin = pin.get_untracked();
-    if !new_operator_pin_is_valid(&current_pin) {
+    if with_pin && !new_operator_pin_is_valid(&current_pin) {
         error.set(Some(tr("enter_4_6_digits_for_this_fan_profile").to_owned()));
         return;
     }
@@ -222,7 +226,7 @@ fn submit_fan_confirm_link(
             "fan_confirm_link",
             &FanConfirmLinkArgs {
                 api_base_url: API_BASE,
-                pin: &current_pin,
+                pin: with_pin.then_some(current_pin.as_str()),
             },
         )
         .await
@@ -322,6 +326,11 @@ fn FanAccess(
     // city, PIN and consent. Lower friction, same backend payload.
     let signup_stage = RwSignal::new(1_u8);
 
+    // A fan who wants a secret in their head rather than one in the phone can
+    // say so, and the PIN field comes back. The offer is only made where the
+    // keystore can actually hold a password.
+    let prefer_pin = RwSignal::new(false);
+
     let open_latarnik = move |_| mode.set(RootMode::Latarnik);
 
     let run_unlock = move || {
@@ -348,6 +357,12 @@ fn FanAccess(
         });
     };
 
+    // Signup makes the same offer the mailed link does: on a phone that can
+    // hold the password, a PIN is a choice rather than a step. The field is
+    // only shown to a fan who asked for one, or to a device that has no
+    // keystore to hold anything.
+    let signup_with_pin =
+        move || prefer_pin.get() || !status.get().device_unlock_supported;
     let run_signup = move || {
         if !consent.get() {
             error.set(Some(
@@ -356,6 +371,11 @@ fn FanAccess(
             return;
         }
         let current_pin = pin.get();
+        let with_pin = signup_with_pin();
+        if with_pin && !new_operator_pin_is_valid(&current_pin) {
+            error.set(Some(tr("enter_4_6_digits_for_this_fan_profile").to_owned()));
+            return;
+        }
         let requested = RequestedCityInput {
             name: custom_city_name.get().trim().to_owned(),
             region: optional(custom_region.get().trim().to_owned()),
@@ -404,7 +424,7 @@ fn FanAccess(
                 "fan_signup",
                 &FanSignupArgs {
                     input: &input,
-                    pin: &current_pin,
+                    pin: with_pin.then_some(current_pin.as_str()),
                 },
             )
             .await
@@ -495,14 +515,48 @@ fn FanAccess(
 
     let run_confirm = move || {
         if link_pending.get_untracked() {
-            submit_fan_confirm_link(token, pin, busy, confirmation_session, error);
+            submit_fan_confirm_link(token, pin, busy, confirmation_session, error, true);
             return;
         }
         submit_fan_confirmation(email, name, token, pin, busy, confirmation_session, error);
     };
+    // The link is the credential and the fan already proved they hold it by
+    // opening the mail. Nothing is asked for here: the device seals the vault
+    // password itself.
+    let run_confirm_without_pin =
+        move || submit_fan_confirm_link(token, pin, busy, confirmation_session, error, false);
     let unlock = move |_| run_unlock();
     let signup = move |_| run_signup();
     let confirm = move |_| run_confirm();
+    let confirm_without_pin = move |_: leptos::ev::MouseEvent| run_confirm_without_pin();
+    let seal_without_pin = move || status.get().device_unlock_supported && !prefer_pin.get();
+
+    // A device that has already sealed a password opens on its own. The gate
+    // never shows a PIN field it does not need, and a seal the keystore
+    // refuses falls through to the PIN prompt rather than to a dead screen.
+    let device_unlock_attempted = RwSignal::new(false);
+    Effect::new(move |_| {
+        let current = status.get();
+        if !current.configured
+            || current.unlocked
+            || !current.device_unlock
+            || device_unlock_attempted.get_untracked()
+        {
+            return;
+        }
+        device_unlock_attempted.set(true);
+        spawn_local(async move {
+            if let Ok(value) =
+                bridge::invoke::<FanSessionStatus, _>("fan_device_unlock", &EmptyArgs {}).await
+                && value.unlocked
+            {
+                bridge::invalidate_latest("launcher:");
+                let _ = status.try_set(value);
+                let _ = status_refresh
+                    .try_update(|generation| *generation = generation.wrapping_add(1));
+            }
+        });
+    });
 
     let run_request_access = move || {
         if busy.get_untracked() {
@@ -637,24 +691,48 @@ fn FanAccess(
                                 <Show when=move || link_pending.get() fallback=move || view! {
                                     <p class="confirm-hint"><strong>{tr("fastest_scan_the_qr_from_the_email")}</strong><br/>{tr("email_button_or_scan_hint")}</p>
                                 }>
-                                    <p class="confirm-hint"><strong>{tr("link_from_the_email_is_ready")}</strong><br/>{tr("set_a_pin_and_enter_signal")}</p>
+                                    <p class="confirm-hint"><strong>{tr("link_from_the_email_is_ready")}</strong><br/>{move || if seal_without_pin() { tr("enter_without_a_pin") } else { tr("set_a_pin_and_enter_signal") }}</p>
                                 </Show>
-                                <label class="pin-field">
-                                    <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
-                                    <small id="fan-confirm-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
-                                    <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-confirm-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) on:keydown=on_enter(move || { if !busy.get_untracked() && new_operator_pin_is_valid(&pin.get_untracked()) && (link_pending.get_untracked() || !token.get_untracked().trim().is_empty()) { run_confirm(); } })/>
-                                </label>
-                                <p class="confirmation-note">{tr("pin_encrypts_your_profile_on_this_device")}</p>
-                                // A pending link is spent by the button; without
-                                // one the camera is the only capability source,
-                                // and it needs the PIN first, so it follows the
-                                // field rather than preceding it.
-                                <Show when=move || link_pending.get() fallback=move || view! {
-                                    <div class="confirmation-actions single">
-                                        <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("scan_the_code_from_the_email")}</small></button>
-                                    </div>
+                                // The link already proved the fan holds the
+                                // address. Asking for a PIN on top of it buys
+                                // nothing the device cannot hold itself, so
+                                // where the keystore can hold it, that is the
+                                // offer and the PIN is the alternative.
+                                <Show when=seal_without_pin fallback=move || view! {
+                                    <>
+                                        <label class="pin-field">
+                                            <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
+                                            <small id="fan-confirm-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
+                                            <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-confirm-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) on:keydown=on_enter(move || { if !busy.get_untracked() && new_operator_pin_is_valid(&pin.get_untracked()) && (link_pending.get_untracked() || !token.get_untracked().trim().is_empty()) { run_confirm(); } })/>
+                                        </label>
+                                        <p class="confirmation-note">{tr("pin_encrypts_your_profile_on_this_device")}</p>
+                                        // A pending link is spent by the button;
+                                        // without one the camera is the only
+                                        // capability source, and it needs the PIN
+                                        // first, so it follows the field rather
+                                        // than preceding it.
+                                        <Show when=move || link_pending.get() fallback=move || view! {
+                                            <div class="confirmation-actions single">
+                                                <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() || (signup_with_pin() && !new_operator_pin_is_valid(&pin.get())) on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("scan_the_code_from_the_email")}</small></button>
+                                            </div>
+                                        }>
+                                            <button class="primary" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_enter")}</button>
+                                        </Show>
+                                    </>
                                 }>
-                                    <button class="primary" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_enter")}</button>
+                                    <p class="confirmation-note">{tr("device_unlock_explainer")}</p>
+                                    // A link already in hand is spent by the
+                                    // button; without one the camera is still
+                                    // the capability source, and it no longer
+                                    // needs a PIN to start.
+                                    <Show when=move || link_pending.get() fallback=move || view! {
+                                        <div class="confirmation-actions single">
+                                            <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("scan_the_code_from_the_email")}</small></button>
+                                        </div>
+                                    }>
+                                        <button class="primary" disabled=move || busy.get() on:click=confirm_without_pin>{tr("enter_without_a_pin")}</button>
+                                    </Show>
+                                    <button type="button" class="text-button" on:click=move |_| prefer_pin.set(true)>{tr("prefer_a_pin_instead")}</button>
                                 </Show>
                                 <button type="button" class="text-button" disabled=move || busy.get() || email.get().trim().is_empty() on:click=request_access>{tr("i_already_have_an_account_send_login")}</button>
                                 <p class="confirmation-resend">{tr("no_message_check_spam_after_15_minutes")}</p>
@@ -663,7 +741,8 @@ fn FanAccess(
                             <>
                                 <Show when=move || { signup_stage.get() < 2 } fallback=move || view! {
                                     <>
-                                        <p class="signup-details-hint">{tr("signup_details_hint")}</p>
+                                        // The hint named a PIN the step below no longer always asks for.
+                                        <p class="signup-details-hint">{move || if signup_with_pin() { tr("signup_details_hint") } else { tr("signup_details_hint_no_pin") }}</p>
                                         <div class="custom-city-fields city-stable-entry">
                                             <label>{tr("city")}<input node_ref=city_ref placeholder=tr("e_g_bielawa") prop:value=move || custom_city_name.get() on:input=move |e| custom_city_name.set(event_target_value(&e))/></label>
                                             <label>{tr("province_region_optional")}<input placeholder=tr("lower_silesia") prop:value=move || custom_region.get() on:input=move |e| custom_region.set(event_target_value(&e))/></label>
@@ -681,13 +760,18 @@ fn FanAccess(
                                             </Show>
                                         </div>
                                         <label>{tr("referral_code_optional")}<input prop:value=move || referral.get() on:input=move |e| referral.set(event_target_value(&e))/></label>
-                                        <label class="pin-field">
-                                            <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
-                                            <small id="fan-signup-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
-                                            <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-signup-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) on:keydown=on_enter(move || { if !busy.get_untracked() && new_operator_pin_is_valid(&pin.get_untracked()) { run_signup(); } })/>
-                                        </label>
+                                        <Show when=signup_with_pin fallback=move || view! {
+                                            <p class="confirmation-note">{tr("device_unlock_explainer")}</p>
+                                            <button type="button" class="text-button" on:click=move |_| prefer_pin.set(true)>{tr("prefer_a_pin_instead")}</button>
+                                        }>
+                                            <label class="pin-field">
+                                                <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
+                                                <small id="fan-signup-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
+                                                <input type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-signup-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) on:keydown=on_enter(move || { if !busy.get_untracked() && new_operator_pin_is_valid(&pin.get_untracked()) { run_signup(); } })/>
+                                            </label>
+                                        </Show>
                                         <div class="pref-list"><label class="pref-row"><span class="pref-row-label">{tr("i_want_to_receive_information_about_virya")}</span><input type="checkbox" class="pref-switch" prop:checked=move || consent.get() on:change=move |e| consent.set(event_target_checked(&e))/></label></div>
-                                        <button class="primary" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=signup>{tr("join_signal")}</button>
+                                        <button class="primary" disabled=move || busy.get() || (signup_with_pin() && !new_operator_pin_is_valid(&pin.get())) on:click=signup>{tr("join_signal")}</button>
                                     </>
                                 }>
                                     <button class="primary" disabled=move || busy.get() || email.get().trim().is_empty() on:click=move |_| signup_stage.set(2)>{tr("continue_to_details")}</button>
@@ -712,7 +796,14 @@ fn FanAccess(
                         <>
                             <p class="lock-copy">{tr("your_profile_and_tickets_are_encrypted_on")}</p>
                             <div class="form-grid">
-                                <label class="pin-field">
+                                // A vault sealed by the device has no PIN behind
+                                // it, so the field below cannot open it and any
+                                // PIN typed into it would read as "wrong PIN".
+                                // The way back in is a fresh link.
+                                <Show when=move || !status.get().pin_unlock>
+                                    <p class="inline-note">{tr("device_unlock_is_on")}</p>
+                                </Show>
+                                <label class="pin-field" class:hidden=move || !status.get().pin_unlock>
                                     <span class="pin-field-label">{tr("fan_app_unlock_pin")}</span>
                                     <small id="fan-unlock-pin-help">{tr("enter_the_pin_created_for_this_fan")}</small>
                                     // The lock screen has exactly one field and
@@ -721,7 +812,9 @@ fn FanAccess(
                                     // no other possible target.
                                     <input node_ref=unlock_pin_ref type="password" autocomplete="current-password" inputmode="numeric" pattern="[0-9]*" placeholder=tr("your_pin") aria-describedby="fan-unlock-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(event_target_value(&e)) on:keydown=on_enter(move || { if !busy.get_untracked() && pin.get_untracked().chars().count() >= 4 { run_unlock(); } })/>
                                 </label>
-                                <button class="primary" disabled=move || busy.get() || pin.get().chars().count() < 4 on:click=unlock>{tr("open_my_signal")}</button>
+                                <Show when=move || status.get().pin_unlock>
+                                    <button class="primary" disabled=move || busy.get() || pin.get().chars().count() < 4 on:click=unlock>{tr("open_my_signal")}</button>
+                                </Show>
                                 <button type="button" class="text-button recovery-link" on:click=move |_| recovery_open.set(true)>{tr("i_forgot_my_pin_sign_in_again")}</button>
                             </div>
                         </>
@@ -731,20 +824,35 @@ fn FanAccess(
                             <label>{tr("email")}<input aria-label=tr("email") type="email" autocomplete="email" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e)) on:keydown=on_enter(move || { if !busy.get_untracked() && !email.get_untracked().trim().is_empty() { run_request_access(); } })/></label>
                             <button type="button" class="ghost" disabled=move || busy.get() || email.get().trim().is_empty() on:click=request_access>{tr("send_login_link")}</button>
                             <p class="confirm-hint">{tr("email_button_or_scan_hint")}</p>
-                            <label class="pin-field">
-                                <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
-                                <small id="fan-recovery-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
-                                <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-recovery-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) on:keydown=on_enter(move || { if !busy.get_untracked() && new_operator_pin_is_valid(&pin.get_untracked()) && link_pending.get_untracked() { run_confirm(); } })/>
-                            </label>
-                            // The link Android routed here is spent by the button.
-                            // Without one the camera is the capability source, and
-                            // it needs the PIN first.
-                            <Show when=move || link_pending.get() fallback=move || view! {
-                                <div class="confirmation-actions single">
-                                    <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("scan_the_code_from_the_email")}</small></button>
-                                </div>
+                            <Show when=seal_without_pin fallback=move || view! {
+                                <>
+                                    <label class="pin-field">
+                                        <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
+                                        <small id="fan-recovery-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
+                                        <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-recovery-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) on:keydown=on_enter(move || { if !busy.get_untracked() && new_operator_pin_is_valid(&pin.get_untracked()) && link_pending.get_untracked() { run_confirm(); } })/>
+                                    </label>
+                                    // The link Android routed here is spent by
+                                    // the button. Without one the camera is the
+                                    // capability source, and it needs the PIN
+                                    // first.
+                                    <Show when=move || link_pending.get() fallback=move || view! {
+                                        <div class="confirmation-actions single">
+                                            <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("scan_the_code_from_the_email")}</small></button>
+                                        </div>
+                                    }>
+                                        <button class="primary" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_set_new_pin")}</button>
+                                    </Show>
+                                </>
                             }>
-                                <button class="primary" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_set_new_pin")}</button>
+                                <p class="confirmation-note">{tr("device_unlock_explainer")}</p>
+                                <Show when=move || link_pending.get() fallback=move || view! {
+                                    <div class="confirmation-actions single">
+                                        <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("scan_the_code_from_the_email")}</small></button>
+                                    </div>
+                                }>
+                                    <button class="primary" disabled=move || busy.get() on:click=confirm_without_pin>{tr("enter_without_a_pin")}</button>
+                                </Show>
+                                <button type="button" class="text-button" on:click=move |_| prefer_pin.set(true)>{tr("prefer_a_pin_instead")}</button>
                             </Show>
                             <button type="button" class="text-button" on:click=move |_| recovery_open.set(false)>{tr("back_to_pin_login")}</button>
                         </div>
@@ -754,15 +862,29 @@ fn FanAccess(
                             <div class="recovery-heading">
                                 <p class="eyebrow">{tr("access_recovery")}</p>
                                 <h3>{tr("link_from_the_email_is_ready")}</h3>
-                                <p>{tr("set_a_pin_and_enter_signal")}</p>
+                                // The subline used to promise a PIN step the
+                                // panel below no longer takes.
+                                <p>{move || if seal_without_pin() {
+                                    tr("enter_without_a_pin")
+                                } else {
+                                    tr("set_a_pin_and_enter_signal")
+                                }}</p>
                             </div>
-                            <label class="pin-field">
-                                <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
-                                <small id="fan-link-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
-                                <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-link-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) on:keydown=on_enter(move || { if !busy.get_untracked() && new_operator_pin_is_valid(&pin.get_untracked()) { run_confirm(); } })/>
-                            </label>
-                            <p class="confirmation-note">{tr("pin_encrypts_your_profile_on_this_device")}</p>
-                            <button class="primary" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_enter")}</button>
+                            <Show when=seal_without_pin fallback=move || view! {
+                                <>
+                                    <label class="pin-field">
+                                        <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
+                                        <small id="fan-link-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
+                                        <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-link-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) on:keydown=on_enter(move || { if !busy.get_untracked() && new_operator_pin_is_valid(&pin.get_untracked()) { run_confirm(); } })/>
+                                    </label>
+                                    <p class="confirmation-note">{tr("pin_encrypts_your_profile_on_this_device")}</p>
+                                    <button class="primary" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_enter")}</button>
+                                </>
+                            }>
+                                <p class="confirmation-note">{tr("device_unlock_explainer")}</p>
+                                <button class="primary" disabled=move || busy.get() on:click=confirm_without_pin>{tr("enter_without_a_pin")}</button>
+                                <button type="button" class="text-button" on:click=move |_| prefer_pin.set(true)>{tr("prefer_a_pin_instead")}</button>
+                            </Show>
                             // The old PIN still works until the link is spent,
                             // so a fan who tapped the link by accident is not
                             // trapped in a screen with no way back.

@@ -253,9 +253,16 @@ fn FanProfileScreen(
         // Optimistic on purpose: the vault lock has no remote leg, so drop the
         // session material here and reconcile with native state when it replies.
         status.set(FanSessionStatus {
-            configured: status.get_untracked().configured,
-            unlocked: false,
-            session: None,
+            // Locking changes nothing about how this device opens, so the
+            // unlock modes are carried over rather than reset — dropping them
+            // would send the gate to a PIN prompt a device-sealed vault has no
+            // answer for, until the native status caught up.
+            ..FanSessionStatus {
+                configured: status.get_untracked().configured,
+                unlocked: false,
+                session: None,
+                ..status.get_untracked()
+            }
         });
         spawn_local(async move {
             // Silent: the optimistic UI already locked the session.
@@ -337,6 +344,7 @@ fn FanProfileScreen(
             <div class="settings-list">
                 <NativePushControl error=error />
                 <LanguageSwitch />
+                <DeviceUnlockSetting status=status error=error />
                 <FanLocationSetting error=error />
                 // AREA lives in the overflow menu, which is the one place a fan
                 // does not look. The side game gets a row here so it is
@@ -409,6 +417,111 @@ fn FanProfileScreen(
             <AnonymousFeedback error=error />
             <p class="security-note">{tr("fan_session_admission_pass_and_private_wallet")}</p>
         </section>
+    }
+}
+
+/// Turns entry-without-a-PIN on and off.
+///
+/// On is the phone's hardware key holding the vault password; off is Argon2
+/// over a PIN the fan types. Turning it off is a re-key rather than a flag, so
+/// it asks for the PIN it is about to key the vault to — which is also why the
+/// field is only shown once the fan has said they want the change.
+#[component]
+fn DeviceUnlockSetting(
+    status: RwSignal<FanSessionStatus>,
+    error: RwSignal<Option<String>>,
+) -> impl IntoView {
+    let busy = RwSignal::new(false);
+    let disabling = RwSignal::new(false);
+    let pin = RwSignal::new(String::new());
+    let inline_status = RwSignal::new(None::<String>);
+
+    let enable = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        busy.set(true);
+        inline_status.set(None);
+        spawn_local(async move {
+            match bridge::invoke::<FanSessionStatus, _>("fan_enable_device_unlock", &EmptyArgs {})
+                .await
+            {
+                Ok(value) => {
+                    let _ = status.try_set(value);
+                    error.set(Some(tr("device_unlock_is_on").to_owned()));
+                }
+                Err(message) => inline_status.set(Some(message)),
+            }
+            let _ = busy.try_set(false);
+        });
+    };
+
+    let disable = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        let current_pin = pin.get_untracked();
+        if !new_operator_pin_is_valid(&current_pin) {
+            inline_status.set(Some(tr("enter_4_6_digits_for_this_fan_profile").to_owned()));
+            return;
+        }
+        busy.set(true);
+        inline_status.set(None);
+        spawn_local(async move {
+            match bridge::invoke::<FanSessionStatus, _>(
+                "fan_disable_device_unlock",
+                &PinArgs { pin: &current_pin },
+            )
+            .await
+            {
+                Ok(value) => {
+                    let _ = pin.try_set(String::new());
+                    let _ = disabling.try_set(false);
+                    let _ = status.try_set(value);
+                    error.set(Some(tr("device_unlock_is_off").to_owned()));
+                }
+                Err(message) => inline_status.set(Some(message)),
+            }
+            let _ = busy.try_set(false);
+        });
+    };
+
+    view! {
+        <Show when=move || status.get().device_unlock_supported>
+            <article class="settings-row settings-row-static">
+                <span class="settings-row-icon" aria-hidden="true">"⚿"</span>
+                <strong>{tr("device_unlock_row_title")}</strong>
+                <small>{tr("device_unlock_row_hint")}</small>
+                <p class="settings-row-value">
+                    {move || if status.get().device_unlock {
+                        tr("device_unlock_is_on")
+                    } else {
+                        tr("device_unlock_is_off")
+                    }}
+                </p>
+                <Show when=move || status.get().device_unlock fallback=move || view! {
+                    <button class="ticket-buy-button" type="button" disabled=move || busy.get() on:click=enable>
+                        {tr("device_unlock_turn_on")}
+                    </button>
+                }>
+                    <Show when=move || disabling.get() fallback=move || view! {
+                        <button class="ghost" type="button" disabled=move || busy.get() on:click=move |_| disabling.set(true)>
+                            {tr("device_unlock_turn_off")}
+                        </button>
+                    }>
+                        <label class="pin-field">
+                            <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
+                            <small id="fan-device-unlock-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
+                            <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-device-unlock-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e)))/>
+                        </label>
+                        <button class="primary" type="button" disabled=move || busy.get() on:click=disable>
+                            {tr("device_unlock_turn_off")}
+                        </button>
+                    </Show>
+                </Show>
+                {move || inline_status.get().map(|msg| view! { <p class="inline-form-error">{error_message(&msg).to_owned()}</p> })}
+            </article>
+        </Show>
     }
 }
 

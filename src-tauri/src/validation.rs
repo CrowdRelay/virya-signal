@@ -30,8 +30,16 @@ pub(crate) fn validate_operator_profile(profile: &mut OperatorProfile) -> Result
     validate_api_base(&profile.api_base_url)
 }
 
-pub(crate) fn validate_fan_signup(input: &mut FanSignupInput, pin: &str) -> Result<(), AppError> {
-    validate_pin(pin)?;
+/// `pin` is `None` when the device will seal the vault password itself. The
+/// rest of the signup payload is validated identically either way — the PIN was
+/// never part of what CrowdRelay is told.
+pub(crate) fn validate_fan_signup(
+    input: &mut FanSignupInput,
+    pin: Option<&str>,
+) -> Result<(), AppError> {
+    if let Some(pin) = pin {
+        validate_pin(pin)?;
+    }
     input.api_base_url = input.api_base_url.trim().to_owned();
     input.email = input.email.trim().to_ascii_lowercase();
     input.city_slug = input.city_slug.trim().to_owned();
@@ -93,6 +101,23 @@ fn normalized_fan_confirmation_token(value: &str) -> Option<String> {
         return Some(token);
     }
     None
+}
+
+/// The same normalisation as `validate_fan_confirmation`, minus the PIN.
+///
+/// A device-sealed confirmation has no PIN to validate, and the token is the
+/// credential in both cases — so the token rules must not become weaker just
+/// because nobody typed anything.
+pub(crate) fn validate_fan_confirmation_token_only(
+    input: &mut FanConfirmationInput,
+) -> Result<(), AppError> {
+    input.api_base_url = input.api_base_url.trim().to_owned();
+    input.email = input.email.trim().to_ascii_lowercase();
+    input.token = normalized_fan_confirmation_token(&input.token)
+        .ok_or_else(|| AppError::InvalidInput(crate::i18n::tr("native_paste_valid_code").into()))?;
+    input.display_name = clean_optional(input.display_name.take());
+    validate_api_base(&input.api_base_url)?;
+    Ok(())
 }
 
 pub(crate) fn validate_fan_confirmation(

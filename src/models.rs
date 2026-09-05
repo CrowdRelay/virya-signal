@@ -45,6 +45,15 @@ pub struct FanSessionStatus {
     pub configured: bool,
     pub unlocked: bool,
     pub session: Option<FanSummary>,
+    /// Mirrors the native record of how this device opens. `serde(default)`
+    /// because a cached status from an older build carries neither field, and
+    /// the gate must fall back to the PIN rather than to nothing.
+    #[serde(default)]
+    pub pin_unlock: bool,
+    #[serde(default)]
+    pub device_unlock: bool,
+    #[serde(default)]
+    pub device_unlock_supported: bool,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]

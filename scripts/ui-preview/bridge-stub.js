@@ -81,6 +81,9 @@
   const fanSession = (signedIn) => ({
     configured: signedIn,
     unlocked: signedIn,
+    pin_unlock: !deviceUnlock,
+    device_unlock: deviceUnlock,
+    device_unlock_supported: true,
     session: signedIn
       ? {
           email: "fan@example.com",
@@ -108,7 +111,18 @@
   // A fan whose vault exists but is locked. Neither `fan` nor `fan-out`
   // reaches the PIN prompt or the "a login link is waiting" panel, which are
   // the two screens every returning fan sees before anything else.
-  const lockedFanSession = () => ({ configured: true, unlocked: false, session: null });
+  // `?unlock=device` models a vault the keystore holds the password for: no
+  // PIN behind it, so the gate must open on its own rather than showing a
+  // field that cannot work. `?unlock=pin` is the ordinary case.
+  const deviceUnlock = params.get("unlock") === "device";
+  const lockedFanSession = () => ({
+    configured: true,
+    unlocked: false,
+    session: null,
+    pin_unlock: !deviceUnlock,
+    device_unlock: deviceUnlock,
+    device_unlock_supported: true,
+  });
 
   // Session state the preview mutates, so an unlock or a confirmation behaves
   // like one: it persists for the rest of the page's life.
@@ -413,7 +427,11 @@
     // block rendered with a blank code and an empty draws list — which reads as
     // "this fan has no code" rather than "the fixture is wrong shape".
     fan_referral: () => ({
-      referral_code: "KASIA-7QX2",
+      // Deliberately long and hyphen-free. A code with hyphens has break
+      // opportunities and hides the case that actually broke: a single
+      // unbreakable token setting the copy button's min-content width and
+      // pushing itself through the right border of the block.
+      referral_code: "KASIAMETALOWASIODEMKA7QX2XL",
       qualified_referrals: 4,
       pending_referrals: 1,
       draw_entries: [
@@ -642,12 +660,16 @@
     // token stays native, so the only thing the WebView learns is that one is
     // waiting. Pair it with `?mode=fan-locked` for the returning-fan path.
     fan_take_confirm_link: () => params.get("link") === "1",
+    fan_device_unlock: () => unlockFan(),
+    fan_enable_device_unlock: () => fanSession(true),
+    fan_disable_device_unlock: () => fanSession(true),
     fan_confirm_link: () => unlockFan(),
     fan_confirm: () => unlockFan(),
     fan_unlock: () => unlockFan(),
     fan_lock: () => { fanUnlocked = false; return launcher[mode]?.fan ?? fanSession(false); },
     fan_request_access: () => null,
     fan_signup: () => ({ session_created: false, email_queued: true, email_kind: "confirmation", retry_after_seconds: null }),
+    fan_prepare_confirmation: () => null,
     fan_push_take_target: () => null,
     native_crash_report: () => null,
 

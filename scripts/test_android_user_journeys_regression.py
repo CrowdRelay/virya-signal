@@ -68,11 +68,20 @@ class AndroidUserJourneysRegression(unittest.TestCase):
             persist.index('vault::replace_fan'),
             persist.index('*state.fan_session.write().await = Some(Arc::new(profile));'),
         )
+        # The credential is named at the call site now: a confirmation carries
+        # either the PIN the fan chose or a request for the device to seal a
+        # password itself, and `persist_confirmed_fan` is the one place that
+        # branches on which.
         self.assertIn(
-            'persist_confirmed_fan(&state, input, Zeroizing::new(pin)).await?',
+            'persist_confirmed_fan(&state, &app, input, FanCredential::Pin(Zeroizing::new(pin))).await?',
             confirm,
         )
-        self.assertIn('persist_confirmed_fan(&state, input, pin).await?', scanned)
+        # The scan spends whatever credential the prepare step recorded, so the
+        # camera path never asks for a PIN a second time.
+        self.assertIn('persist_confirmed_fan(&state, &app, input, credential).await?', scanned)
+        self.assertIn('FanCredential::Pin(pin)', scanned)
+        self.assertIn('FanCredential::Device', scanned)
+        self.assertIn('vault::replace_fan_with_password', persist)
         self.assertIn('fan_status(state).await', confirm)
         self.assertIn('fan_status(state).await', scanned)
         self.assertNotIn('vault::replace_fan', confirm)

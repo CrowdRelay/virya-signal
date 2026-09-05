@@ -195,6 +195,29 @@ fn FanEventCard(
     let event_month = month(&event.starts_at);
     let event_time = human_time(&event.starts_at);
     let location = event_location(&event);
+    // The card carries a date, a title and a line of location, and that is all
+    // Signal holds about a show. Everything else — the lineup, the doors, the
+    // venue write-up — lives on the show page, and until now nothing on this
+    // card led there. The locale segment follows the reader: /pl/live/<slug>
+    // is a 404 for an English fan, and the page exists under both prefixes.
+    let details_url = match i18n::current() {
+        i18n::Language::Pl => {
+            format!("https://virya.music/pl/live/{}/?source=signal-app", event.slug)
+        }
+        i18n::Language::En => {
+            format!("https://virya.music/live/{}/?source=signal-app", event.slug)
+        }
+    };
+    let open_details = move |_| {
+        let url = details_url.clone();
+        spawn_local(async move {
+            if let Err(message) =
+                bridge::invoke_unit("open_external_url", &UrlArgs { url: &url }).await
+            {
+                error.set(Some(message));
+            }
+        });
+    };
     let image = event.image_thumbnail_url.or(event.image_url);
     let description = event.description;
     let title = event.title;
@@ -221,6 +244,12 @@ fn FanEventCard(
                 <h3>{title}</h3><p>{location}</p>
                 {description.map(|text| view! { <p class="event-description">{text}</p> })}
                 <div class="event-actions">
+                    // Everything Signal holds about a show is already on this
+                    // card; the lineup, the doors and the venue write-up are on
+                    // the show page. A tappable heading was carrying that link
+                    // with nothing to say it was one, so it is a labelled
+                    // control in the row where a fan looks for actions.
+                    <button type="button" class="event-details-action" on:click=open_details>{tr("show_details")}</button>
                     <button type="button" class:active=move || interested.get() on:click=interest disabled=move || busy.get() || interested.get()>{move || if busy.get() { tr("saving") } else if interested.get() { tr("saved") } else { tr("interested") }}</button>
                     {move || match pool.get() {
                         TicketPoolAvailability::Available => {

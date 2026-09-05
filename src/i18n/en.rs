@@ -1321,6 +1321,20 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "settings_group_account" => "ACCOUNT AND DATA",
         "settings_open_site" => "OPEN VIRYA.MUSIC",
         "settings_site_hint" => "Shows, releases and the full store, opened in your browser.",
+        "signup_details_hint_no_pin" => "One more step — choose your city.",
+        "enter_without_a_pin" => "Enter without a PIN",
+        "device_unlock_explainer" => {
+            "This phone keeps your profile behind its own hardware key, so Signal opens straight away. The phone's lock screen is what guards it."
+        }
+        "prefer_a_pin_instead" => "I would rather set a PIN",
+        "device_unlock_row_title" => "Entry without a PIN",
+        "device_unlock_row_hint" => {
+            "This phone's hardware key opens your profile. Turn it off to go back to a PIN."
+        }
+        "device_unlock_turn_off" => "Turn off and set a PIN",
+        "device_unlock_turn_on" => "Skip the PIN on this phone",
+        "device_unlock_is_on" => "On for this phone",
+        "device_unlock_is_off" => "Off — Signal asks for your PIN",
         "email_button_or_scan_hint" => {
             "Reading it on another device? Scan the QR code from the message instead."
         }

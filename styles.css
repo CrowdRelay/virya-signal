@@ -1259,11 +1259,22 @@ html[data-virya-scanner-active] .app-shell {
    has no cursor. The glyph says it on the device the app actually ships to. */
 .referral-code-copy:not(:disabled)::after {
   content: "\29C9";
-  margin-left: 8px;
+  flex: 0 0 auto;
   opacity: .75;
   font-size: .9em;
 }
-.referral-code-copy { display: inline-flex; align-items: center; }
+/* A referral code carries no spaces and need not carry hyphens either, so a
+   long one is a single unbreakable token. Without `anywhere` it sets the
+   button's min-content width and pushes the text through the right border and
+   under the copy glyph. `anywhere` is the variant that shrinks min-content;
+   `break-word` does not. */
+.referral-code-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
 .referral-code-copy:disabled { cursor: default; opacity: .72; }
 .referral-copy-status { display: block; margin-top: 6px; color: #9bd5ab; }
 
@@ -1326,6 +1337,9 @@ html[data-virya-scanner-active] .app-shell {
    preserving scroll position and decoded imagery across switches. */
 .tab-page[hidden] { display: none; }
 .tab-page.hidden { display: none; }
+/* Also used by the access gate, where the PIN field is withheld from a vault
+   that has no PIN behind it. */
+.pin-field.hidden { display: none; }
 /* Tab entrance, back on — but on the inner screen, never the tab page.
    This was deleted on the theory that its transform dragged the bottom nav,
    back when the nav was `position: fixed`. The nav is a flex sibling now, and
@@ -1613,7 +1627,19 @@ html[data-virya-scanner-active] .app-shell {
 /* A row whose action is a link rather than the row itself: no chevron, and
    the control takes its own full-width line under the copy. */
 .settings-row-static { grid-template-columns: 38px minmax(0, 1fr); }
-.settings-row-static > .ticket-buy-button { grid-column: 1 / -1; width: 100%; margin-top: 8px; }
+/* Any control a static row carries takes its own full-width line under the
+   copy, not just the buy button. A `.ghost` left in the 38px icon column
+   wrapped its label over four lines. */
+.settings-row-static > .ticket-buy-button,
+.settings-row-static > .ghost,
+.settings-row-static > .primary,
+.settings-row-static > .pin-field,
+.settings-row-static > .inline-form-error,
+.settings-row-static > .settings-row-value {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin-top: 8px;
+}
 /* The value a status row reports — an endpoint, a role — is data to read
    back, not prose. It gets its own recessed line so a long API base URL
    cannot wrap through the label above it. */
@@ -2060,3 +2086,10 @@ html[data-virya-scanner-active] .app-shell {
 /* `.text-button` is full width and centres its label, which read as a stray
    centred line inside an otherwise left-aligned block. */
 .latarnik-entry .text-button { width: auto; margin-top: 4px; padding-left: 0; padding-right: 14px; text-align: left; }
+
+/* Three controls on a card that is two columns wide: details takes the first
+   row on its own, so the two that commit to something — save the show, buy the
+   ticket — keep sitting side by side underneath. */
+.event-actions:has(.event-details-action) { grid-template-columns: 1fr 1fr; }
+.event-details-action { grid-column: 1 / -1; border-color: var(--border-strong) !important; color: var(--muted) !important; }
+.event-details-action:active:not(:disabled) { border-color: var(--signal) !important; color: var(--signal-hot) !important; }

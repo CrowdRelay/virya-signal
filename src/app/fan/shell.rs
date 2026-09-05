@@ -289,9 +289,16 @@ fn FanApp(
     let close = move |_| {
         bridge::invalidate_latest("fan:");
         status.set(FanSessionStatus {
-            configured: status.get_untracked().configured,
-            unlocked: false,
-            session: None,
+            // Locking changes nothing about how this device opens, so the
+            // unlock modes are carried over rather than reset — dropping them
+            // would send the gate to a PIN prompt a device-sealed vault has no
+            // answer for, until the native status caught up.
+            ..FanSessionStatus {
+                configured: status.get_untracked().configured,
+                unlocked: false,
+                session: None,
+                ..status.get_untracked()
+            }
         });
         persist_fan_tab(FanTab::Signal);
         spawn_local(async move {

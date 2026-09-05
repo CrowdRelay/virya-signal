@@ -140,11 +140,19 @@ class FanErrorSilenceTests(unittest.TestCase):
         self.assertIn("inline-form-error", sale, "FanTicketSale missing inline-form-error rendering")
 
     def test_event_interest_toggle_is_silent(self) -> None:
-        """FanEventCard interest toggle must not set error on failure."""
+        """FanEventCard interest toggle must not set error on failure.
+
+        Scoped to the toggle rather than the whole card. The card also opens
+        the show page, and a failed `open_external_url` has to be reported —
+        the fan pressed something and nothing happened — which is the rule
+        `test_external_link_surfaces_errors` states for the same call.
+        """
         card = extract_fn(EVENTS, "FanEventCard")
+        self.assertIn("let interest = move |_|", card, "FanEventCard missing interest handler")
+        toggle = card.split("let interest = move |_|", 1)[1].split("let event_day", 1)[0]
         self.assertNotIn(
             "error.set(Some(message))",
-            card,
+            toggle,
             "FanEventCard interest toggle still surfaces errors",
         )
 

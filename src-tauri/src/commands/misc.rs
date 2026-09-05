@@ -81,6 +81,7 @@ pub(crate) async fn launcher_status(
     let operator_session = state.session.read().await;
     let fan_session = state.fan_session.read().await;
     let beacon_session = state.beacon_session.read().await;
+    let fan_unlock_mode = crate::device_unlock::effective_mode(&state).await;
     let status = LauncherStatus {
         operator: SessionStatus {
             configured: vault::exists(&state.app_data_dir),
@@ -93,6 +94,9 @@ pub(crate) async fn launcher_status(
             configured: vault::fan_exists(&state.app_data_dir),
             unlocked: fan_session.is_some(),
             session: fan_session.as_ref().map(|profile| profile.as_ref().into()),
+            pin_unlock: fan_unlock_mode.pin,
+            device_unlock: fan_unlock_mode.device,
+            device_unlock_supported: state.device_unlock_supported,
         },
         beacon: BeaconSessionStatus {
             configured: vault::beacon_exists(&state.app_data_dir),

@@ -4,6 +4,7 @@
 mod api;
 mod commands;
 mod crash;
+mod device_unlock;
 mod error;
 mod feedback_queue;
 mod i18n;
@@ -34,8 +35,9 @@ use commands::{
         fan_admission_pass, fan_admission_qr, fan_area_challenge, fan_area_claim, fan_area_wallet,
         fan_cached_events, fan_cached_home, fan_cached_merch_catalog, fan_cached_sections,
         fan_cached_wallets, fan_claim_pass, fan_clear_pending_confirmation, fan_confirm,
-        fan_confirm_link, fan_confirm_scanned, fan_delete_account, fan_events, fan_forget,
-        fan_home, fan_import_wallet, fan_interests, fan_lock, fan_merch_bundles, fan_merch_catalog,
+        fan_confirm_link, fan_confirm_scanned, fan_delete_account, fan_device_unlock,
+        fan_disable_device_unlock, fan_enable_device_unlock, fan_events, fan_forget, fan_home,
+        fan_import_wallet, fan_interests, fan_lock, fan_merch_bundles, fan_merch_catalog,
         fan_prepare_confirmation, fan_push_disable, fan_push_enable, fan_push_open_settings,
         fan_push_preferences, fan_push_status, fan_push_sync, fan_push_take_target,
         fan_push_update_preferences, fan_referral, fan_register_interest, fan_request_access,
@@ -69,7 +71,10 @@ use zeroize::Zeroizing;
 
 struct PendingFanConfirmation {
     api_base_url: String,
-    pin: Zeroizing<String>,
+    /// `None` when the fan chose to let this device hold the vault password.
+    /// The scanned-QR exchange reads this to know which credential the
+    /// confirmation was started with.
+    pin: Option<Zeroizing<String>>,
 }
 
 struct PendingBeaconConfirmation {
@@ -99,6 +104,14 @@ pub struct AppState {
     fan_session: RwLock<Option<Arc<FanProfile>>>,
     fan_pin: RwLock<Option<Zeroizing<String>>>,
     fan_vault_password: RwLock<Option<Zeroizing<Vec<u8>>>>,
+    /// The effective unlock mode, resolved once and then held.
+    ///
+    /// `fan_status` runs at the end of nearly every fan command and
+    /// `launcher_status` is polled on resume, so reading the record from disk
+    /// there put a file read, a JSON parse and a `stat` on a path that is
+    /// otherwise pure memory. The value only changes when this process writes
+    /// it, which is where the cache is dropped.
+    fan_unlock_mode: RwLock<Option<device_unlock::UnlockMode>>,
     pending_fan_confirmation: Mutex<Option<PendingFanConfirmation>>,
     pending_fan_confirm_token: Mutex<Option<Zeroizing<String>>>,
     pending_synesthesia_handoff: Mutex<Option<Zeroizing<String>>>,
@@ -116,6 +129,11 @@ pub struct AppState {
     pending_beacon_confirmation: Mutex<Option<PendingBeaconConfirmation>>,
     pending_beacon_link: Mutex<Option<Zeroizing<String>>>,
     native_push_available: bool,
+    /// Whether this device can seal the fan vault password with a hardware
+    /// key. Probed once at setup: the answer cannot change while the process
+    /// runs, and probing it per status read would put a keystore call on the
+    /// path of every launcher poll.
+    device_unlock_supported: bool,
     feedback_queue_mutation: Mutex<()>,
     wallet_qr_tokens: RwLock<HashMap<String, HashMap<String, Zeroizing<String>>>>,
     api: CrowdRelayClient,
@@ -176,6 +194,16 @@ pub fn run() {
 
             #[cfg(not(mobile))]
             let native_push_available = false;
+
+            // Generating the key is the only honest test of support: a device
+            // can advertise a keystore and still refuse AES-GCM key
+            // generation, and finding that out at unlock is finding it out too
+            // late.
+            #[cfg(target_os = "android")]
+            let device_unlock_supported =
+                native_push_available && push_plugin::device_secret_supported(app.handle());
+            #[cfg(not(target_os = "android"))]
+            let device_unlock_supported = false;
             let api = CrowdRelayClient::new(app_data_dir.join("public-cache-v1.json"))?;
             app.manage(AppState {
                 session: RwLock::new(None),
@@ -190,6 +218,7 @@ pub fn run() {
                 fan_session: RwLock::new(None),
                 fan_pin: RwLock::new(None),
                 fan_vault_password: RwLock::new(None),
+                fan_unlock_mode: RwLock::new(None),
                 pending_fan_confirmation: Mutex::new(None),
                 pending_fan_confirm_token: Mutex::new(None),
                 pending_synesthesia_handoff: Mutex::new(None),
@@ -203,6 +232,7 @@ pub fn run() {
                 pending_beacon_confirmation: Mutex::new(None),
                 pending_beacon_link: Mutex::new(None),
                 native_push_available,
+                device_unlock_supported,
                 feedback_queue_mutation: Mutex::new(()),
                 wallet_qr_tokens: RwLock::new(HashMap::new()),
                 api,
@@ -252,6 +282,9 @@ pub fn run() {
             fan_take_synesthesia_app_link,
             fan_take_confirm_link,
             fan_confirm_link,
+            fan_device_unlock,
+            fan_enable_device_unlock,
+            fan_disable_device_unlock,
             fan_link_pending_synesthesia,
             fan_unlock,
             fan_lock,
