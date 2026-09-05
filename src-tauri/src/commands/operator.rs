@@ -10,8 +10,8 @@ use crate::{
     AppError, AppState,
     models::{
         ConcertQrOverview, CreateQrCampaignInput, FanPushStatus, IssuePassInput, OperatorProfile,
-        OperatorSignalOverview, PublicEvent, SessionStatus, ShowChecklist, StaffEventDashboard,
-        TicketingOverview,
+        OperatorSessionPhase, OperatorSignalOverview, PublicEventsResult, SessionStatus,
+        ShowChecklist, StaffEventDashboard, TicketingOverview,
     },
     session::{
         load_operator_signal_cache, operator_profile, persist_operator_signal_cache, run_blocking,
@@ -100,10 +100,12 @@ fn clear_operator_push_preference(app_data_dir: &Path) -> Result<(), AppError> {
 #[tauri::command]
 pub(crate) async fn session_status(state: State<'_, AppState>) -> Result<SessionStatus, AppError> {
     let session = state.session.read().await;
+    let phase = *state.operator_phase.read().await;
     Ok(SessionStatus {
         configured: vault::exists(&state.app_data_dir),
         unlocked: session.is_some(),
         session: session.as_ref().map(|profile| profile.as_ref().into()),
+        phase,
     })
 }
 
@@ -134,6 +136,7 @@ pub(crate) async fn configure(
     *state.session.write().await = Some(Arc::new(persisted_profile));
     *state.operator_pin.write().await = Some(pin);
     *state.operator_vault_password.write().await = Some(vault_password);
+    *state.operator_phase.write().await = OperatorSessionPhase::Active;
     *state.show_mode_store.write().await = None;
     drop(_show_mutation);
     drop(_mutation);
@@ -166,6 +169,7 @@ pub(crate) async fn unlock(
     *state.session.write().await = Some(Arc::new(profile));
     *state.operator_pin.write().await = Some(pin);
     *state.operator_vault_password.write().await = Some(vault_password);
+    *state.operator_phase.write().await = OperatorSessionPhase::Active;
     *state.show_mode_store.write().await = None;
     drop(_show_mutation);
     drop(_mutation);
@@ -182,6 +186,7 @@ pub(crate) async fn lock(state: State<'_, AppState>) -> Result<SessionStatus, Ap
     *state.session.write().await = None;
     *state.operator_pin.write().await = None;
     *state.operator_vault_password.write().await = None;
+    *state.operator_phase.write().await = OperatorSessionPhase::Locked;
     *state.show_mode_store.write().await = None;
     *state.operator_sections_cache.write().await = None;
     session_status(state).await
@@ -215,6 +220,7 @@ pub(crate) async fn forget_device(state: State<'_, AppState>) -> Result<SessionS
     *state.session.write().await = None;
     *state.operator_pin.write().await = None;
     *state.operator_vault_password.write().await = None;
+    *state.operator_phase.write().await = OperatorSessionPhase::Unconfigured;
     *state.show_mode_store.write().await = None;
     *state.operator_sections_cache.write().await = None;
     let app_data_dir = state.app_data_dir.clone();
@@ -229,14 +235,14 @@ pub(crate) async fn forget_device(state: State<'_, AppState>) -> Result<SessionS
 pub(crate) async fn operator_events(
     app: AppHandle,
     state: State<'_, AppState>,
-) -> Result<Vec<PublicEvent>, AppError> {
+) -> Result<PublicEventsResult, AppError> {
     let profile = operator_profile(&state).await?;
-    let events = state.api.operator_events(&profile).await?;
+    let result = state.api.operator_events(&profile).await?;
     remember_operator_sections(app, {
-        let events = events.clone();
+        let events = result.events.clone();
         move |snapshot| snapshot.events = events
     });
-    Ok(events)
+    Ok(result)
 }
 
 #[tauri::command]
@@ -595,7 +601,7 @@ pub(crate) async fn revoke_qr_campaign(
 pub(crate) async fn public_events(
     state: State<'_, AppState>,
     api_base_url: String,
-) -> Result<Vec<PublicEvent>, AppError> {
+) -> Result<PublicEventsResult, AppError> {
     validate_api_base(&api_base_url)?;
     state.api.public_events(&api_base_url).await
 }
@@ -606,8 +612,8 @@ pub(crate) async fn public_cities(
     api_base_url: String,
 ) -> Result<String, AppError> {
     validate_api_base(&api_base_url)?;
-    let cities = state.api.public_cities(&api_base_url).await?;
-    serde_json::to_string(&cities).map_err(AppError::from)
+    let result = state.api.public_cities(&api_base_url).await?;
+    serde_json::to_string(&result).map_err(AppError::from)
 }
 
 /// Returns every operator panel's last known value straight from the vault, so

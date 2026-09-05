@@ -19,8 +19,8 @@ use crate::{
     },
     models::{
         BeaconEngagementResult, BeaconHomeData, BeaconMutationResult, BeaconPressRequestsData,
-        BeaconPressRoomData, BeaconProfile, BeaconReleasesData, BeaconSessionStatus, FanPushStatus,
-        SignalNewsFeed,
+        BeaconPressRoomData, BeaconProfile, BeaconReleasesData, BeaconSessionPhase,
+        BeaconSessionStatus, FanPushStatus, SignalNewsFeed,
     },
     session::{beacon_profile, persist_beacon, run_blocking},
     validation::{validate_api_base, validate_pin},
@@ -173,10 +173,12 @@ fn https_url(value: &str) -> Result<String, AppError> {
 
 async fn status_from_state(state: &State<'_, AppState>) -> BeaconSessionStatus {
     let session = state.beacon_session.read().await;
+    let phase = *state.beacon_phase.read().await;
     BeaconSessionStatus {
         configured: vault::beacon_exists(&state.app_data_dir),
         unlocked: session.is_some(),
         session: session.as_ref().map(|profile| profile.as_ref().into()),
+        phase,
     }
 }
 
@@ -227,6 +229,7 @@ async fn persist_exchanged_beacon(
     *state.beacon_session.write().await = Some(Arc::new(profile));
     *state.beacon_pin.write().await = Some(pin);
     *state.beacon_vault_password.write().await = Some(vault_password);
+    *state.beacon_phase.write().await = BeaconSessionPhase::Active;
     Ok(())
 }
 
@@ -425,6 +428,7 @@ pub(crate) async fn beacon_unlock(
     *state.beacon_session.write().await = Some(Arc::new(profile));
     *state.beacon_pin.write().await = Some(pin);
     *state.beacon_vault_password.write().await = Some(vault_password);
+    *state.beacon_phase.write().await = BeaconSessionPhase::Active;
     drop(_mutation);
     let status = beacon_status(state).await?;
 
@@ -453,6 +457,7 @@ pub(crate) async fn beacon_lock(
     *state.beacon_session.write().await = None;
     *state.beacon_pin.write().await = None;
     *state.beacon_vault_password.write().await = None;
+    *state.beacon_phase.write().await = BeaconSessionPhase::Locked;
     *state.pending_beacon_confirmation.lock().await = None;
     beacon_status(state).await
 }
@@ -685,6 +690,7 @@ async fn clear_beacon_session_state(state: &State<'_, AppState>) {
     *state.beacon_session.write().await = None;
     *state.beacon_pin.write().await = None;
     *state.beacon_vault_password.write().await = None;
+    *state.beacon_phase.write().await = BeaconSessionPhase::Unconfigured;
     *state.pending_beacon_confirmation.lock().await = None;
     *state.pending_beacon_link.lock().await = None;
 }
@@ -695,11 +701,22 @@ pub(crate) async fn beacon_logout(
 ) -> Result<BeaconSessionStatus, AppError> {
     let _mutation = state.beacon_mutation.lock().await;
     let profile = beacon_profile(&state).await?;
-    state.api.beacon_logout(&profile).await?;
+    // The vault is the real security gate: once it is gone the capability is
+    // gone, and the server expires the session on its own. The network call
+    // is a best-effort server-side invalidation, not a safety gate — so a
+    // member offline can still log out. This mirrors the asymmetry with
+    // `fan_forget`, which requires network only for push endpoint cleanup
+    // (a bearer-gated remote mutation), not for vault removal.
     let app_data_dir = state.app_data_dir.clone();
     run_blocking(move || vault::remove_beacon(&app_data_dir)).await?;
     clear_beacon_session_state(&state).await;
     drop(_mutation);
+    // Attempt the server-side logout outside the mutation lock so the UI is
+    // already in the logged-out state. A failure here is logged and swallowed:
+    // the vault is gone and the server will expire the session independently.
+    if let Err(error) = state.api.beacon_logout(&profile).await {
+        eprintln!("[virya:beacon] best-effort logout failed: {error}");
+    }
     beacon_status(state).await
 }
 

@@ -21,7 +21,7 @@ use crate::{
     AppError,
     models::{
         BeaconProfile, CitySignal, EcosystemMeta, FanHomeData, FanProfile, MerchCatalog,
-        OperatorProfile, PublicEvent, StaffPairingExchange,
+        OperatorProfile, PublicCitiesResult, PublicEvent, PublicEventsResult, StaffPairingExchange,
     },
 };
 
@@ -309,14 +309,20 @@ impl CrowdRelayClient {
         }
     }
 
-    pub async fn public_events(&self, api_base_url: &str) -> Result<Vec<PublicEvent>, AppError> {
+    pub async fn public_events(&self, api_base_url: &str) -> Result<PublicEventsResult, AppError> {
         let ck = cache::cache_key(api_base_url)?;
         if let Some(events) = self.cached_events(&ck, EVENTS_CACHE_TTL).await {
-            return Ok(events);
+            return Ok(PublicEventsResult {
+                events,
+                stale: false,
+            });
         }
         let _fetch = self.events_fetch.lock().await;
         if let Some(events) = self.cached_events(&ck, EVENTS_CACHE_TTL).await {
-            return Ok(events);
+            return Ok(PublicEventsResult {
+                events,
+                stale: false,
+            });
         }
         let stale = self.cached_events(&ck, EVENTS_STALE_TTL).await;
         let validators = self.cache_validators(&ck, true).await;
@@ -325,12 +331,22 @@ impl CrowdRelayClient {
             .await
         {
             Ok(response) => response,
-            Err(error) => return stale.ok_or(error),
+            Err(error) => {
+                return stale
+                    .map(|events| PublicEventsResult {
+                        events,
+                        stale: true,
+                    })
+                    .ok_or(error);
+            }
         };
         if transient_public_status(response.status())
             && let Some(events) = stale.as_ref()
         {
-            return Ok(events.clone());
+            return Ok(PublicEventsResult {
+                events: events.clone(),
+                stale: true,
+            });
         }
         if response.status() == reqwest::StatusCode::NOT_MODIFIED {
             let events = stale.ok_or_else(|| AppError::Remote {
@@ -339,7 +355,10 @@ impl CrowdRelayClient {
             })?;
             self.touch_cache(&ck, true).await;
             self.persist_public_cache_in_background();
-            return Ok(events);
+            return Ok(PublicEventsResult {
+                events,
+                stale: true,
+            });
         }
         let (etag, last_modified) = cache::response_validators(response.headers());
         let response: crate::models::EventListResponse = decode(response).await?;
@@ -358,7 +377,10 @@ impl CrowdRelayClient {
         );
         drop(c);
         self.persist_public_cache_in_background();
-        Ok(events)
+        Ok(PublicEventsResult {
+            events,
+            stale: false,
+        })
     }
 
     /// The last successful snapshot, read without touching the network. The UI
@@ -457,14 +479,20 @@ impl CrowdRelayClient {
         staff_gate_status(response.status())
     }
 
-    pub async fn public_cities(&self, api_base_url: &str) -> Result<Vec<CitySignal>, AppError> {
+    pub async fn public_cities(&self, api_base_url: &str) -> Result<PublicCitiesResult, AppError> {
         let ck = cache::cache_key(api_base_url)?;
         if let Some(cities) = self.cached_cities(&ck, CITIES_CACHE_TTL).await {
-            return Ok(cities);
+            return Ok(PublicCitiesResult {
+                cities,
+                stale: false,
+            });
         }
         let _fetch = self.cities_fetch.lock().await;
         if let Some(cities) = self.cached_cities(&ck, CITIES_CACHE_TTL).await {
-            return Ok(cities);
+            return Ok(PublicCitiesResult {
+                cities,
+                stale: false,
+            });
         }
         let stale = self.cached_cities(&ck, CITIES_STALE_TTL).await;
         let validators = self.cache_validators(&ck, false).await;
@@ -473,12 +501,22 @@ impl CrowdRelayClient {
             .await
         {
             Ok(response) => response,
-            Err(error) => return stale.ok_or(error),
+            Err(error) => {
+                return stale
+                    .map(|cities| PublicCitiesResult {
+                        cities,
+                        stale: true,
+                    })
+                    .ok_or(error);
+            }
         };
         if transient_public_status(response.status())
             && let Some(cities) = stale.as_ref()
         {
-            return Ok(cities.clone());
+            return Ok(PublicCitiesResult {
+                cities: cities.clone(),
+                stale: true,
+            });
         }
         if response.status() == reqwest::StatusCode::NOT_MODIFIED {
             let cities = stale.ok_or_else(|| AppError::Remote {
@@ -487,7 +525,10 @@ impl CrowdRelayClient {
             })?;
             self.touch_cache(&ck, false).await;
             self.persist_public_cache_in_background();
-            return Ok(cities);
+            return Ok(PublicCitiesResult {
+                cities,
+                stale: true,
+            });
         }
         let (etag, last_modified) = cache::response_validators(response.headers());
         let response: crate::models::CityListResponse = decode(response).await?;
@@ -506,7 +547,10 @@ impl CrowdRelayClient {
         );
         drop(c);
         self.persist_public_cache_in_background();
-        Ok(cities)
+        Ok(PublicCitiesResult {
+            cities,
+            stale: false,
+        })
     }
 
     pub(super) async fn auth_json<T, B>(

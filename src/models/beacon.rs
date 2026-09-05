@@ -8,6 +8,11 @@ pub struct BeaconSessionStatus {
     pub configured: bool,
     pub unlocked: bool,
     pub session: Option<BeaconSummary>,
+    /// Explicit lifecycle phase from the native side. Not yet read by the
+    /// WASM UI but part of the IPC contract.
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub phase: BeaconSessionPhase,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]

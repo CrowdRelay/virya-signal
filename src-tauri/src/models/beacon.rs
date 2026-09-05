@@ -39,6 +39,8 @@ pub struct BeaconSessionStatus {
     pub configured: bool,
     pub unlocked: bool,
     pub session: Option<BeaconSummary>,
+    #[serde(default)]
+    pub phase: BeaconSessionPhase,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

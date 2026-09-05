@@ -10,9 +10,20 @@ use zeroize::Zeroizing;
 
 use crate::{
     AppError, AppState,
-    models::{BeaconProfile, FanProfile, OperatorProfile, OperatorSignalOverview},
+    models::{
+        BeaconProfile, FanProfile, OperatorProfile, OperatorSessionPhase, OperatorSignalOverview,
+    },
     vault,
 };
+
+/// Returns the current unix timestamp in seconds, or 0 if the clock is before
+/// the epoch (which would only make every expiry check pass trivially).
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
 
 /// Runs a CPU/IO-bound closure on the blocking thread pool and converts a
 /// panicked or cancelled task into a plain `AppError` instead of propagating
@@ -32,7 +43,27 @@ where
 pub(crate) async fn operator_profile(
     state: &State<'_, AppState>,
 ) -> Result<Arc<OperatorProfile>, AppError> {
-    state.session.read().await.clone().ok_or(AppError::Locked)
+    let session = state.session.read().await.clone();
+    let profile = session.as_ref().ok_or(AppError::Locked)?;
+    // The client has the expiry and should act on it: an expired staff session
+    // keeps making requests until CrowdRelay 401s otherwise. The backend is
+    // still authoritative, so this is a client-side optimization that avoids
+    // sending a bearer the server has already invalidated. Lock the session
+    // (clear credentials) so the operator is returned to the unlock screen
+    // instead of receiving opaque 401s on every subsequent command.
+    if let Some(expires_at) = profile.session_expires_at
+        && expires_at <= unix_now()
+    {
+        drop(session);
+        *state.session.write().await = None;
+        *state.operator_pin.write().await = None;
+        *state.operator_vault_password.write().await = None;
+        *state.operator_phase.write().await = OperatorSessionPhase::Locked;
+        *state.show_mode_store.write().await = None;
+        *state.operator_sections_cache.write().await = None;
+        return Err(AppError::Locked);
+    }
+    Ok(profile.clone())
 }
 
 pub(crate) async fn fan_profile(state: &State<'_, AppState>) -> Result<Arc<FanProfile>, AppError> {

@@ -688,16 +688,69 @@ if 'target:' not in (root / '.github/workflows/mobile-release.yml').read_text() 
 # manifest instead of inside the tree the manifest covers — so running it asked
 # the payload to attest to itself. Every promotion job now checks the source out
 # first, which costs one step and removes the circularity.
-for promotion_name in ['android-play.yml', 'android-release-apk.yml', 'mobile-release.yml']:
-    promotion = (root / '.github/workflows' / promotion_name).read_text()
+#
+# The checkout must be in the *promoting* job — the one that runs
+# `artifact_manifest.py verify` or `google_play_rollout.py` — not just
+# somewhere in the file. A file-level text check passes even if checkout is in
+# a build job and the promote job runs without it, so we parse the YAML
+# structure to find the promoting job and verify its steps.
+import yaml as _yaml  # noqa: E402
+
+# Artifact promotion workflows: download a built artifact and publish it.
+# These must verify the artifact against the source SHA and reject artifacts
+# without Firebase push configuration.
+artifact_promotion_workflows = ['android-play.yml', 'android-release-apk.yml', 'mobile-release.yml']
+for promotion_name in artifact_promotion_workflows:
+    promotion_path = root / '.github/workflows' / promotion_name
+    if not promotion_path.exists():
+        raise SystemExit(f'{promotion_name} is listed as a promotion workflow but is missing')
+    promotion = promotion_path.read_text()
     if 'promoted/scripts/artifact_manifest.py verify' in promotion:
         raise SystemExit(f'{promotion_name} must not verify a promoted artifact with the verifier bundled inside it')
     if 'scripts/artifact_manifest.py verify promoted/artifacts promoted/android-artifact-manifest.json --source-sha' not in promotion:
         raise SystemExit(f'{promotion_name} must verify the exact downloaded artifact against the source SHA')
-    if 'uses: actions/checkout@' not in promotion:
-        raise SystemExit(f'{promotion_name} must check the source out so the artifact verifier is not the artifact')
     if 'push-build-config.json' not in promotion or '.firebaseConfigured == true' not in promotion:
         raise SystemExit(f'{promotion_name} must reject production artifacts without Firebase push configuration')
+
+# All promotion workflows (artifact promotion + rollout control): the job that
+# performs the promotion must check the source out so the verifier / rollout
+# script comes from the repo, not from a downloaded artifact.
+all_promotion_workflows = artifact_promotion_workflows + ['android-play-promote.yml']
+for promotion_name in all_promotion_workflows:
+    promotion_path = root / '.github/workflows' / promotion_name
+    if not promotion_path.exists():
+        raise SystemExit(f'{promotion_name} is listed as a promotion workflow but is missing')
+    promotion = promotion_path.read_text()
+    parsed = _yaml.safe_load(promotion)
+    jobs = parsed.get('jobs', {}) if isinstance(parsed, dict) else {}
+    if not jobs:
+        raise SystemExit(f'{promotion_name} has no parseable jobs')
+    promoting_jobs = []
+    for job_id, job in jobs.items():
+        if not isinstance(job, dict):
+            continue
+        steps = job.get('steps', [])
+        if not isinstance(steps, list):
+            continue
+        step_text = ' '.join(
+            str(step.get('run', '')) + ' ' + str(step.get('uses', ''))
+            for step in steps
+            if isinstance(step, dict)
+        )
+        if 'artifact_manifest.py verify' in step_text or 'google_play_rollout.py' in step_text:
+            promoting_jobs.append((job_id, steps))
+    if not promoting_jobs:
+        raise SystemExit(f'{promotion_name} has no job that runs artifact_manifest.py verify or google_play_rollout.py')
+    for job_id, steps in promoting_jobs:
+        has_checkout = any(
+            isinstance(step, dict) and str(step.get('uses', '')).startswith('actions/checkout')
+            for step in steps
+        )
+        if not has_checkout:
+            raise SystemExit(
+                f'{promotion_name} job "{job_id}" performs promotion but does not check the source out '
+                f'— the artifact verifier must come from the checkout, not the artifact'
+            )
 
 print(f'static configuration and IPC contract check: OK ({len(invoked)} active / {len(registered)} registered commands; {len(unreferenced)} compat-only)')
 

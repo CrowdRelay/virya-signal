@@ -12,7 +12,7 @@ use crate::{
     models::{
         AdmissionPass, FanAuthResult, FanConfirmationInput, FanEventInterest, FanHomeData,
         FanLocationState, FanProfile, FanPushPreferences, FanPushPreferencesUpdate, FanSignupInput,
-        PublicEvent, ReferralProgress,
+        PublicEventsResult, ReferralProgress,
     },
 };
 
@@ -171,7 +171,7 @@ impl super::CrowdRelayClient {
         self.fan_home_cache.write().await.remove(&key);
     }
 
-    pub async fn fan_events(&self, profile: &FanProfile) -> Result<Vec<PublicEvent>, AppError> {
+    pub async fn fan_events(&self, profile: &FanProfile) -> Result<PublicEventsResult, AppError> {
         self.public_events(&profile.api_base_url).await
     }
 

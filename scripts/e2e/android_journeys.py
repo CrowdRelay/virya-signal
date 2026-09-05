@@ -225,6 +225,47 @@ def synesthesia_app_link_round_trip(d: Device) -> None:
     d.snapshot("synesthesia-app-link-linked")
 
 
+def cold_start_confirm_link_then_resume(d: Device) -> None:
+    """B5/B6 proof: a cold-start mailed confirmation link opens the confirm
+    panel, and dismissing it with "Back to PIN login" clears the native
+    pending token so a process-kill + relaunch does not re-offer it."""
+    token = "b" * 64
+    url = f"virya-signal://fan/confirm?token={token}"
+    # Cold start: force-stop, then launch with the confirm intent.
+    shell("am", "force-stop", PKG, check=False)
+    shell(
+        "am", "start", "-W",
+        "-a", "android.intent.action.VIEW",
+        "-d", url,
+        "-p", PKG,
+        timeout=20,
+    )
+    # The confirm panel should appear with the "CONFIRM AND ENTER" / Polish
+    # equivalent button and the "Back to PIN login" dismiss control.
+    d.assert_text([
+        "POTWIERDŹ I WEJDŹ",
+        "CONFIRM AND ENTER",
+    ], timeout=25)
+    d.snapshot("cold-start-confirm-link-panel")
+    # Dismiss the panel. This calls fan_clear_pending_confirm_link which
+    # clears both the Rust-side pending token and the native Android link.
+    d.tap([
+        "WRÓĆ DO LOGOWANIA PIN-EM",
+        "BACK TO PIN LOGIN",
+    ], timeout=10)
+    d.snapshot("cold-start-confirm-link-dismissed")
+    # Process-kill + relaunch: the panel must NOT reappear. The native
+    # pending link was cleared, so fan_take_confirm_link returns false.
+    shell("am", "force-stop", PKG, check=False)
+    shell("monkey", "-p", PKG, "-c", "android.intent.category.LAUNCHER", "1", timeout=20)
+    # Wait for the app to paint. The confirm panel text must be absent.
+    d.assert_absent([
+        "POTWIERDŹ I WEJDŹ",
+        "CONFIRM AND ENTER",
+    ], seconds=20)
+    d.snapshot("cold-start-confirm-link-not-reoffered")
+
+
 def fan_event_details(d: Device) -> None:
     d.assert_text(["VIRYA E2E — TEST EVENT"], timeout=25)
     d.tap(["SZCZEGÓŁY", "DETAILS"], timeout=10)
@@ -341,6 +382,7 @@ def main() -> None:
         fan_first_login(d)
         fan_recovery_qr(d)
         synesthesia_app_link_round_trip(d)
+        cold_start_confirm_link_then_resume(d)
         fan_event_details(d)
         fan_settings_survives_android_settings(d)
         open_staff_and_configure_owner(d)
@@ -358,7 +400,7 @@ def main() -> None:
     fatal = [line for line in logcat.splitlines() if "FATAL EXCEPTION" in line or "ANR in music.virya.signal" in line or "Render process gone" in line]
     if fatal:
         raise JourneyError("native/WebView crash detected:\n" + "\n".join(fatal[-20:]))
-    print("VIRYA_SIGNAL_ANDROID_E2E=PASS journeys=fan_auth,fan_recovery,synesthesia_app_link,event_detail,native_settings,staff_language,owner_online,owner_offline,staff_checklist")
+    print("VIRYA_SIGNAL_ANDROID_E2E=PASS journeys=fan_auth,fan_recovery,synesthesia_app_link,cold_start_confirm_link,event_detail,native_settings,staff_language,owner_online,owner_offline,staff_checklist")
 
 
 if __name__ == "__main__":

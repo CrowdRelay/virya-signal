@@ -1,3 +1,36 @@
+/// Explicit session lifecycle phase per domain. Today every writer sets
+/// session + pin + password together, so no path produces a half-unlocked
+/// state. This enum makes that invariant structural instead of implied by
+/// which `RwLock<Option<…>>` fields happen to be populated. Future variants
+/// (Unlocking, Refreshing, Expired, LoggingOut) can be added without
+/// changing existing call sites.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum OperatorSessionPhase {
+    #[default]
+    Unconfigured,
+    Locked,
+    Active,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FanSessionPhase {
+    #[default]
+    Unconfigured,
+    Locked,
+    Active,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BeaconSessionPhase {
+    #[default]
+    Unconfigured,
+    Locked,
+    Active,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Zeroize)]
 #[zeroize(drop)]
 pub struct OperatorProfile {
@@ -35,6 +68,8 @@ pub struct SessionStatus {
     pub configured: bool,
     pub unlocked: bool,
     pub session: Option<SessionSummary>,
+    #[serde(default)]
+    pub phase: OperatorSessionPhase,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Zeroize)]
@@ -189,6 +224,8 @@ pub struct FanSessionStatus {
     /// making.
     #[serde(default)]
     pub device_unlock_supported: bool,
+    #[serde(default)]
+    pub phase: FanSessionPhase,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]

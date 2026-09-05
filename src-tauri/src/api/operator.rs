@@ -4,7 +4,7 @@ use crate::{
     AppError,
     models::{
         AudienceRevenueSummary, AudienceSummary, ConcertQrOverview, CreateQrCampaignInput,
-        IssuePassInput, OperatorProfile, OperatorRole, OperatorSignalOverview, PublicEvent,
+        IssuePassInput, OperatorProfile, OperatorRole, OperatorSignalOverview, PublicEventsResult,
         ShowChecklist, ShowModeSnapshot, StaffEventDashboard, TicketingOverview,
     },
 };
@@ -26,7 +26,7 @@ impl super::CrowdRelayClient {
     pub async fn operator_events(
         &self,
         profile: &OperatorProfile,
-    ) -> Result<Vec<PublicEvent>, AppError> {
+    ) -> Result<PublicEventsResult, AppError> {
         self.public_events(&profile.api_base_url).await
     }
 

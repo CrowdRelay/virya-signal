@@ -148,6 +148,25 @@ pub struct EventCity {
     pub name: String,
 }
 
+/// Envelope for the public events list. `stale` is true when the data came
+/// from the stale cache on a network failure or 429/5xx, so the UI can mark
+/// it as cached rather than presenting potentially outdated shows as live.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct PublicEventsResult {
+    pub events: Vec<PublicEvent>,
+    #[serde(default)]
+    pub stale: bool,
+}
+
+/// Envelope for the public cities list. Same staleness semantics as
+/// [`PublicEventsResult`].
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct PublicCitiesResult {
+    pub cities: Vec<CitySignal>,
+    #[serde(default)]
+    pub stale: bool,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct TicketingOverview {
     pub sale: TicketSaleSummary,

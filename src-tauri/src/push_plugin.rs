@@ -264,6 +264,17 @@ mod android {
             .map_err(|error| error.to_string())
     }
 
+    /// Clears a pending mailed confirmation link from the native side so the
+    /// next resume tick does not re-offer it. Mirrors
+    /// [`clear_synesthesia_app_link`].
+    pub fn clear_fan_confirm_app_link<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+        handle(app)
+            .0
+            .run_mobile_plugin::<serde_json::Value>("clearFanConfirmAppLink", ())
+            .map(|_| ())
+            .map_err(|error| error.to_string())
+    }
+
     pub fn open_notification_settings<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
         handle(app)
             .0

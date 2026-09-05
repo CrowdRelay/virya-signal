@@ -537,6 +537,7 @@ fn BeaconApp(
             configured: status.get_untracked().configured,
             unlocked: false,
             session: None,
+            ..status.get_untracked()
         });
         spawn_local(async move {
             match bridge::invoke::<BeaconSessionStatus, _>("beacon_lock", &EmptyArgs {}).await {

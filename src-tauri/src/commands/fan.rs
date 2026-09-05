@@ -20,9 +20,10 @@ use crate::{
     models::{
         AdmissionPass, AreaChallenge, AreaClaimResult, AreaPositionSample, FanAuthResult,
         FanConfirmationInput, FanEventInterest, FanHomeData, FanLocationState, FanProfile,
-        FanPushPreferences, FanPushPreferencesUpdate, FanPushStatus, FanSessionStatus,
-        FanSignupInput, MerchCatalog, PublicEvent, ReferralProgress, TicketWallet, TicketWalletApi,
-        WalletBatch, WalletCredential, WalletQrCredential, WalletTicket,
+        FanPushPreferences, FanPushPreferencesUpdate, FanPushStatus, FanSessionPhase,
+        FanSessionStatus, FanSignupInput, MerchCatalog, PublicEventsResult, ReferralProgress,
+        TicketWallet, TicketWalletApi, WalletBatch, WalletCredential, WalletQrCredential,
+        WalletTicket,
     },
     session::{fan_profile, persist_fan, run_blocking},
     validation::{

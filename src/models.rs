@@ -1,5 +1,34 @@
 use serde::{Deserialize, Serialize};
 
+/// Explicit session lifecycle phase per domain. Mirrors the native enum so
+/// the WASM UI can read the phase from `launcher_status` / `fan_status`.
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum OperatorSessionPhase {
+    #[default]
+    Unconfigured,
+    Locked,
+    Active,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum FanSessionPhase {
+    #[default]
+    Unconfigured,
+    Locked,
+    Active,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum BeaconSessionPhase {
+    #[default]
+    Unconfigured,
+    Locked,
+    Active,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum OperatorRole {
@@ -38,6 +67,13 @@ pub struct SessionStatus {
     pub configured: bool,
     pub unlocked: bool,
     pub session: Option<SessionSummary>,
+    /// Explicit lifecycle phase from the native side. Not yet read by the
+    /// WASM UI but part of the IPC contract so future transitions
+    /// (Unlocking, Refreshing, Expired, LoggingOut) can be surfaced without
+    /// another contract change.
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub phase: OperatorSessionPhase,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -54,6 +90,11 @@ pub struct FanSessionStatus {
     pub device_unlock: bool,
     #[serde(default)]
     pub device_unlock_supported: bool,
+    /// Explicit lifecycle phase from the native side. Not yet read by the
+    /// WASM UI but part of the IPC contract.
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub phase: FanSessionPhase,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -329,6 +370,15 @@ pub struct PublicEvent {
     pub image_thumbnail_url: Option<String>,
 }
 
+/// Envelope for the public events list. `stale` is true when the data came
+/// from the stale cache on a network failure, so the UI can mark it as cached.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct PublicEventsResult {
+    pub events: Vec<PublicEvent>,
+    #[serde(default)]
+    pub stale: bool,
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct EventCity {
     pub name: String,
@@ -460,6 +510,11 @@ pub struct FanDashboardData {
     #[serde(default)]
     pub interests: Vec<FanEventInterest>,
     pub admission_pass: Option<AdmissionPass>,
+    /// True when the events list came from the stale cache on a network
+    /// failure. The UI shows a "cached data" badge so a fan does not mistake
+    /// a cancelled or moved show for a live one.
+    #[serde(default)]
+    pub events_stale: bool,
 }
 
 /// The operator panels the native side keeps in its encrypted snapshot. Read

@@ -281,7 +281,7 @@ fn refresh_operator_events(
         |state, value| state.events = value,
     );
     spawn_local(async move {
-        let result = bridge::invoke_latest::<Vec<PublicEvent>, _>(
+        let result = bridge::invoke_latest::<PublicEventsResult, _>(
             "operator_events",
             &EmptyArgs {},
             15_000,
@@ -291,7 +291,7 @@ fn refresh_operator_events(
         let completed = latest_request_completed(&result);
         match result {
             Ok(Some(value)) => dashboard.update(|state| {
-                state.get_or_insert_with(DashboardData::default).events = value;
+                state.get_or_insert_with(DashboardData::default).events = value.events;
             }),
             Ok(None) => {}
             Err(message) => set_error_debounced(error, message),
@@ -531,25 +531,26 @@ fn refresh_fan_events(
     // request instead of showing a skeleton until the network answers.
     if !has_events && bridge::native_available() {
         spawn_local(async move {
-            if let Ok(value) = bridge::invoke_timeout::<Vec<PublicEvent>, _>(
+            if let Ok(value) = bridge::invoke_timeout::<PublicEventsResult, _>(
                 "fan_cached_events",
                 &EmptyArgs {},
                 2_000,
             )
             .await
-                && !value.is_empty()
+                && !value.events.is_empty()
                 && dashboard.with_untracked(|state| state.as_ref().is_none_or(|data| data.events.is_empty()))
             {
                 dashboard.update(|state| {
-                    state.get_or_insert_with(FanDashboardData::default).events =
-                        stable_fan_events(value);
+                    let data = state.get_or_insert_with(FanDashboardData::default);
+                    data.events = stable_fan_events(value.events);
+                    data.events_stale = value.stale;
                 });
                 loading.update(|state| state.events = false);
             }
         });
     }
     spawn_local(async move {
-        let result = bridge::invoke_latest::<Vec<PublicEvent>, _>(
+        let result = bridge::invoke_latest::<PublicEventsResult, _>(
             "fan_events",
             &EmptyArgs {},
             15_000,
@@ -559,8 +560,9 @@ fn refresh_fan_events(
         let completed = latest_request_completed(&result);
         match result {
             Ok(Some(value)) => dashboard.update(|state| {
-                state.get_or_insert_with(FanDashboardData::default).events =
-                    stable_fan_events(value);
+                let data = state.get_or_insert_with(FanDashboardData::default);
+                data.events = stable_fan_events(value.events);
+                data.events_stale = value.stale;
             }),
             Ok(None) => {}
             // Silent: cached events or empty state handles the UI.

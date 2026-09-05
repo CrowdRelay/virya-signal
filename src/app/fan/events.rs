@@ -20,9 +20,11 @@ fn FanEvents(
     // `loading` is one struct for eight sections, so reading `.events` off it
     // raw made the warm-up's merch/wallet/area flags rebuild this list too.
     let events_loading = Memo::new(move |_| loading.get().events);
+    let events_stale = Memo::new(move |_| dashboard.with(|state| state.as_ref().is_some_and(|data| data.events_stale)));
     view! {
         <section class="screen">
             <header class="screen-title"><p class="eyebrow">{tr("where_we_play")}</p><h2>{tr("shows_tab")}</h2></header>
+            {move || events_stale.get().then(|| view! { <span class="cache-badge">{tr("cached_data")}</span> })}
             {move || {
                 let events = events.get();
                 if let Some(slug) = focused_event_slug.get() {

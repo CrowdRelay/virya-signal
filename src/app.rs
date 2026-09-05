@@ -27,11 +27,11 @@ use crate::{
         FanEventInterest, FanHomeData, FanLocationState, FanMerchBundleCatalog, FanPushPreferences,
         FanPushPreferencesUpdate, FanPushStatus, FanSessionStatus, FanSignupInput, FanTarget,
         IssuePassInput, IssuedPass, MerchCatalog, OperatorProfileInput, OperatorRole,
-        OperatorSignalOverview, PublicEvent, PublicHomeData, QrCampaign, ReferralProgress,
-        RequestedCityInput, RequestedCityResult, SessionStatus, ShowChecklist, ShowModeScanResult,
-        ShowModeStatus, ShowModeSyncResult, SignalNewsFeed, StaffEventDashboard,
-        TicketCheckoutInput, TicketCheckoutItemInput, TicketCheckoutStart, TicketSaleOffer,
-        TicketWallet, TicketingOverview, WalletBatch, WalletTicket,
+        OperatorSignalOverview, PublicEvent, PublicEventsResult, PublicHomeData, QrCampaign,
+        ReferralProgress, RequestedCityInput, RequestedCityResult, SessionStatus, ShowChecklist,
+        ShowModeScanResult, ShowModeStatus, ShowModeSyncResult, SignalNewsFeed,
+        StaffEventDashboard, TicketCheckoutInput, TicketCheckoutItemInput, TicketCheckoutStart,
+        TicketSaleOffer, TicketWallet, TicketingOverview, WalletBatch, WalletTicket,
     },
 };
 

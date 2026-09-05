@@ -34,16 +34,16 @@ use commands::{
     fan::{
         fan_admission_pass, fan_admission_qr, fan_area_challenge, fan_area_claim, fan_area_wallet,
         fan_cached_events, fan_cached_home, fan_cached_merch_catalog, fan_cached_sections,
-        fan_cached_wallets, fan_claim_pass, fan_clear_pending_confirmation, fan_confirm,
-        fan_confirm_link, fan_confirm_scanned, fan_delete_account, fan_device_unlock,
-        fan_disable_device_unlock, fan_enable_device_unlock, fan_events, fan_forget, fan_home,
-        fan_import_wallet, fan_interests, fan_lock, fan_merch_bundles, fan_merch_catalog,
-        fan_prepare_confirmation, fan_push_disable, fan_push_enable, fan_push_open_settings,
-        fan_push_preferences, fan_push_status, fan_push_sync, fan_push_take_target,
-        fan_push_update_preferences, fan_referral, fan_register_interest, fan_request_access,
-        fan_request_delivery, fan_set_location, fan_signup, fan_start_ticket_checkout, fan_status,
-        fan_take_confirm_link, fan_ticket_sale, fan_unlock, fan_unpublish_synesthesia_leaderboard,
-        fan_wallets, render_wallet_qr,
+        fan_cached_wallets, fan_claim_pass, fan_clear_pending_confirm_link,
+        fan_clear_pending_confirmation, fan_confirm, fan_confirm_link, fan_confirm_scanned,
+        fan_delete_account, fan_device_unlock, fan_disable_device_unlock, fan_enable_device_unlock,
+        fan_events, fan_forget, fan_home, fan_import_wallet, fan_interests, fan_lock,
+        fan_merch_bundles, fan_merch_catalog, fan_prepare_confirmation, fan_push_disable,
+        fan_push_enable, fan_push_open_settings, fan_push_preferences, fan_push_status,
+        fan_push_sync, fan_push_take_target, fan_push_update_preferences, fan_referral,
+        fan_register_interest, fan_request_access, fan_request_delivery, fan_set_location,
+        fan_signup, fan_start_ticket_checkout, fan_status, fan_take_confirm_link, fan_ticket_sale,
+        fan_unlock, fan_unpublish_synesthesia_leaderboard, fan_wallets, render_wallet_qr,
     },
     misc::{
         launcher_status, open_external_url, request_city, submit_anonymous_feedback,
@@ -64,7 +64,10 @@ use commands::{
     },
     synesthesia::{fan_link_pending_synesthesia, fan_take_synesthesia_app_link},
 };
-use models::{BeaconProfile, FanProfile, OperatorProfile, ShowModeStore};
+use models::{
+    BeaconProfile, BeaconSessionPhase, FanProfile, FanSessionPhase, OperatorProfile,
+    OperatorSessionPhase, ShowModeStore,
+};
 use tauri::Manager;
 use tokio::sync::{Mutex, RwLock};
 use zeroize::Zeroizing;
@@ -92,6 +95,7 @@ pub struct AppState {
     session: RwLock<Option<Arc<OperatorProfile>>>,
     operator_pin: RwLock<Option<Zeroizing<String>>>,
     operator_vault_password: RwLock<Option<Zeroizing<Vec<u8>>>>,
+    operator_phase: RwLock<OperatorSessionPhase>,
     operator_mutation: Mutex<()>,
     operator_push_mutation: Mutex<()>,
     /// In-memory mirror of the encrypted operator-panel snapshot, for the same
@@ -104,6 +108,7 @@ pub struct AppState {
     fan_session: RwLock<Option<Arc<FanProfile>>>,
     fan_pin: RwLock<Option<Zeroizing<String>>>,
     fan_vault_password: RwLock<Option<Zeroizing<Vec<u8>>>>,
+    fan_phase: RwLock<FanSessionPhase>,
     /// The effective unlock mode, resolved once and then held.
     ///
     /// `fan_status` runs at the end of nearly every fan command and
@@ -125,6 +130,7 @@ pub struct AppState {
     beacon_session: RwLock<Option<Arc<BeaconProfile>>>,
     beacon_pin: RwLock<Option<Zeroizing<String>>>,
     beacon_vault_password: RwLock<Option<Zeroizing<Vec<u8>>>>,
+    beacon_phase: RwLock<BeaconSessionPhase>,
     beacon_mutation: Mutex<()>,
     pending_beacon_confirmation: Mutex<Option<PendingBeaconConfirmation>>,
     pending_beacon_link: Mutex<Option<Zeroizing<String>>>,
@@ -209,6 +215,7 @@ pub fn run() {
                 session: RwLock::new(None),
                 operator_pin: RwLock::new(None),
                 operator_vault_password: RwLock::new(None),
+                operator_phase: RwLock::new(OperatorSessionPhase::default()),
                 operator_mutation: Mutex::new(()),
                 operator_push_mutation: Mutex::new(()),
                 operator_sections_cache: RwLock::new(None),
@@ -218,6 +225,7 @@ pub fn run() {
                 fan_session: RwLock::new(None),
                 fan_pin: RwLock::new(None),
                 fan_vault_password: RwLock::new(None),
+                fan_phase: RwLock::new(FanSessionPhase::default()),
                 fan_unlock_mode: RwLock::new(None),
                 pending_fan_confirmation: Mutex::new(None),
                 pending_fan_confirm_token: Mutex::new(None),
@@ -228,6 +236,7 @@ pub fn run() {
                 beacon_session: RwLock::new(None),
                 beacon_pin: RwLock::new(None),
                 beacon_vault_password: RwLock::new(None),
+                beacon_phase: RwLock::new(BeaconSessionPhase::default()),
                 beacon_mutation: Mutex::new(()),
                 pending_beacon_confirmation: Mutex::new(None),
                 pending_beacon_link: Mutex::new(None),
@@ -295,6 +304,7 @@ pub fn run() {
             fan_request_access,
             fan_prepare_confirmation,
             fan_clear_pending_confirmation,
+            fan_clear_pending_confirm_link,
             fan_confirm,
             fan_confirm_scanned,
             fan_home,

@@ -918,8 +918,15 @@ fn FanAccess(
                             </Show>
                             // The old PIN still works until the link is spent,
                             // so a fan who tapped the link by accident is not
-                            // trapped in a screen with no way back.
-                            <button type="button" class="text-button" on:click=move |_| link_pending.set(false)>{tr("back_to_pin_login")}</button>
+                            // trapped in a screen with no way back. The native
+                            // pending link is also cleared so the next resume
+                            // tick does not re-offer it and reopen this panel.
+                            <button type="button" class="text-button" on:click=move |_| {
+                                link_pending.set(false);
+                                spawn_local(async move {
+                                    let _ = bridge::invoke_unit("fan_clear_pending_confirm_link", &EmptyArgs {}).await;
+                                });
+                            }>{tr("back_to_pin_login")}</button>
                         </div>
                     </Show>
                 </div>

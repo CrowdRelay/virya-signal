@@ -2,6 +2,7 @@
 pub(crate) async fn fan_status(state: State<'_, AppState>) -> Result<FanSessionStatus, AppError> {
     let mode = crate::device_unlock::effective_mode(&state).await;
     let session = state.fan_session.read().await;
+    let phase = *state.fan_phase.read().await;
     Ok(FanSessionStatus {
         configured: vault::fan_exists(&state.app_data_dir),
         unlocked: session.is_some(),
@@ -9,6 +10,7 @@ pub(crate) async fn fan_status(state: State<'_, AppState>) -> Result<FanSessionS
         pin_unlock: mode.pin,
         device_unlock: mode.device,
         device_unlock_supported: state.device_unlock_supported,
+        phase,
     })
 }
 
@@ -32,6 +34,7 @@ pub(crate) async fn fan_unlock(
     *state.fan_session.write().await = Some(Arc::new(profile));
     *state.fan_pin.write().await = Some(pin_for_session);
     *state.fan_vault_password.write().await = Some(vault_password);
+    *state.fan_phase.write().await = FanSessionPhase::Active;
     *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
     drop(_mutation);
@@ -70,6 +73,7 @@ pub(crate) async fn fan_lock(state: State<'_, AppState>) -> Result<FanSessionSta
     *state.fan_session.write().await = None;
     *state.fan_pin.write().await = None;
     *state.fan_vault_password.write().await = None;
+    *state.fan_phase.write().await = FanSessionPhase::Locked;
     *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
     *state.fan_sections_cache.write().await = None;
@@ -117,6 +121,7 @@ pub(crate) async fn fan_delete_account(
     *state.fan_session.write().await = None;
     *state.fan_pin.write().await = None;
     *state.fan_vault_password.write().await = None;
+    *state.fan_phase.write().await = FanSessionPhase::Unconfigured;
     *state.pending_fan_confirmation.lock().await = None;
     clear_fan_identity_capabilities(&state).await;
     state.wallet_qr_tokens.write().await.clear();
@@ -162,6 +167,7 @@ pub(crate) async fn fan_forget(
     *state.fan_session.write().await = None;
     *state.fan_pin.write().await = None;
     *state.fan_vault_password.write().await = None;
+    *state.fan_phase.write().await = FanSessionPhase::Unconfigured;
     *state.pending_fan_confirmation.lock().await = None;
     clear_fan_identity_capabilities(&state).await;
     state.wallet_qr_tokens.write().await.clear();
@@ -261,6 +267,7 @@ async fn persist_confirmed_fan(
     *state.fan_session.write().await = Some(Arc::new(profile));
     *state.fan_pin.write().await = session_pin;
     *state.fan_vault_password.write().await = Some(vault_password);
+    *state.fan_phase.write().await = FanSessionPhase::Active;
     state.wallet_qr_tokens.write().await.clear();
     // A different fan now owns this vault; the previous fan's panels must not
     // paint under the new session.
@@ -317,6 +324,23 @@ pub(crate) async fn fan_clear_pending_confirmation(
 ) -> Result<(), AppError> {
     let _mutation = state.fan_mutation.lock().await;
     *state.pending_fan_confirmation.lock().await = None;
+    Ok(())
+}
+
+/// Clears a pending mailed confirmation link from both the Rust-side token
+/// slot and the native Android app-link holder. Without this, "Back to PIN
+/// login" only flips WASM state and the next resume tick re-reads the native
+/// pending link, reopening the confirm panel.
+#[tauri::command]
+pub(crate) async fn fan_clear_pending_confirm_link(
+    state: State<'_, AppState>,
+    _app: AppHandle,
+) -> Result<(), AppError> {
+    *state.pending_fan_confirm_token.lock().await = None;
+    #[cfg(target_os = "android")]
+    {
+        let _ = crate::push_plugin::clear_fan_confirm_app_link(&_app);
+    }
     Ok(())
 }
 
@@ -706,9 +730,14 @@ fn remember_fan_sections(
 #[tauri::command]
 pub(crate) async fn fan_cached_events(
     state: State<'_, AppState>,
-) -> Result<Vec<PublicEvent>, AppError> {
+) -> Result<PublicEventsResult, AppError> {
     let profile = fan_profile(&state).await?;
-    Ok(state.api.public_events_snapshot(&profile.api_base_url).await)
+    Ok(PublicEventsResult {
+        events: state.api.public_events_snapshot(&profile.api_base_url).await,
+        // A disk-only snapshot is always stale by definition: it is the last
+        // known good list, painted while the live request is in flight.
+        stale: true,
+    })
 }
 
 #[tauri::command]
@@ -720,7 +749,9 @@ pub(crate) async fn fan_cached_merch_catalog(
 }
 
 #[tauri::command]
-pub(crate) async fn fan_events(state: State<'_, AppState>) -> Result<Vec<PublicEvent>, AppError> {
+pub(crate) async fn fan_events(
+    state: State<'_, AppState>,
+) -> Result<PublicEventsResult, AppError> {
     let profile = fan_profile(&state).await?;
     state.api.fan_events(&profile).await
 }

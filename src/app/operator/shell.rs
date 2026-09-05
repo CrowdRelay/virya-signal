@@ -138,6 +138,7 @@ fn OperatorApp(
             configured: status.get_untracked().configured,
             unlocked: false,
             session: None,
+            ..status.get_untracked()
         });
         mode.set(RootMode::Fan);
         spawn_local(async move {

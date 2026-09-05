@@ -91,6 +91,7 @@ pub(crate) async fn fan_signup(
         *state.fan_session.write().await = Some(Arc::new(profile));
         *state.fan_pin.write().await = pin;
         *state.fan_vault_password.write().await = Some(vault_password);
+        *state.fan_phase.write().await = FanSessionPhase::Active;
         *state.pending_fan_confirmation.lock().await = None;
         state.wallet_qr_tokens.write().await.clear();
     } else {

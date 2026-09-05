@@ -384,6 +384,7 @@ fn OperatorSettings(
             configured: status.get_untracked().configured,
             unlocked: false,
             session: None,
+            ..status.get_untracked()
         });
         spawn_local(async move {
             match bridge::invoke::<SessionStatus, _>("lock", &EmptyArgs {}).await {
