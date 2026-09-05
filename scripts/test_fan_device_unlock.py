@@ -150,7 +150,7 @@ class NotificationPrimer(unittest.TestCase):
     """
 
     def test_the_system_dialog_is_only_reached_through_the_card(self) -> None:
-        primer = SHELL.split("fn PushPrimer()", 1)[1].split("\n#[component]", 1)[0]
+        primer = SHELL.split("fn PushPrimer(", 1)[1].split("\n#[component]", 1)[0]
         self.assertIn('"fan_push_enable"', primer)
         allow = primer.split("let allow =", 1)[1]
         self.assertIn("mark_push_primer_seen", allow)
@@ -159,7 +159,7 @@ class NotificationPrimer(unittest.TestCase):
         self.assertLess(allow.index("mark_push_primer_seen"), allow.index('"fan_push_enable"'))
 
     def test_it_is_shown_once_and_only_when_there_is_something_to_ask(self) -> None:
-        primer = SHELL.split("fn PushPrimer()", 1)[1].split("\n#[component]", 1)[0]
+        primer = SHELL.split("fn PushPrimer(", 1)[1].split("\n#[component]", 1)[0]
         self.assertIn("bridge::push_primer_seen()", primer)
         self.assertIn("status.supported", primer)
         self.assertIn("!status.enabled", primer)
