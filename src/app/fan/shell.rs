@@ -576,16 +576,21 @@ fn FanNavButton(
 /// unprompted, on a fan who has just arrived and does not yet know what Signal
 /// would send, is how an app loses the channel it needs to reach the people who
 /// drift away — which is the whole reason for asking. So the system dialog is
-/// only reached by a fan who has already said yes to this card.
+/// only reached by a fan who has already said yes to this modal.
 ///
-/// Shown once. "Not now" is remembered the same as "yes", because a card that
-/// returns every launch is the same nag by another name; the switch in Profile
-/// stays available for anyone who changes their mind.
+/// Shown once, as a centered modal overlay, after the home data has painted.
+/// The fan sees the app first — what Signal actually gives them — and then the
+/// primer appears. "Not now" is remembered the same as "yes", because a modal
+/// that returns every launch is the same nag by another name; the switch in
+/// Profile stays available for anyone who changes their mind.
 #[component]
-fn PushPrimer() -> impl IntoView {
+fn PushPrimer(loading: RwSignal<FanLoadingState>) -> impl IntoView {
     let visible = RwSignal::new(false);
     let busy = RwSignal::new(false);
+    let eligible = RwSignal::new(false);
 
+    // Check push status on mount — this only sets eligibility, it does not
+    // show the modal. The modal waits for the home data to paint.
     Effect::new(move |_| {
         if !bridge::native_available() || bridge::push_primer_seen() {
             return;
@@ -604,11 +609,21 @@ fn PushPrimer() -> impl IntoView {
                 return;
             };
             if status.supported && !status.enabled && status.permission != "denied" {
-                let _ = visible.try_set(true);
+                let _ = eligible.try_set(true);
             }
         });
     });
     on_cleanup(|| bridge::invalidate_latest("fan:push-primer"));
+
+    // Show the modal only after the home section has painted. This is the
+    // "polite" part: the fan sees the app's value first, then the ask.
+    // A fan whose home data loaded from the snapshot cache sees it almost
+    // immediately; one waiting on the network sees it when the response lands.
+    Effect::new(move |_| {
+        if eligible.get_untracked() && !loading.get().home {
+            let _ = visible.try_set(true);
+        }
+    });
 
     let dismiss = move || {
         bridge::mark_push_primer_seen();
@@ -639,19 +654,22 @@ fn PushPrimer() -> impl IntoView {
 
     view! {
         <Show when=move || visible.get()>
-            <article class="push-primer" role="region" aria-label=tr("push_primer_title")>
-                <span class="push-primer-icon" aria-hidden="true">"◉"</span>
-                <strong>{tr("push_primer_title")}</strong>
-                <p>{tr("push_primer_body")}</p>
-                <div class="push-primer-actions">
-                    <button type="button" class="primary" disabled=move || busy.get() on:click=allow>
-                        {tr("push_primer_allow")}
-                    </button>
-                    <button type="button" class="text-button" on:click=move |_| dismiss()>
-                        {tr("push_primer_later")}
-                    </button>
+            <div class="modal-backdrop" />
+            <div class="push-primer-modal" role="dialog" aria-modal="true" aria-label=tr("push_primer_title")>
+                <div class="push-primer-modal-body">
+                    <span class="push-primer-icon" aria-hidden="true">"◉"</span>
+                    <strong>{tr("push_primer_title")}</strong>
+                    <p>{tr("push_primer_body")}</p>
+                    <div class="push-primer-actions">
+                        <button type="button" class="primary" disabled=move || busy.get() on:click=allow>
+                            {tr("push_primer_allow")}
+                        </button>
+                        <button type="button" class="text-button" on:click=move |_| dismiss()>
+                            {tr("push_primer_later")}
+                        </button>
+                    </div>
                 </div>
-            </article>
+            </div>
         </Show>
     }
 }
@@ -702,7 +720,7 @@ fn FanSignal(
     };
     view! {
         <section class="screen fan-screen">
-            <PushPrimer />
+            <PushPrimer loading=loading />
             <FanHomeOverview home=home loading=loading tab=tab focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview error=error />
             <Show when=move || !loading.get().referral fallback=move || view! { <Skeleton rows=1 height=180 /> }>
             {move || referral_progress.get().map(|referral| {

@@ -2094,21 +2094,26 @@ html[data-virya-scanner-active] .app-shell {
 .event-details-action { grid-column: 1 / -1; border-color: var(--border-strong) !important; color: var(--muted) !important; }
 .event-details-action:active:not(:disabled) { border-color: var(--signal) !important; color: var(--signal-hot) !important; }
 
-/* The notification ask, in our words, before Android asks in its. It sits at
-   the top of Signal because a fan who has just arrived from a mailed link is
-   looking here, and it is the only card on this screen that leaves when it is
-   answered. */
-.push-primer {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 16px;
-  padding: 18px;
+/* The notification ask, in our words, before Android asks in its. A centered
+   modal overlay that appears after the home data has painted — the fan sees
+   the app's value first, then the ask. One shot, dismissible. */
+.push-primer-modal {
+  position: fixed; z-index: 61;
+  left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: calc(100% - 32px); max-width: 420px;
+  max-height: calc(100dvh - 32px); overflow-y: auto;
   border: 1px solid color-mix(in srgb, var(--signal) 42%, var(--border-strong));
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-xl);
   background: linear-gradient(145deg, rgba(132,180,172,.10), var(--surface) 66%);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
+  animation: fade-in var(--dur-fast) var(--ease-out);
 }
-.push-primer-icon { color: var(--signal-hot); font-size: 1.3rem; line-height: 1; }
-.push-primer strong { font-size: var(--type-body); font-weight: 850; line-height: 1.2; }
-.push-primer p { margin: 0; color: var(--muted); font-size: var(--type-meta); line-height: 1.5; }
-.push-primer-actions { display: grid; gap: 6px; margin-top: 6px; }
+.push-primer-modal-body {
+  display: grid; gap: 10px;
+  padding: 28px 24px 24px;
+  text-align: center;
+}
+.push-primer-icon { color: var(--signal-hot); font-size: 1.6rem; line-height: 1; }
+.push-primer-modal strong { font-size: var(--type-body); font-weight: 850; line-height: 1.2; }
+.push-primer-modal p { margin: 0; color: var(--muted); font-size: var(--type-meta); line-height: 1.5; }
+.push-primer-actions { display: grid; gap: 8px; margin-top: 10px; }
