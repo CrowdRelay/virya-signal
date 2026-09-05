@@ -121,6 +121,17 @@ fn OperatorPortal(
     }
 }
 
+/// Adopts an authoritative unlocked staff session into the UI.
+///
+/// The `launcher:` scope is retired first. A `launcher_status` issued before
+/// the unlock — by the root resume subscriber, for instance — carries the
+/// answer for a locked device, and landing after this write would put the
+/// portal straight back on the PIN screen.
+fn adopt_operator_session(status: RwSignal<SessionStatus>, value: SessionStatus) {
+    bridge::invalidate_latest("launcher:");
+    status.set(value);
+}
+
 fn new_operator_pin_is_valid(pin: &str) -> bool {
     (4..=6).contains(&pin.len()) && pin.bytes().all(|byte| byte.is_ascii_digit())
 }
@@ -158,7 +169,7 @@ fn OperatorAccess(
             {
                 Ok(value) => {
                     pin.set(String::new());
-                    status.set(value);
+                    adopt_operator_session(status, value);
                 }
                 Err(message) => error.set(Some(message)),
             }
@@ -186,7 +197,7 @@ fn OperatorAccess(
                 Ok(value) => {
                     pin.set(String::new());
                     pairing.set(String::new());
-                    status.set(value);
+                    adopt_operator_session(status, value);
                 }
                 Err(message) => error.set(Some(message)),
             }
@@ -236,7 +247,7 @@ fn OperatorAccess(
                 Ok(value) => {
                     pin.set(String::new());
                     token.set(String::new());
-                    status.set(value);
+                    adopt_operator_session(status, value);
                 }
                 Err(message) => error.set(Some(message)),
             }

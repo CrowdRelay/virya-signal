@@ -489,7 +489,10 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "Feedback must contain between 8 and 2000 characters."
         }
         "feedback_was_sent_anonymously_thank_you" => {
-            "Feedback was accepted anonymously. If you are offline, it will be sent automatically when the connection returns."
+            "Feedback was sent anonymously and accepted. Thank you."
+        }
+        "feedback_queued_until_online" => {
+            "No connection. The feedback is saved on this device and will be sent when the connection returns — it has not reached us yet."
         }
         "anonymous_feedback" => "ANONYMOUS FEEDBACK",
         "tell_us_what_to_improve" => "Tell us what to improve",

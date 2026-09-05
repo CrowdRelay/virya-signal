@@ -113,7 +113,6 @@ async fn exchange_fan_confirmation(
         },
     )
     .await?;
-    bridge::invalidate_latest("launcher:");
     Ok(status)
 }
 
@@ -129,6 +128,13 @@ fn adopt_fan_session(
     pin: RwSignal<String>,
     session: FanConfirmationSession,
 ) {
+    // The identity this process reports has just changed. A `launcher_status`
+    // that is still on the wire was asked before the change, and the refresh
+    // below would otherwise join it — same command, same args, same scope — and
+    // adopt its pre-login answer, dropping the fan straight back onto the lock
+    // screen. Every adoption path funnels through here, so this is the one
+    // place the stale scope has to be retired.
+    bridge::invalidate_latest("launcher:");
     let _ = pin.try_set(String::new());
     let _ = token.try_set(String::new());
     // A confirmation (email code, deep link, or QR scan) is always a

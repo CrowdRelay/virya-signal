@@ -491,7 +491,10 @@ pub(super) fn text(key: &'static str) -> &'static str {
         }
         "feedback_must_contain_between_8_and_2000" => "Feedback powinien mieć od 8 do 2000 znaków.",
         "feedback_was_sent_anonymously_thank_you" => {
-            "Feedback został przyjęty anonimowo. Jeśli jesteś offline, wyślę go automatycznie po powrocie sieci."
+            "Feedback został wysłany anonimowo i przyjęty. Dzięki."
+        }
+        "feedback_queued_until_online" => {
+            "Brak połączenia. Feedback jest zapisany na tym urządzeniu i wyślę go po powrocie sieci — na razie do nas nie dotarł."
         }
         "anonymous_feedback" => "ANONIMOWY FEEDBACK",
         "tell_us_what_to_improve" => "Powiedz nam, co poprawić",

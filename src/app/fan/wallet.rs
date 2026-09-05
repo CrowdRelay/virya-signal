@@ -661,7 +661,7 @@ fn AnonymousFeedback(error: RwSignal<Option<String>>) -> impl IntoView {
         inline_status.set(None);
         busy.set(true);
         spawn_local(async move {
-            match bridge::invoke_unit(
+            match bridge::invoke::<String, _>(
                 "submit_anonymous_feedback",
                 &AnonymousFeedbackArgs {
                     category: &current_category,
@@ -670,10 +670,18 @@ fn AnonymousFeedback(error: RwSignal<Option<String>>) -> impl IntoView {
             )
             .await
             {
-                Ok(()) => {
+                // "queued" means the outbox holds it and a later launch will
+                // try again. Saying "sent" there would be the app answering a
+                // question only the server can answer.
+                Ok(outcome) => {
                     message.set(String::new());
                     error.set(Some(
-                        tr("feedback_was_sent_anonymously_thank_you").to_owned(),
+                        if outcome == "queued" {
+                            tr("feedback_queued_until_online")
+                        } else {
+                            tr("feedback_was_sent_anonymously_thank_you")
+                        }
+                        .to_owned(),
                     ));
                 }
                 Err(message) => inline_status.set(Some(message)),

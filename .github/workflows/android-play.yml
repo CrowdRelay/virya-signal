@@ -272,7 +272,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 promoted/scripts/artifact_manifest.py verify promoted/artifacts promoted/android-artifact-manifest.json --source-sha "$GITHUB_SHA"
+          # The verifier comes from this checkout, not from the bundle it is
+          # verifying. The artifact carries its own copy of the script, beside
+          # the manifest rather than inside the tree the manifest covers, so
+          # running that copy asked the payload to vouch for itself.
+          python3 scripts/artifact_manifest.py verify promoted/artifacts promoted/android-artifact-manifest.json --source-sha "$GITHUB_SHA"
           test -s promoted/release-provenance.json
           test -f "promoted/artifacts/virya-signal-${EXPECTED_VERSION}.aab"
           jq -e '.firebaseConfigured == true and .analyticsIncluded == false and .crashlyticsIncluded == false' promoted/artifacts/push-build-config.json >/dev/null

@@ -233,6 +233,11 @@ fn BeaconAccess(
     let reactivation = RwSignal::new(false);
 
     let adopt = move |value: BeaconSessionStatus| {
+        // A `launcher_status` asked before this exchange is still the same
+        // command with the same arguments, so the refresh below would join it
+        // and overwrite the session that was just established with the answer
+        // to a question about the previous one.
+        bridge::invalidate_latest("launcher:");
         pending_link.set(false);
         status.set(value);
         status_refresh.update(|value| *value = value.wrapping_add(1));
@@ -322,6 +327,7 @@ fn BeaconAccess(
             }
             match bridge::scan_and_confirm_beacon().await {
                 Ok(Some(value)) => {
+                    bridge::invalidate_latest("launcher:");
                     let _ = pin.try_set(String::new());
                     let _ = invite.try_set(String::new());
                     let _ = pending_link.try_set(false);

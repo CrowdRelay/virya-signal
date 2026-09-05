@@ -94,6 +94,9 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$GITHUB_REF" == "refs/heads/main" ]]
+      # Checked out only so the artifact is verified by source-controlled code
+      # rather than by the copy of the verifier that travels inside it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v7.0.1
         with:
           name: ${{ needs.meta.outputs.android_artifact }}
@@ -101,7 +104,7 @@ jobs:
       - name: Verify exact Android build artifact
         run: |
           set -euo pipefail
-          python3 promoted/scripts/artifact_manifest.py verify promoted/artifacts promoted/android-artifact-manifest.json --source-sha "$GITHUB_SHA"
+          python3 scripts/artifact_manifest.py verify promoted/artifacts promoted/android-artifact-manifest.json --source-sha "$GITHUB_SHA"
           test -f "promoted/artifacts/virya-signal-${{ needs.meta.outputs.version }}.aab"
           if [[ "${{ inputs.play_track || 'internal' }}" == "production" ]]; then
             jq -e '.firebaseConfigured == true and .analyticsIncluded == false and .crashlyticsIncluded == false' promoted/artifacts/push-build-config.json >/dev/null
@@ -258,6 +261,9 @@ jobs:
       contents: write
       actions: read
     steps:
+      # Checked out only so the artifact is verified by source-controlled code
+      # rather than by the copy of the verifier that travels inside it.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v7.0.1
         with:
           name: ${{ needs.meta.outputs.android_artifact }}
@@ -265,7 +271,7 @@ jobs:
       - name: Verify Android release artifact
         run: |
           set -euo pipefail
-          python3 promoted/scripts/artifact_manifest.py verify promoted/artifacts promoted/android-artifact-manifest.json --source-sha "$GITHUB_SHA"
+          python3 scripts/artifact_manifest.py verify promoted/artifacts promoted/android-artifact-manifest.json --source-sha "$GITHUB_SHA"
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

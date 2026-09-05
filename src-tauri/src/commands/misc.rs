@@ -134,19 +134,28 @@ pub(crate) async fn verify_staff_access(
     state.api.verify_staff_access(password.as_str()).await
 }
 
+/// Delivery outcome of one anonymous submission.
+///
+/// `"queued"` is not `"sent"`. A retryable failure parks the submission in the
+/// on-disk outbox and a later launch flushes it, which is worth doing — but the
+/// server has not accepted anything yet, and telling the fan it has is the app
+/// inventing an outcome CrowdRelay never gave it.
+const FEEDBACK_SENT: &str = "sent";
+const FEEDBACK_QUEUED: &str = "queued";
+
 #[tauri::command]
 pub(crate) async fn submit_anonymous_feedback(
     state: State<'_, AppState>,
     category: String,
     message: String,
-) -> Result<(), AppError> {
+) -> Result<String, AppError> {
     let submission_id = Uuid::new_v4().to_string();
     match state
         .api
         .submit_anonymous_feedback(&submission_id, &category, &message)
         .await
     {
-        Ok(()) => Ok(()),
+        Ok(()) => Ok(FEEDBACK_SENT.to_owned()),
         Err(error) if feedback_retryable(&error) => {
             let _queue = state.feedback_queue_mutation.lock().await;
             let dir = state.app_data_dir.clone();
@@ -157,7 +166,7 @@ pub(crate) async fn submit_anonymous_feedback(
                 queued_at_unix: time::OffsetDateTime::now_utc().unix_timestamp(),
             };
             run_blocking(move || feedback_queue::enqueue(&dir, queued)).await?;
-            Ok(())
+            Ok(FEEDBACK_QUEUED.to_owned())
         }
         Err(error) => Err(error),
     }

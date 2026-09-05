@@ -16,6 +16,7 @@ CONTRACT = {
     "src-tauri/src/commands/fan.rs": [
         "fan/push.rs", "fan/session_commerce.rs", "fan/wallet.rs", "fan/tests.rs",
     ],
+    "src-tauri/src/commands/beacon.rs": ["beacon/push.rs"],
 }
 DATA_EXCEPTIONS = {"src/i18n/pl.rs", "src/i18n/en.rs"}
 # `ffi.rs` is one `#[wasm_bindgen(inline_js = ...)]` block, and an inline_js

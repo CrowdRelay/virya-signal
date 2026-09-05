@@ -682,10 +682,20 @@ for wrapper_name in ['mobile-smoke.yml', 'android-release-apk.yml', 'android-pla
         raise SystemExit(f'{wrapper_name} bypasses the canonical reusable Android builder')
 if 'target:' not in (root / '.github/workflows/mobile-release.yml').read_text() or "github.event_name == 'workflow_dispatch'" not in (root / '.github/workflows/mobile-release.yml').read_text():
     raise SystemExit('mobile store release must gate iOS behind an explicit manual target')
+# A promotion job must verify the exact downloaded artifact, and the verifier
+# has to come from the checkout rather than from the bundle. The artifact ships
+# its own copy of `scripts/artifact_manifest.py`, and that copy is beside the
+# manifest instead of inside the tree the manifest covers — so running it asked
+# the payload to attest to itself. Every promotion job now checks the source out
+# first, which costs one step and removes the circularity.
 for promotion_name in ['android-play.yml', 'android-release-apk.yml', 'mobile-release.yml']:
     promotion = (root / '.github/workflows' / promotion_name).read_text()
-    if 'promoted/scripts/artifact_manifest.py verify' not in promotion:
-        raise SystemExit(f'{promotion_name} must verify the exact downloaded artifact from its preserved scripts/ path')
+    if 'promoted/scripts/artifact_manifest.py verify' in promotion:
+        raise SystemExit(f'{promotion_name} must not verify a promoted artifact with the verifier bundled inside it')
+    if 'scripts/artifact_manifest.py verify promoted/artifacts promoted/android-artifact-manifest.json --source-sha' not in promotion:
+        raise SystemExit(f'{promotion_name} must verify the exact downloaded artifact against the source SHA')
+    if 'uses: actions/checkout@' not in promotion:
+        raise SystemExit(f'{promotion_name} must check the source out so the artifact verifier is not the artifact')
     if 'push-build-config.json' not in promotion or '.firebaseConfigured == true' not in promotion:
         raise SystemExit(f'{promotion_name} must reject production artifacts without Firebase push configuration')
 

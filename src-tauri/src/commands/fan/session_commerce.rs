@@ -77,6 +77,18 @@ pub(crate) async fn fan_lock(state: State<'_, AppState>) -> Result<FanSessionSta
     fan_status(state).await
 }
 
+/// Retires the two staged capabilities that belong to the fan identity itself.
+///
+/// `fan_lock` deliberately keeps both: locking is temporary, and a mailed
+/// confirmation link or a Synesthesia handoff that arrived while the vault was
+/// closed is still the same person's to spend once they unlock. Forgetting and
+/// deleting are not temporary — leaving either behind would hand a one-time
+/// credential for a destroyed account to whoever sets this device up next.
+async fn clear_fan_identity_capabilities(state: &State<'_, AppState>) {
+    *state.pending_fan_confirm_token.lock().await = None;
+    *state.pending_synesthesia_handoff.lock().await = None;
+}
+
 #[tauri::command]
 pub(crate) async fn fan_delete_account(
     state: State<'_, AppState>,
@@ -106,6 +118,7 @@ pub(crate) async fn fan_delete_account(
     *state.fan_pin.write().await = None;
     *state.fan_vault_password.write().await = None;
     *state.pending_fan_confirmation.lock().await = None;
+    clear_fan_identity_capabilities(&state).await;
     state.wallet_qr_tokens.write().await.clear();
     *state.fan_sections_cache.write().await = None;
 
@@ -150,6 +163,7 @@ pub(crate) async fn fan_forget(
     *state.fan_pin.write().await = None;
     *state.fan_vault_password.write().await = None;
     *state.pending_fan_confirmation.lock().await = None;
+    clear_fan_identity_capabilities(&state).await;
     state.wallet_qr_tokens.write().await.clear();
     *state.fan_sections_cache.write().await = None;
     let app_data_dir = state.app_data_dir.clone();
