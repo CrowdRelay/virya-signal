@@ -2093,3 +2093,22 @@ html[data-virya-scanner-active] .app-shell {
 .event-actions:has(.event-details-action) { grid-template-columns: 1fr 1fr; }
 .event-details-action { grid-column: 1 / -1; border-color: var(--border-strong) !important; color: var(--muted) !important; }
 .event-details-action:active:not(:disabled) { border-color: var(--signal) !important; color: var(--signal-hot) !important; }
+
+/* The notification ask, in our words, before Android asks in its. It sits at
+   the top of Signal because a fan who has just arrived from a mailed link is
+   looking here, and it is the only card on this screen that leaves when it is
+   answered. */
+.push-primer {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--signal) 42%, var(--border-strong));
+  border-radius: var(--radius-md);
+  background: linear-gradient(145deg, rgba(132,180,172,.10), var(--surface) 66%);
+  box-shadow: var(--shadow-md);
+}
+.push-primer-icon { color: var(--signal-hot); font-size: 1.3rem; line-height: 1; }
+.push-primer strong { font-size: var(--type-body); font-weight: 850; line-height: 1.2; }
+.push-primer p { margin: 0; color: var(--muted); font-size: var(--type-meta); line-height: 1.5; }
+.push-primer-actions { display: grid; gap: 6px; margin-top: 6px; }

@@ -27,6 +27,7 @@ SESSION = read("src-tauri/src/commands/fan/session_commerce.rs") + read(
 )
 PLUGIN = read("src-tauri/android-push/SignalPushPlugin.kt")
 GATE = read("src/app/fan.rs")
+SHELL = read("src/app/fan/shell.rs")
 
 
 class FanDeviceUnlockContract(unittest.TestCase):
@@ -109,6 +110,71 @@ class FanDeviceUnlockContract(unittest.TestCase):
             "#[tauri::command]", 1
         )[0]
         self.assertIn("FanCredential::Device", scanned)
+
+
+class MailedLinkLandsInsideTheApp(unittest.TestCase):
+    """The button in the email is the fan's decision; the app must not re-ask."""
+
+    def test_a_sealable_link_is_spent_without_a_tap(self) -> None:
+        effect = GATE.split("let auto_link_attempted = RwSignal::new(false);", 1)[1].split(
+            "\n    let ", 1
+        )[0]
+        self.assertIn("link_pending.get()", effect)
+        self.assertIn("seal_without_pin()", effect)
+        self.assertIn("run_confirm_without_pin()", effect)
+
+    def test_the_link_is_spent_at_most_once(self) -> None:
+        """The token is one-time; a retry would spend a credential already gone."""
+        effect = GATE.split("let auto_link_attempted = RwSignal::new(false);", 1)[1].split(
+            "\n    let ", 1
+        )[0]
+        self.assertIn("auto_link_attempted.get_untracked()", effect)
+        self.assertIn("auto_link_attempted.set(true);", effect)
+        self.assertLess(
+            effect.index("auto_link_attempted.set(true);"),
+            effect.index("run_confirm_without_pin()"),
+        )
+        # Submitting sets `busy`. Tracking it here would re-run this effect
+        # inside its own call and cancel the request it just spawned, which is
+        # exactly what happened the first time this was written.
+        self.assertIn("busy.get_untracked()", effect)
+        self.assertNotIn("busy.get()", effect)
+
+
+class NotificationPrimer(unittest.TestCase):
+    """Android 13 grants one POST_NOTIFICATIONS dialog per install.
+
+    A denial there is permanent short of a trip to system settings, so the ask
+    has to be earned by a card the fan already said yes to, and it must never
+    repeat on its own.
+    """
+
+    def test_the_system_dialog_is_only_reached_through_the_card(self) -> None:
+        primer = SHELL.split("fn PushPrimer()", 1)[1].split("\n#[component]", 1)[0]
+        self.assertIn('"fan_push_enable"', primer)
+        allow = primer.split("let allow =", 1)[1]
+        self.assertIn("mark_push_primer_seen", allow)
+        # Marked before the request: the system dialog takes the window away,
+        # and a fan who answers it and never returns must not be asked again.
+        self.assertLess(allow.index("mark_push_primer_seen"), allow.index('"fan_push_enable"'))
+
+    def test_it_is_shown_once_and_only_when_there_is_something_to_ask(self) -> None:
+        primer = SHELL.split("fn PushPrimer()", 1)[1].split("\n#[component]", 1)[0]
+        self.assertIn("bridge::push_primer_seen()", primer)
+        self.assertIn("status.supported", primer)
+        self.assertIn("!status.enabled", primer)
+        self.assertIn('status.permission != "denied"', primer)
+        # Declining is remembered the same as accepting; a card that returns
+        # every launch is the same nag by another name.
+        dismiss = primer.split("let dismiss =", 1)[1].split("let allow =", 1)[0]
+        self.assertIn("mark_push_primer_seen", dismiss)
+
+    def test_no_storage_counts_as_already_asked(self) -> None:
+        navigation = read("src/bridge/navigation.rs")
+        seen = navigation.split("export function viryaPushPrimerSeen()", 1)[1].split(
+            "export function", 1
+        )[0]
+        self.assertIn("return true;", seen)
 
 
 class FanDeviceUnlockCost(unittest.TestCase):

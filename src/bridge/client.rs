@@ -131,6 +131,15 @@ pub fn push_back_guard() {
     push_back_guard_js();
 }
 
+/// Whether the notification primer has already been shown on this device.
+pub fn push_primer_seen() -> bool {
+    push_primer_seen_js()
+}
+
+pub fn mark_push_primer_seen() {
+    mark_push_primer_seen_js();
+}
+
 /// Consumes one history entry, which is what fires the `popstate` handler.
 pub fn go_back() {
     go_back_js();

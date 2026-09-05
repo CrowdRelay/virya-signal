@@ -558,6 +558,31 @@ fn FanAccess(
         });
     });
 
+    // A mailed link that this device can seal for itself needs nothing from the
+    // fan, so it is spent on arrival rather than behind a button. The tap it
+    // replaces was asking permission to do the only thing the screen offered.
+    //
+    // One attempt, ever: the token is one-time, and a retry after a partial
+    // failure would spend a credential that may already be gone. If it fails
+    // the panel below is still there, with the same button and the PIN
+    // alternative next to it.
+    let auto_link_attempted = RwSignal::new(false);
+    Effect::new(move |_| {
+        // `busy` is read untracked on purpose. Submitting sets it, and an
+        // effect that tracked it would re-run inside its own call — disposing
+        // the owner that the spawned request is scoped to and cancelling the
+        // exchange before it reached the native side.
+        if !link_pending.get()
+            || !seal_without_pin()
+            || busy.get_untracked()
+            || auto_link_attempted.get_untracked()
+        {
+            return;
+        }
+        auto_link_attempted.set(true);
+        run_confirm_without_pin();
+    });
+
     let run_request_access = move || {
         if busy.get_untracked() {
             return;

@@ -53,6 +53,26 @@ export function viryaPushBackGuard() {
   try { window.history?.pushState({ virya: 'back-guard' }, ''); } catch {}
 }
 
+const VIRYA_PUSH_PRIMER_KEY = 'virya:push-primer:v1';
+
+// Whether the fan has already been asked, in our own words, to turn
+// notifications on. Android 13 grants exactly one POST_NOTIFICATIONS dialog: a
+// denial there is permanent short of a trip to system settings, so the ask has
+// to be spent deliberately and never repeated on every launch.
+export function viryaPushPrimerSeen() {
+  try {
+    return window.localStorage?.getItem(VIRYA_PUSH_PRIMER_KEY) === 'seen';
+  } catch {
+    // No storage means no memory of asking, and asking twice is worse than
+    // never asking: treat it as already spent.
+    return true;
+  }
+}
+
+export function viryaMarkPushPrimerSeen() {
+  try { window.localStorage?.setItem(VIRYA_PUSH_PRIMER_KEY, 'seen'); } catch {}
+}
+
 export function viryaGoBack() {
   try { window.history?.back(); } catch {}
 }
@@ -79,6 +99,12 @@ extern "C" {
 
     #[wasm_bindgen(js_name = viryaPushBackGuard)]
     fn push_back_guard_js();
+
+    #[wasm_bindgen(js_name = viryaPushPrimerSeen)]
+    fn push_primer_seen_js() -> bool;
+
+    #[wasm_bindgen(js_name = viryaMarkPushPrimerSeen)]
+    fn mark_push_primer_seen_js();
 
     #[wasm_bindgen(js_name = viryaGoBack)]
     fn go_back_js();

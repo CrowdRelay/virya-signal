@@ -193,11 +193,15 @@
   // FanPushStatus is `rename_all = "camelCase"` on the contract side. Most
   // other payloads here are snake_case; this one is not, and snake_case keys
   // fail decode with `missing field \`backendEnabled\``.
+  // `?push=prompt` models a fan Android has not asked yet, which is the only
+  // state the notification primer appears in. The default stays "already on",
+  // because that is what every other screen should be reviewed against.
+  const pushUnanswered = params.get("push") === "prompt";
   const pushStatus = () => ({
     supported: true,
     backendEnabled: true,
-    enabled: true,
-    permission: "granted",
+    enabled: !pushUnanswered,
+    permission: pushUnanswered ? "prompt" : "granted",
     transport: "fcm",
     detail: null,
   });
@@ -540,6 +544,7 @@
         : null
     ),
     fan_push_sync: () => pushStatus(),
+    fan_push_enable: () => ({ ...pushStatus(), enabled: true, permission: "granted" }),
     fan_push_preferences: () => ({
       shows: true, releases: true, community: false, merch: false,
       quiet_hours_enabled: true, quiet_start: "22:00", quiet_end: "08:00",

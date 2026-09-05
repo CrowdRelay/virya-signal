@@ -1325,6 +1325,12 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "settings_group_account" => "KONTO I DANE",
         "settings_open_site" => "OTWÓRZ VIRYA.MUSIC",
         "settings_site_hint" => "Koncerty, wydawnictwa i pełny sklep — otwarte w przeglądarce.",
+        "push_primer_title" => "Nie przegap następnego koncertu",
+        "push_primer_body" => {
+            "Signal da znać, gdy ruszą bilety w Twojej okolicy, gdy pojawi się nowy koncert i gdy przyjdzie to, na co czekasz. Kilka razy w miesiącu, nie więcej."
+        }
+        "push_primer_allow" => "Włącz powiadomienia",
+        "push_primer_later" => "Nie teraz",
         "signup_details_hint_no_pin" => "Jeszcze jeden krok — wybierz miasto.",
         "enter_without_a_pin" => "Wejdź bez PIN-u",
         "device_unlock_explainer" => {

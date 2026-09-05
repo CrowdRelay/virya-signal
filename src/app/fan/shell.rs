@@ -569,6 +569,93 @@ fn FanNavButton(
     view! { <button class:active=move || tab.get() == own aria-current=move || (tab.get() == own).then_some("page") on:click=move |_| { bridge::haptic("tap"); tab.set(own); }><NavGlyph icon=icon/><small>{label}</small></button> }
 }
 
+/// Asks for notifications in our own words before Android asks in its.
+///
+/// Android 13 grants exactly one `POST_NOTIFICATIONS` dialog per install: a
+/// denial there is permanent short of a trip to system settings. Spending it
+/// unprompted, on a fan who has just arrived and does not yet know what Signal
+/// would send, is how an app loses the channel it needs to reach the people who
+/// drift away — which is the whole reason for asking. So the system dialog is
+/// only reached by a fan who has already said yes to this card.
+///
+/// Shown once. "Not now" is remembered the same as "yes", because a card that
+/// returns every launch is the same nag by another name; the switch in Profile
+/// stays available for anyone who changes their mind.
+#[component]
+fn PushPrimer() -> impl IntoView {
+    let visible = RwSignal::new(false);
+    let busy = RwSignal::new(false);
+
+    Effect::new(move |_| {
+        if !bridge::native_available() || bridge::push_primer_seen() {
+            return;
+        }
+        spawn_local(async move {
+            // Nothing to ask for if the fan already answered Android, either
+            // way, or if this build cannot deliver a notification at all.
+            let Ok(Some(status)) = bridge::invoke_latest::<FanPushStatus, _>(
+                "fan_push_sync",
+                &EmptyArgs {},
+                15_000,
+                "fan:push-primer",
+            )
+            .await
+            else {
+                return;
+            };
+            if status.supported && !status.enabled && status.permission != "denied" {
+                let _ = visible.try_set(true);
+            }
+        });
+    });
+    on_cleanup(|| bridge::invalidate_latest("fan:push-primer"));
+
+    let dismiss = move || {
+        bridge::mark_push_primer_seen();
+        visible.set(false);
+    };
+    let allow = move |_| {
+        if busy.get_untracked() {
+            return;
+        }
+        busy.set(true);
+        // Marked before the request, not after: the system dialog takes the
+        // window away, and a fan who answers it and never comes back must not
+        // be asked again on the next launch.
+        bridge::mark_push_primer_seen();
+        spawn_lifecycle_task(async move {
+            // Silent: the Profile switch shows the outcome, and a failed
+            // enable is not something the fan can act on from here.
+            let _ = bridge::invoke_timeout::<FanPushStatus, _>(
+                "fan_push_enable",
+                &EmptyArgs {},
+                45_000,
+            )
+            .await;
+            let _ = busy.try_set(false);
+            let _ = visible.try_set(false);
+        });
+    };
+
+    view! {
+        <Show when=move || visible.get()>
+            <article class="push-primer" role="region" aria-label=tr("push_primer_title")>
+                <span class="push-primer-icon" aria-hidden="true">"◉"</span>
+                <strong>{tr("push_primer_title")}</strong>
+                <p>{tr("push_primer_body")}</p>
+                <div class="push-primer-actions">
+                    <button type="button" class="primary" disabled=move || busy.get() on:click=allow>
+                        {tr("push_primer_allow")}
+                    </button>
+                    <button type="button" class="text-button" on:click=move |_| dismiss()>
+                        {tr("push_primer_later")}
+                    </button>
+                </div>
+            </article>
+        </Show>
+    }
+}
+
 #[component]
 fn FanSignal(
     home: RwSignal<Option<FanHomeData>>,
@@ -615,6 +702,7 @@ fn FanSignal(
     };
     view! {
         <section class="screen fan-screen">
+            <PushPrimer />
             <FanHomeOverview home=home loading=loading tab=tab focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview error=error />
             <Show when=move || !loading.get().referral fallback=move || view! { <Skeleton rows=1 height=180 /> }>
             {move || referral_progress.get().map(|referral| {

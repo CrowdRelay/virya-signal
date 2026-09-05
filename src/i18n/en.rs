@@ -1321,6 +1321,12 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "settings_group_account" => "ACCOUNT AND DATA",
         "settings_open_site" => "OPEN VIRYA.MUSIC",
         "settings_site_hint" => "Shows, releases and the full store, opened in your browser.",
+        "push_primer_title" => "Do not miss the next show",
+        "push_primer_body" => {
+            "Signal can tell you when tickets open near you, when a show is announced and when something you are waiting for lands. A few a month, never more."
+        }
+        "push_primer_allow" => "Turn notifications on",
+        "push_primer_later" => "Not now",
         "signup_details_hint_no_pin" => "One more step — choose your city.",
         "enter_without_a_pin" => "Enter without a PIN",
         "device_unlock_explainer" => {
