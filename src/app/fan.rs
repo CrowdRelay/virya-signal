@@ -635,18 +635,9 @@ fn FanAccess(
                         <Show when=move || access_mode.get() == FanAccessMode::Signup fallback=move || view! {
                             <>
                                 <Show when=move || link_pending.get() fallback=move || view! {
-                                    <p class="confirm-hint"><strong>{tr("fastest_scan_the_qr_from_the_email")}</strong><br/>{tr("you_can_also_paste_the_full_link")}</p>
+                                    <p class="confirm-hint"><strong>{tr("fastest_scan_the_qr_from_the_email")}</strong><br/>{tr("email_button_or_scan_hint")}</p>
                                 }>
                                     <p class="confirm-hint"><strong>{tr("link_from_the_email_is_ready")}</strong><br/>{tr("set_a_pin_and_enter_signal")}</p>
-                                </Show>
-                                // A capability that already arrived leaves nothing
-                                // to paste or scan. Showing the empty field and the
-                                // scanner next to it reads as "nothing happened".
-                                <Show when=move || !link_pending.get()>
-                                    <label>{tr("email_link_or_code")}<textarea aria-label=tr("email_link_or_code") rows="3" autocomplete="one-time-code" spellcheck="false" autocapitalize="none" placeholder=tr("paste_a_link_or_code_or_use") prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
-                                    <div class="confirmation-actions single">
-                                        <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("or_hold_the_field_above_and_choose")}</small></button>
-                                    </div>
                                 </Show>
                                 <label class="pin-field">
                                     <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
@@ -654,7 +645,17 @@ fn FanAccess(
                                     <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-confirm-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) on:keydown=on_enter(move || { if !busy.get_untracked() && new_operator_pin_is_valid(&pin.get_untracked()) && (link_pending.get_untracked() || !token.get_untracked().trim().is_empty()) { run_confirm(); } })/>
                                 </label>
                                 <p class="confirmation-note">{tr("pin_encrypts_your_profile_on_this_device")}</p>
-                                <button class="primary" disabled=move || busy.get() || (!link_pending.get() && token.get().trim().is_empty()) || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_enter")}</button>
+                                // A pending link is spent by the button; without
+                                // one the camera is the only capability source,
+                                // and it needs the PIN first, so it follows the
+                                // field rather than preceding it.
+                                <Show when=move || link_pending.get() fallback=move || view! {
+                                    <div class="confirmation-actions single">
+                                        <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("scan_the_code_from_the_email")}</small></button>
+                                    </div>
+                                }>
+                                    <button class="primary" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_enter")}</button>
+                                </Show>
                                 <button type="button" class="text-button" disabled=move || busy.get() || email.get().trim().is_empty() on:click=request_access>{tr("i_already_have_an_account_send_login")}</button>
                                 <p class="confirmation-resend">{tr("no_message_check_spam_after_15_minutes")}</p>
                             </>
@@ -729,19 +730,22 @@ fn FanAccess(
                             <div class="recovery-heading"><p class="eyebrow">{tr("access_recovery")}</p><h3>{tr("create_a_new_pin")}</h3><p>{tr("enter_your_email_request_a_fresh_link")}</p></div>
                             <label>{tr("email")}<input aria-label=tr("email") type="email" autocomplete="email" prop:value=move || email.get() on:input=move |e| email.set(event_target_value(&e)) on:keydown=on_enter(move || { if !busy.get_untracked() && !email.get_untracked().trim().is_empty() { run_request_access(); } })/></label>
                             <button type="button" class="ghost" disabled=move || busy.get() || email.get().trim().is_empty() on:click=request_access>{tr("send_login_link")}</button>
-                            <label>{tr("email_link_or_code")}<textarea aria-label=tr("email_link_or_code") rows="3" autocomplete="one-time-code" spellcheck="false" autocapitalize="none" placeholder=tr("paste_link_or_code") prop:value=move || token.get() on:input=move |e| token.set(event_target_value(&e))></textarea></label>
-                            <div class="confirmation-actions single">
-                                <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("or_hold_the_field_and_choose_paste")}</small></button>
-                            </div>
+                            <p class="confirm-hint">{tr("email_button_or_scan_hint")}</p>
                             <label class="pin-field">
                                 <span class="pin-field-label">{tr("create_fan_unlock_pin")}</span>
                                 <small id="fan-recovery-pin-help">{tr("enter_4_6_digits_for_this_fan_profile")}</small>
-                                <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-recovery-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) on:keydown=on_enter(move || { if !busy.get_untracked() && new_operator_pin_is_valid(&pin.get_untracked()) && (link_pending.get_untracked() || !token.get_untracked().trim().is_empty()) { run_confirm(); } })/>
+                                <input aria-label=tr("create_fan_unlock_pin") type="password" autocomplete="new-password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder=tr("pin_example") aria-describedby="fan-recovery-pin-help" prop:value=move || pin.get() on:input=move |e| pin.set(normalize_new_operator_pin(event_target_value(&e))) on:keydown=on_enter(move || { if !busy.get_untracked() && new_operator_pin_is_valid(&pin.get_untracked()) && link_pending.get_untracked() { run_confirm(); } })/>
                             </label>
-                            // A link Android routed here leaves nothing to paste,
-                            // so requiring a token would disable this button for
-                            // exactly the fan the link was sent to.
-                            <button class="primary" disabled=move || busy.get() || (!link_pending.get() && token.get().trim().is_empty()) || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_set_new_pin")}</button>
+                            // The link Android routed here is spent by the button.
+                            // Without one the camera is the capability source, and
+                            // it needs the PIN first.
+                            <Show when=move || link_pending.get() fallback=move || view! {
+                                <div class="confirmation-actions single">
+                                    <button type="button" class="confirmation-action primary-scan" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=scan_confirmation><span aria-hidden="true">"▦"</span><strong>{tr("scan_qr")}</strong><small>{tr("scan_the_code_from_the_email")}</small></button>
+                                </div>
+                            }>
+                                <button class="primary" disabled=move || busy.get() || !new_operator_pin_is_valid(&pin.get()) on:click=confirm>{tr("confirm_and_set_new_pin")}</button>
+                            </Show>
                             <button type="button" class="text-button" on:click=move |_| recovery_open.set(false)>{tr("back_to_pin_login")}</button>
                         </div>
                     </Show>

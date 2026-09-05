@@ -308,19 +308,13 @@ pub(super) fn text(key: &'static str) -> &'static str {
             " Zaproś ludzi, którym naprawdę może zależeć, i zdobywaj nagrody, gdy się pojawiają."
         }
         "get_started" => "ZACZYNAM",
-        "i_have_a_code" => "MAM KOD",
+        "i_have_a_code" => "Z MAILA",
         "email" => "E-mail",
         "name_optional" => "Imię / nazwa (opcjonalnie)",
-        "fastest_scan_the_qr_from_the_email" => "Najszybciej: zeskanuj QR z maila.",
-        "you_can_also_paste_the_full_link" => {
-            "Możesz też wkleić cały link albo 64-znakowy kod. Aplikacja sama wyciągnie właściwy token."
-        }
+        "fastest_scan_the_qr_from_the_email" => "Otwórz maila i naciśnij „Nadaj Sygnał”.",
         "link_from_the_email_is_ready" => "Link z e-maila jest gotowy.",
         "set_a_pin_and_enter_signal" => "Ustaw PIN i wejdź do Signal.",
-        "email_link_or_code" => "Link lub kod z e-maila",
-        "paste_a_link_or_code_or_use" => "Wklej link, kod albo użyj QR",
         "scan_qr" => "SKANUJ QR",
-        "or_hold_the_field_above_and_choose" => "albo przytrzymaj pole wyżej i wybierz Wklej",
         "local_pin" => "Lokalny PIN",
         "pin_encrypts_your_profile_on_this_device" => {
             "PIN szyfruje profil tylko na tym urządzeniu. Nie wysyłamy go do CrowdRelay."
@@ -351,8 +345,6 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "Podaj e-mail, wyślij świeży link, a potem zeskanuj QR lub wklej kod w pole."
         }
         "send_login_link" => "WYŚLIJ LINK LOGOWANIA",
-        "paste_link_or_code" => "Wklej link lub kod",
-        "or_hold_the_field_and_choose_paste" => "albo przytrzymaj pole i wybierz Wklej",
         "new_local_pin" => "Nowy lokalny PIN",
         "confirm_and_set_new_pin" => "POTWIERDŹ I USTAW NOWY PIN",
         "back_to_pin_login" => "WRÓĆ DO LOGOWANIA PIN-EM",
@@ -1333,6 +1325,8 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "settings_group_account" => "KONTO I DANE",
         "settings_open_site" => "OTWÓRZ VIRYA.MUSIC",
         "settings_site_hint" => "Koncerty, wydawnictwa i pełny sklep — otwarte w przeglądarce.",
+        "email_button_or_scan_hint" => "Czytasz na innym urządzeniu? Zeskanuj kod QR z wiadomości.",
+        "scan_the_code_from_the_email" => "Wyceluj aparat w kod QR z wiadomości.",
         "primary_navigation" => "Nawigacja główna",
         "settings_area_hint" => "Zbieraj punkty na koncertach i wymieniaj je na nagrody.",
         "settings_open_area" => "Otwórz AREA",

@@ -310,19 +310,13 @@ pub(super) fn text(key: &'static str) -> &'static str {
             " Invite people who might genuinely care and earn rewards when they show up."
         }
         "get_started" => "GET STARTED",
-        "i_have_a_code" => "I HAVE A CODE",
+        "i_have_a_code" => "FROM THE EMAIL",
         "email" => "Email",
         "name_optional" => "Name (optional)",
-        "fastest_scan_the_qr_from_the_email" => "Fastest: scan the QR from the email.",
-        "you_can_also_paste_the_full_link" => {
-            "You can also paste the full link or the 64-character code. The app will extract the correct token."
-        }
+        "fastest_scan_the_qr_from_the_email" => "Open the email and press “Send a Signal”.",
         "link_from_the_email_is_ready" => "The link from your email is ready.",
         "set_a_pin_and_enter_signal" => "Set a PIN and enter Signal.",
-        "email_link_or_code" => "Email link or code",
-        "paste_a_link_or_code_or_use" => "Paste a link or code, or use QR",
         "scan_qr" => "SCAN QR",
-        "or_hold_the_field_above_and_choose" => "or hold the field above and choose Paste",
         "local_pin" => "Local PIN",
         "pin_encrypts_your_profile_on_this_device" => {
             "The PIN encrypts your profile on this device only. It is never sent to CrowdRelay."
@@ -353,8 +347,6 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "Enter your email, request a fresh link, then scan the QR or paste the code."
         }
         "send_login_link" => "SEND LOGIN LINK",
-        "paste_link_or_code" => "Paste link or code",
-        "or_hold_the_field_and_choose_paste" => "or hold the field and choose Paste",
         "new_local_pin" => "New local PIN",
         "confirm_and_set_new_pin" => "CONFIRM AND SET NEW PIN",
         "back_to_pin_login" => "BACK TO PIN LOGIN",
@@ -1329,6 +1321,10 @@ pub(super) fn text(key: &'static str) -> &'static str {
         "settings_group_account" => "ACCOUNT AND DATA",
         "settings_open_site" => "OPEN VIRYA.MUSIC",
         "settings_site_hint" => "Shows, releases and the full store, opened in your browser.",
+        "email_button_or_scan_hint" => {
+            "Reading it on another device? Scan the QR code from the message instead."
+        }
+        "scan_the_code_from_the_email" => "Point the camera at the QR code in the email.",
         "primary_navigation" => "Primary navigation",
         "settings_area_hint" => "Collect points at shows and trade them for rewards.",
         "settings_open_area" => "Open AREA",
