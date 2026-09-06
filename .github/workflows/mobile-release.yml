@@ -112,6 +112,7 @@ jobs:
           releaseFiles: promoted/artifacts/virya-signal-${{ needs.meta.outputs.version }}.aab
           track: ${{ inputs.play_track || 'internal' }}
           status: completed
+          changesNotSentForReview: true
   github-release:
     name: GitHub release artifacts
     if: startsWith(github.ref, 'refs/tags/v') && needs.android-build.result == 'success'
