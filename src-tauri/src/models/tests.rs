@@ -240,4 +240,86 @@ mod compat_string_shape_tests {
         };
         assert!(referral.referral_code.is_empty());
     }
+
+    /// The whole phase contract as a table, for all three domains.
+    ///
+    /// The row that used to be wrong is `(configured: true, unlocked: false)`
+    /// on a cold start: the phase lived in its own lock initialised to
+    /// `Unconfigured`, so a device holding a real locked vault reported
+    /// "no identity here" until something happened to write the phase.
+    #[test]
+    fn sessions_report_a_phase_derived_from_their_own_facts() {
+        for (configured, unlocked, operator, fan, beacon) in [
+            (
+                false,
+                false,
+                OperatorSessionPhase::Unconfigured,
+                FanSessionPhase::Unconfigured,
+                BeaconSessionPhase::Unconfigured,
+            ),
+            (
+                true,
+                false,
+                OperatorSessionPhase::Locked,
+                FanSessionPhase::Locked,
+                BeaconSessionPhase::Locked,
+            ),
+            (
+                true,
+                true,
+                OperatorSessionPhase::Active,
+                FanSessionPhase::Active,
+                BeaconSessionPhase::Active,
+            ),
+            // Credentials in memory decide on their own: a session that exists
+            // is Active whatever a concurrent vault probe happens to answer,
+            // so a removal racing a status read can never report Unconfigured
+            // while a live bearer is still held.
+            (
+                false,
+                true,
+                OperatorSessionPhase::Active,
+                FanSessionPhase::Active,
+                BeaconSessionPhase::Active,
+            ),
+        ] {
+            assert_eq!(
+                OperatorSessionPhase::resolve(configured, unlocked),
+                operator,
+                "operator ({configured}, {unlocked})"
+            );
+            assert_eq!(
+                FanSessionPhase::resolve(configured, unlocked),
+                fan,
+                "fan ({configured}, {unlocked})"
+            );
+            assert_eq!(
+                BeaconSessionPhase::resolve(configured, unlocked),
+                beacon,
+                "beacon ({configured}, {unlocked})"
+            );
+        }
+    }
+
+    /// `Active` must mean credentials are present, and the default must not.
+    /// A `Default` that resolved to anything but `Unconfigured` would make an
+    /// unset envelope claim an identity.
+    #[test]
+    fn the_default_phase_is_the_one_with_no_identity_behind_it() {
+        assert_eq!(
+            OperatorSessionPhase::default(),
+            OperatorSessionPhase::resolve(false, false)
+        );
+        assert_eq!(
+            FanSessionPhase::default(),
+            FanSessionPhase::resolve(false, false)
+        );
+        assert_eq!(
+            BeaconSessionPhase::default(),
+            BeaconSessionPhase::resolve(false, false)
+        );
+        assert_ne!(OperatorSessionPhase::default(), OperatorSessionPhase::Active);
+        assert_ne!(FanSessionPhase::default(), FanSessionPhase::Active);
+        assert_ne!(BeaconSessionPhase::default(), BeaconSessionPhase::Active);
+    }
 }

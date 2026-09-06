@@ -100,12 +100,13 @@ fn clear_operator_push_preference(app_data_dir: &Path) -> Result<(), AppError> {
 #[tauri::command]
 pub(crate) async fn session_status(state: State<'_, AppState>) -> Result<SessionStatus, AppError> {
     let session = state.session.read().await;
-    let phase = *state.operator_phase.read().await;
+    let configured = vault::exists(&state.app_data_dir);
+    let unlocked = session.is_some();
     Ok(SessionStatus {
-        configured: vault::exists(&state.app_data_dir),
-        unlocked: session.is_some(),
+        configured,
+        unlocked,
         session: session.as_ref().map(|profile| profile.as_ref().into()),
-        phase,
+        phase: OperatorSessionPhase::resolve(configured, unlocked),
     })
 }
 
@@ -136,7 +137,6 @@ pub(crate) async fn configure(
     *state.session.write().await = Some(Arc::new(persisted_profile));
     *state.operator_pin.write().await = Some(pin);
     *state.operator_vault_password.write().await = Some(vault_password);
-    *state.operator_phase.write().await = OperatorSessionPhase::Active;
     *state.show_mode_store.write().await = None;
     drop(_show_mutation);
     drop(_mutation);
@@ -169,7 +169,6 @@ pub(crate) async fn unlock(
     *state.session.write().await = Some(Arc::new(profile));
     *state.operator_pin.write().await = Some(pin);
     *state.operator_vault_password.write().await = Some(vault_password);
-    *state.operator_phase.write().await = OperatorSessionPhase::Active;
     *state.show_mode_store.write().await = None;
     drop(_show_mutation);
     drop(_mutation);
@@ -186,7 +185,6 @@ pub(crate) async fn lock(state: State<'_, AppState>) -> Result<SessionStatus, Ap
     *state.session.write().await = None;
     *state.operator_pin.write().await = None;
     *state.operator_vault_password.write().await = None;
-    *state.operator_phase.write().await = OperatorSessionPhase::Locked;
     *state.show_mode_store.write().await = None;
     *state.operator_sections_cache.write().await = None;
     session_status(state).await
@@ -220,7 +218,6 @@ pub(crate) async fn forget_device(state: State<'_, AppState>) -> Result<SessionS
     *state.session.write().await = None;
     *state.operator_pin.write().await = None;
     *state.operator_vault_password.write().await = None;
-    *state.operator_phase.write().await = OperatorSessionPhase::Unconfigured;
     *state.show_mode_store.write().await = None;
     *state.operator_sections_cache.write().await = None;
     let app_data_dir = state.app_data_dir.clone();

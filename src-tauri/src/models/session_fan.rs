@@ -1,35 +1,53 @@
-/// Explicit session lifecycle phase per domain. Today every writer sets
-/// session + pin + password together, so no path produces a half-unlocked
-/// state. This enum makes that invariant structural instead of implied by
-/// which `RwLock<Option<…>>` fields happen to be populated. Future variants
-/// (Unlocking, Refreshing, Expired, LoggingOut) can be added without
-/// changing existing call sites.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum OperatorSessionPhase {
-    #[default]
-    Unconfigured,
-    Locked,
-    Active,
+/// Explicit session lifecycle phase per domain.
+///
+/// The phase is *derived*, never stored. It used to live in its own
+/// `RwLock<…Phase>` beside the session, and that second copy could disagree
+/// with the first in two ways. On a cold start the lock initialised to
+/// `Unconfigured` while `configured` was read from the vault on disk, so a
+/// device with a real locked vault reported `configured: true, phase:
+/// Unconfigured`. And because the phase and the credentials were two locks, a
+/// status read could land between the two writes of an unlock and see one
+/// without the other.
+///
+/// Both disappear if the phase is a function of the two facts the status
+/// already reports rather than a third fact kept in step by hand. `resolve`
+/// is that function, and `sessions_report_a_phase_derived_from_their_own_facts`
+/// in `models/tests.rs` is its table.
+///
+/// Future variants (Unlocking, Refreshing, Expired, LoggingOut) are additional
+/// *facts*, not additional copies: each would arrive with its own input to
+/// `resolve` rather than as another lock to keep synchronised.
+macro_rules! session_phase {
+    ($name:ident) => {
+        #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+        #[serde(rename_all = "camelCase")]
+        pub enum $name {
+            #[default]
+            Unconfigured,
+            Locked,
+            Active,
+        }
+
+        impl $name {
+            /// `unlocked` implies credentials are in memory, which is only
+            /// reachable from a persisted identity, so it decides on its own.
+            /// Otherwise the vault on disk is what separates "never set up"
+            /// from "set up and closed".
+            #[must_use]
+            pub const fn resolve(configured: bool, unlocked: bool) -> Self {
+                match (configured, unlocked) {
+                    (_, true) => Self::Active,
+                    (true, false) => Self::Locked,
+                    (false, false) => Self::Unconfigured,
+                }
+            }
+        }
+    };
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum FanSessionPhase {
-    #[default]
-    Unconfigured,
-    Locked,
-    Active,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub enum BeaconSessionPhase {
-    #[default]
-    Unconfigured,
-    Locked,
-    Active,
-}
+session_phase!(OperatorSessionPhase);
+session_phase!(FanSessionPhase);
+session_phase!(BeaconSessionPhase);
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Zeroize)]
 #[zeroize(drop)]
@@ -219,9 +237,12 @@ pub struct FanSessionStatus {
     pub pin_unlock: bool,
     #[serde(default)]
     pub device_unlock: bool,
-    /// Whether this device could seal a password at all. False on a build or a
-    /// device with no usable keystore, where the PIN is the only offer worth
-    /// making.
+    /// Whether this device is capable of sealing a password at all. False on a
+    /// build or a device with no usable keystore, where the PIN is the only
+    /// offer worth making. True is a capability rather than a guarantee: the
+    /// probe stops short of generating the real key, so an offer made on the
+    /// strength of this can still fail at the first seal — which is why that
+    /// failure removes the vault it was for instead of stranding it.
     #[serde(default)]
     pub device_unlock_supported: bool,
     #[serde(default)]

@@ -213,17 +213,48 @@ class SignalPushPlugin(private val activity: Activity) : Plugin(activity) {
         invoke.resolve()
     }
 
+    /// Mirrors `clearSynesthesiaAppLink` for the mailed confirmation link.
+    /// Without this, "Back to PIN login" only flips WASM state and the next
+    /// resume tick re-reads the pending link, reopening the panel. Both the
+    /// holder and the launch intent are dropped, and the reply is only resolved
+    /// once neither can produce the link again — Rust reports the boundary as
+    /// cleared on the strength of this answer, so it must not be optimistic.
+    @Command
+    fun clearFanConfirmAppLink(invoke: Invoke) {
+        pendingFanConfirmAppLink = null
+        pendingFanConfirmAppLinkRejected = false
+        if (isFanConfirmIntent(activity.intent)) {
+            activity.intent.data = null
+        }
+        if (pendingFanConfirmAppLink != null || fanConfirmAppLinkFrom(activity.intent) != null) {
+            invoke.reject("fan_confirm_app_link_not_cleared")
+            return
+        }
+        invoke.resolve()
+    }
+
     @InvokeArg
     class DeviceSecretArgs {
         lateinit var value: String
     }
 
-    /// Capability only. This runs on every cold start, and it used to answer by
-    /// calling `loadOrCreateDeviceKey()` — which generated a 256-bit AES key in
-    /// the keystore for every install, including the ones that never seal
-    /// anything. Key generation can reach the TEE or StrongBox and cost tens of
-    /// milliseconds on the startup path, and it left a key behind that nothing
-    /// owned. The key is created lazily by the first seal instead.
+    /// Capability, not guarantee.
+    ///
+    /// True means this device has an AndroidKeyStore provider that will hand
+    /// out an AES `KeyGenerator`. It deliberately does not generate the real
+    /// `KeyGenParameterSpec` — 256-bit AES/GCM, no padding, randomized
+    /// encryption — so a device that has the provider and still refuses that
+    /// configuration answers true here and fails at the first `sealDeviceSecret`.
+    ///
+    /// That is the accepted trade: this runs on every cold start, and it used
+    /// to answer by calling `loadOrCreateDeviceKey()`, which reached the TEE or
+    /// StrongBox on the startup path for every install including the ones that
+    /// never seal anything, and left behind a key nothing owned. The key is
+    /// created lazily by the first seal instead.
+    ///
+    /// The weaker claim is safe because the caller treats a failed first seal
+    /// as fatal to the vault it was for: `seal_or_discard_fan_vault` removes
+    /// the snapshot rather than leaving one with no PIN and no key.
     @Command
     fun deviceSecretSupported(invoke: Invoke) {
         val supported = runCatching {

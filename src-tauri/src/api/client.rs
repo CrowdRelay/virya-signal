@@ -21,7 +21,8 @@ use crate::{
     AppError,
     models::{
         BeaconProfile, CitySignal, EcosystemMeta, FanHomeData, FanProfile, MerchCatalog,
-        OperatorProfile, PublicCitiesResult, PublicEvent, PublicEventsResult, StaffPairingExchange,
+        MerchCatalogResult, OperatorProfile, PublicCitiesResult, PublicEvent, PublicEventsResult,
+        StaffPairingExchange,
     },
 };
 
@@ -314,14 +315,14 @@ impl CrowdRelayClient {
         if let Some(events) = self.cached_events(&ck, EVENTS_CACHE_TTL).await {
             return Ok(PublicEventsResult {
                 events,
-                stale: false,
+                stale: cache::PublicFreshness::FreshCache.stale(),
             });
         }
         let _fetch = self.events_fetch.lock().await;
         if let Some(events) = self.cached_events(&ck, EVENTS_CACHE_TTL).await {
             return Ok(PublicEventsResult {
                 events,
-                stale: false,
+                stale: cache::PublicFreshness::FreshCache.stale(),
             });
         }
         let stale = self.cached_events(&ck, EVENTS_STALE_TTL).await;
@@ -335,7 +336,7 @@ impl CrowdRelayClient {
                 return stale
                     .map(|events| PublicEventsResult {
                         events,
-                        stale: true,
+                        stale: cache::PublicFreshness::Unvalidated.stale(),
                     })
                     .ok_or(error);
             }
@@ -345,7 +346,7 @@ impl CrowdRelayClient {
         {
             return Ok(PublicEventsResult {
                 events: events.clone(),
-                stale: true,
+                stale: cache::PublicFreshness::Unvalidated.stale(),
             });
         }
         if response.status() == reqwest::StatusCode::NOT_MODIFIED {
@@ -355,9 +356,10 @@ impl CrowdRelayClient {
             })?;
             self.touch_cache(&ck, true).await;
             self.persist_public_cache_in_background();
+            // A 304 is the origin confirming these exact bytes are current.
             return Ok(PublicEventsResult {
                 events,
-                stale: true,
+                stale: cache::PublicFreshness::Revalidated.stale(),
             });
         }
         let (etag, last_modified) = cache::response_validators(response.headers());
@@ -379,39 +381,63 @@ impl CrowdRelayClient {
         self.persist_public_cache_in_background();
         Ok(PublicEventsResult {
             events,
-            stale: false,
+            stale: cache::PublicFreshness::Live.stale(),
         })
     }
 
     /// The last successful snapshot, read without touching the network. The UI
     /// paints this while the live request is still in flight, so a warm cold
     /// start shows real content instead of a skeleton.
-    pub async fn public_events_snapshot(&self, api_base_url: &str) -> Vec<PublicEvent> {
+    ///
+    /// Returns the envelope rather than a bare list so the freshness answer is
+    /// produced here, beside every other one, instead of being re-decided by
+    /// the command that forwards it. Nothing validated this copy in this
+    /// process, so it is `Unvalidated` by construction.
+    pub async fn public_events_snapshot(&self, api_base_url: &str) -> PublicEventsResult {
         let Ok(key) = cache::cache_key(api_base_url) else {
-            return Vec::new();
+            return PublicEventsResult {
+                events: Vec::new(),
+                stale: cache::PublicFreshness::Unvalidated.stale(),
+            };
         };
-        self.cached_events(&key, EVENTS_STALE_TTL)
-            .await
-            .unwrap_or_default()
+        PublicEventsResult {
+            events: self
+                .cached_events(&key, EVENTS_STALE_TTL)
+                .await
+                .unwrap_or_default(),
+            stale: cache::PublicFreshness::Unvalidated.stale(),
+        }
     }
 
     /// See [`Self::public_events_snapshot`].
-    pub async fn public_merch_snapshot(&self, api_base_url: &str) -> Option<MerchCatalog> {
+    pub async fn public_merch_snapshot(&self, api_base_url: &str) -> Option<MerchCatalogResult> {
         let key = cache::cache_key(api_base_url).ok()?;
-        self.cached_merch(&key, MERCH_STALE_TTL).await
+        Some(MerchCatalogResult {
+            catalog: self.cached_merch(&key, MERCH_STALE_TTL).await?,
+            stale: cache::PublicFreshness::Unvalidated.stale(),
+        })
     }
 
-    pub async fn public_merch_catalog(&self, api_base_url: &str) -> Result<MerchCatalog, AppError> {
+    pub async fn public_merch_catalog(
+        &self,
+        api_base_url: &str,
+    ) -> Result<MerchCatalogResult, AppError> {
         let cache_key = cache::cache_key(api_base_url)?;
         if let Some(catalog) = self.cached_merch(&cache_key, MERCH_CACHE_TTL).await {
-            return Ok(catalog);
+            return Ok(MerchCatalogResult {
+                catalog,
+                stale: cache::PublicFreshness::FreshCache.stale(),
+            });
         }
 
         // Coalesce concurrent UI refreshes (for example returning to the fan tab
         // while the storefront is mounting) into one conditional GET.
         let _fetch = self.merch_fetch.lock().await;
         if let Some(catalog) = self.cached_merch(&cache_key, MERCH_CACHE_TTL).await {
-            return Ok(catalog);
+            return Ok(MerchCatalogResult {
+                catalog,
+                stale: cache::PublicFreshness::FreshCache.stale(),
+            });
         }
 
         let stale = self.cached_merch(&cache_key, MERCH_STALE_TTL).await;
@@ -421,13 +447,23 @@ impl CrowdRelayClient {
             .await
         {
             Ok(response) => response,
-            Err(error) => return stale.ok_or(error),
+            Err(error) => {
+                return stale
+                    .map(|catalog| MerchCatalogResult {
+                        catalog,
+                        stale: cache::PublicFreshness::Unvalidated.stale(),
+                    })
+                    .ok_or(error);
+            }
         };
 
         if transient_public_status(response.status())
             && let Some(catalog) = stale.as_ref()
         {
-            return Ok(catalog.clone());
+            return Ok(MerchCatalogResult {
+                catalog: catalog.clone(),
+                stale: cache::PublicFreshness::Unvalidated.stale(),
+            });
         }
         if response.status() == reqwest::StatusCode::NOT_MODIFIED {
             let catalog = stale.ok_or_else(|| AppError::Remote {
@@ -435,7 +471,11 @@ impl CrowdRelayClient {
                 detail: crate::i18n::tr("native_missing_merch_cache").into(),
             })?;
             self.touch_merch_cache(&cache_key).await;
-            return Ok(catalog);
+            // A 304 is the origin confirming these exact bytes are current.
+            return Ok(MerchCatalogResult {
+                catalog,
+                stale: cache::PublicFreshness::Revalidated.stale(),
+            });
         }
 
         let (etag, last_modified) = cache::response_validators(response.headers());
@@ -462,7 +502,10 @@ impl CrowdRelayClient {
         );
         drop(public_cache);
         self.persist_public_cache_in_background();
-        Ok(catalog)
+        Ok(MerchCatalogResult {
+            catalog,
+            stale: cache::PublicFreshness::Live.stale(),
+        })
     }
 
     pub async fn verify_staff_access(&self, password: &str) -> Result<(), AppError> {
@@ -484,14 +527,14 @@ impl CrowdRelayClient {
         if let Some(cities) = self.cached_cities(&ck, CITIES_CACHE_TTL).await {
             return Ok(PublicCitiesResult {
                 cities,
-                stale: false,
+                stale: cache::PublicFreshness::FreshCache.stale(),
             });
         }
         let _fetch = self.cities_fetch.lock().await;
         if let Some(cities) = self.cached_cities(&ck, CITIES_CACHE_TTL).await {
             return Ok(PublicCitiesResult {
                 cities,
-                stale: false,
+                stale: cache::PublicFreshness::FreshCache.stale(),
             });
         }
         let stale = self.cached_cities(&ck, CITIES_STALE_TTL).await;
@@ -505,7 +548,7 @@ impl CrowdRelayClient {
                 return stale
                     .map(|cities| PublicCitiesResult {
                         cities,
-                        stale: true,
+                        stale: cache::PublicFreshness::Unvalidated.stale(),
                     })
                     .ok_or(error);
             }
@@ -515,7 +558,7 @@ impl CrowdRelayClient {
         {
             return Ok(PublicCitiesResult {
                 cities: cities.clone(),
-                stale: true,
+                stale: cache::PublicFreshness::Unvalidated.stale(),
             });
         }
         if response.status() == reqwest::StatusCode::NOT_MODIFIED {
@@ -525,9 +568,10 @@ impl CrowdRelayClient {
             })?;
             self.touch_cache(&ck, false).await;
             self.persist_public_cache_in_background();
+            // A 304 is the origin confirming these exact bytes are current.
             return Ok(PublicCitiesResult {
                 cities,
-                stale: true,
+                stale: cache::PublicFreshness::Revalidated.stale(),
             });
         }
         let (etag, last_modified) = cache::response_validators(response.headers());
@@ -549,7 +593,7 @@ impl CrowdRelayClient {
         self.persist_public_cache_in_background();
         Ok(PublicCitiesResult {
             cities,
-            stale: false,
+            stale: cache::PublicFreshness::Live.stale(),
         })
     }
 

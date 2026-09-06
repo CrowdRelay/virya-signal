@@ -291,7 +291,9 @@ fn refresh_operator_events(
         let completed = latest_request_completed(&result);
         match result {
             Ok(Some(value)) => dashboard.update(|state| {
-                state.get_or_insert_with(DashboardData::default).events = value.events;
+                let data = state.get_or_insert_with(DashboardData::default);
+                data.events_stale = value.stale;
+                data.events = value.events;
             }),
             Ok(None) => {}
             Err(message) => set_error_debounced(error, message),
@@ -576,6 +578,7 @@ fn refresh_fan_events(
 
 fn refresh_fan_merch(
     merch: RwSignal<Option<MerchCatalog>>,
+    merch_stale: RwSignal<bool>,
     loading: RwSignal<FanLoadingState>,
     _error: RwSignal<Option<String>>,
 ) {
@@ -585,7 +588,7 @@ fn refresh_fan_merch(
     // is replaced silently when the live catalog lands.
     if !has_merch && bridge::native_available() {
         spawn_local(async move {
-            if let Ok(Some(value)) = bridge::invoke_timeout::<Option<MerchCatalog>, _>(
+            if let Ok(Some(value)) = bridge::invoke_timeout::<Option<MerchCatalogResult>, _>(
                 "fan_cached_merch_catalog",
                 &EmptyArgs {},
                 2_000,
@@ -593,13 +596,14 @@ fn refresh_fan_merch(
             .await
                 && merch.get_untracked().is_none()
             {
-                merch.set(Some(value));
+                merch_stale.set(value.stale);
+                merch.set(Some(value.catalog));
                 loading.update(|state| state.merch = false);
             }
         });
     }
     spawn_local(async move {
-        let result = bridge::invoke_latest::<MerchCatalog, _>(
+        let result = bridge::invoke_latest::<MerchCatalogResult, _>(
             "fan_merch_catalog",
             &EmptyArgs {},
             15_000,
@@ -612,8 +616,9 @@ fn refresh_fan_merch(
             // identical to it. Setting it anyway would tear down and rebuild
             // every product card and product image for no visible change.
             Ok(Some(value)) => {
-                if merch.with_untracked(|current| current.as_ref() != Some(&value)) {
-                    merch.set(Some(value));
+                merch_stale.set(value.stale);
+                if merch.with_untracked(|current| current.as_ref() != Some(&value.catalog)) {
+                    merch.set(Some(value.catalog));
                 }
             }
             Ok(None) => {}

@@ -64,10 +64,7 @@ use commands::{
     },
     synesthesia::{fan_link_pending_synesthesia, fan_take_synesthesia_app_link},
 };
-use models::{
-    BeaconProfile, BeaconSessionPhase, FanProfile, FanSessionPhase, OperatorProfile,
-    OperatorSessionPhase, ShowModeStore,
-};
+use models::{BeaconProfile, FanProfile, OperatorProfile, ShowModeStore};
 use tauri::Manager;
 use tokio::sync::{Mutex, RwLock};
 use zeroize::Zeroizing;
@@ -95,7 +92,6 @@ pub struct AppState {
     session: RwLock<Option<Arc<OperatorProfile>>>,
     operator_pin: RwLock<Option<Zeroizing<String>>>,
     operator_vault_password: RwLock<Option<Zeroizing<Vec<u8>>>>,
-    operator_phase: RwLock<OperatorSessionPhase>,
     operator_mutation: Mutex<()>,
     operator_push_mutation: Mutex<()>,
     /// In-memory mirror of the encrypted operator-panel snapshot, for the same
@@ -108,7 +104,6 @@ pub struct AppState {
     fan_session: RwLock<Option<Arc<FanProfile>>>,
     fan_pin: RwLock<Option<Zeroizing<String>>>,
     fan_vault_password: RwLock<Option<Zeroizing<Vec<u8>>>>,
-    fan_phase: RwLock<FanSessionPhase>,
     /// The effective unlock mode, resolved once and then held.
     ///
     /// `fan_status` runs at the end of nearly every fan command and
@@ -130,7 +125,6 @@ pub struct AppState {
     beacon_session: RwLock<Option<Arc<BeaconProfile>>>,
     beacon_pin: RwLock<Option<Zeroizing<String>>>,
     beacon_vault_password: RwLock<Option<Zeroizing<Vec<u8>>>>,
-    beacon_phase: RwLock<BeaconSessionPhase>,
     beacon_mutation: Mutex<()>,
     pending_beacon_confirmation: Mutex<Option<PendingBeaconConfirmation>>,
     pending_beacon_link: Mutex<Option<Zeroizing<String>>>,
@@ -215,7 +209,6 @@ pub fn run() {
                 session: RwLock::new(None),
                 operator_pin: RwLock::new(None),
                 operator_vault_password: RwLock::new(None),
-                operator_phase: RwLock::new(OperatorSessionPhase::default()),
                 operator_mutation: Mutex::new(()),
                 operator_push_mutation: Mutex::new(()),
                 operator_sections_cache: RwLock::new(None),
@@ -225,7 +218,6 @@ pub fn run() {
                 fan_session: RwLock::new(None),
                 fan_pin: RwLock::new(None),
                 fan_vault_password: RwLock::new(None),
-                fan_phase: RwLock::new(FanSessionPhase::default()),
                 fan_unlock_mode: RwLock::new(None),
                 pending_fan_confirmation: Mutex::new(None),
                 pending_fan_confirm_token: Mutex::new(None),
@@ -236,7 +228,6 @@ pub fn run() {
                 beacon_session: RwLock::new(None),
                 beacon_pin: RwLock::new(None),
                 beacon_vault_password: RwLock::new(None),
-                beacon_phase: RwLock::new(BeaconSessionPhase::default()),
                 beacon_mutation: Mutex::new(()),
                 pending_beacon_confirmation: Mutex::new(None),
                 pending_beacon_link: Mutex::new(None),
