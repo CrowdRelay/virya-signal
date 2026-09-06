@@ -64,6 +64,19 @@ jobs:
             --name "${AVD_NAME}" \
             --package "system-images;android-${ANDROID_API};google_apis;x86_64" \
             --device "pixel_6"
+          # sdkmanager installs the emulator under $ANDROID_HOME/emulator, and
+          # setup-android only exports cmdline-tools and platform-tools. A bare
+          # `emulator` therefore resolved to nothing, and because `nohup`
+          # forking succeeds the boot step reported it as "emulator process
+          # exited during startup" — a real failure hidden behind a wrong
+          # explanation. Assert the binary here, where the message is the truth.
+          emulator_bin="${ANDROID_HOME}/emulator/emulator"
+          test -x "${emulator_bin}" || {
+            echo "::error::sdkmanager did not install ${emulator_bin}" >&2
+            exit 1
+          }
+          echo "${ANDROID_HOME}/emulator" >> "$GITHUB_PATH"
+          echo "ANDROID_E2E_EMULATOR_BIN=${emulator_bin}"
       - name: Enable KVM for the Android emulator
         shell: bash
         run: |
@@ -85,7 +98,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/android-e2e
-          nohup emulator -avd "${AVD_NAME}" \
+          # Absolute path rather than PATH lookup: this step must fail because
+          # the emulator refused to boot, never because a shell could not find
+          # it. The install step already proved the binary is there.
+          emulator_bin="${ANDROID_HOME}/emulator/emulator"
+          test -x "${emulator_bin}" || {
+            echo "::error::${emulator_bin} is missing; the install step should have caught this" >&2
+            exit 1
+          }
+          nohup "${emulator_bin}" -avd "${AVD_NAME}" \
             -no-window -no-audio -no-boot-anim -no-snapshot \
             -accel on -gpu swiftshader \
             > artifacts/android-e2e/emulator.log 2>&1 &
