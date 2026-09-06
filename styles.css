@@ -2155,7 +2155,7 @@ html[data-virya-scanner-active] .app-shell {
   max-height: calc(100dvh - 32px); overflow-y: auto;
   border: 1px solid color-mix(in srgb, var(--signal) 42%, var(--border-strong));
   border-radius: var(--radius-xl);
-  background: linear-gradient(145deg, rgba(132,180,172,.10), var(--surface) 66%);
+  background: var(--surface);
   box-shadow: var(--shadow-lg);
   animation: fade-in var(--dur-fast) var(--ease-out);
 }
