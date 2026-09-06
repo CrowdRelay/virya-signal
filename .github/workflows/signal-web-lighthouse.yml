@@ -105,7 +105,13 @@ jobs:
       - name: Lighthouse mobile
         shell: bash
         env:
-          LIGHTHOUSE_RUNS: "3"
+          # Mobile applies a 4x CPU throttle on top of an already shared
+          # runner, so its spread is far wider than desktop's: one commit
+          # produced TBT 80, 1555 and 2917 ms in three runs while desktop in
+          # the same job spread 6 ms. More samples make the median land on the
+          # real mode instead of on whichever third of a multi-modal
+          # population happened to be drawn twice.
+          LIGHTHOUSE_RUNS: "5"
         run: |
           set -euo pipefail
           # One run measures the site plus whatever else the runner was doing.
@@ -117,6 +123,7 @@ jobs:
               --quiet \
               --chrome-flags="--headless --no-sandbox --disable-dev-shm-usage" \
               --only-categories=performance,accessibility,best-practices \
+              --throttling.cpuSlowdownMultiplier=4 \
               --max-wait-for-load=20000 \
               --output=json --output=html \
               --output-path="artifacts/runs/mobile-${run}"
@@ -150,15 +157,23 @@ jobs:
             --out artifacts/lighthouse-desktop.report.json
 
       - name: Validate performance and accessibility regression budget
+        id: budget
         shell: bash
         run: |
           set -euo pipefail
           python3 scripts/check-lighthouse.py \
             --mobile artifacts/lighthouse-mobile.report.json \
             --desktop artifacts/lighthouse-desktop.report.json \
+            --mobile-runs artifacts/lighthouse-mobile.runs.json \
+            --desktop-runs artifacts/lighthouse-desktop.runs.json \
             --baseline artifacts/previous/lighthouse-summary.json \
             --json-out artifacts/lighthouse-summary.json \
             --markdown-out artifacts/lighthouse-summary.md
+          # A measurement the script could not trust must not become the number
+          # every later run is compared against.
+          reliable="$(jq -r '.reliable' artifacts/lighthouse-summary.json)"
+          echo "reliable=${reliable}" >> "$GITHUB_OUTPUT"
+          echo "SIGNAL_LIGHTHOUSE_RELIABLE=${reliable}"
 
       - name: Publish workflow summary
         if: always()
@@ -180,6 +195,8 @@ jobs:
           path: |
             artifacts/lighthouse-mobile.report.json
             artifacts/lighthouse-mobile.report.html
+            artifacts/lighthouse-mobile.runs.json
+            artifacts/lighthouse-desktop.runs.json
             artifacts/lighthouse-desktop.report.json
             artifacts/lighthouse-desktop.report.html
             artifacts/lighthouse-summary.json
@@ -187,8 +204,10 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+      # A doubtful run is not a baseline. Recording one would drag every later
+      # comparison toward a number the site never produced.
       - name: Store successful regression baseline
-        if: success()
+        if: success() && steps.budget.outputs.reliable == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: virya-signal-lighthouse-baseline

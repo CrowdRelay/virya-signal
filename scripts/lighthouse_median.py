@@ -15,6 +15,14 @@ whichever sorted first.
 Median is deliberate rather than best-of-N. Best-of-N would report the
 luckiest run and quietly ratchet the baseline toward numbers the site cannot
 reproduce; median reports a run the site can actually hit again.
+
+The median alone is not enough when the population is multi-modal. Observed on
+one commit: mobile TBT 80, 1555, 2917 ms in three consecutive runs, while
+desktop in the same job held a 6 ms spread. The median of that is 2917 ms and
+it is not a fact about the site. So this also writes a sidecar record of the
+whole run set — every TBT and every `benchmarkIndex` Chrome measured for the
+machine — and `check-lighthouse.py` uses it to tell a reproducible regression
+(consistently slow) from a starved runner (wildly dispersed).
 """
 
 from __future__ import annotations
@@ -40,6 +48,16 @@ def tbt_of(report: dict) -> float:
     return float(value) if isinstance(value, (int, float)) else 0.0
 
 
+def benchmark_index_of(report: dict) -> float:
+    """Chrome's own measurement of how fast the machine running the audit is.
+
+    This is a property of the runner, not of the page, so it is the one number
+    that can separate "the site got slower" from "the box was busy".
+    """
+    value = report.get("environment", {}).get("benchmarkIndex")
+    return float(value) if isinstance(value, (int, float)) else 0.0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--report", type=Path, action="append", required=True,
@@ -59,7 +77,7 @@ def main() -> int:
             report = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as exc:
             raise SystemExit(f"LIGHTHOUSE_MEDIAN=FAIL cannot read {path}: {exc}") from exc
-        runs.append((score_of(report), tbt_of(report), path))
+        runs.append((score_of(report), tbt_of(report), path, benchmark_index_of(report)))
 
     # Sort by score, then by TBT, and take the middle run. For an even count
     # this takes the lower-middle, which is the conservative side.
@@ -74,13 +92,34 @@ def main() -> int:
     if chosen_html.is_file():
         shutil.copyfile(chosen_html, Path(str(args.out).replace(".report.json", ".report.html")))
 
+    tbt_values = [run[1] for run in runs]
+    benchmark_values = [run[3] for run in runs]
+    spread = max(tbt_values) - min(tbt_values)
+    sidecar = Path(str(args.out).replace(".report.json", ".runs.json"))
+    sidecar.write_text(
+        json.dumps(
+            {
+                "label": args.label,
+                "runs": len(runs),
+                "total_blocking_time_ms": tbt_values,
+                "total_blocking_time_spread_ms": spread,
+                "benchmark_index": benchmark_values,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
     scores = [f"{run[0] * 100:.0f}" for run in runs]
     tbts = [f"{run[1]:.0f}" for run in runs]
     print(
         f"LIGHTHOUSE_MEDIAN={args.label} runs={len(runs)} "
         f"scores=[{','.join(scores)}] tbt_ms=[{','.join(tbts)}] "
         f"chosen_score={chosen[0] * 100:.0f} chosen_tbt_ms={chosen[1]:.0f} "
-        f"spread_tbt_ms={max(run[1] for run in runs) - min(run[1] for run in runs):.0f}"
+        f"spread_tbt_ms={spread:.0f} "
+        f"benchmark_index=[{','.join(f'{value:.0f}' for value in benchmark_values)}]"
     )
     if len(runs) > 1:
         print(f"LIGHTHOUSE_MEDIAN_STDEV_TBT_MS={statistics.pstdev([run[1] for run in runs]):.0f}")
