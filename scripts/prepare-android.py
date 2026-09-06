@@ -330,6 +330,18 @@ if args.signing:
         else:
             raise SystemExit("could not locate release build type in generated Gradle file")
 
+# Compress native libraries in the APK (extractNativeLibs=true in the
+# manifest). useLegacyPackaging=true is the Gradle-native equivalent that
+# AGP expects when extractNativeLibs is set in the manifest. Without it AGP
+# emits a warning and may not honour the manifest attribute consistently.
+if "useLegacyPackaging" not in text:
+    text = re.sub(
+        r'(?m)^(\s*)buildFeatures\s*\{',
+        r'\1packaging {\n\1    jniLibs {\n\1        useLegacyPackaging = true\n\1    }\n\1}\n\1buildFeatures {',
+        text,
+        count=1,
+    )
+
 gradle.write_text(text, encoding="utf-8")
 
 # Install R8/ProGuard keep rules into the generated Android project. The
@@ -696,6 +708,18 @@ def _stage_android_push() -> bool:
     application = manifest_root.find("application")
     if application is None:
         raise SystemExit("generated Android manifest is missing <application>")
+
+    # Compress native libraries in the device APK. AGP defaults to
+    # extractNativeLibs="false" for minSdk >= 23, which stores the .so
+    # uncompressed in the APK for mmap-based loading. That makes the Play
+    # Store download size balloon because the 9.4 MiB Rust library is sent
+    # uncompressed. Setting extractNativeLibs="true" compresses the .so in
+    # the APK (9.4 MiB -> ~3.9 MiB), cutting the full download from ~12.5 MiB
+    # to ~7 MiB. The .so is extracted to disk on install — a one-time cost
+    # of ~9.4 MiB that is negligible on minSdk 26 devices.
+    extract_attr = f"{{{ANDROID_NS}}}extractNativeLibs"
+    application.set(extract_attr, "true")
+
     service_name = f"{PUSH_PACKAGE}.ViryaFirebaseMessagingService"
     existing_service = next(
         (node for node in application.findall("service") if node.attrib.get(permission_name) == service_name),
