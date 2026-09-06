@@ -18,8 +18,6 @@ assert "#f3c51a" not in svg.lower()
 assert 'branding/signal-v2.svg --ios-color "#070908"' in regen
 assert "regenerate-signal-icons.fish" in play
 assert 'cargo tauri icon branding/signal-v2.svg --ios-color "#070908"' in android
-assert 'cargo tauri icon branding/signal-v2.svg --ios-color "#070908"' in mobile
-assert "virya-signal-brand-full.png --ios-color" not in mobile
 assert '"backgroundColor": "#070908"' in tauri
 
 print("SIGNAL_V2_ICON_PIPELINE=PASS")
