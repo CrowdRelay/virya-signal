@@ -78,10 +78,20 @@ class Device:
         # directory` — a missing file standing in for a refused write.
         remote = "/data/local/tmp/window.xml"
         shell("rm", "-f", remote, check=False, timeout=15)
-        shell("uiautomator", "dump", "--compressed", remote, check=False, timeout=15)
-        xml = adb("exec-out", "cat", remote, timeout=15)
+        # `check=False` here is deliberate — a dump can fail transiently while a
+        # window is still settling and the retry loop in `find` handles that.
+        # What is not acceptable is discarding *why*: the read below then
+        # reports "No such file or directory", which describes the symptom of
+        # every possible cause and points at none of them. Keep the tool's own
+        # words and put them in the error.
+        report = shell("uiautomator", "dump", "--compressed", remote, check=False, timeout=15)
+        xml = adb("exec-out", "cat", remote, check=False, timeout=15)
         if "<hierarchy" not in xml:
-            raise JourneyError(f"UIAutomator did not return hierarchy:\n{xml[:1000]}")
+            raise JourneyError(
+                "UIAutomator did not return hierarchy.\n"
+                f"uiautomator said: {report.strip() or '(nothing)'}\n"
+                f"reading {remote} said: {xml[:500].strip() or '(nothing)'}"
+            )
         try:
             root = ET.fromstring(xml)
         except ET.ParseError as exc:
