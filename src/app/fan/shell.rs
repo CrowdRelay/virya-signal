@@ -596,16 +596,17 @@ fn PushPrimer(loading: RwSignal<FanLoadingState>) -> impl IntoView {
         if !bridge::native_available() || bridge::push_primer_seen() {
             return;
         }
-        spawn_local(async move {
+        // `invoke_timeout`, not `invoke_latest`. This is a one-shot probe, not
+        // a latest-wins read, and the "fan:push-primer" scope shared the
+        // "fan:" prefix that a pull-to-refresh or a lock invalidates — which
+        // resolved the probe as superseded and abandoned the ask for the whole
+        // session, silently, because the effect has nothing to re-run on.
+        spawn_lifecycle_task(async move {
             // Nothing to ask for if the fan already answered Android, either
             // way, or if this build cannot deliver a notification at all.
-            let Ok(Some(status)) = bridge::invoke_latest::<FanPushStatus, _>(
-                "fan_push_sync",
-                &EmptyArgs {},
-                15_000,
-                "fan:push-primer",
-            )
-            .await
+            let Ok(status) =
+                bridge::invoke_timeout::<FanPushStatus, _>("fan_push_sync", &EmptyArgs {}, 15_000)
+                    .await
             else {
                 return;
             };
@@ -614,14 +615,19 @@ fn PushPrimer(loading: RwSignal<FanLoadingState>) -> impl IntoView {
             }
         });
     });
-    on_cleanup(|| bridge::invalidate_latest("fan:push-primer"));
 
     // Show the modal only after the home section has painted. This is the
     // "polite" part: the fan sees the app's value first, then the ask.
-    // A fan whose home data loaded from the snapshot cache sees it almost
-    // immediately; one waiting on the network sees it when the response lands.
+    //
+    // Both inputs are tracked. `eligible` used to be read untracked, so the
+    // effect only re-ran when `loading.home` changed — and the two settle in
+    // the opposite order to the one that assumed. Home paints from the
+    // encrypted snapshot in about a hundred milliseconds; the probe above is a
+    // capability check plus a push-config round trip and lands seconds later.
+    // So `loading.home` was already false by the time `eligible` turned true,
+    // nothing re-ran, and the ask never appeared on any real launch.
     Effect::new(move |_| {
-        if eligible.get_untracked() && !loading.get().home {
+        if eligible.get() && !loading.get().home {
             let _ = visible.try_set(true);
         }
     });

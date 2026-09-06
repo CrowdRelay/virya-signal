@@ -43,6 +43,10 @@ const MODES = [
   { id: 'fan-locked', label: 'locked gate' },
   { id: 'fan-locked&link=1', label: 'pending confirmation link' },
   { id: 'fan', label: 'fan shell', tabs: true },
+  // `push=prompt` is the only state the notification primer renders in, and
+  // a centered dialog is exactly the thing a transformed ancestor pushes
+  // off-screen without any scrollbar to show for it.
+  { id: 'fan&push=prompt', label: 'notification primer' },
   { id: 'beacon', label: 'beacon' },
   { id: 'staff', label: 'staff gate' },
   { id: 'owner', label: 'operator shell', tabs: true },

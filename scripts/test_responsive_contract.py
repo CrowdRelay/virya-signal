@@ -22,6 +22,10 @@ GATE = ROOT / "scripts/check-responsive.mjs"
 CHECK = ROOT / ".github/workflows/check.yml"
 STYLES = ROOT / "styles.css"
 
+
+def read(relative: str) -> str:
+    return (ROOT / relative).read_text(encoding="utf-8")
+
 # The narrow end is the one that breaks; 320 is the smallest width Android
 # still ships (small-screen phones in landscape-locked kiosk mode included).
 REQUIRED_WIDTHS = (320, 360, 375, 390, 430, 768, 1024, 1280, 1440)
@@ -65,6 +69,72 @@ class ResponsiveGateRuns(unittest.TestCase):
         # Under 16px, iOS Safari zooms the page on focus and the user has to
         # undo the layout by hand.
         self.assertIn("INPUT_FONT_MIN = 16", gate)
+
+
+class OverlaysReachTheViewport(unittest.TestCase):
+    """A `position: fixed` overlay resolves against the nearest transformed
+    ancestor, not the viewport, and any non-`none` transform counts.
+
+    `animation: tab-enter ... both` left the final keyframe's identity
+    transform on `.screen` for as long as the tab stayed active, so every
+    overlay inside a screen was positioned against the scroll content. The
+    notification primer computed `top: 896.766px` inside an 1794px `.screen` on
+    an 844px viewport and rendered below the fold — visible in the DOM, present
+    in tests, and impossible for any user to see.
+    """
+
+    def test_the_tab_entrance_does_not_outlive_itself(self) -> None:
+        styles = STYLES.read_text(encoding="utf-8")
+        rule = styles.split(".tab-page.tab-active > .screen {", 1)[1].split("}", 1)[0]
+        self.assertIn("backwards", rule)
+        self.assertNotIn(" both", rule, "`both` pins the final transform forever")
+
+    def test_no_entrance_animation_leaves_a_transform_behind(self) -> None:
+        # `both` is `backwards` plus `forwards`, and `forwards` keeps the final
+        # keyframe applied for the life of the element. Every one of these
+        # keyframes ends on a transform, so `both` hands the element a
+        # permanent one — a containing block for fixed descendants, and a
+        # compositing layer, for no visual gain.
+        styles = STYLES.read_text(encoding="utf-8")
+        offenders = [
+            line.strip()
+            for line in styles.splitlines()
+            if "animation:" in line and " both;" in line
+        ]
+        self.assertEqual(offenders, [], "entrance animations must not use fill-mode both")
+
+    def test_the_primer_dialog_is_measured_at_every_width(self) -> None:
+        gate = GATE.read_text(encoding="utf-8")
+        self.assertIn("push=prompt", gate)
+
+
+class PrimerActuallyBecomesVisible(unittest.TestCase):
+    """The ask is gated on two async facts that settle in the opposite order to
+    the one the code assumed.
+
+    Home paints from the encrypted snapshot in about a hundred milliseconds.
+    The eligibility probe is a capability check plus a push-config round trip
+    and lands seconds later. Reading `eligible` untracked meant the effect only
+    re-ran on `loading.home`, which had already settled — so the modal never
+    appeared on any real launch.
+    """
+
+    def test_both_inputs_to_the_visibility_decision_are_tracked(self) -> None:
+        shell = read("src/app/fan/shell.rs")
+        primer = shell.split("fn PushPrimer(", 1)[1]
+        self.assertIn("if eligible.get() && !loading.get().home", primer)
+        self.assertNotIn("eligible.get_untracked() && !loading.get()", primer)
+
+    def test_the_probe_cannot_be_silently_superseded(self) -> None:
+        # `invoke_latest` under a "fan:" scope resolves as Ok(None) whenever a
+        # refresh or a lock invalidates the prefix, and the effect has nothing
+        # to re-run on, so the ask would be abandoned for the whole session.
+        shell = read("src/app/fan/shell.rs")
+        primer = shell.split("fn PushPrimer(", 1)[1].split("fn ", 1)[0]
+        self.assertIn('invoke_timeout::<FanPushStatus, _>("fan_push_sync"', primer)
+        # The comment names the retired call on purpose, so assert on the call
+        # itself rather than on the prose that explains why it is gone.
+        self.assertNotIn("bridge::invoke_latest", primer)
 
 
 class LayoutSurvivesServerStrings(unittest.TestCase):
