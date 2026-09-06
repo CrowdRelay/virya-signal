@@ -8,8 +8,8 @@ use zeroize::Zeroizing;
 use crate::{
     AppError, AppState, feedback_queue, i18n,
     models::{
-        BeaconSessionStatus, FanSessionStatus, LauncherStatus, RequestedCityInput,
-        RequestedCityResult, SessionStatus,
+        BeaconSessionPhase, BeaconSessionStatus, FanSessionPhase, FanSessionStatus, LauncherStatus,
+        OperatorSessionPhase, RequestedCityInput, RequestedCityResult, SessionStatus,
     },
     session::run_blocking,
     validation::clean_optional,
@@ -81,35 +81,42 @@ pub(crate) async fn launcher_status(
     let operator_session = state.session.read().await;
     let fan_session = state.fan_session.read().await;
     let beacon_session = state.beacon_session.read().await;
-    let operator_phase = *state.operator_phase.read().await;
-    let fan_phase = *state.fan_phase.read().await;
-    let beacon_phase = *state.beacon_phase.read().await;
     let fan_unlock_mode = crate::device_unlock::effective_mode(&state).await;
+    // Every phase below is derived from the two facts published beside it,
+    // while the session guards are still held. A cold start therefore reports
+    // `Locked` for a vault that exists on disk instead of the `Unconfigured`
+    // a separately initialised phase field used to claim.
+    let operator_configured = vault::exists(&state.app_data_dir);
+    let operator_unlocked = operator_session.is_some();
+    let fan_configured = vault::fan_exists(&state.app_data_dir);
+    let fan_unlocked = fan_session.is_some();
+    let beacon_configured = vault::beacon_exists(&state.app_data_dir);
+    let beacon_unlocked = beacon_session.is_some();
     let status = LauncherStatus {
         operator: SessionStatus {
-            configured: vault::exists(&state.app_data_dir),
-            unlocked: operator_session.is_some(),
+            configured: operator_configured,
+            unlocked: operator_unlocked,
             session: operator_session
                 .as_ref()
                 .map(|profile| profile.as_ref().into()),
-            phase: operator_phase,
+            phase: OperatorSessionPhase::resolve(operator_configured, operator_unlocked),
         },
         fan: FanSessionStatus {
-            configured: vault::fan_exists(&state.app_data_dir),
-            unlocked: fan_session.is_some(),
+            configured: fan_configured,
+            unlocked: fan_unlocked,
             session: fan_session.as_ref().map(|profile| profile.as_ref().into()),
             pin_unlock: fan_unlock_mode.pin,
             device_unlock: fan_unlock_mode.device,
             device_unlock_supported: state.device_unlock_supported,
-            phase: fan_phase,
+            phase: FanSessionPhase::resolve(fan_configured, fan_unlocked),
         },
         beacon: BeaconSessionStatus {
-            configured: vault::beacon_exists(&state.app_data_dir),
-            unlocked: beacon_session.is_some(),
+            configured: beacon_configured,
+            unlocked: beacon_unlocked,
             session: beacon_session
                 .as_ref()
                 .map(|profile| profile.as_ref().into()),
-            phase: beacon_phase,
+            phase: BeaconSessionPhase::resolve(beacon_configured, beacon_unlocked),
         },
     };
     drop(operator_session);

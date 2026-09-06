@@ -10,9 +10,7 @@ use zeroize::Zeroizing;
 
 use crate::{
     AppError, AppState,
-    models::{
-        BeaconProfile, FanProfile, OperatorProfile, OperatorSessionPhase, OperatorSignalOverview,
-    },
+    models::{BeaconProfile, FanProfile, OperatorProfile, OperatorSignalOverview},
     vault,
 };
 
@@ -58,7 +56,6 @@ pub(crate) async fn operator_profile(
         *state.session.write().await = None;
         *state.operator_pin.write().await = None;
         *state.operator_vault_password.write().await = None;
-        *state.operator_phase.write().await = OperatorSessionPhase::Locked;
         *state.show_mode_store.write().await = None;
         *state.operator_sections_cache.write().await = None;
         return Err(AppError::Locked);

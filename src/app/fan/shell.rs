@@ -45,6 +45,7 @@ fn FanApp(
     let home = RwSignal::new(None::<FanHomeData>);
     let dashboard = RwSignal::new(None::<FanDashboardData>);
     let merch = RwSignal::new(None::<MerchCatalog>);
+    let merch_stale = RwSignal::new(false);
     let merch_bundles = RwSignal::new(None::<FanMerchBundleCatalog>);
     let wallets = RwSignal::new(Vec::<TicketWallet>::new());
     let checkout_event = RwSignal::new(None::<PublicEvent>);
@@ -135,7 +136,7 @@ fn FanApp(
             FanTab::Merch => {
                 if !loaded.get_untracked().merch {
                     loaded.update(|state| state.merch = true);
-                    refresh_fan_merch(merch, loading, error);
+                    refresh_fan_merch(merch, merch_stale, loading, error);
                     refresh_fan_merch_bundles(merch_bundles);
                 }
             }
@@ -225,7 +226,7 @@ fn FanApp(
                     refresh_fan_admission_pass(dashboard, loading, error);
                 }
                 if claim_fan_section(loaded, |state| &mut state.merch) {
-                    refresh_fan_merch(merch, loading, error);
+                    refresh_fan_merch(merch, merch_stale, loading, error);
                     refresh_fan_merch_bundles(merch_bundles);
                 }
                 if claim_fan_section(loaded, |state| &mut state.area) {
@@ -265,7 +266,7 @@ fn FanApp(
         });
         refresh_fan_home(home, loading, error);
         refresh_fan_parts(dashboard, loading, error);
-        refresh_fan_merch(merch, loading, error);
+        refresh_fan_merch(merch, merch_stale, loading, error);
         refresh_fan_merch_bundles(merch_bundles);
         refresh_wallets(wallets, Some(loading), error);
         refresh_fan_area(area, loading, error);
@@ -527,7 +528,7 @@ fn FanApp(
                     }.into_any())}
                 </div>
                 <div class="tab-page" class:hidden=move || tab.get() != FanTab::Merch class:tab-active=move || tab.get() == FanTab::Merch>
-                    <FanMerch merch=merch bundles=merch_bundles loading=loading error=error />
+                    <FanMerch merch=merch merch_stale=merch_stale bundles=merch_bundles loading=loading error=error />
                 </div>
                 <div class="tab-page" class:hidden=move || tab.get() != FanTab::Game class:tab-active=move || tab.get() == FanTab::Game>
                     <AreaGameScreen area=area loading=loading error=error />

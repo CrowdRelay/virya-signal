@@ -48,7 +48,6 @@ pub(crate) async fn fan_device_unlock(
     *state.fan_session.write().await = Some(Arc::new(profile));
     *state.fan_pin.write().await = None;
     *state.fan_vault_password.write().await = Some(password);
-    *state.fan_phase.write().await = FanSessionPhase::Active;
     *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
     drop(_mutation);
@@ -130,6 +129,44 @@ pub(crate) async fn fan_disable_device_unlock(
     *state.fan_vault_password.write().await = Some(password);
     drop(_mutation);
     fan_status(state).await
+}
+
+/// Seals a just-written vault password, and removes the vault it belongs to if
+/// the keystore refuses.
+///
+/// `device_secret_supported` proves that an AndroidKeyStore provider exists and
+/// will hand out an AES `KeyGenerator`. It deliberately does not generate the
+/// real key — that call can reach the TEE or StrongBox, and running it on every
+/// cold start cost startup latency and left a key nothing owned. So the probe
+/// answers "capable", not "guaranteed", and the first real seal is where a
+/// device that refuses this configuration finds out.
+///
+/// The vault has to be written before the seal, because a key for a snapshot
+/// that never landed is a key to nothing. That ordering leaves exactly one bad
+/// outcome: the vault lands, the seal fails, and what remains is a snapshot
+/// with no PIN behind it and no key to open it — unopenable for good, and the
+/// unlock record is not written yet, so the gate offers a PIN prompt that
+/// cannot work. Removing the vault turns that into a clean device the fan can
+/// sign in on again, which is the same trade `fan_delete_account` makes.
+///
+/// A confirmation that replaced an older vault has already lost it by this
+/// point; `replace_fan_with_password` only removes its backup once the new
+/// snapshot is committed. Clean-and-retry is still strictly better than
+/// keeping a snapshot nobody can open.
+async fn seal_or_discard_fan_vault(
+    state: &AppState,
+    app: &AppHandle,
+    password: &[u8],
+) -> Result<(), AppError> {
+    let Err(error) = crate::device_unlock::seal(app, &state.app_data_dir, password) else {
+        return Ok(());
+    };
+    let app_data_dir = state.app_data_dir.clone();
+    if let Err(cleanup) = run_blocking(move || vault::remove_fan(&app_data_dir)).await {
+        eprintln!("[virya:device-unlock] unopenable vault was not removed: {cleanup}");
+    }
+    forget_device_unlock(state, app).await;
+    Err(error)
 }
 
 /// Drops every trace of device unlock. Best effort on purpose: this runs while

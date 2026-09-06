@@ -173,12 +173,13 @@ fn https_url(value: &str) -> Result<String, AppError> {
 
 async fn status_from_state(state: &State<'_, AppState>) -> BeaconSessionStatus {
     let session = state.beacon_session.read().await;
-    let phase = *state.beacon_phase.read().await;
+    let configured = vault::beacon_exists(&state.app_data_dir);
+    let unlocked = session.is_some();
     BeaconSessionStatus {
-        configured: vault::beacon_exists(&state.app_data_dir),
-        unlocked: session.is_some(),
+        configured,
+        unlocked,
         session: session.as_ref().map(|profile| profile.as_ref().into()),
-        phase,
+        phase: BeaconSessionPhase::resolve(configured, unlocked),
     }
 }
 
@@ -229,7 +230,6 @@ async fn persist_exchanged_beacon(
     *state.beacon_session.write().await = Some(Arc::new(profile));
     *state.beacon_pin.write().await = Some(pin);
     *state.beacon_vault_password.write().await = Some(vault_password);
-    *state.beacon_phase.write().await = BeaconSessionPhase::Active;
     Ok(())
 }
 
@@ -428,7 +428,6 @@ pub(crate) async fn beacon_unlock(
     *state.beacon_session.write().await = Some(Arc::new(profile));
     *state.beacon_pin.write().await = Some(pin);
     *state.beacon_vault_password.write().await = Some(vault_password);
-    *state.beacon_phase.write().await = BeaconSessionPhase::Active;
     drop(_mutation);
     let status = beacon_status(state).await?;
 
@@ -457,7 +456,6 @@ pub(crate) async fn beacon_lock(
     *state.beacon_session.write().await = None;
     *state.beacon_pin.write().await = None;
     *state.beacon_vault_password.write().await = None;
-    *state.beacon_phase.write().await = BeaconSessionPhase::Locked;
     *state.pending_beacon_confirmation.lock().await = None;
     beacon_status(state).await
 }
@@ -690,7 +688,6 @@ async fn clear_beacon_session_state(state: &State<'_, AppState>) {
     *state.beacon_session.write().await = None;
     *state.beacon_pin.write().await = None;
     *state.beacon_vault_password.write().await = None;
-    *state.beacon_phase.write().await = BeaconSessionPhase::Unconfigured;
     *state.pending_beacon_confirmation.lock().await = None;
     *state.pending_beacon_link.lock().await = None;
 }

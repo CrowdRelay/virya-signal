@@ -175,11 +175,18 @@ mod android {
         Ok(Some(link.to_owned()))
     }
 
-    /// Whether this device can seal a secret with a hardware-backed key.
+    /// Whether this device is *capable* of sealing a secret with a
+    /// hardware-backed key. Not a guarantee that the first seal will succeed.
     ///
     /// False on anything without a usable keystore — an emulator image with no
-    /// keymaster, a device where key generation is refused — and the fan keeps
-    /// the PIN in that case rather than being handed a weaker seal.
+    /// keymaster — and the fan keeps the PIN in that case rather than being
+    /// handed a weaker seal. True means the provider exists and will hand out
+    /// an AES `KeyGenerator`; it does not prove the configured 256-bit AES/GCM
+    /// spec will be accepted, because generating the real key on every cold
+    /// start is a TEE round trip on the startup path. See the Kotlin
+    /// `deviceSecretSupported` for the full trade, and
+    /// `seal_or_discard_fan_vault` for what happens when the first real seal
+    /// turns out to be the one that finds out.
     pub fn device_secret_supported<R: Runtime>(app: &AppHandle<R>) -> bool {
         handle(app)
             .0

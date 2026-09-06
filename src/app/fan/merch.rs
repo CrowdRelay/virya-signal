@@ -9,6 +9,10 @@ include!("affiliate.rs");
 #[component]
 fn FanMerch(
     merch: RwSignal<Option<MerchCatalog>>,
+    /// Whether these prices and stock are the last ones that arrived rather
+    /// than the ones the store would quote now. Same single meaning as the
+    /// Shows badge, and the same badge.
+    merch_stale: RwSignal<bool>,
     bundles: RwSignal<Option<FanMerchBundleCatalog>>,
     loading: RwSignal<FanLoadingState>,
     error: RwSignal<Option<String>>,
@@ -17,7 +21,7 @@ fn FanMerch(
         <section class="screen fan-screen merch-screen">
             <header class="screen-title">
                 <p class="eyebrow">{tr("virya_store")}</p>
-                <h2>{tr("merch")}</h2>
+                <h2>{tr("merch")}{move || merch_stale.get().then(|| view! { <span class="cache-badge">{tr("cached_data")}</span> })}</h2>
                 <p>{tr("products_and_bundles_use_the_same_inventory")}</p>
             </header>
             <Show when=move || !loading.get().merch fallback=move || view! { <Skeleton rows=4 height=420 /> }>
@@ -31,7 +35,7 @@ fn FanMerch(
                                 <strong>{tr("store_is_temporarily_unavailable")}</strong>
                                 <p>{tr("rest_of_signal_is_working_normally_try")}</p>
                                 <button class="ghost" on:click=move |_| {
-                                    refresh_fan_merch(merch, loading, error);
+                                    refresh_fan_merch(merch, merch_stale, loading, error);
                                     refresh_fan_merch_bundles(bundles);
                                 }>{tr("refresh_merch")}</button>
                             </div>
@@ -127,7 +131,7 @@ fn FanMerch(
                                                     view! { <ExternalLink url=shop_url label=tr("buy_in_store") error=error /> }.into_any()
                                                 } else {
                                                     view! {
-                                                        <button class="ghost" on:click=move |_| refresh_fan_merch(merch, loading, error)>{tr("check_again")}</button>
+                                                        <button class="ghost" on:click=move |_| refresh_fan_merch(merch, merch_stale, loading, error)>{tr("check_again")}</button>
                                                     }.into_any()
                                                 }}
                                             </div>
@@ -142,7 +146,7 @@ fn FanMerch(
                         <strong>{tr("could_not_load_store_status")}</strong>
                         <p>{tr("shows_tickets_and_profile_remain_available")}</p>
                         <button class="ghost" on:click=move |_| {
-                            refresh_fan_merch(merch, loading, error);
+                            refresh_fan_merch(merch, merch_stale, loading, error);
                             refresh_fan_merch_bundles(bundles);
                         }>{tr("try_again")}</button>
                     </div>

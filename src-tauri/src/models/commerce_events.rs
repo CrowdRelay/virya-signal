@@ -167,6 +167,17 @@ pub struct PublicCitiesResult {
     pub stale: bool,
 }
 
+/// Envelope for the public merch catalog. Same staleness semantics as
+/// [`PublicEventsResult`]: prices and stock served from the failure-window
+/// cache are the last ones that arrived, not the ones the store would quote
+/// now, and the storefront has to be able to say so.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct MerchCatalogResult {
+    pub catalog: MerchCatalog,
+    #[serde(default)]
+    pub stale: bool,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct TicketingOverview {
     pub sale: TicketSaleSummary,

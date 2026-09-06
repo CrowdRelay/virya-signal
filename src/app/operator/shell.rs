@@ -40,7 +40,13 @@ fn OperatorApp(
             } = snapshot;
             if !events.is_empty() && loading.get_untracked().events {
                 dashboard.update(|state| {
-                    state.get_or_insert_with(DashboardData::default).events = events;
+                    let data = state.get_or_insert_with(DashboardData::default);
+                    // Straight off the encrypted disk snapshot, before any live
+                    // request has answered. Nothing in this process validated
+                    // it, which is the same thing `PublicFreshness::Unvalidated`
+                    // says on the native side.
+                    data.events_stale = true;
+                    data.events = events;
                 });
                 loading.update(|state| state.events = false);
             }
@@ -308,7 +314,7 @@ fn OperatorHome(
 ) -> impl IntoView {
     view! {
         <section class="screen">
-            <header class="screen-title"><p class="eyebrow">{tr("live_operations")}</p><h2>{tr("today_under_control")}</h2></header>
+            <header class="screen-title"><p class="eyebrow">{tr("live_operations")}</p><h2>{tr("today_under_control")}{move || dashboard.with(|state| state.as_ref().is_some_and(|data| data.events_stale)).then(|| view! { <span class="cache-badge">{tr("cached_data")}</span> })}</h2></header>
             <Show when=move || !loading.get().events || !operator_events(dashboard).is_empty() fallback=move || view! { <Skeleton rows=3 height=96 /> }>
                 {move || dashboard.with(|state| state.as_ref().map(|data| {
                     let next = data.events.first().cloned();

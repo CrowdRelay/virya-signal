@@ -24,6 +24,42 @@ const PUBLIC_CACHE_VERSION: u8 = 1;
 const MAX_FUTURE_CLOCK_SKEW: Duration = Duration::from_secs(5 * 60);
 pub(super) const MAX_DISK_CACHE_BYTES: u64 = 2 * 1024 * 1024;
 
+/// Where a public list came from, and — as the single derived question —
+/// whether the client may still present it as current.
+///
+/// `stale` used to be written by hand at each return site, and the 304 branch
+/// got it backwards: a 304 is the origin saying "the copy you hold is the copy
+/// I would send", which is the strongest freshness evidence there is, and it
+/// was being reported as cached-and-possibly-outdated. Naming the source and
+/// deriving the boolean from it makes the mapping a table one can read and
+/// test, instead of five independent literals.
+///
+/// `stale` answers exactly one question: is this older than what the origin
+/// would answer right now? It does not mean "came from a cache", it does not
+/// mean "came from disk", and it does not mean "a request failed".
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum PublicFreshness {
+    /// Decoded from a 200 that just arrived.
+    Live,
+    /// Served from memory inside the short cache TTL. The client validated
+    /// recently enough that asking again would be noise, so this is current.
+    FreshCache,
+    /// The origin answered 304 for the validators the cached copy carries.
+    /// The cached bytes are the current bytes.
+    Revalidated,
+    /// The origin could not be reached, or refused with 429/5xx, or was never
+    /// asked at all (a disk snapshot painted before the live request lands).
+    /// This is the last copy that arrived and nobody has confirmed it still
+    /// holds.
+    Unvalidated,
+}
+
+impl PublicFreshness {
+    pub(super) const fn stale(self) -> bool {
+        matches!(self, Self::Unvalidated)
+    }
+}
+
 /// Process start time, used to clamp disk-restored cache ages.
 ///
 /// On a cold start, `Instant::now()` is near zero. If a disk snapshot's
@@ -262,6 +298,24 @@ fn restore_entries<T>(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
+
+    /// The whole freshness contract as a table. Every public-list return site
+    /// picks one of these four sources, so this is the complete mapping from
+    /// "where did the bytes come from" to what the UI is told.
+    #[test]
+    fn public_freshness_marks_only_unvalidated_sources_as_stale() {
+        for (source, expected_stale) in [
+            (PublicFreshness::Live, false),
+            (PublicFreshness::FreshCache, false),
+            // A 304 is the origin confirming the cached bytes are current. It
+            // used to report stale=true, which put a "cached data" badge on a
+            // list the server had just certified as up to date.
+            (PublicFreshness::Revalidated, false),
+            (PublicFreshness::Unvalidated, true),
+        ] {
+            assert_eq!(source.stale(), expected_stale, "{source:?}");
+        }
+    }
 
     #[test]
     fn cache_key_normalizes_trailing_slash() {

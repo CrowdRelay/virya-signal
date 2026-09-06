@@ -921,10 +921,16 @@ fn FanAccess(
                             // trapped in a screen with no way back. The native
                             // pending link is also cleared so the next resume
                             // tick does not re-offer it and reopen this panel.
+                            // The panel closes only once native reports the link
+                            // is actually gone. Closing first and clearing after
+                            // would put the fan on the PIN screen while the next
+                            // resume tick still had a link to re-offer.
                             <button type="button" class="text-button" on:click=move |_| {
-                                link_pending.set(false);
                                 spawn_local(async move {
-                                    let _ = bridge::invoke_unit("fan_clear_pending_confirm_link", &EmptyArgs {}).await;
+                                    match bridge::invoke_unit("fan_clear_pending_confirm_link", &EmptyArgs {}).await {
+                                        Ok(()) => { let _ = link_pending.try_set(false); }
+                                        Err(message) => { let _ = error.try_set(Some(message)); }
+                                    }
                                 });
                             }>{tr("back_to_pin_login")}</button>
                         </div>

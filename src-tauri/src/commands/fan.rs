@@ -21,7 +21,7 @@ use crate::{
         AdmissionPass, AreaChallenge, AreaClaimResult, AreaPositionSample, FanAuthResult,
         FanConfirmationInput, FanEventInterest, FanHomeData, FanLocationState, FanProfile,
         FanPushPreferences, FanPushPreferencesUpdate, FanPushStatus, FanSessionPhase,
-        FanSessionStatus, FanSignupInput, MerchCatalog, PublicEventsResult, ReferralProgress,
+        FanSessionStatus, FanSignupInput, MerchCatalogResult, PublicEventsResult, ReferralProgress,
         TicketWallet, TicketWalletApi, WalletBatch, WalletCredential, WalletQrCredential,
         WalletTicket,
     },

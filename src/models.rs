@@ -183,6 +183,17 @@ pub struct MerchCatalog {
     pub products: Vec<MerchProduct>,
 }
 
+/// Envelope for the storefront. `stale` carries the same single meaning as on
+/// [`PublicEventsResult`]: these are the last prices and stock that arrived,
+/// not the ones the store would quote now.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+pub struct MerchCatalogResult {
+    #[serde(default)]
+    pub catalog: MerchCatalog,
+    #[serde(default)]
+    pub stale: bool,
+}
+
 #[derive(Clone, Debug, Default, Deserialize, PartialEq)]
 pub struct FanMerchBundleCatalog {
     #[serde(default)]
@@ -330,6 +341,11 @@ pub struct TicketCheckoutStart {
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct DashboardData {
     pub events: Vec<PublicEvent>,
+    /// Same single meaning as on the fan side: these are the last shows that
+    /// arrived, not the ones CrowdRelay would list now. Staff act on this
+    /// panel at the gate, so it must not present a failure-window cache as
+    /// the current schedule.
+    pub events_stale: bool,
     pub qr: Option<ConcertQrOverview>,
 }
 
