@@ -8,17 +8,12 @@ permissions:
   actions: read
 
 concurrency:
-  group: signal-web-lighthouse-${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+  group: signal-web-lighthouse-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   lighthouse:
-    if: >-
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main') ||
-      github.event_name == 'schedule' ||
-      github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

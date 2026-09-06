@@ -435,7 +435,17 @@ pub(crate) async fn fan_confirm_link(
             FanCredential::Device
         }
     };
-    persist_confirmed_fan(&state, &app, input, credential).await?;
+    // A one-time token that the server has already consumed (409) or expired
+    // (404) can never succeed on a retry. Clearing it here prevents the next
+    // resume tick from re-offering the same spent panel — the "never re-open a
+    // dismissed action" invariant, applied to the terminal-failure path that
+    // the success path already handled.
+    if let Err(error) = persist_confirmed_fan(&state, &app, input, credential).await {
+        if matches!(error, AppError::Conflict(_) | AppError::NotFound) {
+            *state.pending_fan_confirm_token.lock().await = None;
+        }
+        return Err(error);
+    }
     *state.pending_fan_confirm_token.lock().await = None;
     *state.pending_fan_confirmation.lock().await = None;
     drop(_mutation);
@@ -718,6 +728,16 @@ fn remember_fan_sections(
             .duration_since(std::time::UNIX_EPOCH)
             .map(|value| value.as_secs())
             .unwrap_or(0);
+        // Re-check the vault password immediately before publishing the
+        // snapshot. `fan_lock` clears `fan_vault_password` and
+        // `fan_sections_cache` without holding `fan_sections_cache_mutation`,
+        // so a background `remember_fan_sections` that captured the password
+        // before the lock can still be in flight here. Without this guard, the
+        // stale snapshot would re-populate the cache after the lock cleared it,
+        // and the next unlock would serve the previous fan's panels.
+        if state.fan_vault_password.read().await.is_none() {
+            return;
+        }
         *state.fan_sections_cache.write().await = Some(snapshot.clone());
         let app_data_dir = state.app_data_dir.clone();
         if let Err(error) = run_blocking(move || {

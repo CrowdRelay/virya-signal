@@ -7,19 +7,50 @@
 // size contract. Included rather than a module of its own so it keeps sharing
 // the imports, helpers and `AppState` handles the session commands use.
 
+/// Writes the new push state to the vault and publishes it as the live beacon
+/// session. Returns `Ok(None)` when the session moved on while the vault write
+/// was in flight, meaning nothing was published.
+///
+/// `expected` is the session the caller reconciles for, or `None` for a
+/// user-initiated command that reconciles whatever is live. This mirrors the
+/// fan `persist_push_state`: `beacon_lock` deliberately does not queue behind
+/// `beacon_mutation`, so the beacon can lock while the vault write is running.
+/// Publishing unconditionally would put the session back and silently undo
+/// that lock.
 async fn persist_push_state(
     state: &State<'_, AppState>,
+    expected: Option<&Arc<BeaconProfile>>,
     profile: &BeaconProfile,
     desired: bool,
     sync_ok: bool,
-) -> Result<Arc<BeaconProfile>, AppError> {
+) -> Result<Option<Arc<BeaconProfile>>, AppError> {
     let mut updated = profile.clone();
     updated.push_enabled = desired;
     updated.push_last_sync_ok = sync_ok;
     persist_beacon(state, &updated).await?;
     let updated = Arc::new(updated);
-    *state.beacon_session.write().await = Some(updated.clone());
-    Ok(updated)
+    let mut session = state.beacon_session.write().await;
+    let still_current = session
+        .as_ref()
+        .is_some_and(|current| expected.is_none_or(|expected| Arc::ptr_eq(current, expected)));
+    if !still_current {
+        return Ok(None);
+    }
+    *session = Some(updated.clone());
+    Ok(Some(updated))
+}
+
+/// `persist_push_state` for user-initiated commands, where a session that
+/// disappeared mid-command is a real failure the caller must surface.
+async fn persist_push_state_now(
+    state: &State<'_, AppState>,
+    profile: &BeaconProfile,
+    desired: bool,
+    sync_ok: bool,
+) -> Result<Arc<BeaconProfile>, AppError> {
+    persist_push_state(state, None, profile, desired, sync_ok)
+        .await?
+        .ok_or(AppError::Locked)
 }
 
 async fn current_push_status(
@@ -58,16 +89,19 @@ async fn current_push_status(
             Err(error) => (false, Some(format!("push_config_unavailable:{error}"))),
         },
     };
+    let firebase_configured = native_firebase_configured(app).unwrap_or(false);
+    let provider_detail = (!firebase_configured).then(|| "firebase_not_configured".to_owned());
     FanPushStatus {
         supported,
         backend_enabled,
         enabled: profile.push_enabled
             && profile.push_last_sync_ok
             && backend_enabled
+            && firebase_configured
             && permission == "granted",
         permission,
         transport: Some("android_fcm".to_owned()),
-        detail: detail.or(config_detail),
+        detail: detail.or(config_detail).or(provider_detail),
     }
 }
 
@@ -76,6 +110,7 @@ async fn sync_native_push_if_desired(
     app: &AppHandle,
 ) -> Result<Option<FanPushConfigApi>, AppError> {
     let profile = beacon_profile(state).await?;
+    let expected = profile.clone();
     if !state.native_push_available || !cfg!(target_os = "android") {
         return Ok(None);
     }
@@ -94,17 +129,17 @@ async fn sync_native_push_if_desired(
                 ));
             }
         }
-        persist_push_state(state, &profile, false, true).await?;
+        persist_push_state(state, Some(&expected), &profile, false, true).await?;
         return Ok(None);
     }
     let config = state.api.beacon_push_config(&profile).await?;
     if !config.enabled || !config.android_fcm {
-        let _ = persist_push_state(state, &profile, true, false).await;
+        let _ = persist_push_state(state, Some(&expected), &profile, true, false).await;
         return Err(AppError::Conflict("push_delivery_not_live".to_owned()));
     }
     let permission = native_push_permission(app).map_err(AppError::InvalidInput)?;
     if permission != "granted" {
-        let _ = persist_push_state(state, &profile, true, false).await;
+        let _ = persist_push_state(state, Some(&expected), &profile, true, false).await;
         return Err(AppError::Forbidden);
     }
     let token = native_push_token(app).map_err(AppError::InvalidInput)?;
@@ -114,12 +149,12 @@ async fn sync_native_push_if_desired(
         .beacon_register_android_push(&profile, &installation_id, &token)
         .await?;
     if !response.registered {
-        let _ = persist_push_state(state, &profile, true, false).await;
+        let _ = persist_push_state(state, Some(&expected), &profile, true, false).await;
         return Err(AppError::Conflict(
             "push_registration_not_confirmed".to_owned(),
         ));
     }
-    persist_push_state(state, &profile, true, true).await?;
+    persist_push_state(state, Some(&expected), &profile, true, true).await?;
     Ok(Some(config))
 }
 
@@ -181,7 +216,7 @@ pub(crate) async fn beacon_push_enable(
         )
         .await);
     }
-    let profile = persist_push_state(&state, &profile, true, false).await?;
+    let profile = persist_push_state_now(&state, &profile, true, false).await?;
     let token = native_push_token(&app).map_err(AppError::InvalidInput)?;
     let installation_id = ensure_native_push_installation_id(&state.app_data_dir)?;
     let response = state
@@ -193,7 +228,7 @@ pub(crate) async fn beacon_push_enable(
             "push_registration_not_confirmed".to_owned(),
         ));
     }
-    persist_push_state(&state, &profile, true, true).await?;
+    persist_push_state_now(&state, &profile, true, true).await?;
     Ok(current_push_status(&state, &app, None, Some(&config)).await)
 }
 
@@ -204,7 +239,7 @@ pub(crate) async fn beacon_push_disable(
 ) -> Result<FanPushStatus, AppError> {
     let _mutation = state.beacon_mutation.lock().await;
     let profile = beacon_profile(&state).await?;
-    let profile = persist_push_state(&state, &profile, false, false).await?;
+    let profile = persist_push_state_now(&state, &profile, false, false).await?;
     let detail = match read_native_push_installation_id(&state.app_data_dir) {
         Some(installation_id) => match state
             .api
@@ -212,14 +247,14 @@ pub(crate) async fn beacon_push_disable(
             .await
         {
             Ok(response) if !response.registered => {
-                persist_push_state(&state, &profile, false, true).await?;
+                persist_push_state_now(&state, &profile, false, true).await?;
                 None
             }
             Ok(_) => Some("beacon_push_disable_not_confirmed".to_owned()),
             Err(error) => Some(format!("remote_disable_unconfirmed:{error}")),
         },
         None => {
-            persist_push_state(&state, &profile, false, true).await?;
+            persist_push_state_now(&state, &profile, false, true).await?;
             None
         }
     };
@@ -242,7 +277,7 @@ pub(crate) async fn beacon_push_open_settings(
     }
     let _mutation = state.beacon_mutation.lock().await;
     let profile = beacon_profile(&state).await?;
-    let _ = persist_push_state(&state, &profile, true, false).await?;
+    let _ = persist_push_state_now(&state, &profile, true, false).await?;
     open_native_push_settings(&app).map_err(AppError::InvalidInput)?;
     Ok(current_push_status(
         &state,

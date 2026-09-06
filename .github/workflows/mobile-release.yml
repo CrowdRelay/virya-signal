@@ -58,7 +58,7 @@ jobs:
           echo "android_version_code=$((100000000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_OUTPUT"
 
   android-build:
-    if: github.event_name == 'push' || inputs.target == 'android' || inputs.target == 'all'
+    if: github.event_name == 'push' || inputs.target == 'android'
     needs: meta
     uses: ./.github/workflows/_android-build.yml
     with:
@@ -72,7 +72,7 @@ jobs:
 
   android-publish:
     name: Google Play promotion
-    if: github.event_name == 'push' || inputs.target == 'android' || inputs.target == 'all'
+    if: github.event_name == 'push' || inputs.target == 'android'
     needs: [meta, android-build]
     runs-on: ubuntu-24.04
     timeout-minutes: 30

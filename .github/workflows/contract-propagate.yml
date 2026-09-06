@@ -2,7 +2,6 @@ name: Contract propagate
 
 # Triggered by CrowdRelay when its OpenAPI spec changes on main.
 # Regenerates the fan wire contract from the new spec and opens a PR.
-# Also runs as a fallback on schedule in case the dispatch was missed.
 
 on:
   repository_dispatch:
@@ -142,9 +141,7 @@ jobs:
           - Contract test passes with the regenerated files
 
           **OpenAPI SHA256:** \`${{ steps.sha.outputs.sha }}\`
-          **Trigger:** ${{ github.event_name }}
-
-          Generated with [Devin](https://devin.ai)"
+          **Trigger:** ${{ github.event_name }}"
 
           EXISTING_PR=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || true)
           if [[ -n "$EXISTING_PR" ]]; then

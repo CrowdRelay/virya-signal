@@ -59,6 +59,16 @@ fn FanApp(
     // must not surface as the first thing a fan sees after a successful unlock.
     error.set(None);
 
+    // A push target belongs to the fan session that received it. When the
+    // session locks — whether the fan tapped lock, forgot the profile, or
+    // deleted the account — any target still in the signal is stale and must
+    // not be consumed by the next fan who unlocks on this device.
+    Effect::new(move |_| {
+        if !status.get().unlocked {
+            push_target.set(None);
+        }
+    });
+
     let loaded = RwSignal::new(FanLoadedState::default());
     let menu_open = RwSignal::new(false);
     let refresh_requested = RwSignal::new(0_u32);

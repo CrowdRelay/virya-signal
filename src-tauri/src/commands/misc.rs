@@ -208,8 +208,25 @@ async fn flush_feedback_outbox(state: &State<'_, AppState>) {
             .await
         {
             Ok(()) => delivered += 1,
+            // A transient failure means the server might not have received the
+            // submission. Stop flushing so the item stays in the queue for the
+            // next retry, and leave the items before it (which succeeded) to
+            // be drained below.
             Err(error) if feedback_retryable(&error) => break,
-            Err(_) => delivered += 1,
+            // A non-retryable failure (4xx, validation) means the server
+            // refused this submission permanently. It will never succeed on a
+            // retry, so dropping it from the queue prevents a permanently
+            // rejected item from blocking every subsequent submission. The
+            // count is only used to advance the drain cursor — it is never
+            // reported to the user as a success — so logging the rejection is
+            // the honest treatment.
+            Err(_) => {
+                delivered += 1;
+                eprintln!(
+                    "[virya:feedback] submission {} rejected by server; dropping from queue",
+                    item.submission_id
+                );
+            }
         }
     }
     if delivered == 0 {

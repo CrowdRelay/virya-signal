@@ -613,6 +613,21 @@ pub(crate) async fn public_cities(
     serde_json::to_string(&result).map_err(AppError::from)
 }
 
+/// Marks the Signal overview inside a cached sections snapshot as coming from
+/// offline storage, so the UI can show the same degraded warning it shows when
+/// a live fetch fails and falls back to disk. Without this, a cold-start
+/// Signal screen paints a days-old cached aggregate as if it were live data.
+fn mark_signal_snapshot_as_offline(snapshot: &mut vault::OperatorSectionsCacheSnapshot) {
+    if let Some(signal) = snapshot.signal.as_mut()
+        && !signal
+            .unavailable_sources
+            .iter()
+            .any(|source| source == "offline_cache")
+    {
+        signal.unavailable_sources.push("offline_cache".to_owned());
+    }
+}
+
 /// Returns every operator panel's last known value straight from the vault, so
 /// a cold Latarnik paints from disk while its six live requests are still in
 /// flight instead of holding six skeletons.
@@ -630,7 +645,8 @@ pub(crate) async fn operator_cached_sections(
         .as_ref()
         .map(|value| Zeroizing::new(value.to_vec()))
         .ok_or(AppError::Locked)?;
-    if let Some(snapshot) = state.operator_sections_cache.read().await.clone() {
+    if let Some(mut snapshot) = state.operator_sections_cache.read().await.clone() {
+        mark_signal_snapshot_as_offline(&mut snapshot);
         return Ok(Some(snapshot));
     }
     let app_data_dir = state.app_data_dir.clone();
@@ -647,6 +663,10 @@ pub(crate) async fn operator_cached_sections(
     };
     if let Some(snapshot) = snapshot.clone() {
         *state.operator_sections_cache.write().await = Some(snapshot);
+    }
+    let mut snapshot = snapshot;
+    if let Some(ref mut snapshot) = snapshot {
+        mark_signal_snapshot_as_offline(snapshot);
     }
     Ok(snapshot)
 }
@@ -681,6 +701,17 @@ fn remember_operator_sections(
             .duration_since(std::time::UNIX_EPOCH)
             .map(|value| value.as_secs())
             .unwrap_or(0);
+        // Re-check the vault password immediately before publishing the
+        // snapshot. `lock` and `forget_device` clear
+        // `operator_vault_password` and `operator_sections_cache` without
+        // holding `operator_sections_cache_mutation`, so a background
+        // `remember_operator_sections` that captured the password before the
+        // lock can still be in flight here. Without this guard, the stale
+        // snapshot would re-populate the cache after the lock cleared it, and
+        // the next unlock would serve the previous operator's panels.
+        if state.operator_vault_password.read().await.is_none() {
+            return;
+        }
         *state.operator_sections_cache.write().await = Some(snapshot.clone());
         let app_data_dir = state.app_data_dir.clone();
         if let Err(error) = run_blocking(move || {

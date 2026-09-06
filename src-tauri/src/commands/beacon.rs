@@ -13,8 +13,8 @@ use crate::{
     AppError, AppState, PendingBeaconConfirmation,
     api::{BeaconPreferencesInput, FanPushConfigApi},
     commands::fan::{
-        ensure_native_push_installation_id, native_push_permission, native_push_token,
-        open_native_push_settings, read_native_push_installation_id,
+        ensure_native_push_installation_id, native_firebase_configured, native_push_permission,
+        native_push_token, open_native_push_settings, read_native_push_installation_id,
         request_native_push_permission,
     },
     models::{
