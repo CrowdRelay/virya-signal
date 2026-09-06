@@ -154,6 +154,50 @@ jobs:
         if: always()
         run: sccache --show-stats
 
+  # The stylesheet carries 28 media queries and nothing ever proved any of them
+  # worked. Inspecting CSS cannot: what breaks a phone layout is what the
+  # content does to it, and the shell clips instead of scrolling, so an overflow
+  # is invisible rather than merely ugly. This renders the exact bundle the
+  # webassembly job produced, at the widths real devices use, and measures.
+  responsive:
+    needs: webassembly
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v7.0.1
+        with:
+          name: virya-signal-web-dist
+          path: dist
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v7.0.1
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}-1.49.1
+      - name: Install a browser to measure in
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix "${RUNNER_TEMP}/rwd" install --no-audit --no-fund playwright@1.49.1
+          "${RUNNER_TEMP}/rwd/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Serve the audited bundle with the stub bridge
+        shell: bash
+        run: |
+          set -euo pipefail
+          VIRYA_PREVIEW_PORT=4181 nohup bash scripts/ui-preview/serve.sh >/tmp/preview.log 2>&1 &
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null "http://127.0.0.1:4181/index.html?mode=fan"; then
+              echo "SIGNAL_PREVIEW=READY"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/preview.log >&2 || true
+          exit 1
+      - name: Rendered responsive contract
+        env:
+          VIRYA_PLAYWRIGHT: ${{ runner.temp }}/rwd/node_modules/playwright/index.mjs
+        run: node scripts/check-responsive.mjs --base http://127.0.0.1:4181
+
   native:
     needs: contracts
     runs-on: ubuntu-24.04
