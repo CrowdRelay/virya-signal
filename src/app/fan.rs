@@ -694,7 +694,7 @@ fn FanAccess(
             </header>
             <Show when=move || status.get().configured fallback=move || view! {
                 <div class="access-card fan-card">
-                    {move || error.get().map(|msg| view! { <p class="inline-form-error" role="alert">{msg}</p> })}
+                    {move || error.get().map(|msg| view! { <p class="inline-form-error" role="alert">{error_message(&msg).to_owned()}</p> })}
                     <div class="segmented">
                         <button class:active=move || access_mode.get() == FanAccessMode::Signup on:click=move |_| access_mode.set(FanAccessMode::Signup)>{tr("get_started")}</button>
                         <button class:active=move || access_mode.get() == FanAccessMode::Confirm on:click=move |_| access_mode.set(FanAccessMode::Confirm)>{tr("i_have_a_code")}</button>
@@ -813,7 +813,7 @@ fn FanAccess(
                 </div>
             }>
                 <div class="access-card fan-card">
-                    {move || error.get().map(|msg| view! { <p class="inline-form-error" role="alert">{msg}</p> })}
+                    {move || error.get().map(|msg| view! { <p class="inline-form-error" role="alert">{error_message(&msg).to_owned()}</p> })}
                     // A fan who already has a profile on this device and asked
                     // for a login link landed here: the link was collected, the
                     // token stayed native, and this branch never looked at

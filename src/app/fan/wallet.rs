@@ -89,7 +89,7 @@ fn FanWallet(
 
     view! {
         <section class="screen"><header class="screen-title"><p class="eyebrow">{tr("mobile_wallet")}</p><h2>{tr("tickets_and_entry")}</h2></header><Show when=move || !loading.get().admission_pass fallback=move || view! { <Skeleton rows=1 height=140 /> }>{move || dashboard.with(|state| state.as_ref().and_then(|d| d.admission_pass.clone())).map(|pass| view! { <article class="admission-card"><p class="eyebrow">{tr("virya_admission_pass")}</p><h3>{pass.event_title}</h3><p>{event_time_location(&pass.starts_at, pass.venue.as_deref())}</p><strong>{pass.public_reference}</strong><span>{pass.status}</span><button class="primary" on:click=qr disabled=move || busy.get()>{tr("show_entry_qr")}</button>{move || admission_qr.get().map(|value| view! { <QrPanel svg=value.qr_svg token=value.token expires=value.expires_at /> })}</article> })}
-        <Show when=move || dashboard.with(|state| state.as_ref().is_none_or(|d| d.admission_pass.is_none()))><div class="claim-box"><p class="eyebrow">{tr("did_you_win_an_admission_pass")}</p><h3>{tr("assign_it_to_your_phone")}</h3><p class="field-hint">{tr("claim_pass_hint")}</p><textarea rows="3" placeholder=tr("token_from_the_message") prop:value=move || claim_token.get() on:input=move |e| claim_token.set(event_target_value(&e))></textarea><button class="primary" on:click=claim disabled=move || busy.get()>{tr("claim_admission_pass")}</button>{move || claim_status.get().map(|msg| view! { <p class="inline-form-error">{msg}</p> })}</div></Show></Show>
+        <Show when=move || dashboard.with(|state| state.as_ref().is_none_or(|d| d.admission_pass.is_none()))><div class="claim-box"><p class="eyebrow">{tr("did_you_win_an_admission_pass")}</p><h3>{tr("assign_it_to_your_phone")}</h3><p class="field-hint">{tr("claim_pass_hint")}</p><textarea rows="3" placeholder=tr("token_from_the_message") prop:value=move || claim_token.get() on:input=move |e| claim_token.set(event_target_value(&e))></textarea><button class="primary" on:click=claim disabled=move || busy.get()>{tr("claim_admission_pass")}</button>{move || claim_status.get().map(|msg| view! { <p class="inline-form-error">{error_message(&msg).to_owned()}</p> })}</div></Show></Show>
         <div class="section-head"><h3>{tr("ticket_wallet")}</h3><span>{move || wallets.get().len()}</span></div><Show when=move || !loading.get().wallets fallback=move || view! { <Skeleton rows=2 height=110 /> }><div class="wallet-stack"><For each=move || wallets.get() key=|wallet| wallet.order.order_id.clone() let:wallet>
             <WalletCard wallet=wallet error=error />
         </For></div></Show><details class="import-box">
@@ -103,7 +103,7 @@ fn FanWallet(
                 <label>"Order ID"<input placeholder=tr("order_uuid") prop:value=move || order_id.get() on:input=move |e| order_id.set(event_target_value(&e))/><small class="field-hint">{tr("import_order_id_hint")}</small></label>
                 <label>{tr("private_checkout_token")}<textarea rows="3" autocomplete="off" autocapitalize="none" spellcheck="false" prop:value=move || checkout_token.get() on:input=move |e| checkout_token.set(event_target_value(&e))></textarea><small class="field-hint">{tr("import_token_hint")}</small></label>
                 <button class="primary" on:click=import disabled=move || busy.get()>{tr("add_to_wallet")}</button>
-                {move || import_status.get().map(|msg| view! { <p class="inline-form-error">{msg}</p> })}
+                {move || import_status.get().map(|msg| view! { <p class="inline-form-error">{error_message(&msg).to_owned()}</p> })}
             </div>
         </details></section>
     }
@@ -633,7 +633,7 @@ fn FanLocationSetting(error: RwSignal<Option<String>>) -> impl IntoView {
                 };
                 view! { <p class=class>{message}</p> }
             })}
-            {move || inline_status.get().map(|msg| view! { <p class="inline-form-error">{msg}</p> })}
+            {move || inline_status.get().map(|msg| view! { <p class="inline-form-error">{error_message(&msg).to_owned()}</p> })}
         </article>
     }
 }
@@ -723,7 +723,7 @@ fn AnonymousFeedback(error: RwSignal<Option<String>>) -> impl IntoView {
                     {move || if busy.get() { tr("sending_2") } else { tr("send_anonymously") }}
                 </button>
             </div>
-            {move || inline_status.get().map(|msg| view! { <p class="inline-form-error">{msg}</p> })}
+            {move || inline_status.get().map(|msg| view! { <p class="inline-form-error">{error_message(&msg).to_owned()}</p> })}
         </section>
     }
 }
