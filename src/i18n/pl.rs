@@ -66,6 +66,9 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "Przejdź wszystkie 11 pokojów. Ukończenie daje 1 los w osobnej puli 5 płyt."
         }
         "enter_synesthesia" => "WEJDŹ DO SYNESTHESII",
+        "update_available_title" => "DOSTĘPNA AKTUALIZACJA",
+        "update_available_hint" => "Nowa wersja Signal czeka w Google Play.",
+        "update_available_action" => "AKTUALIZUJ",
         "synesthesia_best_time" => "Najlepszy czas {}",
         "synesthesia_rank" => "miejsce #{}",
         "synesthesia_rooms_progress" => "{}/11 pokojów",

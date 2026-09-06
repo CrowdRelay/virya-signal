@@ -331,7 +331,7 @@ fn SynesthesiaHomeCard(
                                 <div class="progress-track"><span style=format!("width:{}%", (i32::from(synesthesia.rooms_completed).clamp(0, 11) * 100) / 11)></span></div>
                                 <small>{format!("{}/11", synesthesia.rooms_completed.clamp(0, 11))}</small>
                             })}
-                            <ExternalLink url="https://synesthesia.virya.music/?source=signal-app&resume=1".to_owned() label=if synesthesia.started { tr("open_synesthesia") } else { tr("enter_synesthesia") } error=error />
+                            <ExternalLink url="https://play.google.com/store/apps/details?id=music.virya.synesthesia".to_owned() label=if synesthesia.started { tr("open_synesthesia") } else { tr("enter_synesthesia") } error=error />
                             {(bridge::native_available() && synesthesia.leaderboard_published).then(|| view! {
                                 <button
                                     class="ghost"

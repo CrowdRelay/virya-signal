@@ -104,6 +104,17 @@ pub struct LauncherStatus {
     pub beacon: BeaconSessionStatus,
 }
 
+/// Result of comparing the installed Signal version against the backend's
+/// `minimumSignalAppVersion`. `update_available` is true only when the
+/// backend explicitly reports a parseable version strictly greater than
+/// the installed one.
+#[derive(Clone, Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SignalUpdateStatus {
+    pub update_available: bool,
+    pub latest_version: Option<String>,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct FanSummary {
     pub email: String,

@@ -964,6 +964,14 @@ html[data-virya-scanner-active] .app-shell {
 
 /* ── FanHomeBanner: priority / next-best-action banner ── */
 .home-banner.priority-banner { display: grid; grid-template-columns: 1fr; gap: 12px; border: 1px solid var(--signal-hot); background: linear-gradient(145deg, #0f1a17, #0e0e0c); padding: 14px; margin-bottom: 12px; border-radius: var(--control-radius); box-shadow: 0 8px 28px #0005; }
+
+/* ── UpdateBanner: subtle, dismissible "new version available" notice ── */
+.update-banner { display: flex; align-items: center; gap: 10px; padding: 12px 14px; margin: 0 0 12px; border: 1px solid color-mix(in srgb, var(--signal) 42%, var(--border-strong)); border-radius: var(--control-radius); background: linear-gradient(145deg, #0f1a17, #0e0e0c); }
+.update-banner-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.update-banner strong { color: var(--signal-hot); font-size: var(--type-micro); font-weight: 900; letter-spacing: .06em; text-transform: uppercase; }
+.update-banner small { color: var(--muted); font-size: var(--type-meta); line-height: 1.4; }
+.update-banner-action { flex-shrink: 0; min-height: 36px; padding: 8px 14px; border-radius: var(--control-radius); border: 1px solid var(--signal-hot); background: #93c6c018; color: var(--signal-hot); font-size: var(--type-micro); font-weight: 900; letter-spacing: .07em; }
+.update-banner-dismiss { flex-shrink: 0; width: 32px; height: 32px; border: none; background: none; color: var(--muted); font-size: 1.2rem; line-height: 1; cursor: pointer; }
 .home-banner .banner-content { min-width: 0; }
 .home-banner .banner-content strong { display: block; margin-top: 4px; color: var(--signal-hot); font-size: 1rem; line-height: 1.3; }
 .home-banner .banner-reason { margin: 6px 0 0; color: var(--muted); font-size: .82rem; line-height: 1.4; }

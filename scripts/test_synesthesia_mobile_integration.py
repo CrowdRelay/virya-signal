@@ -15,9 +15,9 @@ class SynesthesiaMobileIntegrationTests(unittest.TestCase):
         self.assertNotIn("FanSynesthesiaCard", shell)
         self.assertNotIn("synesthesia-entry-card", shell)
 
-    def test_canonical_card_resumes_local_journey(self):
+    def test_canonical_card_opens_play_store_listing(self):
         home = (ROOT / "src/app/fan_home.rs").read_text(encoding="utf-8")
-        self.assertIn("https://synesthesia.virya.music/?source=signal-app&resume=1", home)
+        self.assertIn("https://play.google.com/store/apps/details?id=music.virya.synesthesia", home)
         self.assertIn('if synesthesia.started { tr("open_synesthesia") } else { tr("enter_synesthesia") }', home)
 
 if __name__ == "__main__":

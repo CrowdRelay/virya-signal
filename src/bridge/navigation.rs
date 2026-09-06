@@ -98,6 +98,20 @@ export function viryaInstallBackHandler(callback) {
   return () => { try { window.removeEventListener('popstate', handler); } catch {} };
 }
 
+const VIRYA_UPDATE_DISMISSED_KEY = 'virya:update-dismissed:v1';
+
+// The update banner is dismissed per-version: storing the version string
+// means a new release re-triggers the banner, while the current one stays
+// hidden. No storage means no dismissal memory, which is treated as
+// "not dismissed" so the banner can still appear.
+export function viryaReadDismissedUpdate() {
+  try { return window.localStorage?.getItem(VIRYA_UPDATE_DISMISSED_KEY) || ''; } catch { return ''; }
+}
+
+export function viryaWriteDismissedUpdate(version) {
+  try { window.localStorage?.setItem(VIRYA_UPDATE_DISMISSED_KEY, String(version || '')); } catch {}
+}
+
 "#)]
 extern "C" {
     #[wasm_bindgen(js_name = viryaReadFanTab)]
@@ -126,4 +140,10 @@ extern "C" {
 
     #[wasm_bindgen(js_name = viryaInstallBackHandler)]
     fn install_back_handler_js(callback: &js_sys::Function) -> js_sys::Function;
+
+    #[wasm_bindgen(js_name = viryaReadDismissedUpdate)]
+    fn read_dismissed_update_js() -> String;
+
+    #[wasm_bindgen(js_name = viryaWriteDismissedUpdate)]
+    fn write_dismissed_update_js(version: &str);
 }

@@ -76,6 +76,11 @@ pub struct EcosystemMeta {
     pub build_timestamp: Option<String>,
     pub minimum_postgres_server_version_num: i32,
     pub capabilities: std::collections::BTreeMap<String, bool>,
+    /// Lowest Signal app version (semver) that still works against this
+    /// backend. Absent means no update gate — the client never claims an
+    /// update without a parseable value here.
+    #[serde(default)]
+    pub minimum_signal_app_version: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]

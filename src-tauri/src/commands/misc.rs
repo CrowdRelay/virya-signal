@@ -1,5 +1,6 @@
 //! Small commands that don't belong to the operator/fan/show-mode domains.
 
+use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 use uuid::Uuid;
@@ -191,6 +192,60 @@ pub(crate) async fn submit_anonymous_feedback(
 fn feedback_retryable(error: &AppError) -> bool {
     matches!(error, AppError::Network(_))
         || matches!(error, AppError::Remote { status, .. } if *status == 429 || *status >= 500)
+}
+
+/// Result of comparing the installed Signal version against the backend's
+/// `minimumSignalAppVersion`. `update_available` is true only when the
+/// backend field is present, parseable, and strictly greater than the
+/// installed version. Any error or missing field means no update is claimed.
+#[derive(Clone, Debug, Default, Serialize)]
+pub struct SignalUpdateStatus {
+    pub update_available: bool,
+    pub latest_version: Option<String>,
+}
+
+/// Parses a `major.minor.patch` semver string into a comparable triple.
+/// Returns `None` for anything that is not exactly three non-negative
+/// integer components separated by dots. No pre-release/build metadata —
+/// the backend gate is a simple floor, not a full semver ordering.
+fn parse_semver(value: &str) -> Option<(u32, u32, u32)> {
+    let mut parts = value.trim().split('.');
+    let major = parts.next()?.parse::<u32>().ok()?;
+    let minor = parts.next()?.parse::<u32>().ok()?;
+    let patch = parts.next()?.parse::<u32>().ok()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some((major, minor, patch))
+}
+
+#[tauri::command]
+pub(crate) async fn signal_update_status(
+    state: State<'_, AppState>,
+) -> Result<SignalUpdateStatus, AppError> {
+    let installed = parse_semver(env!("CARGO_PKG_VERSION"));
+    let minimum = match state
+        .api
+        .ecosystem_meta("https://signal-api.virya.music/v1/")
+        .await
+    {
+        Ok(meta) => meta.minimum_signal_app_version,
+        Err(_) => return Ok(SignalUpdateStatus::default()),
+    };
+    let Some(minimum) = minimum else {
+        return Ok(SignalUpdateStatus::default());
+    };
+    let Some(parsed_min) = parse_semver(&minimum) else {
+        return Ok(SignalUpdateStatus::default());
+    };
+    let Some(parsed_installed) = installed else {
+        return Ok(SignalUpdateStatus::default());
+    };
+    let update_available = parsed_min > parsed_installed;
+    Ok(SignalUpdateStatus {
+        update_available,
+        latest_version: update_available.then_some(minimum),
+    })
 }
 
 async fn flush_feedback_outbox(state: &State<'_, AppState>) {

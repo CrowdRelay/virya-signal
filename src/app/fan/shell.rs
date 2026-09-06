@@ -531,6 +531,7 @@ fn FanApp(
                     }
                     aria-hidden="true"
                 ><span>"↻"</span></div>
+                <UpdateBanner error=error />
                 <div class="tab-page" class:hidden=move || tab.get() != FanTab::Signal class:tab-active=move || tab.get() == FanTab::Signal>
                     <FanSignal home=home dashboard=dashboard tab=tab focused_event_slug=focused_event_slug focused_event_preview=focused_event_preview loading=loading error=error />
                 </div>
@@ -579,6 +580,70 @@ fn FanApp(
                 <FanNavButton tab=tab own=FanTab::Profile icon="profile" label=tr("profile_tab")/>
             </nav>
         </section>
+    }
+}
+
+/// A subtle, dismissible banner that appears when the installed Signal
+/// version is older than the backend's `minimumSignalAppVersion`. Tap opens
+/// the Play Store listing. Dismissal is per-version: a new release
+/// re-triggers the banner. The banner never claims an update without a
+/// parseable backend version strictly greater than the installed one.
+#[component]
+fn UpdateBanner(error: RwSignal<Option<String>>) -> impl IntoView {
+    let visible = RwSignal::new(false);
+    let latest = RwSignal::new(None::<String>);
+    Effect::new(move |_| {
+        if !bridge::native_available() {
+            return;
+        }
+        spawn_local(async move {
+            match bridge::signal_update_status().await {
+                Ok(status) if status.update_available => {
+                    if let Some(version) = status.latest_version
+                        && bridge::dismissed_update_version() != version
+                    {
+                        latest.set(Some(version));
+                        visible.set(true);
+                    }
+                }
+                _ => {}
+            }
+        });
+    });
+    let open_store = move |_| {
+        let _ = latest.get_untracked();
+        spawn_local(async move {
+            if let Err(message) = bridge::invoke_unit(
+                "open_external_url",
+                &UrlArgs {
+                    url: "https://play.google.com/store/apps/details?id=music.virya.signal",
+                },
+            )
+            .await
+            {
+                error.set(Some(message));
+            }
+        });
+    };
+    let dismiss = move |_| {
+        if let Some(version) = latest.get_untracked() {
+            bridge::dismiss_update(&version);
+        }
+        visible.set(false);
+    };
+    view! {
+        <Show when=move || visible.get()>
+            <div class="update-banner" role="status">
+                <div class="update-banner-text">
+                    <strong>{tr("update_available_title")}</strong>
+                    <small>{tr("update_available_hint")}</small>
+                </div>
+                <button class="update-banner-action" type="button" on:click=open_store>
+                    {tr("update_available_action")}
+                </button>
+                <button class="update-banner-dismiss" type="button" aria-label=tr("close") on:click=dismiss>"×"</button>
+            </div>
+        </Show>
     }
 }
 

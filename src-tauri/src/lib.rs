@@ -50,8 +50,8 @@ use commands::{
         fan_unlock, fan_unpublish_synesthesia_leaderboard, fan_wallets, render_wallet_qr,
     },
     misc::{
-        launcher_status, open_external_url, request_city, submit_anonymous_feedback,
-        verify_staff_access,
+        launcher_status, open_external_url, request_city, signal_update_status,
+        submit_anonymous_feedback, verify_staff_access,
     },
     operator::{
         configure, create_qr_campaign, forget_device, issue_pass, lock, operator_cached_sections,
@@ -267,6 +267,7 @@ pub fn run() {
             crash::acknowledge_native_crash,
             session_status,
             launcher_status,
+            signal_update_status,
             verify_staff_access,
             configure,
             unlock,

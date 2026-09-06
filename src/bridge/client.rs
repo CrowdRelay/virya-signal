@@ -81,6 +81,21 @@ pub async fn launcher_status() -> Result<Option<crate::models::LauncherStatus>, 
     .await
 }
 
+/// Asks the native side whether the installed Signal version is older than
+/// the backend's `minimumSignalAppVersion`. Returns a status with
+/// `update_available: false` on any error or missing field — the UI never
+/// claims an update without proof.
+pub async fn signal_update_status() -> Result<crate::models::SignalUpdateStatus, String> {
+    #[derive(Serialize)]
+    struct UpdateStatusArgs {}
+
+    invoke::<crate::models::SignalUpdateStatus, _>(
+        "signal_update_status",
+        &UpdateStatusArgs {},
+    )
+    .await
+}
+
 /// Runs a read request in a named UI scope. Starting a newer request in the
 /// same scope makes the older result disappear, preventing stale state writes.
 pub async fn invoke_latest<T, A>(
@@ -138,6 +153,17 @@ pub fn push_primer_seen() -> bool {
 
 pub fn mark_push_primer_seen() {
     mark_push_primer_seen_js();
+}
+
+/// Returns the version string the user dismissed, or empty if none. The
+/// update banner compares this against the current `latest_version` to
+/// decide whether to show — a new version re-triggers the banner.
+pub fn dismissed_update_version() -> String {
+    read_dismissed_update_js()
+}
+
+pub fn dismiss_update(version: &str) {
+    write_dismissed_update_js(version);
 }
 
 /// Consumes one history entry, which is what fires the `popstate` handler.
