@@ -49,8 +49,20 @@ export function viryaWriteRootMode(value) {
 // closed the app from the middle of checkout. One guard entry is pushed while
 // any dismissible layer is open; back consumes it, the app closes that layer,
 // and a still-open layer below pushes the next guard.
+//
+// Android WebView (especially the first pushState after page load) can fire a
+// spurious popstate synchronously after pushState. Without suppression, the
+// back handler fires immediately, closes the layer that was just opened, and
+// the tab snaps back to Signal on the first tap. The flag is cleared on the
+// next macrotask — a real back gesture arrives as a later event, never
+// synchronously off the pushState call itself.
+let viryaSuppressPopstate = false;
 export function viryaPushBackGuard() {
-  try { window.history?.pushState({ virya: 'back-guard' }, ''); } catch {}
+  try {
+    viryaSuppressPopstate = true;
+    window.history?.pushState({ virya: 'back-guard' }, '');
+    setTimeout(() => { viryaSuppressPopstate = false; }, 0);
+  } catch {}
 }
 
 const VIRYA_PUSH_PRIMER_KEY = 'virya:push-primer:v1';
@@ -78,7 +90,10 @@ export function viryaGoBack() {
 }
 
 export function viryaInstallBackHandler(callback) {
-  const handler = () => { try { callback(); } catch {} };
+  const handler = () => {
+    if (viryaSuppressPopstate) return;
+    try { callback(); } catch {}
+  };
   try { window.addEventListener('popstate', handler); } catch { return () => {}; }
   return () => { try { window.removeEventListener('popstate', handler); } catch {} };
 }

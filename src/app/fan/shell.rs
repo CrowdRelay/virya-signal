@@ -121,75 +121,87 @@ fn FanApp(
             dashboard.set(Some(FanDashboardData::default()));
         }
 
+        // A section is (re)loaded when it has never been claimed OR when its
+        // loading flag is still raised. The warm-up claims sections and issues
+        // requests in the background, but a superseded request (Ok(None)) does
+        // not clear the loading flag — only the winning request does. If the
+        // warm-up's request was invalidated and no replacement landed, the
+        // loading flag stays true and the tab would paint a skeleton forever.
+        // Checking `loading` here recovers that case: the tab effect re-issues
+        // the request, the new token wins, and the flag clears on completion.
+        let load_state = loading.get_untracked();
         match tab.get() {
             FanTab::Signal => {
-                if !loaded.get_untracked().home {
-                    loaded.update(|state| state.home = true);
+                let state = loaded.get_untracked();
+                if !state.home || load_state.home {
+                    loaded.update(|value| value.home = true);
                     refresh_fan_home(home, loading, error);
                 }
-                if !loaded.get_untracked().referral {
-                    loaded.update(|state| state.referral = true);
+                if !state.referral || load_state.referral {
+                    loaded.update(|value| value.referral = true);
                     refresh_fan_referral(dashboard, loading, error);
                 }
             }
             FanTab::Events => {
                 let state = loaded.get_untracked();
-                if !state.events {
+                if !state.events || load_state.events {
                     loaded.update(|value| value.events = true);
                     refresh_fan_events(dashboard, loading, error);
                 }
-                if !state.interests {
+                if !state.interests || load_state.interests {
                     loaded.update(|value| value.interests = true);
                     refresh_fan_interests(dashboard, loading, error);
                 }
             }
             FanTab::Merch => {
-                if !loaded.get_untracked().merch {
-                    loaded.update(|state| state.merch = true);
+                let state = loaded.get_untracked();
+                if !state.merch || load_state.merch {
+                    loaded.update(|value| value.merch = true);
                     refresh_fan_merch(merch, merch_stale, loading, error);
                     refresh_fan_merch_bundles(merch_bundles);
                 }
             }
             FanTab::Game => {
-                if !loaded.get_untracked().area {
-                    loaded.update(|state| state.area = true);
+                let state = loaded.get_untracked();
+                if !state.area || load_state.area {
+                    loaded.update(|value| value.area = true);
                     refresh_fan_area(area, loading, error);
                 }
             }
             FanTab::Wallet => {
                 let state = loaded.get_untracked();
-                if !state.admission_pass {
+                if !state.admission_pass || load_state.admission_pass {
                     loaded.update(|value| value.admission_pass = true);
                     refresh_fan_admission_pass(dashboard, loading, error);
                 }
-                if !state.wallets {
+                if !state.wallets || load_state.wallets {
                     loaded.update(|value| value.wallets = true);
                     refresh_wallets(wallets, Some(loading), error);
                 }
             }
             FanTab::Profile => {
                 let state = loaded.get_untracked();
-                if !state.referral {
+                if !state.referral || load_state.referral {
                     loaded.update(|value| value.referral = true);
                     refresh_fan_referral(dashboard, loading, error);
                 }
-                if !state.events {
+                if !state.events || load_state.events {
                     loaded.update(|value| value.events = true);
                     refresh_fan_events(dashboard, loading, error);
                 }
-                if !state.interests {
+                if !state.interests || load_state.interests {
                     loaded.update(|value| value.interests = true);
                     refresh_fan_interests(dashboard, loading, error);
                 }
-                if !state.admission_pass {
+                if !state.admission_pass || load_state.admission_pass {
                     loaded.update(|value| value.admission_pass = true);
                     refresh_fan_admission_pass(dashboard, loading, error);
                 }
-                if !state.wallets {
+                if !state.wallets || load_state.wallets {
                     loaded.update(|value| value.wallets = true);
                     refresh_wallets(wallets, Some(loading), error);
                 }
-                if !state.area {
+                if !state.area || load_state.area {
                     loaded.update(|value| value.area = true);
                     refresh_fan_area(area, loading, error);
                 }
