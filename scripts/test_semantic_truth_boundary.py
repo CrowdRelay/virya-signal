@@ -91,7 +91,7 @@ class CacheFreshnessTruth(unittest.TestCase):
         self.assertIn("PublicFreshness::Unvalidated.stale()", snapshot)
 
         command = item_body(
-            read("src-tauri/src/commands/fan/session_commerce.rs"),
+            read("src-tauri/src/commands/fan/sections.rs"),
             "pub(crate) async fn fan_cached_events(",
         )
         self.assertIn("public_events_snapshot", command)

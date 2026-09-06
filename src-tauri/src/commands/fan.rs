@@ -39,6 +39,7 @@ const NATIVE_PUSH_INSTALLATION_FILE: &str = "push-installation-id-v1";
 
 include!("fan/push.rs");
 include!("fan/session_commerce.rs");
+include!("fan/sections.rs");
 include!("fan/device_unlock.rs");
 include!("fan/signup.rs");
 include!("fan/wallet.rs");
