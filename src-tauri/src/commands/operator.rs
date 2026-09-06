@@ -1,7 +1,10 @@
 //! Operator (owner/staff) session lifecycle and every CrowdRelay command that
 //! requires an authenticated operator bearer token.
 
-use std::{path::Path, sync::Arc};
+use std::{
+    path::Path,
+    sync::{Arc, atomic::Ordering},
+};
 
 use tauri::{AppHandle, Manager, State};
 use zeroize::Zeroizing;
@@ -14,7 +17,8 @@ use crate::{
         ShowChecklist, StaffEventDashboard, TicketingOverview,
     },
     session::{
-        load_operator_signal_cache, operator_profile, persist_operator_signal_cache, run_blocking,
+        load_operator_signal_cache, operator_profile, operator_session_expired,
+        persist_operator_signal_cache, run_blocking,
     },
     validation::{
         validate_api_base, validate_campaign, validate_issue_pass, validate_new_operator_pin,
@@ -101,7 +105,15 @@ fn clear_operator_push_preference(app_data_dir: &Path) -> Result<(), AppError> {
 pub(crate) async fn session_status(state: State<'_, AppState>) -> Result<SessionStatus, AppError> {
     let session = state.session.read().await;
     let configured = vault::exists(&state.app_data_dir);
-    let unlocked = session.is_some();
+    // A session whose token has expired is not usable. `operator_profile`
+    // clears it lazily on the next command, but status must not report
+    // `unlocked: true` / `phase: Active` for it in the meantime — that
+    // would be a one-render overclaim of a session the backend has already
+    // invalidated.
+    let expired = session
+        .as_ref()
+        .is_some_and(|profile| operator_session_expired(profile.as_ref()));
+    let unlocked = session.is_some() && !expired;
     Ok(SessionStatus {
         configured,
         unlocked,
@@ -117,6 +129,7 @@ pub(crate) async fn configure(
     mut profile: OperatorProfile,
 ) -> Result<SessionStatus, AppError> {
     let _mutation = state.operator_mutation.lock().await;
+    let epoch = state.operator_session_epoch.load(Ordering::Relaxed);
     validate_operator_profile(&mut profile)?;
     validate_new_operator_pin(&pin)?;
     state.api.validate(&profile).await?;
@@ -134,6 +147,11 @@ pub(crate) async fn configure(
         run_blocking(move || vault::operator_password(&password_dir, password_pin.as_str()))
             .await?;
     let _show_mutation = state.show_mode_mutation.lock().await;
+    if epoch != state.operator_session_epoch.load(Ordering::Relaxed) {
+        drop(_show_mutation);
+        drop(_mutation);
+        return Err(AppError::Locked);
+    }
     *state.session.write().await = Some(Arc::new(persisted_profile));
     *state.operator_pin.write().await = Some(pin);
     *state.operator_vault_password.write().await = Some(vault_password);
@@ -149,6 +167,7 @@ pub(crate) async fn unlock(
     pin: String,
 ) -> Result<SessionStatus, AppError> {
     let _mutation = state.operator_mutation.lock().await;
+    let epoch = state.operator_session_epoch.load(Ordering::Relaxed);
     validate_pin(&pin)?;
     if !vault::exists(&state.app_data_dir) {
         return Err(AppError::NotConfigured);
@@ -166,6 +185,11 @@ pub(crate) async fn unlock(
     })
     .await?;
     let _show_mutation = state.show_mode_mutation.lock().await;
+    if epoch != state.operator_session_epoch.load(Ordering::Relaxed) {
+        drop(_show_mutation);
+        drop(_mutation);
+        return Err(AppError::Locked);
+    }
     *state.session.write().await = Some(Arc::new(profile));
     *state.operator_pin.write().await = Some(pin);
     *state.operator_vault_password.write().await = Some(vault_password);
@@ -181,12 +205,15 @@ pub(crate) async fn lock(state: State<'_, AppState>) -> Result<SessionStatus, Ap
     // queue behind the mutation locks. A background reconciliation can hold those
     // for the length of a network call, and "log me out" must not wait for it.
     // An in-flight mutation already owns a cloned profile; anything starting
-    // after this point sees a locked session.
+    // after this point sees a locked session. The epoch increment ensures an
+    // unlock that was in flight when lock fired cannot republish the session
+    // after lock cleared it.
     *state.session.write().await = None;
     *state.operator_pin.write().await = None;
     *state.operator_vault_password.write().await = None;
     *state.show_mode_store.write().await = None;
     *state.operator_sections_cache.write().await = None;
+    state.operator_session_epoch.fetch_add(1, Ordering::Relaxed);
     session_status(state).await
 }
 
@@ -220,6 +247,7 @@ pub(crate) async fn forget_device(state: State<'_, AppState>) -> Result<SessionS
     *state.operator_vault_password.write().await = None;
     *state.show_mode_store.write().await = None;
     *state.operator_sections_cache.write().await = None;
+    state.operator_session_epoch.fetch_add(1, Ordering::Relaxed);
     let app_data_dir = state.app_data_dir.clone();
     run_blocking(move || vault::remove(&app_data_dir)).await?;
     drop(_show_mutation);
@@ -635,9 +663,11 @@ fn mark_signal_snapshot_as_offline(snapshot: &mut vault::OperatorSectionsCacheSn
 pub(crate) async fn operator_cached_sections(
     state: State<'_, AppState>,
 ) -> Result<Option<vault::OperatorSectionsCacheSnapshot>, AppError> {
-    // Prove the session is unlocked before the in-memory mirror is served.
-    // Locking clears the vault password, and a decrypted mirror must never
-    // outlive it.
+    // Prove the session is unlocked and not expired before the in-memory
+    // mirror is served. `operator_profile` checks `session_expires_at` and
+    // lazily clears an expired session, so a cached panel can never be
+    // decrypted for a bearer the backend has already invalidated.
+    let _profile = operator_profile(&state).await?;
     let password = state
         .operator_vault_password
         .read()

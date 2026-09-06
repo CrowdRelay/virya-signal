@@ -3,7 +3,11 @@
 //! locally-rendered QR codes, whose raw tokens never leave the native
 //! process once fetched).
 
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::Path,
+    sync::{Arc, atomic::Ordering},
+};
 
 use futures_util::{StreamExt, stream};
 use qrcode::{QrCode, render::svg};

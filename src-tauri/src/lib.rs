@@ -17,7 +17,11 @@ mod vault;
 
 pub use error::AppError;
 
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashMap,
+    path::PathBuf,
+    sync::{Arc, atomic::AtomicU64},
+};
 
 use api::CrowdRelayClient;
 use commands::{
@@ -94,6 +98,11 @@ pub struct AppState {
     operator_vault_password: RwLock<Option<Zeroizing<Vec<u8>>>>,
     operator_mutation: Mutex<()>,
     operator_push_mutation: Mutex<()>,
+    /// Monotonic counter incremented by `lock`/`forget_device`. Session-
+    /// establishing commands (`unlock`/`configure`) capture it before their
+    /// blocking work and re-verify before publishing, so a lock that fires
+    /// during Argon2 cannot be silently undone by the completing unlock.
+    operator_session_epoch: AtomicU64,
     /// In-memory mirror of the encrypted operator-panel snapshot, for the same
     /// reason as `fan_sections_cache`: six panels refresh independently and
     /// none of them should have to decrypt the other five back first.
@@ -116,6 +125,10 @@ pub struct AppState {
     pending_fan_confirm_token: Mutex<Option<Zeroizing<String>>>,
     pending_synesthesia_handoff: Mutex<Option<Zeroizing<String>>>,
     fan_mutation: Mutex<()>,
+    /// Same role as `operator_session_epoch` for the fan identity. `fan_lock`
+    /// already takes `fan_mutation`, but the epoch makes the guard explicit
+    /// and covers the background push reconciliation path.
+    fan_session_epoch: AtomicU64,
     /// In-memory mirror of the encrypted dashboard-fragment snapshot. Each
     /// section refreshes on its own schedule, so the mirror lets a single
     /// section update the record without decrypting the vault to read the
@@ -126,6 +139,11 @@ pub struct AppState {
     beacon_pin: RwLock<Option<Zeroizing<String>>>,
     beacon_vault_password: RwLock<Option<Zeroizing<Vec<u8>>>>,
     beacon_mutation: Mutex<()>,
+    /// Same role as `operator_session_epoch` for the beacon identity.
+    /// `beacon_lock` deliberately skips `beacon_mutation`, so this is the
+    /// primary guard against an in-flight `beacon_unlock` republishing the
+    /// session after lock cleared it.
+    beacon_session_epoch: AtomicU64,
     pending_beacon_confirmation: Mutex<Option<PendingBeaconConfirmation>>,
     pending_beacon_link: Mutex<Option<Zeroizing<String>>>,
     native_push_available: bool,
@@ -211,6 +229,7 @@ pub fn run() {
                 operator_vault_password: RwLock::new(None),
                 operator_mutation: Mutex::new(()),
                 operator_push_mutation: Mutex::new(()),
+                operator_session_epoch: AtomicU64::new(0),
                 operator_sections_cache: RwLock::new(None),
                 operator_sections_cache_mutation: Mutex::new(()),
                 show_mode_mutation: Mutex::new(()),
@@ -225,10 +244,12 @@ pub fn run() {
                 fan_sections_cache: RwLock::new(None),
                 fan_sections_cache_mutation: Mutex::new(()),
                 fan_mutation: Mutex::new(()),
+                fan_session_epoch: AtomicU64::new(0),
                 beacon_session: RwLock::new(None),
                 beacon_pin: RwLock::new(None),
                 beacon_vault_password: RwLock::new(None),
                 beacon_mutation: Mutex::new(()),
+                beacon_session_epoch: AtomicU64::new(0),
                 pending_beacon_confirmation: Mutex::new(None),
                 pending_beacon_link: Mutex::new(None),
                 native_push_available,

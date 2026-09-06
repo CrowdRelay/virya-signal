@@ -25,6 +25,7 @@ pub(crate) async fn fan_signup(
         ));
     }
     validate_fan_signup(&mut input, pin.as_deref())?;
+    let epoch = state.fan_session_epoch.load(Ordering::Relaxed);
     // Signing up with no PIN is the same offer the mailed link makes, and it is
     // only available where a keystore can actually hold the password.
     if pin.is_none() && !state.device_unlock_supported {
@@ -88,6 +89,9 @@ pub(crate) async fn fan_signup(
                 password
             }
         };
+        if epoch != state.fan_session_epoch.load(Ordering::Relaxed) {
+            return Err(AppError::Locked);
+        }
         *state.fan_session.write().await = Some(Arc::new(profile));
         *state.fan_pin.write().await = pin;
         *state.fan_vault_password.write().await = Some(vault_password);

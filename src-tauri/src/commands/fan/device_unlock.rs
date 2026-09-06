@@ -29,6 +29,7 @@ pub(crate) async fn fan_device_unlock(
     if !crate::device_unlock::effective_mode(&state).await.device {
         return Err(AppError::Locked);
     }
+    let epoch = state.fan_session_epoch.load(Ordering::Relaxed);
     let password = match crate::device_unlock::open(&app, &state.app_data_dir) {
         Ok(password) => password,
         Err(error) => {
@@ -45,6 +46,10 @@ pub(crate) async fn fan_device_unlock(
     let profile =
         run_blocking(move || vault::load_fan_with_password(&app_data_dir, loading.as_ref()))
             .await?;
+    if epoch != state.fan_session_epoch.load(Ordering::Relaxed) {
+        drop(_mutation);
+        return Err(AppError::Locked);
+    }
     *state.fan_session.write().await = Some(Arc::new(profile));
     *state.fan_pin.write().await = None;
     *state.fan_vault_password.write().await = Some(password);

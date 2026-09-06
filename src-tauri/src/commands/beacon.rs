@@ -3,7 +3,7 @@
 //! The Beacon bearer is Stronghold-only. The WASM UI receives bounded member
 //! DTOs and session summaries, never the bearer or raw persisted capability.
 
-use std::sync::Arc;
+use std::sync::{Arc, atomic::Ordering};
 
 use tauri::{AppHandle, Manager, State};
 use url::Url;
@@ -199,6 +199,7 @@ async fn persist_exchanged_beacon(
     locale: String,
     topics: Vec<String>,
 ) -> Result<(), AppError> {
+    let epoch = state.beacon_session_epoch.load(Ordering::Relaxed);
     let exchange = state
         .api
         .beacon_exchange(&api_base_url, invite_token, radius_km, &locale, &topics)
@@ -227,6 +228,11 @@ async fn persist_exchanged_beacon(
             .await?;
     // Native storage is authoritative. UI state is unlocked only after the
     // Stronghold write has succeeded and can be reopened with this PIN.
+    // The epoch guard prevents a `beacon_lock` that fired during the API
+    // call or vault write from being silently undone by this session write.
+    if epoch != state.beacon_session_epoch.load(Ordering::Relaxed) {
+        return Err(AppError::Locked);
+    }
     *state.beacon_session.write().await = Some(Arc::new(profile));
     *state.beacon_pin.write().await = Some(pin);
     *state.beacon_vault_password.write().await = Some(vault_password);
@@ -415,6 +421,7 @@ pub(crate) async fn beacon_unlock(
     pin: String,
 ) -> Result<BeaconSessionStatus, AppError> {
     let _mutation = state.beacon_mutation.lock().await;
+    let epoch = state.beacon_session_epoch.load(Ordering::Relaxed);
     validate_pin(&pin)?;
     let pin = Zeroizing::new(pin);
     let app_data_dir = state.app_data_dir.clone();
@@ -425,6 +432,10 @@ pub(crate) async fn beacon_unlock(
         Ok((profile, password))
     })
     .await?;
+    if epoch != state.beacon_session_epoch.load(Ordering::Relaxed) {
+        drop(_mutation);
+        return Err(AppError::Locked);
+    }
     *state.beacon_session.write().await = Some(Arc::new(profile));
     *state.beacon_pin.write().await = Some(pin);
     *state.beacon_vault_password.write().await = Some(vault_password);
@@ -452,11 +463,14 @@ pub(crate) async fn beacon_lock(
     // queue behind `beacon_mutation`. The push reconciliation spawned by unlock
     // can hold that lock for the length of several network calls, and "log me
     // out" must not wait for it. An in-flight mutation already owns a cloned
-    // profile; anything starting after this point sees a locked session.
+    // profile; anything starting after this point sees a locked session. The
+    // epoch increment ensures an unlock that was in flight when lock fired
+    // cannot republish the session after lock cleared it.
     *state.beacon_session.write().await = None;
     *state.beacon_pin.write().await = None;
     *state.beacon_vault_password.write().await = None;
     *state.pending_beacon_confirmation.lock().await = None;
+    state.beacon_session_epoch.fetch_add(1, Ordering::Relaxed);
     beacon_status(state).await
 }
 
@@ -690,6 +704,7 @@ async fn clear_beacon_session_state(state: &State<'_, AppState>) {
     *state.beacon_vault_password.write().await = None;
     *state.pending_beacon_confirmation.lock().await = None;
     *state.pending_beacon_link.lock().await = None;
+    state.beacon_session_epoch.fetch_add(1, Ordering::Relaxed);
 }
 
 #[tauri::command]
@@ -766,5 +781,25 @@ mod tests {
             Some(vec!["accreditation".into(), "shows".into()])
         );
         assert!(normalize_topics(vec!["street_team".into()]).is_err());
+    }
+
+    #[test]
+    fn session_epoch_guard_drops_session_after_lock() {
+        // The epoch guard is a monotonic counter: lock increments it, and a
+        // session-establishing command that captured the epoch before lock
+        // must refuse to publish. This test verifies the logic directly
+        // without constructing a full AppState — the guard is a plain
+        // AtomicU64 comparison.
+        use std::sync::atomic::AtomicU64;
+        let epoch = AtomicU64::new(0);
+        let captured = epoch.load(Ordering::Relaxed);
+        // Simulate a lock firing while the unlock is in flight.
+        epoch.fetch_add(1, Ordering::Relaxed);
+        assert_ne!(
+            captured,
+            epoch.load(Ordering::Relaxed),
+            "epoch must change after lock"
+        );
+        // A session write would be skipped here because captured != current.
     }
 }

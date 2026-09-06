@@ -25,6 +25,7 @@ pub(crate) async fn fan_unlock(
     pin: String,
 ) -> Result<FanSessionStatus, AppError> {
     let _mutation = state.fan_mutation.lock().await;
+    let epoch = state.fan_session_epoch.load(Ordering::Relaxed);
     validate_pin(&pin)?;
     let app_data_dir = state.app_data_dir.clone();
     let vault_pin = Zeroizing::new(pin);
@@ -35,6 +36,10 @@ pub(crate) async fn fan_unlock(
         Ok((profile, password))
     })
     .await?;
+    if epoch != state.fan_session_epoch.load(Ordering::Relaxed) {
+        drop(_mutation);
+        return Err(AppError::Locked);
+    }
     *state.fan_session.write().await = Some(Arc::new(profile));
     *state.fan_pin.write().await = Some(pin_for_session);
     *state.fan_vault_password.write().await = Some(vault_password);
@@ -79,6 +84,7 @@ pub(crate) async fn fan_lock(state: State<'_, AppState>) -> Result<FanSessionSta
     *state.pending_fan_confirmation.lock().await = None;
     state.wallet_qr_tokens.write().await.clear();
     *state.fan_sections_cache.write().await = None;
+    state.fan_session_epoch.fetch_add(1, Ordering::Relaxed);
     drop(_mutation);
     fan_status(state).await
 }
@@ -127,6 +133,7 @@ pub(crate) async fn fan_delete_account(
     clear_fan_identity_capabilities(&state).await;
     state.wallet_qr_tokens.write().await.clear();
     *state.fan_sections_cache.write().await = None;
+    state.fan_session_epoch.fetch_add(1, Ordering::Relaxed);
 
     // The device FCM token is shared with Staff mode, so the server removes
     // only the fan endpoint association. A failure here leaves an orphaned
@@ -172,6 +179,7 @@ pub(crate) async fn fan_forget(
     clear_fan_identity_capabilities(&state).await;
     state.wallet_qr_tokens.write().await.clear();
     *state.fan_sections_cache.write().await = None;
+    state.fan_session_epoch.fetch_add(1, Ordering::Relaxed);
     let app_data_dir = state.app_data_dir.clone();
     run_blocking(move || vault::remove_fan(&app_data_dir)).await?;
     // The seal outlives the snapshot it opens unless it is dropped with it. A
@@ -199,6 +207,7 @@ async fn persist_confirmed_fan(
     input: FanConfirmationInput,
     credential: FanCredential,
 ) -> Result<(), AppError> {
+    let epoch = state.fan_session_epoch.load(Ordering::Relaxed);
     let (_result, session_token, canonical_email, canonical_name) =
         state.api.fan_confirm(&input).await?;
     let profile = FanProfile {
@@ -266,6 +275,9 @@ async fn persist_confirmed_fan(
             (password, None)
         }
     };
+    if epoch != state.fan_session_epoch.load(Ordering::Relaxed) {
+        return Err(AppError::Locked);
+    }
     *state.fan_session.write().await = Some(Arc::new(profile));
     *state.fan_pin.write().await = session_pin;
     *state.fan_vault_password.write().await = Some(vault_password);

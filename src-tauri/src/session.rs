@@ -23,6 +23,20 @@ fn unix_now() -> u64 {
         .unwrap_or(0)
 }
 
+/// Whether a stored operator profile's session token has passed its expiry.
+///
+/// `operator_profile` uses this to lazily clear an expired session before the
+/// first command that needs it. `session_status` and `launcher_status` use it
+/// to avoid reporting `unlocked: true` / `phase: Active` for a session whose
+/// token is already expired — a one-render overclaim that was possible because
+/// those status commands read `state.session` directly rather than going
+/// through `operator_profile`.
+pub(crate) fn operator_session_expired(profile: &OperatorProfile) -> bool {
+    profile
+        .session_expires_at
+        .is_some_and(|expires_at| expires_at <= unix_now())
+}
+
 /// Runs a CPU/IO-bound closure on the blocking thread pool and converts a
 /// panicked or cancelled task into a plain `AppError` instead of propagating
 /// a panic (see the crate-level panic strategy in
@@ -49,15 +63,25 @@ pub(crate) async fn operator_profile(
     // sending a bearer the server has already invalidated. Lock the session
     // (clear credentials) so the operator is returned to the unlock screen
     // instead of receiving opaque 401s on every subsequent command.
-    if let Some(expires_at) = profile.session_expires_at
-        && expires_at <= unix_now()
-    {
+    if operator_session_expired(profile) {
         drop(session);
-        *state.session.write().await = None;
-        *state.operator_pin.write().await = None;
-        *state.operator_vault_password.write().await = None;
-        *state.show_mode_store.write().await = None;
-        *state.operator_sections_cache.write().await = None;
+        // Re-verify under the write guard: a concurrent `unlock`/`configure`
+        // may have already replaced the expired session with a fresh one. The
+        // epoch increment prevents an in-flight unlock that captured the old
+        // epoch from republishing after this clear.
+        let mut write = state.session.write().await;
+        if let Some(current) = write.as_ref()
+            && operator_session_expired(current)
+        {
+            *write = None;
+            *state.operator_pin.write().await = None;
+            *state.operator_vault_password.write().await = None;
+            *state.show_mode_store.write().await = None;
+            *state.operator_sections_cache.write().await = None;
+            state
+                .operator_session_epoch
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
         return Err(AppError::Locked);
     }
     Ok(profile.clone())
@@ -161,4 +185,48 @@ pub(crate) async fn load_operator_signal_cache(
     })
     .await?;
     Ok((!overview.generated_at.trim().is_empty()).then_some(overview))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{OperatorProfile, OperatorRole};
+
+    fn profile_with_expiry(expires_at: Option<u64>) -> OperatorProfile {
+        OperatorProfile {
+            display_name: "Staff".into(),
+            api_base_url: "https://signal-api.virya.music/v1/".into(),
+            role: OperatorRole::Staff,
+            bearer_token: "token".into(),
+            session_expires_at: expires_at,
+        }
+    }
+
+    #[test]
+    fn operator_session_expired_is_true_for_past_expiry() {
+        let now = unix_now();
+        let profile = profile_with_expiry(Some(now.saturating_sub(1)));
+        assert!(operator_session_expired(&profile));
+    }
+
+    #[test]
+    fn operator_session_expired_is_false_for_future_expiry() {
+        let now = unix_now();
+        let profile = profile_with_expiry(Some(now + 3600));
+        assert!(!operator_session_expired(&profile));
+    }
+
+    #[test]
+    fn operator_session_expired_is_false_for_no_expiry() {
+        let profile = profile_with_expiry(None);
+        assert!(!operator_session_expired(&profile));
+    }
+
+    #[test]
+    fn operator_session_expired_is_true_for_exact_expiry() {
+        let now = unix_now();
+        // `<=` means a token expiring this second is already expired.
+        let profile = profile_with_expiry(Some(now));
+        assert!(operator_session_expired(&profile));
+    }
 }

@@ -11,7 +11,7 @@ use crate::{
         BeaconSessionPhase, BeaconSessionStatus, FanSessionPhase, FanSessionStatus, LauncherStatus,
         OperatorSessionPhase, RequestedCityInput, RequestedCityResult, SessionStatus,
     },
-    session::run_blocking,
+    session::{operator_session_expired, run_blocking},
     validation::clean_optional,
     vault,
 };
@@ -87,7 +87,10 @@ pub(crate) async fn launcher_status(
     // `Locked` for a vault that exists on disk instead of the `Unconfigured`
     // a separately initialised phase field used to claim.
     let operator_configured = vault::exists(&state.app_data_dir);
-    let operator_unlocked = operator_session.is_some();
+    let operator_expired = operator_session
+        .as_ref()
+        .is_some_and(|profile| operator_session_expired(profile.as_ref()));
+    let operator_unlocked = operator_session.is_some() && !operator_expired;
     let fan_configured = vault::fan_exists(&state.app_data_dir);
     let fan_unlocked = fan_session.is_some();
     let beacon_configured = vault::beacon_exists(&state.app_data_dir);
