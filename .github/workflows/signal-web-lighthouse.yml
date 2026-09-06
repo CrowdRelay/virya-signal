@@ -1,11 +1,6 @@
 name: Signal Web Lighthouse Watch
 
 on:
-  workflow_run:
-    workflows: ["Check"]
-    types: [completed]
-  schedule:
-    - cron: "17 4 * * *"
   workflow_dispatch:
 
 permissions:
@@ -202,7 +197,7 @@ jobs:
             artifacts/lighthouse-summary.json
             artifacts/lighthouse-summary.md
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 3
 
       # A doubtful run is not a baseline. Recording one would drag every later
       # comparison toward a number the site never produced.
@@ -213,4 +208,4 @@ jobs:
           name: virya-signal-lighthouse-baseline
           path: artifacts/lighthouse-summary.json
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 3

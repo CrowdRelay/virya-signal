@@ -22,8 +22,6 @@ on:
       - "scripts/check-future-incompat.py"
       - ".github/workflows/security.yml"
   workflow_dispatch:
-  schedule:
-    - cron: "17 5 * * 1"
 
 permissions:
   contents: read

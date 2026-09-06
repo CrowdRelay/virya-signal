@@ -23,7 +23,7 @@ on:
       retention_days:
         required: false
         type: number
-        default: 7
+        default: 3
       signed:
         required: false
         type: boolean

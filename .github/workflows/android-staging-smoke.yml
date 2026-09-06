@@ -1,8 +1,6 @@
 name: Android staging smoke
 
 on:
-  schedule:
-    - cron: "37 2 * * *"
   workflow_dispatch:
 
 permissions:
@@ -21,7 +19,7 @@ jobs:
       build_kind: debug-apk
       version: 0.5.1-staging
       artifact_name: virya-signal-android-staging-smoke
-      retention_days: 7
+      retention_days: 3
       signed: false
       target_arch: x86_64
       e2e_api_base: ${{ vars.VIRYA_SIGNAL_STAGING_API_BASE }}
@@ -149,4 +147,4 @@ jobs:
           name: virya-signal-android-staging-${{ github.run_id }}
           path: artifacts/android-staging
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 3

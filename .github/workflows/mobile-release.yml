@@ -11,22 +11,17 @@ on:
         required: true
         default: 0.5.1
       target:
-        description: Store target. Normal v* tags intentionally release Android only.
+        description: Store target. Normal v* tags release Android only.
         required: true
         type: choice
         default: android
-        options: [android, ios, all]
+        options: [android]
       play_track:
         description: Google Play track
         required: true
         type: choice
         default: internal
         options: [internal, alpha, beta, production]
-      submit_ios_review:
-        description: Submit the uploaded iOS build for App Review
-        required: true
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -71,7 +66,7 @@ jobs:
       version: ${{ needs.meta.outputs.version }}
       android_version_code: ${{ needs.meta.outputs.android_version_code }}
       artifact_name: ${{ needs.meta.outputs.android_artifact }}
-      retention_days: 7
+      retention_days: 3
       signed: true
     secrets: inherit
 
@@ -117,140 +112,6 @@ jobs:
           releaseFiles: promoted/artifacts/virya-signal-${{ needs.meta.outputs.version }}.aab
           track: ${{ inputs.play_track || 'internal' }}
           status: completed
-  ios:
-    if: github.event_name == 'workflow_dispatch' && (inputs.target == 'ios' || inputs.target == 'all')
-    needs: meta
-    name: iOS IPA and App Store Connect
-    runs-on: macos-15
-    timeout-minutes: 120
-    environment:
-      name: ${{ inputs.submit_ios_review && 'production' || 'store-testing' }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Validate Apple secrets
-        env:
-          CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}
-          CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
-          PROVISION: ${{ secrets.IOS_MOBILE_PROVISION }}
-          KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY_BASE64 }}
-        run: |
-          test -n "$CERTIFICATE" || { echo "Missing IOS_CERTIFICATE"; exit 1; }
-          test -n "$CERTIFICATE_PASSWORD" || { echo "Missing IOS_CERTIFICATE_PASSWORD"; exit 1; }
-          test -n "$PROVISION" || { echo "Missing IOS_MOBILE_PROVISION"; exit 1; }
-          test -n "$KEY_ID" || { echo "Missing APPLE_API_KEY_ID"; exit 1; }
-          test -n "$ISSUER" || { echo "Missing APPLE_API_ISSUER"; exit 1; }
-          test -n "$PRIVATE_KEY" || { echo "Missing APPLE_API_PRIVATE_KEY_BASE64"; exit 1; }
-      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c # stable
-        with:
-          toolchain: 1.97.1
-          targets: wasm32-unknown-unknown,aarch64-apple-ios,aarch64-apple-ios-sim
-      - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
-        with:
-          version: "v0.16.0"
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          cache-on-failure: true
-          cache-targets: false
-          shared-key: ios-release
-      - name: Install pinned Tauri tools
-        uses: taiki-e/install-action@ba47c86ac325773530516bb756137ac718732518 # v2
-        with:
-          tool: trunk@0.21.14,tauri-cli@2.11.4
-      - name: Set release version
-        run: python3 scripts/set-release-version.py "${{ needs.meta.outputs.version }}" --build-number "$GITHUB_RUN_NUMBER"
-      - name: Prepare App Store Connect API key
-        env:
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_PRIVATE_KEY_BASE64: ${{ secrets.APPLE_API_PRIVATE_KEY_BASE64 }}
-        run: |
-          umask 077
-          mkdir -p "$HOME/.appstoreconnect/private_keys"
-          KEY_PATH="$HOME/.appstoreconnect/private_keys/AuthKey_${APPLE_API_KEY_ID}.p8"
-          printf '%s' "$APPLE_API_PRIVATE_KEY_BASE64" | base64 --decode > "$KEY_PATH"
-          chmod 600 "$KEY_PATH"
-          echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
-      - name: Generate iOS project
-        run: cargo tauri ios init --ci --skip-targets-install
-      - name: Generate mobile icons
-        run: cargo tauri icon branding/signal-v2.svg --ios-color "#070908"
-      - name: Build signed IPA
-        env:
-          IOS_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}
-          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
-          IOS_MOBILE_PROVISION: ${{ secrets.IOS_MOBILE_PROVISION }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_KEY_PATH: ${{ env.APPLE_API_KEY_PATH }}
-        run: cargo tauri ios build --ci --export-method app-store-connect
-      - name: Collect IPA
-        run: |
-          python3 scripts/collect-mobile-artifact.py ipa "artifacts/virya-${{ needs.meta.outputs.version }}.ipa"
-          echo "IPA_PATH=$GITHUB_WORKSPACE/artifacts/virya-${{ needs.meta.outputs.version }}.ipa" >> "$GITHUB_ENV"
-      - name: Create iOS artifact provenance manifest
-        run: |
-          python3 scripts/artifact_manifest.py create artifacts ios-artifact-manifest.json --source-sha "$GITHUB_SHA"
-          python3 scripts/artifact_manifest.py verify artifacts ios-artifact-manifest.json --source-sha "$GITHUB_SHA"
-      - name: Purge stale artifacts before upload
-        continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t ids < <(gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts?per_page=100" \
-            --jq ".artifacts[] | select(.workflow_run.id != ${GITHUB_RUN_ID}) | select(.created_at < (now - 7200 | strftime(\"%Y-%m-%dT%H:%M:%SZ\"))) | .id" 2>/dev/null || true)
-          for id in "${ids[@]}"; do
-            gh api -X DELETE "repos/${GITHUB_REPOSITORY}/actions/artifacts/${id}" 2>/dev/null || true
-          done
-          echo "Purged ${#ids[@]} stale artifact(s)"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: virya-ios-${{ needs.meta.outputs.version }}
-          path: |
-            artifacts/*
-            ios-artifact-manifest.json
-            scripts/artifact_manifest.py
-          if-no-files-found: error
-          retention-days: 7
-      - name: Upload to TestFlight
-        if: ${{ !inputs.submit_ios_review }}
-        env:
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-        run: xcrun altool --upload-app --type ios --file "$IPA_PATH" --apiKey "$APPLE_API_KEY_ID" --apiIssuer "$APPLE_API_ISSUER"
-      - name: Upload and submit for App Review
-        if: ${{ inputs.submit_ios_review }}
-        env:
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-        run: |
-          gem install fastlane --no-document
-          export APP_STORE_KEY_JSON="$RUNNER_TEMP/app-store-key.json"
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          payload = {
-              "key_id": os.environ["APPLE_API_KEY_ID"],
-              "issuer_id": os.environ["APPLE_API_ISSUER"],
-              "key": Path(os.environ["APPLE_API_KEY_PATH"]).read_text(),
-              "duration": 1200,
-              "in_house": False,
-          }
-          Path(os.environ["APP_STORE_KEY_JSON"]).write_text(json.dumps(payload))
-          PY
-          fastlane deliver \
-            --ipa "$IPA_PATH" \
-            --api_key_path "$APP_STORE_KEY_JSON" \
-            --submit_for_review \
-            --automatic_release \
-            --skip_metadata \
-            --skip_screenshots \
-            --force
-
   github-release:
     name: GitHub release artifacts
     if: startsWith(github.ref, 'refs/tags/v') && needs.android-build.result == 'success'

@@ -13,8 +13,6 @@ on:
         description: "CrowdRelay OpenAPI SHA256 (optional — defaults to current main)"
         required: false
         type: string
-  schedule:
-    - cron: "13 */6 * * *"
 
 permissions:
   contents: write

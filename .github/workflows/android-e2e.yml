@@ -18,7 +18,7 @@ jobs:
       build_kind: debug-apk
       version: 0.5.1-e2e
       artifact_name: virya-signal-android-e2e
-      retention_days: 7
+      retention_days: 3
       signed: false
       target_arch: x86_64
       e2e_api_base: http://10.0.2.2:8787/v1/
@@ -243,4 +243,4 @@ jobs:
           name: virya-signal-android-e2e-report-${{ github.run_id }}
           path: artifacts/android-e2e
           if-no-files-found: warn
-          retention-days: 7
+          retention-days: 3
