@@ -105,8 +105,25 @@ jobs:
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules >/dev/null
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-          test -w /dev/kvm || { echo "::error::/dev/kvm is not writable; the emulator cannot be accelerated" >&2; exit 1; }
-          echo "ANDROID_E2E_KVM=PASS"
+          # `udevadm trigger` queues the event and returns; the permission
+          # change lands afterwards. Testing immediately failed two runs out of
+          # three on identical code, so the job read as "this machine has no
+          # KVM" when it only had not caught up yet. `settle` waits for the
+          # queue, and the loop covers the case where the node is re-created
+          # after it drains. Also chmod directly: the rule is the durable fix,
+          # this is the one that has to work now.
+          sudo udevadm settle --timeout=20 || true
+          for attempt in $(seq 1 10); do
+            if [[ -w /dev/kvm ]]; then
+              echo "ANDROID_E2E_KVM=PASS attempt=${attempt}"
+              exit 0
+            fi
+            sudo chmod 666 /dev/kvm 2>/dev/null || true
+            sleep 2
+          done
+          echo "::error::/dev/kvm is not writable after 10 attempts; the emulator cannot be accelerated" >&2
+          ls -la /dev/kvm 2>&1 || echo "/dev/kvm does not exist"
+          exit 1
       - name: Boot clean Android emulator
         timeout-minutes: 12
         shell: bash

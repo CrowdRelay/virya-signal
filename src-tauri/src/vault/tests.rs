@@ -103,4 +103,66 @@ mod tests {
         assert!(exists(&directory));
         let _ = std::fs::remove_dir_all(directory);
     }
+
+    /// The KDF cost is a security parameter, so a change to it has to be a
+    /// decision rather than a dependency bump. `vault_params` pins the values
+    /// explicitly; this pins them again from the outside so a future default
+    /// change in the `argon2` crate cannot move them quietly.
+    ///
+    /// m = 19 MiB, t = 2, p = 1 is the OWASP interactive-authentication floor.
+    /// Raising it is not free — it is paid on every unlock, on the weakest
+    /// Android device the app supports — and lowering it must never happen by
+    /// accident, which is what this asserts.
+    #[test]
+    fn the_key_derivation_cost_cannot_drift_without_a_decision() {
+        let params = vault_params().expect("vault params must build");
+        assert_eq!(params.m_cost(), 19 * 1024, "Argon2id memory cost in KiB");
+        assert_eq!(params.t_cost(), 2, "Argon2id iterations");
+        assert_eq!(params.p_cost(), 1, "Argon2id parallelism");
+        assert_eq!(params.output_len(), Some(PASSWORD_BYTES));
+        // The snapshot's second stretch is deliberately cheap because the key
+        // handed to it is already Argon2id output. Anything below this stops
+        // being a stretch at all; anything near Stronghold's default of 19
+        // brings back the 512 MiB arena that the low-memory killer noticed.
+        assert!(
+            (8..=12).contains(&SNAPSHOT_WORK_FACTOR),
+            "snapshot work factor {SNAPSHOT_WORK_FACTOR} outside the reasoned range"
+        );
+    }
+
+    /// What one guess costs an offline attacker who has the snapshot.
+    ///
+    /// Ignored because it measures rather than asserts: the number depends on
+    /// the machine, and a threshold here would fail on a busy CI runner for
+    /// reasons that say nothing about the code. Run it deliberately:
+    ///
+    ///   cargo test -p virya-signal --release -- --ignored --nocapture kdf_cost
+    ///
+    /// Read the output against the PIN space it defends. `validate_new_operator_pin`
+    /// accepts 4 to 6 ASCII digits, so the space is 10^4 to 10^6 — 13.3 to 19.9
+    /// bits. Multiply the per-guess cost below by 10_000 to get the wall time
+    /// of an exhaustive 4-digit search on one core, then divide by however many
+    /// cores or GPU lanes the attacker brings.
+    #[test]
+    #[ignore = "benchmark: run deliberately with --ignored --nocapture"]
+    fn kdf_cost_per_guess() {
+        let salt = [7_u8; SALT_BYTES];
+        let started = std::time::Instant::now();
+        const ROUNDS: u32 = 8;
+        for index in 0..ROUNDS {
+            let pin = format!("{:04}", index);
+            password(&pin, &salt).expect("derivation must succeed");
+        }
+        let per_guess = started.elapsed() / ROUNDS;
+        let four_digit = per_guess * 10_000;
+        let six_digit = per_guess * 1_000_000;
+        println!(
+            "VAULT_KDF_COST per_guess={per_guess:?} \
+             exhaustive_4_digit_single_core={four_digit:?} \
+             exhaustive_6_digit_single_core={six_digit:?} \
+             m_cost_kib={} t_cost={}",
+            19 * 1024,
+            2
+        );
+    }
 }
