@@ -154,15 +154,43 @@ class Device:
     def tap_exact_text(self, label: str, *, timeout: float = 15) -> None:
         self.tap_node(self.find_exact_text(label, timeout=timeout))
 
+    def find_field(self, labels: list[str], *, timeout: float = 15) -> Node:
+        """The edit field a label names, or the only one on screen.
+
+        A WebView `EditText` does not always carry its accessible name into the
+        UIAutomator tree: the signup email input has aria-label="E-mail" and a
+        wrapping label, verified in the preview harness, and reached Android
+        with both `text` and `content-desc` empty. Matching on the name alone
+        therefore failed on a screen where the field was plainly visible.
+
+        So: try the name first, because that is the precise answer. Fall back to
+        the single visible edit field, because on a screen with exactly one
+        there is nothing to confuse it with. Refuse to guess when there is more
+        than one — that is the case where picking wrong writes an email address
+        into a PIN box and the failure surfaces somewhere else entirely.
+        """
+        try:
+            return self.find(labels, timeout=timeout, cls_contains="EditText")
+        except JourneyError:
+            fields = [node for node in self.dump() if "edittext" in node.cls.casefold()]
+            if len(fields) == 1:
+                print(
+                    f"[journey] {labels!r} matched no accessible name; "
+                    "using the only edit field on screen",
+                    file=sys.stderr,
+                )
+                return fields[0]
+            raise
+
     def input(self, labels: list[str], value: str, *, timeout: float = 15) -> None:
-        node = self.find(labels, timeout=timeout, cls_contains="EditText")
+        node = self.find_field(labels, timeout=timeout)
         self.tap_node(node)
         shell("input", "keyevent", "KEYCODE_MOVE_END", check=False)
         shell("input", "text", value)
         time.sleep(0.25)
 
     def clear_and_input(self, labels: list[str], value: str, *, timeout: float = 15) -> None:
-        node = self.find(labels, timeout=timeout, cls_contains="EditText")
+        node = self.find_field(labels, timeout=timeout)
         self.tap_node(node)
         shell("input", "keyevent", "KEYCODE_CTRL_A", check=False)
         shell("input", "keyevent", "KEYCODE_DEL", check=False)
