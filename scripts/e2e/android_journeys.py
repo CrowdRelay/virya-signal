@@ -71,7 +71,13 @@ class Device:
         self.step = 0
 
     def dump(self) -> list[Node]:
-        remote = "/sdcard/window.xml"
+        # `/data/local/tmp` rather than `/sdcard`: the shell user owns the
+        # former on every API level, while scoped storage on Android 15 (API 35)
+        # gives `adb shell` a view of `/sdcard` that `uiautomator` cannot write
+        # into. That failed as `cat: /sdcard/window.xml: No such file or
+        # directory` — a missing file standing in for a refused write.
+        remote = "/data/local/tmp/window.xml"
+        shell("rm", "-f", remote, check=False, timeout=15)
         shell("uiautomator", "dump", "--compressed", remote, check=False, timeout=15)
         xml = adb("exec-out", "cat", remote, timeout=15)
         if "<hierarchy" not in xml:
