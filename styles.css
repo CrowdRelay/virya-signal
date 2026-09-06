@@ -167,9 +167,39 @@ button:disabled { opacity: .48; cursor: default; }
 .authenticated { display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
 .topbar { position: sticky; z-index: 20; top: 0; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: max(16px, env(safe-area-inset-top)) 18px 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
 .topbar strong { display: block; margin-top: 4px; font-size: 15px; }
-.topbar-actions { display: flex; align-items: center; gap: 10px; }
+/* The name in the topbar is whatever CrowdRelay returned as the canonical
+   display name, and an unbroken string there used to push the whole flex row
+   sideways: measured at a 320px viewport with a 72-character name, the menu
+   button sat at right: 1248px. The shell clips rather than scrolls, so the
+   button was not merely off-screen, it was unreachable — no menu, no lock, no
+   mode switch. A flex item refuses to shrink below its content by default,
+   which is what `min-width: 0` overrides; `overflow-wrap` then breaks the word
+   instead of the layout, and the actions keep their intrinsic width so the
+   control can never be the thing that gives way. */
+.topbar > div { min-width: 0; }
+.topbar strong, .topbar .eyebrow { overflow-wrap: anywhere; }
+.topbar-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .topbar-actions button { width: 44px; height: 44px; border: 1px solid var(--border-strong); border-radius: var(--control-radius); background: #111; color: #999; font-size: 18px; }
-.role-pill { padding: 7px 10px; border: 1px solid var(--signal-deep); color: var(--signal-hot); font-size: var(--type-micro); font-weight: 900; letter-spacing: .14em; }
+.role-pill { padding: 7px 10px; border: 1px solid var(--signal-deep); color: var(--signal-hot); font-size: var(--type-micro); font-weight: 900; letter-spacing: .14em; overflow-wrap: anywhere; }
+/* Everything below renders a string CrowdRelay chose — a display name, an
+   email, a referral URL, an event title, a coupon code. None of them is
+   guaranteed to contain a space, and a word with no break opportunity is laid
+   out at its full width no matter how narrow the box is. The shell clips
+   instead of scrolling, so the overflow does not show up as a scrollbar; it
+   shows up as content nobody can reach. Measured at 320px with 72-character
+   values, ten elements ran past the viewport and the fan menu button landed at
+   right: 1248px. `min-width: 0` lets the flex/grid children shrink at all,
+   `overflow-wrap: anywhere` decides that the word breaks rather than the
+   layout. */
+.screen-title, .access-card, .settings-row, .hero-card, .fan-coupon,
+.reward-card, .draw-card, .beacon-access-card, .empty-state { min-width: 0; }
+.screen-title h2, .screen-title p, .access-card h2, .access-card h3,
+.access-card p, .hero-card h3, .hero-card p, .settings-row strong,
+.settings-row small, .inline-note, .confirm-hint, .security-note,
+.referral-code-copy, .fan-coupon strong, .reward-card strong, .reward-card p,
+.draw-card strong, .empty-state strong, .empty-state p, .lock-copy {
+  overflow-wrap: anywhere;
+}
 /* Hardening for the scroll column. The bottom-nav jitter itself was already
    cured by moving the nav out of `position: fixed` into this flex column;
    measured in a harness against the real stylesheet, the nav box is identical
@@ -985,7 +1015,11 @@ html[data-virya-scanner-active] .app-shell {
 
 .language-setting { display: grid; gap: 12px; align-items: center; }
 .language-setting p { margin: 4px 0 0; color: var(--muted); font-size: .82rem; line-height: 1.45; }
-.language-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; }
+/* `minmax(0, 1fr)` lets the two buttons shrink to whatever the flex row
+   leaves them, and beside a long label that was 41px each at a 320px
+   viewport — under the 44px touch minimum. 96px is the floor two 44px
+   targets plus the 8px gap actually need. */
+.language-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; min-width: 96px; }
 .language-switch button { min-height: 48px; border-radius: var(--control-radius); border: 1px solid var(--border-strong); background: var(--surface); color: var(--muted); font-weight: 800; letter-spacing: .08em; }
 .language-switch button.active { border-color: var(--signal-hot); background: #93c6c018; color: var(--signal-hot); }
 

@@ -201,7 +201,10 @@ def fan_first_login(d: Device) -> None:
     # still cross the normal Tauri commands.
     if d.exists(["MAM KOD", "I HAVE A CODE"], timeout=3):
         d.tap(["MAM KOD", "I HAVE A CODE"])
-    d.input(["E-mail", "Email"], FAN_EMAIL)
+    # The visible label is the wrapping one; the accessible name is the
+    # aria-label. Accept either, so the journey does not depend on which of
+    # the two Android chose to expose for a WebView edit field.
+    d.input(["E-mail", "Email", "aby zacz", "email to start"], FAN_EMAIL)
     d.input(["Utwórz PIN odblokowania fana", "Create fan unlock PIN"], PIN)
     d.snapshot("fan-confirm-ready")
     d.tap(["SKANUJ QR", "SCAN QR"], timeout=10)
@@ -213,7 +216,10 @@ def fan_recovery_qr(d: Device) -> None:
     relaunch()
     d.assert_text(["VIRYA SIGNAL"], timeout=25)
     d.tap(["NIE PAMIĘTAM PIN-U", "I FORGOT MY PIN", "SIGN IN AGAIN"], timeout=10)
-    d.input(["E-mail", "Email"], FAN_EMAIL)
+    # The visible label is the wrapping one; the accessible name is the
+    # aria-label. Accept either, so the journey does not depend on which of
+    # the two Android chose to expose for a WebView edit field.
+    d.input(["E-mail", "Email", "aby zacz", "email to start"], FAN_EMAIL)
     d.input(["Utwórz PIN odblokowania fana", "Create fan unlock PIN"], "3690")
     d.snapshot("fan-recovery-ready")
     d.tap(["SKANUJ QR", "SCAN QR"], timeout=10)
