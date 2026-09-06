@@ -680,8 +680,8 @@ for wrapper_name in ['mobile-smoke.yml', 'android-release-apk.yml', 'android-pla
     wrapper = (root / '.github/workflows' / wrapper_name).read_text()
     if 'uses: ./.github/workflows/_android-build.yml' not in wrapper:
         raise SystemExit(f'{wrapper_name} bypasses the canonical reusable Android builder')
-if 'target:' not in (root / '.github/workflows/mobile-release.yml').read_text() or "github.event_name == 'workflow_dispatch'" not in (root / '.github/workflows/mobile-release.yml').read_text():
-    raise SystemExit('mobile store release must gate iOS behind an explicit manual target')
+if 'target:' not in (root / '.github/workflows/mobile-release.yml').read_text() or 'workflow_dispatch:' not in (root / '.github/workflows/mobile-release.yml').read_text():
+    raise SystemExit('mobile store release must require a manual dispatch target')
 # A promotion job must verify the exact downloaded artifact, and the verifier
 # has to come from the checkout rather than from the bundle. The artifact ships
 # its own copy of `scripts/artifact_manifest.py`, and that copy is beside the
