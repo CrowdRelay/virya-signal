@@ -1013,7 +1013,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "Zaproś 1–3 osoby, które faktycznie słuchają ciężkiej muzyki albo są częścią sceny. Bez spamu — liczy się zaufanie."
         }
         "virya_signal_share_copy" => {
-            "VIRYA gra i buduje Signal dla ludzi sceny. Jeśli czujesz, że to dla Ciebie albo kogoś z Twoich ludzi, wejdź tutaj:"
+            "VIRYA gra i buduje Signal dla ludzi sceny. Jeśli czujesz, że to dla Ciebie albo kogoś z Twoich ludzi, pobierz aplikację:"
         }
         "share_signal" => "UDOSTĘPNIJ SYGNAŁ",
         "signal_shared" => "Sygnał poszedł dalej.",

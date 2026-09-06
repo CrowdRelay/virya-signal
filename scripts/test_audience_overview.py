@@ -43,7 +43,7 @@ class AudienceOverviewContract(unittest.TestCase):
         bridge = read_rust_module(ROOT, "src/bridge.rs")
         ffi = (ROOT / "src/bridge/ffi.rs").read_text()
         self.assertIn("bridge::referral_code_from_location().unwrap_or_default()", fan)
-        self.assertIn("https://www.virya.music/r/{referral_code}", shell)
+        self.assertIn("https://play.google.com/store/apps/details?id=music.virya.signal&referrer={referral_code}", shell)
         self.assertIn("bridge::share_text", shell)
         self.assertIn("window.navigator?.share", ffi)
         self.assertIn("window.navigator?.clipboard?.writeText", ffi)

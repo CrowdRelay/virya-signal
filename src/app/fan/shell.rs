@@ -738,7 +738,7 @@ fn FanSignal(
         if referral_code.is_empty() {
             return;
         }
-        let url = format!("https://www.virya.music/r/{referral_code}");
+        let url = format!("https://play.google.com/store/apps/details?id=music.virya.signal&referrer={referral_code}");
         share_status.set(None);
         spawn_local(async move {
             // Silent: the fan can tap the copy button again.
@@ -756,7 +756,7 @@ fn FanSignal(
                 let draw_count = referral.draw_entries.len();
                 let referral_code = referral.referral_code.clone();
                 let share_url = (!referral_code.trim().is_empty()).then(|| {
-                    format!("https://www.virya.music/r/{referral_code}")
+                    format!("https://play.google.com/store/apps/details?id=music.virya.signal&referrer={referral_code}")
                 });
                 let draws = referral.draw_entries;
                 let coupons = referral.coupons;

@@ -253,7 +253,7 @@ class UiAsyncStabilityContracts(unittest.TestCase):
         self.assertIn("fan-event-detail", events)
         self.assertIn("referral-code-copy", shell)
         self.assertIn("bridge::copy_text(&url)", shell)
-        self.assertIn('format!("https://www.virya.music/r/{referral_code}")', shell)
+        self.assertIn('format!("https://play.google.com/store/apps/details?id=music.virya.signal&referrer={referral_code}")', shell)
 
 
     def test_resume_refresh_does_not_unmount_authenticated_trees(self) -> None:

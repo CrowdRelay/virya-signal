@@ -1013,7 +1013,7 @@ pub(super) fn text(key: &'static str) -> &'static str {
             "Invite 1–3 people who actually listen to heavy music or are part of the scene. No spam — trust is the point."
         }
         "virya_signal_share_copy" => {
-            "VIRYA is building Signal for people in the scene. If this feels like your thing, or someone in your circle would care, enter here:"
+            "VIRYA is building Signal for people in the scene. If this feels like your thing, or someone in your circle would care, get the app:"
         }
         "share_signal" => "SHARE SIGNAL",
         "signal_shared" => "Signal carried forward.",
