@@ -34,6 +34,12 @@ jobs:
     env:
       ANDROID_API: "35"
       AVD_NAME: virya-signal-e2e
+      # avdmanager and the emulator each pick an AVD directory from their own
+      # precedence list ($ANDROID_AVD_HOME, then $ANDROID_SDK_HOME/avd, then
+      # $HOME/.android/avd). With none of them set, avdmanager reported success
+      # and the emulator then refused with "Unknown AVD name" — the two tools
+      # had chosen differently. Naming the directory once removes the guess.
+      ANDROID_AVD_HOME: ${{ github.workspace }}/.android-avd
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v7.0.1
@@ -59,11 +65,20 @@ jobs:
             "emulator" \
             "platforms;android-${ANDROID_API}" \
             "system-images;android-${ANDROID_API};google_apis;x86_64"
+          mkdir -p "${ANDROID_AVD_HOME}"
           echo no | avdmanager create avd \
             --force \
             --name "${AVD_NAME}" \
             --package "system-images;android-${ANDROID_API};google_apis;x86_64" \
             --device "pixel_6"
+          # avdmanager exits 0 whether or not the emulator will later find what
+          # it wrote. Prove the descriptor is where the boot step will look.
+          test -f "${ANDROID_AVD_HOME}/${AVD_NAME}.ini" || {
+            echo "::error::avdmanager reported success but ${ANDROID_AVD_HOME}/${AVD_NAME}.ini does not exist" >&2
+            ls -la "${ANDROID_AVD_HOME}" "${HOME}/.android/avd" 2>/dev/null || true
+            exit 1
+          }
+          echo "ANDROID_E2E_AVD=PASS home=${ANDROID_AVD_HOME}"
           # sdkmanager installs the emulator under $ANDROID_HOME/emulator, and
           # setup-android only exports cmdline-tools and platform-tools. A bare
           # `emulator` therefore resolved to nothing, and because `nohup`
